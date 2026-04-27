@@ -618,6 +618,152 @@
     color: #5580a8;
     margin-top: 1px;
   }
+  /* ══════════════════════════════════════════════════════
+     RESPONSIVE MOBILE  (≤ 768px)
+  ══════════════════════════════════════════════════════ */
+  @media (max-width: 768px) {
+
+    /* ── Hide topbar, action panel, tool panel, status bar ── */
+    .topbar        { display: none !important; }
+    .action-panel  { display: none !important; }
+    .tool-panel    { display: none !important; }
+    .statusbar     { display: none !important; }
+
+    /* ── Main fills full screen ── */
+    body { overflow: hidden; }
+    .app { height: 100dvh; }
+
+    /* ── Right panel: overlay from right ── */
+    .right-panel {
+      position: fixed !important;
+      top: 0; right: 0; bottom: 0;
+      width: min(300px, 90vw) !important;
+      z-index: 1000;
+      transform: translateX(100%);
+      transition: transform 0.25s ease;
+      box-shadow: -4px 0 24px rgba(0,0,0,0.45);
+    }
+    .right-panel.mobile-open  { transform: translateX(0); }
+    .right-panel.collapsed    { transform: translateX(100%) !important; }
+
+    /* Backdrop */
+    #mobile-backdrop {
+      display: none; position: fixed; inset: 0; z-index: 999;
+      background: rgba(0,0,0,0.45);
+    }
+    #mobile-backdrop.visible { display: block; }
+
+    /* ── Hide desktop panel toggle ── */
+    #panel-toggle-btn { display: none !important; }
+
+    /* ── Canvas fills everything ── */
+    .canvas-wrap  { flex: 1 !important; }
+
+    /* ── Mobile floating toolbar (bottom) ── */
+    #mob-toolbar {
+      display: flex !important;
+    }
+
+    /* ── 3D modal header: scroll strip ── */
+    #modal-3d-header {
+      overflow-x: auto; overflow-y: hidden;
+      flex-wrap: nowrap !important;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      padding: 6px 8px;
+    }
+    #modal-3d-header::-webkit-scrollbar { display: none; }
+    #modal-3d-header > * { flex-shrink: 0; }
+    #d3-btn-close {
+      position: sticky; right: 0;
+      background: #161b22 !important;
+      box-shadow: -8px 0 12px #161b22;
+      z-index: 10;
+    }
+    /* 3D modal full screen */
+    #modal-3d > div {
+      width: 100vw !important;
+      height: 100dvh !important;
+      border-radius: 0 !important;
+      max-width: 100vw !important;
+    }
+    #canvas-3d { height: calc(100dvh - 90px) !important; }
+  }
+
+  /* ── Mobile floating toolbar (hidden on desktop) ── */
+  #mob-toolbar {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 800;
+    background: rgba(22,27,34,0.97);
+    border-top: 1px solid #30363d;
+    padding: 6px 8px;
+    gap: 4px;
+    align-items: center;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  #mob-toolbar::-webkit-scrollbar { display: none; }
+  .mob-btn {
+    flex-shrink: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1px;
+    min-width: 52px; height: 52px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #94a3b8;
+    font-size: 10px; font-weight: 600;
+    user-select: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.12s, color 0.12s;
+  }
+  .mob-btn:active, .mob-btn.active {
+    background: rgba(96,165,250,0.2);
+    border-color: #60a5fa; color: #60a5fa;
+  }
+  .mob-btn.danger { color: #ef4444; border-color: rgba(239,68,68,0.3); }
+  .mob-btn.danger:active { background: rgba(239,68,68,0.2); }
+  /* Extra overlay buttons */
+  .mob-xbtn {
+    display: flex; align-items: center; justify-content: center;
+    padding: 6px 10px; min-width: 44px; height: 34px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid #30363d; border-radius: 6px;
+    cursor: pointer; color: #94a3b8;
+    font-size: 12px; font-weight: 600;
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    transition: background 0.1s;
+  }
+  .mob-xbtn.active { background: rgba(96,165,250,0.2); border-color: #60a5fa; color: #60a5fa; }
+  .mob-xbtn:active { opacity: 0.7; }
+  .mob-sep {
+    flex-shrink: 0; width: 1px; height: 36px;
+    background: #30363d; margin: 0 2px;
+  }
+  /* Mobile HUD overlay (status info on canvas) */
+  #mob-hud {
+    display: none;
+    position: fixed;
+    top: 6px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10,20,40,0.82);
+    border: 1px solid #30363d;
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-family: var(--mono); font-size: 11px;
+    color: #94a3b8;
+    z-index: 799;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  @media (max-width: 768px) {
+    #mob-hud { display: block; }
+  }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -701,6 +847,10 @@
       </svg>
       <span style="font-size:10px;font-weight:600">Selec.</span>
     </button>
+    <button class="tbtn tb-act" id="btn-pan-2d" onclick="toggle2DPan()" data-tip="Modo mano — arrastrar para mover el canvas (útil en móvil)">
+      <span style="font-size:14px;line-height:1;">✋</span>
+      <span style="font-size:10px;font-weight:600">Pan</span>
+    </button>
     <button class="tbtn tb-act disabled" id="act-mover"  onclick="activarMover()"    data-tip="Mover selección">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/>
@@ -751,6 +901,8 @@
 
 <!-- ═══════════════════ MAIN ═══════════════════ -->
 <div class="main">
+  <!-- Mobile backdrop (closes right panel on tap) -->
+  <div id="mobile-backdrop" onclick="closeMobilePanel(); document.getElementById('mob-extra')&&(document.getElementById('mob-extra').style.display='none')"></div>
 
   <!-- Panel izquierdo fusionado: resultados + acciones -->
   <div class="action-panel">
@@ -1006,7 +1158,7 @@
 
   <!-- Canvas principal -->
   <div class="canvas-wrap" id="wrap">
-    <canvas id="cv"></canvas>
+    <canvas id="cv" style="touch-action:none;"></canvas>
     <div class="canvas-hint" id="hint">Modo nudo — clic para agregar</div>
     <div class="canvas-coords" id="coords">x: 0.00  y: 0.00</div>
     <!-- Leyenda de combos flotante en canvas -->
@@ -1936,6 +2088,7 @@ let mode = 'select';
 let pendNudo = null;
 let zoom = 60;
 let panX = 0, panY = 0;
+let panMode2D = false; // mode: drag canvas to pan
 let isPanning = false, lastPan = null;
 
 // Ortogonal y Snap — activos por defecto
@@ -2437,11 +2590,12 @@ cv.addEventListener('mousemove', e => {
 });
 
 cv.addEventListener('mousedown', e => {
-  // Pan con Alt o botón medio
-  if (e.button === 1 || (e.button === 0 && e.altKey)) {
+  // Pan con Alt, botón medio, o modo Pan activo
+  if (e.button === 1 || (e.button === 0 && e.altKey) || (e.button === 0 && panMode2D)) {
     isPanning = true;
     const r = cv.getBoundingClientRect();
     lastPan = { x: e.clientX - r.left, y: e.clientY - r.top };
+    if (panMode2D) cv.style.cursor = 'grabbing';
     e.preventDefault();
     return;
   }
@@ -2521,7 +2675,107 @@ cv.addEventListener('mouseup', e => {
   }
   if (e.button === 0 && mode === 'mover') moverMouseUp();
   isPanning = false; lastPan = null;
+  if (panMode2D) cv.style.cursor = 'grab';
 });
+
+// ── Touch support for 2D canvas ─────────────────────────────
+{
+  let t2d = {}, lastPinch2d = null;
+  let tapStart = null, tapMoved = false;
+  const TAP_MOVE_THRESHOLD = 8; // px
+
+  cv.addEventListener('touchstart', e=>{
+    e.preventDefault();
+    tapMoved = false;
+    [...e.changedTouches].forEach(t=>{ t2d[t.identifier]={x:t.clientX,y:t.clientY}; });
+
+    if (e.touches.length === 2) {
+      const t0=e.touches[0], t1=e.touches[1];
+      lastPinch2d = Math.hypot(t1.clientX-t0.clientX, t1.clientY-t0.clientY);
+    } else if (e.touches.length === 1) {
+      tapStart = {x: e.touches[0].clientX, y: e.touches[0].clientY};
+      // Fire mousemove so cursor tracking works
+      const r = cv.getBoundingClientRect();
+      const mx = tapStart.x - r.left, my = tapStart.y - r.top;
+      cursorCanvas = {x:mx, y:my};
+      cursorMundo  = { x: (mx - panX) / zoom, y: -(my - panY) / zoom };
+    }
+  },{passive:false});
+
+  cv.addEventListener('touchmove', e=>{
+    e.preventDefault();
+    const r = cv.getBoundingClientRect();
+
+    if (e.touches.length === 1) {
+      const t    = e.touches[0];
+      const prev = t2d[t.identifier] || {x:t.clientX,y:t.clientY};
+      const dx = t.clientX-prev.x, dy = t.clientY-prev.y;
+
+      if (tapStart && Math.hypot(t.clientX-tapStart.x, t.clientY-tapStart.y) > TAP_MOVE_THRESHOLD) {
+        tapMoved = true;
+      }
+
+      if (panMode2D) {
+        panX += dx; panY += dy; draw();
+      } else {
+        // Update cursor for drawing preview
+        const mx = t.clientX - r.left, my = t.clientY - r.top;
+        cursorCanvas = {x:mx, y:my};
+        cursorMundo  = { x: (mx - panX) / zoom, y: -(my - panY) / zoom };
+        draw();
+      }
+      t2d[t.identifier] = {x:t.clientX, y:t.clientY};
+
+    } else if (e.touches.length === 2) {
+      const t0=e.touches[0], t1=e.touches[1];
+      const dist = Math.hypot(t1.clientX-t0.clientX, t1.clientY-t0.clientY);
+      tapMoved = true;
+
+      if (lastPinch2d && dist > 0) {
+        const midX=(t0.clientX+t1.clientX)/2-r.left;
+        const midY=(t0.clientY+t1.clientY)/2-r.top;
+        const factor = dist/lastPinch2d;
+        panX = midX+(panX-midX)*factor;
+        panY = midY+(panY-midY)*factor;
+        zoom = Math.max(10, Math.min(zoom*factor, 5000));
+      }
+      lastPinch2d = dist;
+
+      const midX=(t0.clientX+t1.clientX)/2, midY=(t0.clientY+t1.clientY)/2;
+      const p0x=((t2d[t0.identifier]||t0).x+(t2d[t1.identifier]||t1).x)/2;
+      const p0y=((t2d[t0.identifier]||t0).y+(t2d[t1.identifier]||t1).y)/2;
+      panX += midX-p0x; panY += midY-p0y;
+      t2d[t0.identifier]={x:t0.clientX,y:t0.clientY};
+      t2d[t1.identifier]={x:t1.clientX,y:t1.clientY};
+      draw();
+    }
+  },{passive:false});
+
+  cv.addEventListener('touchend', e=>{
+    e.preventDefault();
+    const r = cv.getBoundingClientRect();
+    [...e.changedTouches].forEach(t=>delete t2d[t.identifier]);
+    if (e.touches.length < 2) lastPinch2d = null;
+
+    // Single tap without significant movement = synthetic click
+    if (!tapMoved && tapStart && e.changedTouches.length === 1) {
+      const t  = e.changedTouches[0];
+      const cx = t.clientX - r.left;
+      const cy = t.clientY - r.top;
+      // Update cursor world position
+      cursorCanvas = {x:cx, y:cy};
+      cursorMundo  = { x: (cx - panX) / zoom, y: -(cy - panY) / zoom };
+      // Fire the click handler directly
+      cv.dispatchEvent(new MouseEvent('click', {
+        bubbles: true, cancelable: true,
+        clientX: t.clientX, clientY: t.clientY,
+        button: 0, buttons: 0,
+        view: window
+      }));
+    }
+    tapStart = null;
+  },{passive:false});
+}
 
 cv.addEventListener('mouseleave', () => {
   document.getElementById('info-bar').style.display = 'none';
@@ -7683,32 +7937,52 @@ function _applyOrbit3D() {
   _3d.camera.lookAt(new THREE.Vector3(o.tx, o.ty, 0));
 }
 
+let _3dPanMode = false; // when true, left drag = pan instead of rotate
+
+function toggle3DPanMode() {
+  _3dPanMode = !_3dPanMode;
+  const btn = document.getElementById('d3-btn-pan');
+  if (btn) {
+    btn.style.background  = _3dPanMode ? 'rgba(148,163,184,0.35)' : 'rgba(148,163,184,0.12)';
+    btn.style.borderColor = _3dPanMode ? '#94a3b8' : 'rgba(148,163,184,0.4)';
+    btn.style.boxShadow   = _3dPanMode ? '0 0 8px #94a3b888' : 'none';
+    btn.style.color       = _3dPanMode ? '#e2e8f0' : '#94a3b8';
+    // Change canvas cursor
+    const canvas = document.getElementById('canvas-3d');
+    if (canvas) canvas.style.cursor = _3dPanMode ? 'grab' : 'default';
+  }
+}
+
 function setup3DControls(canvas) {
   let drag=false, btn=0, last={x:0,y:0};
 
   canvas.addEventListener('mousedown', e=>{
-    drag=true; btn=e.button; last={x:e.clientX,y:e.clientY}; e.preventDefault();
+    drag=true; btn=e.button; last={x:e.clientX,y:e.clientY};
+    if (_3dPanMode && btn===0) canvas.style.cursor='grabbing';
+    e.preventDefault();
   });
-  window.addEventListener('mouseup', ()=>drag=false);
+  window.addEventListener('mouseup', ()=>{
+    drag=false;
+    if (_3dPanMode) canvas.style.cursor='grab';
+  });
 
   canvas.addEventListener('mousemove', e=>{
     if (!drag||!_3d) return;
     const dx=e.clientX-last.x, dy=e.clientY-last.y;
     last={x:e.clientX,y:e.clientY};
     const o=_3d.orbit;
-    if (btn===0) {
-      // Izquierdo: rotar
+    const isPan = btn===1 || btn===2 || (btn===0 && _3dPanMode);
+    if (!isPan) {
+      // Rotate
       o.theta -= dx*0.007;
       o.phi = Math.max(0.05, Math.min(Math.PI-0.05, o.phi+dy*0.007));
-    } else if (btn===1 || btn===2) {
-      // Central o derecho: pan
+    } else {
+      // Pan in camera plane
       const s = o.radius*0.0012;
-      // Mover en el plano de la cámara
       const cam = _3d.camera;
       const right = new THREE.Vector3();
-      const up    = new THREE.Vector3();
       right.crossVectors(cam.getWorldDirection(new THREE.Vector3()), cam.up).normalize();
-      up.copy(cam.up).normalize();
+      const up = cam.up.clone().normalize();
       o.tx -= right.x*dx*s + up.x*(-dy*s);
       o.ty -= right.y*dx*s + up.y*(-dy*s);
     }
@@ -7723,32 +7997,177 @@ function setup3DControls(canvas) {
     _applyOrbit3D(); e.preventDefault();
   },{passive:false});
 
-  // Soporte táctil básico (pinch zoom)
-  let touches={};
+  // ── Touch: 1 finger = rotate (or pan if panMode), 2 fingers = pinch zoom + pan ──
+  let touches = {};
+  let lastPinchDist = null;
+
   canvas.addEventListener('touchstart', e=>{
-    [...e.changedTouches].forEach(t=>{ touches[t.identifier]={x:t.clientX,y:t.clientY}; });
-    e.preventDefault();
-  },{passive:false});
-  canvas.addEventListener('touchmove', e=>{
-    if (!_3d) return;
-    const ids=Object.keys(touches);
-    if (e.touches.length===1 && ids.length===1) {
-      const t=e.touches[0], prev=touches[t.identifier]||{x:t.clientX,y:t.clientY};
-      const dx=t.clientX-prev.x, dy=t.clientY-prev.y;
-      _3d.orbit.theta -= dx*0.007;
-      _3d.orbit.phi = Math.max(0.05, Math.min(Math.PI-0.05, _3d.orbit.phi+dy*0.007));
-      touches[t.identifier]={x:t.clientX,y:t.clientY};
-      _applyOrbit3D();
+    [...e.changedTouches].forEach(t=>{
+      touches[t.identifier] = {x:t.clientX, y:t.clientY};
+    });
+    if (e.touches.length === 2) {
+      const t0=e.touches[0], t1=e.touches[1];
+      lastPinchDist = Math.hypot(t1.clientX-t0.clientX, t1.clientY-t0.clientY);
     }
     e.preventDefault();
   },{passive:false});
+
+  canvas.addEventListener('touchmove', e=>{
+    if (!_3d) return;
+    e.preventDefault();
+
+    if (e.touches.length === 1) {
+      // Single finger
+      const t    = e.touches[0];
+      const prev = touches[t.identifier] || {x:t.clientX, y:t.clientY};
+      const dx   = t.clientX - prev.x;
+      const dy   = t.clientY - prev.y;
+      const o    = _3d.orbit;
+      if (_3dPanMode) {
+        // Pan
+        const s = o.radius * 0.002;
+        const cam = _3d.camera;
+        const right = new THREE.Vector3();
+        right.crossVectors(cam.getWorldDirection(new THREE.Vector3()), cam.up).normalize();
+        const up = cam.up.clone().normalize();
+        o.tx -= right.x*dx*s + up.x*(-dy*s);
+        o.ty -= right.y*dx*s + up.y*(-dy*s);
+      } else {
+        // Rotate
+        o.theta -= dx*0.007;
+        o.phi = Math.max(0.05, Math.min(Math.PI-0.05, o.phi+dy*0.007));
+      }
+      touches[t.identifier] = {x:t.clientX, y:t.clientY};
+      _applyOrbit3D();
+
+    } else if (e.touches.length === 2) {
+      // Two fingers: pinch zoom + pan
+      const t0=e.touches[0], t1=e.touches[1];
+      const dist = Math.hypot(t1.clientX-t0.clientX, t1.clientY-t0.clientY);
+      const o = _3d.orbit;
+
+      if (lastPinchDist) {
+        // Zoom from pinch
+        const scale = lastPinchDist / dist;
+        o.radius = Math.max(0.5, o.radius * scale);
+      }
+      lastPinchDist = dist;
+
+      // Pan from 2-finger drag (midpoint movement)
+      const midX = (t0.clientX+t1.clientX)/2;
+      const midY = (t0.clientY+t1.clientY)/2;
+      const prevMid = {
+        x: ((touches[t0.identifier]||t0).x + (touches[t1.identifier]||t1).x)/2,
+        y: ((touches[t0.identifier]||t0).y + (touches[t1.identifier]||t1).y)/2,
+      };
+      const dx = midX - prevMid.x, dy = midY - prevMid.y;
+      const s = o.radius * 0.0015;
+      const cam = _3d.camera;
+      const right = new THREE.Vector3();
+      right.crossVectors(cam.getWorldDirection(new THREE.Vector3()), cam.up).normalize();
+      const up = cam.up.clone().normalize();
+      o.tx -= right.x*dx*s + up.x*(-dy*s);
+      o.ty -= right.y*dx*s + up.y*(-dy*s);
+
+      touches[t0.identifier] = {x:t0.clientX, y:t0.clientY};
+      touches[t1.identifier] = {x:t1.clientX, y:t1.clientY};
+      _applyOrbit3D();
+    }
+  },{passive:false});
+
   canvas.addEventListener('touchend', e=>{
     [...e.changedTouches].forEach(t=>delete touches[t.identifier]);
+    if (e.touches.length < 2) lastPinchDist = null;
   });
 }
 
-function toggleRightPanel() {
+function toggle2DPan() {
+  panMode2D = !panMode2D;
+  const btn = document.getElementById('btn-pan-2d');
+  if (btn) {
+    btn.classList.toggle('active', panMode2D);
+    btn.style.borderColor = panMode2D ? '#22c55e' : '';
+    btn.style.color       = panMode2D ? '#22c55e' : '';
+  }
+  cv.style.cursor = panMode2D ? 'grab' : '';
+  if (panMode2D) setMsg('Modo Pan activo — arrastra para mover el canvas');
+  else           setMsg('Modo Pan desactivado');
+}
 
+function isMobile() { return window.innerWidth <= 768; }
+
+function openMobilePanel() {
+  const panel = document.getElementById('right-panel');
+  const backdrop = document.getElementById('mobile-backdrop');
+  if (panel)    panel.classList.add('mobile-open');
+  if (backdrop) backdrop.classList.add('visible');
+}
+
+function closeMobilePanel() {
+  const panel = document.getElementById('right-panel');
+  const backdrop = document.getElementById('mobile-backdrop');
+  if (panel)    panel.classList.remove('mobile-open');
+  if (backdrop) backdrop.classList.remove('visible');
+}
+
+function mobHighlight(id) {
+  document.querySelectorAll('.mob-btn').forEach(b => b.classList.remove('active'));
+  const el = document.getElementById('mob-'+id);
+  if (el) el.classList.add('active');
+}
+
+// For panel-dependent tools: activate mode + open right panel on mobile
+function mobPanel(mode, mobId) {
+  setMode(mode);
+  mobHighlight(mobId);
+  if (isMobile()) openMobilePanel();
+}
+
+function toggleMobExtra() {
+  const el = document.getElementById('mob-extra');
+  const btn = document.getElementById('mob-extra-btn');
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (btn) btn.classList.toggle('active', !open);
+  if (!open) mobXSync();
+}
+
+function mobXSync() {
+  // Sync active state of toggle buttons in extra panel
+  const map = {
+    'mob-tog-def':'def','mob-tog-mom':'mom','mob-tog-cor':'cor',
+    'mob-tog-axi':'axi','mob-tog-rea':'rea'
+  };
+  Object.entries(map).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('active', !!vis[key]);
+  });
+  const xo = document.getElementById('mob-xortog');
+  const xs = document.getElementById('mob-xsnap');
+  if (xo) xo.classList.toggle('active', ortogonalActivo);
+  if (xs) xs.classList.toggle('active', snapActivo);
+}
+
+function updateMobHUD() {
+  const mn = document.getElementById('mob-n');
+  const mb = document.getElementById('mob-b');
+  const ma = document.getElementById('mob-a');
+  if (mn) mn.textContent = nudos.length;
+  if (mb) mb.textContent = barras.length;
+  if (ma) ma.textContent = apoyos.length;
+}
+
+function toggleRightPanel() {
+  if (isMobile()) {
+    // Mobile: toggle overlay panel
+    const panel = document.getElementById('right-panel');
+    const isOpen = panel.classList.contains('mobile-open');
+    if (isOpen) closeMobilePanel();
+    else        openMobilePanel();
+    return;
+  }
+  // Desktop: collapse/expand
   const panel = document.getElementById('right-panel');
   const btn   = document.getElementById('panel-toggle-btn');
   const collapsed = panel.classList.toggle('collapsed');
@@ -7761,7 +8180,6 @@ function toggleRightPanel() {
     btn.style.right = '260px';
     btn.setAttribute('data-tip', 'Ocultar panel derecho');
   }
-  // Redimensionar canvas
   setTimeout(resize, 220);
 }
 
@@ -8097,6 +8515,7 @@ function updateStatus() {
   document.getElementById('st-b').textContent = barras.length;
   document.getElementById('st-a').textContent = apoyos.length;
   document.getElementById('st-c').textContent = cargas.length;
+  updateMobHUD();
 }
 
 function zoomIn() {
@@ -8455,7 +8874,7 @@ function aplicarComboACargas(cargasOrig, cargasDistOrig) {
   </div>
   <div class="field">
     <label style="font-size:12px; color:var(--muted);">URL del servidor</label>
-    <input id="api-url" value="https://porticad-backend-production.up.railway.app" style="font-family:var(--mono); font-size:13px;" />
+    <input id="api-url" value="http://localhost:8000" style="font-family:var(--mono); font-size:13px;" />
   </div>
 </div>
 <!-- Modal para nombre de archivo -->
@@ -8498,7 +8917,7 @@ function aplicarComboACargas(cargasOrig, cargasDistOrig) {
     box-shadow:0 20px 60px rgba(0,0,0,0.7);">
 
     <!-- Header -->
-    <div style="display:flex; align-items:center; justify-content:space-between;
+    <div id="modal-3d-header" style="display:flex; align-items:center; justify-content:space-between;
       padding:10px 16px; border-bottom:1px solid #21262d; background:#161b22;">
       <div style="display:flex; align-items:center; gap:12px;">
         <span style="color:#58a6ff; font-weight:700; font-size:14px;">⬛ Vista 3D — Estructura</span>
@@ -8521,6 +8940,14 @@ function aplicarComboACargas(cargasOrig, cargasDistOrig) {
           <option value="wood">Madera</option>
           <option value="color">Colores</option>
         </select>
+        <!-- Pan mode toggle for mobile -->
+        <button id="d3-btn-pan" onclick="toggle3DPanMode()"
+          data-tip="Modo mano: arrastrar para mover cámara"
+          style="font-size:13px; padding:3px 10px; background:rgba(148,163,184,0.12);
+                 border:1px solid rgba(148,163,184,0.4); color:#94a3b8; border-radius:50px;
+                 cursor:pointer; font-weight:700; transition:all 0.15s; user-select:none;">
+          ✋ Pan
+        </button>
         <button onclick="resetCamera3D()"
           style="font-size:11px; padding:3px 10px; background:rgba(88,166,255,0.15);
                  border:1px solid #388bfd; color:#58a6ff; border-radius:4px; cursor:pointer;">
@@ -8564,7 +8991,7 @@ function aplicarComboACargas(cargasOrig, cargasDistOrig) {
           <input id="d3-diag-scale" type="range" min="0.05" max="2" step="0.05" value="0.4"
             style="width:70px;" oninput="build3DScene()" title="Escala diagramas"/>
         </div>
-        <button onclick="cerrar3D()"
+        <button id="d3-btn-close" onclick="cerrar3D()"
           style="font-size:13px; padding:3px 10px; background:rgba(248,81,73,0.15);
                  border:1px solid #f85149; color:#f85149; border-radius:4px; cursor:pointer;">
           ✕
@@ -8581,6 +9008,139 @@ function aplicarComboACargas(cargasOrig, cargasDistOrig) {
       padding:7px 12px; font-family:Consolas,monospace; font-size:12px; color:#e6edf3;
       white-space:nowrap; z-index:200; line-height:1.7; box-shadow:0 4px 16px rgba(0,0,0,0.5);">
     </div>
+  </div>
+</div>
+<!-- Mobile HUD (status bar replacement) -->
+<div id="mob-hud">N:<b id="mob-n">0</b> B:<b id="mob-b">0</b> A:<b id="mob-a">0</b></div>
+
+<!-- Mobile floating toolbar -->
+<div id="mob-toolbar">
+  <button class="mob-btn" id="mob-nudo" onclick="setMode('nudo');mobHighlight('nudo')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="6" fill="#dd3333"/></svg>
+    <span>Nudo</span>
+  </button>
+  <button class="mob-btn" id="mob-barra" onclick="setMode('barra');mobHighlight('barra')">
+    <svg width="20" height="20" viewBox="0 0 24 24"><line x1="3" y1="20" x2="21" y2="4" stroke="#5090d0" stroke-width="2.5"/><circle cx="3" cy="20" r="2.5" fill="#dd3333"/><circle cx="21" cy="4" r="2.5" fill="#dd3333"/></svg>
+    <span>Barra</span>
+  </button>
+  <button class="mob-btn" id="mob-apoyo" onclick="setMode('apoyo');mobHighlight('apoyo')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><polygon points="12,4 20,20 4,20" fill="none" stroke="#facc15" stroke-width="2"/><line x1="4" y1="22" x2="20" y2="22" stroke="#facc15" stroke-width="2"/></svg>
+    <span>Apoyo</span>
+  </button>
+  <button class="mob-btn" id="mob-sel" onclick="setMode('selbox');mobHighlight('sel')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="10" height="10" rx="1" stroke-dasharray="3 2"/><polyline points="14,12 20,18"/><line x1="18" y1="21" x2="21" y2="18"/></svg>
+    <span>Selec.</span>
+  </button>
+  <button class="mob-btn" id="mob-pan" onclick="toggle2DPan();mobHighlight('pan')">
+    <span style="font-size:18px;line-height:1">✋</span>
+    <span>Pan</span>
+  </button>
+  <button class="mob-btn danger" id="mob-borrar" onclick="setMode('borrar');mobHighlight('borrar')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    <span>Borrar</span>
+  </button>
+
+  <div class="mob-sep"></div>
+
+  <button class="mob-btn" id="mob-cpunt" onclick="mobPanel('carga','cpunt')">
+    <svg width="20" height="20" viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="18" stroke="#dd2222" stroke-width="2.5"/><polygon points="12,20 9,13 15,13" fill="#dd2222"/></svg>
+    <span>C.Punt</span>
+  </button>
+  <button class="mob-btn" id="mob-cdist" onclick="mobPanel('cdist','cdist')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><line x1="3" y1="4" x2="21" y2="4" stroke="#dd2222" stroke-width="1.5"/><line x1="6" y1="4" x2="6" y2="14" stroke="#dd2222" stroke-width="1.5"/><line x1="12" y1="4" x2="12" y2="14" stroke="#dd2222" stroke-width="1.5"/><line x1="18" y1="4" x2="18" y2="14" stroke="#dd2222" stroke-width="1.5"/><line x1="3" y1="14" x2="21" y2="14" stroke="#5090d0" stroke-width="2"/></svg>
+    <span>C.Dist</span>
+  </button>
+  <button class="mob-btn" id="mob-secc" onclick="mobPanel('seccion','secc')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="2" stroke="#60a5fa" stroke-width="2"/></svg>
+    <span>Secc.</span>
+  </button>
+  <button class="mob-btn" id="mob-resorte" onclick="mobPanel('resorte','resorte')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f0abfc" stroke-width="1.8"><path d="M12 2v3M12 5l3 3M15 8l-3 3M12 11l3 3M15 14l-3 3M12 17v3" stroke-linecap="round"/></svg>
+    <span>Resorte</span>
+  </button>
+  <button class="mob-btn" id="mob-artic" onclick="mobPanel('articulacion','artic')">
+    <svg width="20" height="20" viewBox="0 0 24 24"><line x1="2" y1="12" x2="22" y2="12" stroke="#5090d0" stroke-width="2"/><circle cx="6" cy="12" r="3.5" fill="none" stroke="#dd2222" stroke-width="2"/><circle cx="18" cy="12" r="3.5" fill="none" stroke="#5090d0" stroke-width="2"/></svg>
+    <span>Artic.</span>
+  </button>
+
+  <div class="mob-sep"></div>
+
+  <button class="mob-btn" id="mob-combos" onclick="mobPanel('combos','combos')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="8" height="6" rx="1" stroke="#60a5fa"/><rect x="14" y="2" width="8" height="6" rx="1" stroke="#fb923c"/><line x1="6" y1="8" x2="6" y2="12" stroke="#60a5fa"/><line x1="18" y1="8" x2="18" y2="12" stroke="#fb923c"/><line x1="6" y1="12" x2="18" y2="12" stroke="#94a3b8"/></svg>
+    <span>Combos</span>
+  </button>
+  <button class="mob-btn" onclick="calcular()" style="background:rgba(34,197,94,0.15);border-color:rgba(34,197,94,0.5);color:#22c55e;">
+    <span style="font-size:16px">▶</span>
+    <span>Calc.</span>
+  </button>
+  <button class="mob-btn" id="mob-undo" onclick="undoAccion()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M3 13C5 7 11 4 17 6s8 8 5 13"/></svg>
+    <span>Undo</span>
+  </button>
+  <button class="mob-btn" id="mob-redo" onclick="redoAccion()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M21 13C19 7 13 4 7 6S-1 14 2 19"/></svg>
+    <span>Redo</span>
+  </button>
+
+  <div class="mob-sep"></div>
+
+  <button class="mob-btn" onclick="toggleRightPanel()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="14" y="2" width="8" height="20" rx="1"/><line x1="3" y1="7" x2="11" y2="7"/><line x1="3" y1="12" x2="11" y2="12"/><line x1="3" y1="17" x2="11" y2="17"/></svg>
+    <span>Panel</span>
+  </button>
+  <button class="mob-btn" onclick="abrir3D()" style="color:#22c55e;border-color:rgba(34,197,94,0.3);">
+    <span style="font-size:16px">⬛</span>
+    <span>3D</span>
+  </button>
+  <button class="mob-btn" onclick="toggleMobExtra()" id="mob-extra-btn" style="color:#f59e0b;border-color:rgba(245,158,11,0.3);">
+    <span style="font-size:16px">⋯</span>
+    <span>Más</span>
+  </button>
+</div>
+
+<!-- Mobile extra controls overlay -->
+<div id="mob-extra" style="display:none; position:fixed; bottom:70px; right:8px; z-index:850;
+  background:rgba(22,27,34,0.98); border:1px solid #30363d; border-radius:12px;
+  padding:10px 8px; min-width:200px; box-shadow:0 -4px 24px rgba(0,0,0,0.5);">
+
+  <!-- Vista toggles -->
+  <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;padding:0 4px;">Visualización</div>
+  <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">
+    <button class="mob-xbtn" id="mob-tog-def" onclick="toggleVis('def');mobXSync()" style="color:#22c55e;border-color:rgba(34,197,94,0.4);">DEF</button>
+    <button class="mob-xbtn" id="mob-tog-mom" onclick="toggleVis('mom');mobXSync()" style="color:#cc88ff;border-color:rgba(204,136,255,0.4);">M</button>
+    <button class="mob-xbtn" id="mob-tog-cor" onclick="toggleVis('cor');mobXSync()" style="color:#44ee88;border-color:rgba(68,238,136,0.4);">V</button>
+    <button class="mob-xbtn" id="mob-tog-axi" onclick="toggleVis('axi');mobXSync()" style="color:#ff9999;border-color:rgba(255,100,100,0.4);">N</button>
+    <button class="mob-xbtn" id="mob-tog-rea" onclick="toggleVis('rea');mobXSync()" style="color:#fbbf24;border-color:rgba(251,191,36,0.4);">R</button>
+  </div>
+
+  <!-- Zoom -->
+  <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;padding:0 4px;">Zoom</div>
+  <div style="display:flex;gap:4px;margin-bottom:8px;">
+    <button class="mob-xbtn" onclick="zoomIn()"  style="flex:1;font-size:16px;">＋</button>
+    <button class="mob-xbtn" onclick="zoomOut()" style="flex:1;font-size:16px;">－</button>
+    <button class="mob-xbtn" onclick="ajustarVista();toggleMobExtra()" style="flex:1;font-size:11px;">Fit</button>
+  </div>
+
+  <!-- Herramientas de dibujo -->
+  <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;padding:0 4px;">Herramientas</div>
+  <div style="display:flex;gap:4px;margin-bottom:8px;">
+    <button class="mob-xbtn" id="mob-xortog" onclick="toggleOrtogonal();mobXSync()" style="flex:1;font-size:11px;">Ortog.</button>
+    <button class="mob-xbtn" id="mob-xsnap"  onclick="toggleSnap();mobXSync()"      style="flex:1;font-size:11px;">Snap</button>
+    <button class="mob-xbtn" onclick="limpiar();toggleMobExtra()" style="flex:1;font-size:11px;color:#ef4444;border-color:rgba(239,68,68,0.4);">Limpiar</button>
+  </div>
+
+  <!-- Mover/Copiar/Pegar -->
+  <div style="display:flex;gap:4px;margin-bottom:8px;">
+    <button class="mob-xbtn" id="mob-xmover"  onclick="activarMover();toggleMobExtra()"   style="flex:1;font-size:11px;">Mover</button>
+    <button class="mob-xbtn" id="mob-xcopiar" onclick="copiarSeleccion();toggleMobExtra()" style="flex:1;font-size:11px;">Copiar</button>
+    <button class="mob-xbtn" id="mob-xpegar"  onclick="pegarSeleccion();toggleMobExtra()"  style="flex:1;font-size:11px;">Pegar</button>
+  </div>
+
+  <!-- Archivo -->
+  <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;padding:0 4px;">Archivo</div>
+  <div style="display:flex;gap:4px;">
+    <button class="mob-xbtn" onclick="guardarModelo();toggleMobExtra()" style="flex:1;font-size:11px;">Guardar</button>
+    <button class="mob-xbtn" onclick="document.getElementById('file-input').click();toggleMobExtra()" style="flex:1;font-size:11px;">Abrir</button>
   </div>
 </div>
 
