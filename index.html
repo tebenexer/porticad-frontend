@@ -2005,7 +2005,12 @@
   <span>Barras: <b id="st-b">0</b></span>
   <span>Apoyos: <b id="st-a">0</b></span>
   <span>Cargas: <b id="st-c">0</b></span>
-  <span style="margin-left:auto" id="st-msg">Listo</span>
+  <span style="margin-left:auto; display:flex; align-items:center; gap:14px;">
+    <span style="font-size:11px; color:#6e7681; white-space:nowrap;">
+      <span style="color:#22c55e">●</span>&nbsp;<span id="contador-analisis">–</span> análisis
+    </span>
+    <span id="st-msg">Listo</span>
+  </span>
 </div>
 
 <script>
@@ -8599,8 +8604,8 @@ function zoomOut() {
 // ── Contador de análisis realizados ─────────────────────────────────────────
 async function cargarContador() {
   try {
-    const url = document.getElementById('api-url')?.value?.trim() || '';
-    if (!url) return;
+    const url = document.getElementById('api-url')?.value?.trim()
+              || 'https://porticad-backend-production.up.railway.app';
     const res  = await fetch(url + '/contador');
     if (!res.ok) return;
     const data = await res.json();
@@ -8959,9 +8964,7 @@ function aplicarComboACargas(cargasOrig, cargasDistOrig) {
   </div>
   <div class="field">
     <label style="font-size:12px; color:var(--muted);">URL del servidor</label>
-    <span style="font-family:var(--mono); font-size:12px; color:#6e7681; margin-right:10px; white-space:nowrap;">
-  <span style="color:#22c55e">●</span>&nbsp;<span id="contador-analisis">0</span> análisis realizados
-</span><input id="api-url" value="https://porticad-backend-production.up.railway.app" style="font-family:var(--mono); font-size:13px;" />
+    <input id="api-url" value="https://porticad-backend-production.up.railway.app" style="display:none;" />
   </div>
 </div>
 <!-- Modal para nombre de archivo -->
