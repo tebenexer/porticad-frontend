@@ -114,10 +114,27 @@
     font-size: 14px; color: var(--muted);
   }
   .status-dot {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: var(--green);
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 0 0 rgba(34,197,94,0.6);
+    animation: pulse-online 2s infinite;
+    flex-shrink: 0;
   }
-  .status-dot.off { background: var(--muted); }
+  .status-dot.off {
+    background: #ef4444;
+    box-shadow: none;
+    animation: none;
+  }
+  .status-dot.checking {
+    background: #f59e0b;
+    box-shadow: none;
+    animation: none;
+  }
+  @keyframes pulse-online {
+    0%   { box-shadow: 0 0 0 0 rgba(34,197,94,0.6); }
+    70%  { box-shadow: 0 0 0 5px rgba(34,197,94,0); }
+    100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+  }
 
   /* ── Main layout ──────────────────────────────────────── */
   .main {
@@ -889,9 +906,9 @@
       <span style="font-size:10px;font-weight:600">Redo</span>
     </button>
   </div>
-  <div class="ml-auto backend-status">
-    <div class="status-dot" id="dot"></div>
-    <span id="backend-url">localhost:8000</span>
+  <div class="ml-auto backend-status" style="cursor:pointer;" onclick="checkServerStatus()" title="Clic para verificar conexión">
+    <div class="status-dot checking" id="dot"></div>
+    <span id="backend-url" style="font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0.03em;">VERIFICANDO…</span>
   </div>
 </div>
 
@@ -1962,11 +1979,7 @@
 
       <!-- TAB: API -->
       <div id="tab-api" style="display:none">
-        <div class="section-title">Llamada al backend</div>
-        <p style="font-size:14px;color:var(--muted);margin-bottom:8px">
-          Tu <code style="color:var(--blue)">analysis.py</code> corre en el servidor.
-          Nadie puede ver el código.
-        </p>
+        <div class="section-title">Registro de conexión</div>
         <div class="api-box" id="api-log"><span class="dim">esperando análisis...</span></div>
       </div>
 
@@ -4555,9 +4568,8 @@ async function calcular() {
   };
 
   // Mostrar en tab API
-  logApi('<span class="dim">POST ' + url + '/analizar</span>\n' +
-    JSON.stringify({ nudos: nudos.length, barras: barras.length, apoyos: apoyos.length }, null, 0) +
-    '\n<span class="warn">→ analysis.py corriendo...</span>');
+  logApi('<span class="warn">⏳ Conectando con el servidor...</span>\n' +
+    'Nudos: ' + nudos.length + '  Barras: ' + barras.length + '  Apoyos: ' + apoyos.length);
   showTab('api');
 
   document.getElementById('btn-calc').disabled = true;
@@ -4582,8 +4594,7 @@ async function calcular() {
     resultados = await res.json();
 
     // Log de respuesta
-    logApi('<span class="dim">POST ' + url + '/analizar</span>\n' +
-      '<span style="color:#22c55e">200 OK ✓</span>\n' +
+    logApi('<span style="color:#22c55e;font-weight:700">✓ CONEXIÓN ESTABLECIDA</span>\n' +
       'Nudos: ' + resultados.nudos + '  Barras: ' + resultados.barras + '\n' +
       'Max Uy: ' + Math.max(...resultados.desplazamientos.map(d => Math.abs(d.Uy_cm))).toFixed(4) + ' cm\n' +
       'Reacciones: ' + resultados.reacciones.length + ' nudos');
@@ -4594,6 +4605,7 @@ async function calcular() {
     document.getElementById('tog-def').classList.add('active');
     showTab('resultados');
     setMsg('✓ Análisis completado');
+    checkServerStatus();
 
     // Habilitar exportar PDF
     const pdfItem = document.getElementById('menu-item-pdf');
@@ -4607,9 +4619,12 @@ async function calcular() {
     draw();
 
   } catch (err) {
-    logApi('<span class="err">ERROR: ' + err.message + '\n\nVerifica que el servidor esté corriendo:\n  uvicorn api:app --reload</span>');
+    logApi('<span class="err">✗ SIN CONEXIÓN AL SERVIDOR\n\n' + err.message + '</span>');
     setMsg('✗ Error: ' + err.message);
-    document.getElementById('dot').classList.add('off');
+    const _dot = document.getElementById('dot');
+    const _lbl = document.getElementById('backend-url');
+    if (_dot) { _dot.className = 'status-dot off'; }
+    if (_lbl) { _lbl.textContent = 'OFFLINE'; _lbl.style.color = '#ef4444'; }
   }
 
   document.getElementById('btn-calc').disabled = false;
@@ -8157,6 +8172,44 @@ function updateMobHUD() {
   if (mb) mb.textContent = barras.length;
   if (ma) ma.textContent = apoyos.length;
 }
+
+// ── Server health check ──────────────────────────────────
+async function checkServerStatus() {
+  const dot   = document.getElementById('dot');
+  const label = document.getElementById('backend-url');
+  if (!dot || !label) return;
+
+  // Set checking state
+  dot.className   = 'status-dot checking';
+  label.textContent = 'VERIFICANDO…';
+  label.style.color = '#f59e0b';
+
+  const url = document.getElementById('api-url')?.value?.trim()
+            || 'https://porticad-backend-production.up.railway.app';
+  try {
+    const res = await fetch(url + '/salud', {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000)
+    });
+    if (res.ok) {
+      dot.className     = 'status-dot';
+      label.textContent = 'ONLINE';
+      label.style.color = '#22c55e';
+    } else {
+      throw new Error('HTTP ' + res.status);
+    }
+  } catch (e) {
+    dot.className     = 'status-dot off';
+    label.textContent = 'OFFLINE';
+    label.style.color = '#ef4444';
+  }
+}
+
+// Check on load, then every 30 seconds
+window.addEventListener('load', () => {
+  checkServerStatus();
+  setInterval(checkServerStatus, 30000);
+});
 
 function toggleRightPanel() {
   if (isMobile()) {
