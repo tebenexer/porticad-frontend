@@ -795,6 +795,114 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     Supabase Auth — reemplaza SUPABASE_URL y SUPABASE_ANON_KEY
+     con los valores de tu proyecto en supabase.com
+     ═══════════════════════════════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ── Configuración Supabase ────────────────────────────────────────
+const SUPABASE_URL      = 'https://iltuxpidyagewmbvhhtv.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_Zn1_MUZuUCQp3Hea7Sexkg_UHLuTJIJ';
+const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let _sesionActiva = false;
+
+// ── Estado del botón Calcular según sesión ────────────────────────
+function _actualizarEstadoCalc() {
+  const btnCalc     = document.getElementById('btn-calc');
+  const btnMobCalc  = document.getElementById('mob-btn-calc');
+  const btnLogin    = document.getElementById('btn-login-topbar');
+  const btnLogout   = document.getElementById('btn-logout-topbar');
+  const userLabel   = document.getElementById('user-label-topbar');
+
+  if (_sesionActiva) {
+    if (btnCalc)    { btnCalc.disabled = false; btnCalc.title = ''; btnCalc.style.opacity = '1'; }
+    if (btnMobCalc) { btnMobCalc.disabled = false; btnMobCalc.style.opacity = '1'; }
+    if (btnLogin)   btnLogin.style.display  = 'none';
+    if (btnLogout)  btnLogout.style.display = '';
+    const u = _sb.auth.getUser ? null : null;
+    _sb.auth.getUser().then(({data}) => {
+      if (userLabel && data?.user?.email) {
+        userLabel.textContent = data.user.email.split('@')[0];
+        userLabel.style.display = '';
+      }
+    });
+  } else {
+    if (btnCalc)    { btnCalc.disabled = true; btnCalc.title = 'Inicia sesión para calcular'; btnCalc.style.opacity = '0.45'; }
+    if (btnMobCalc) { btnMobCalc.disabled = true; btnMobCalc.style.opacity = '0.45'; }
+    if (btnLogin)   btnLogin.style.display  = '';
+    if (btnLogout)  btnLogout.style.display = 'none';
+    if (userLabel)  userLabel.style.display = 'none';
+  }
+}
+
+// ── Modal de Login / Registro ─────────────────────────────────────
+function abrirModalLogin() {
+  document.getElementById('modal-auth').style.display = 'flex';
+  document.getElementById('auth-email').focus();
+  document.getElementById('auth-msg').textContent = '';
+}
+function cerrarModalLogin() {
+  document.getElementById('modal-auth').style.display = 'none';
+}
+
+async function authAccion(modo) {
+  const email = document.getElementById('auth-email').value.trim();
+  const pass  = document.getElementById('auth-pass').value;
+  const msg   = document.getElementById('auth-msg');
+
+  if (!email || !pass) { msg.textContent = 'Ingresa email y contraseña.'; return; }
+
+  msg.textContent = modo === 'login' ? 'Iniciando sesión...' : 'Registrando cuenta...';
+  msg.style.color = '#94a3b8';
+
+  let result;
+  if (modo === 'login') {
+    result = await _sb.auth.signInWithPassword({ email, password: pass });
+  } else {
+    result = await _sb.auth.signUp({ email, password: pass });
+  }
+
+  if (result.error) {
+    msg.textContent = result.error.message;
+    msg.style.color = '#f87171';
+    return;
+  }
+
+  if (modo === 'register' && !result.data?.session) {
+    msg.textContent = '✓ Revisa tu correo para confirmar la cuenta.';
+    msg.style.color = '#22c55e';
+    return;
+  }
+
+  _sesionActiva = true;
+  cerrarModalLogin();
+  _actualizarEstadoCalc();
+  setMsg('✓ Sesión iniciada');
+}
+
+async function cerrarSesion() {
+  await _sb.auth.signOut();
+  _sesionActiva = false;
+  _actualizarEstadoCalc();
+  setMsg('Sesión cerrada');
+}
+
+// ── Verificar sesión al cargar ────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async function() {
+  const { data } = await _sb.auth.getSession();
+  _sesionActiva = !!data?.session;
+  _actualizarEstadoCalc();
+
+  // Escuchar cambios de sesión (refresh de token, etc.)
+  _sb.auth.onAuthStateChange((_event, session) => {
+    _sesionActiva = !!session;
+    _actualizarEstadoCalc();
+  });
+});
+</script>
 </head>
 <body>
 
@@ -857,7 +965,20 @@
              max-width:130px;">
       <option value="__default__">Default (todas)</option>
     </select>
-    <button class="tbtn run" id="btn-calc" onclick="calcular()">▶ Calcular</button>
+    <button class="tbtn run" id="btn-calc" onclick="calcular()"
+      disabled title="Inicia sesión para calcular"
+      style="opacity:0.45;">▶ Calcular</button>
+    <button id="btn-login-topbar" onclick="abrirModalLogin()"
+      style="font-size:12px; padding:4px 10px; border-radius:5px; border:1px solid #60a5fa;
+             background:rgba(96,165,250,0.12); color:#60a5fa; cursor:pointer; white-space:nowrap;">
+      🔐 Iniciar sesión
+    </button>
+    <span id="user-label-topbar" style="display:none; font-size:12px; color:#22c55e; white-space:nowrap;"></span>
+    <button id="btn-logout-topbar" onclick="cerrarSesion()"
+      style="display:none; font-size:11px; padding:3px 8px; border-radius:5px; border:1px solid #6e7681;
+             background:transparent; color:#6e7681; cursor:pointer; white-space:nowrap;">
+      Cerrar sesión
+    </button>
     <!-- Separador -->
     <div style="width:1px; height:22px; background:var(--border); margin:0 4px; flex-shrink:0;"></div>
 
@@ -9158,7 +9279,7 @@ function aplicarComboACargas(cargasOrig, cargasDistOrig) {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="8" height="6" rx="1" stroke="#60a5fa"/><rect x="14" y="2" width="8" height="6" rx="1" stroke="#fb923c"/><line x1="6" y1="8" x2="6" y2="12" stroke="#60a5fa"/><line x1="18" y1="8" x2="18" y2="12" stroke="#fb923c"/><line x1="6" y1="12" x2="18" y2="12" stroke="#94a3b8"/></svg>
     <span>Combos</span>
   </button>
-  <button class="mob-btn" onclick="calcular()" style="background:rgba(34,197,94,0.15);border-color:rgba(34,197,94,0.5);color:#22c55e;">
+  <button class="mob-btn" id="mob-btn-calc" onclick="calcular()" disabled style="background:rgba(34,197,94,0.15);border-color:rgba(34,197,94,0.5);color:#22c55e;opacity:0.45;">
     <span style="font-size:16px">▶</span>
     <span>Calc.</span>
   </button>
@@ -9230,6 +9351,60 @@ function aplicarComboACargas(cargasOrig, cargasDistOrig) {
   <div style="display:flex;gap:4px;">
     <button class="mob-xbtn" onclick="guardarModelo();toggleMobExtra()" style="flex:1;font-size:11px;">Guardar</button>
     <button class="mob-xbtn" onclick="document.getElementById('file-input').click();toggleMobExtra()" style="flex:1;font-size:11px;">Abrir</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     Modal de Login / Registro — PortiCAD
+     ═══════════════════════════════════════ -->
+<div id="modal-auth" style="display:none; position:fixed; inset:0; z-index:9999;
+  background:rgba(0,0,0,0.7); align-items:center; justify-content:center;">
+  <div style="background:#161b22; border:1px solid #30363d; border-radius:12px;
+    padding:32px 28px; width:100%; max-width:360px; box-shadow:0 8px 32px rgba(0,0,0,0.6);">
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+      <div style="font-size:18px; font-weight:700; color:#e6edf3;">
+        🔐 PortiCAD
+      </div>
+      <button onclick="cerrarModalLogin()"
+        style="background:none; border:none; color:#6e7681; font-size:20px; cursor:pointer; line-height:1;">✕</button>
+    </div>
+
+    <div style="margin-bottom:14px;">
+      <label style="display:block; font-size:12px; color:#8b949e; margin-bottom:5px;">Correo electrónico</label>
+      <input id="auth-email" type="email" placeholder="tu@correo.com"
+        style="width:100%; box-sizing:border-box; padding:9px 12px; border-radius:6px;
+               border:1px solid #30363d; background:#0d1117; color:#e6edf3; font-size:14px;"
+        onkeydown="if(event.key==='Enter') authAccion('login')" />
+    </div>
+
+    <div style="margin-bottom:8px;">
+      <label style="display:block; font-size:12px; color:#8b949e; margin-bottom:5px;">Contraseña</label>
+      <input id="auth-pass" type="password" placeholder="••••••••"
+        style="width:100%; box-sizing:border-box; padding:9px 12px; border-radius:6px;
+               border:1px solid #30363d; background:#0d1117; color:#e6edf3; font-size:14px;"
+        onkeydown="if(event.key==='Enter') authAccion('login')" />
+    </div>
+
+    <div id="auth-msg" style="font-size:12px; min-height:18px; margin-bottom:14px; color:#f87171;"></div>
+
+    <div style="display:flex; gap:8px; margin-bottom:12px;">
+      <button onclick="authAccion('login')"
+        style="flex:1; padding:10px; border-radius:6px; border:none;
+               background:#22c55e; color:#000; font-weight:700; font-size:14px; cursor:pointer;">
+        Iniciar sesión
+      </button>
+      <button onclick="authAccion('register')"
+        style="flex:1; padding:10px; border-radius:6px;
+               border:1px solid #30363d; background:transparent;
+               color:#8b949e; font-size:14px; cursor:pointer;">
+        Registrarse
+      </button>
+    </div>
+
+    <p style="font-size:11px; color:#6e7681; text-align:center; margin:0;">
+      Al registrarte aceptas que tus datos se usan para autenticación únicamente.
+    </p>
   </div>
 </div>
 
