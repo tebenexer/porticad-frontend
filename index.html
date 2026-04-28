@@ -7494,12 +7494,15 @@ function build3DScene() {
   const isColorMode = palKey === 'color';
 
   // Scales for loads
+  // scaleDist sincroniza con la escala 2D: ESCALA_2D = 2*escalaDist en píxeles, zoom px/m
+  // → para que las flechas sean proporcionales en 3D: base = 2*escalaDist/zoom
+  const _escDistMult = parseFloat(document.getElementById('d3-scale-dist')?.value) || 1.0;
   const scalePunt = parseFloat(document.getElementById('d3-scale-punt')?.value) || 1.0;
-  const scaleDist = parseFloat(document.getElementById('d3-scale-dist')?.value) || 0.4;
+  const scaleDist = (2 * escalaDist / zoom) * _escDistMult;
   const pvEl = document.getElementById('d3-scale-punt-val');
   const dvEl = document.getElementById('d3-scale-dist-val');
   if (pvEl) pvEl.textContent = scalePunt.toFixed(1);
-  if (dvEl) dvEl.textContent = scaleDist.toFixed(2);
+  if (dvEl) dvEl.textContent = _escDistMult.toFixed(2);
 
   scene.background = new THREE.Color(pal.bg);
   scene.fog = new THREE.Fog(pal.bg, 50, 200);
@@ -7928,7 +7931,16 @@ function build3DScene() {
 
   // ── DIAGRAMAS (M / V / N / Deformada) ────────────────
   if (resultados?.constantes) {
-    const dScale  = parseFloat(document.getElementById('d3-diag-scale')?.value)||0.4;
+    // Escalas 3D sincronizadas con el 2D: dScale_X = escala2D_X × multiplicador3D
+    const _multM   = parseFloat(document.getElementById('d3-scale-mom')?.value) || 1.0;
+    const _multV   = parseFloat(document.getElementById('d3-scale-cor')?.value) || 1.0;
+    const _multN   = parseFloat(document.getElementById('d3-scale-axi')?.value) || 1.0;
+    const _multDef = parseFloat(document.getElementById('d3-scale-def')?.value) || 1.0;
+    const dScaleM  = escalaMomentos  * _multM;   // Momentos: sincronizado con 2D × mult
+    const dScaleV  = escalaCortante  * _multV;   // Cortante: sincronizado con 2D × mult
+    const dScaleN  = escalaAxial     * _multN;   // Axial: sincronizado con 2D × mult
+    const dScaleDef = escalaDeformada * _multDef; // Deformada: sincronizada con 2D × mult
+    const dScale   = dScaleM; // fallback para el helper diag3D
     const E_def   = parseFloat(document.getElementById('E').value)||21000000;
     const I_def   = parseFloat(document.getElementById('I').value)||0.0001;
     const raycaster3D = new THREE.Raycaster();
@@ -7936,7 +7948,8 @@ function build3DScene() {
     const N = 21;
 
     // Helper: build 3D filled diagram using exact same projection as 2D drawDiagrama
-    const diag3D = (bIdx, valores, signo, hexColor, zOff) => {
+    const diag3D = (bIdx, valores, signo, hexColor, zOff, scaleOverride) => {
+      const _dS = scaleOverride !== undefined ? scaleOverride : dScale;
       const b  = barras[bIdx];
       const n1 = nudos[b.ni];
       const con = resultados.constantes[bIdx];
@@ -7948,7 +7961,7 @@ function build3DScene() {
       const basePts=[], linePts=[];
       for (let k=0;k<N;k++){
         const x=k/(N-1)*L;
-        const y_off=valores[k]*dScale*signo;
+        const y_off=valores[k]*_dS*signo;
         basePts.push(new THREE.Vector3(nx1+x*cosA,        ny1+x*sinA,        zOff));
         linePts.push(new THREE.Vector3(nx1+x*cosA-y_off*sinA, ny1+x*sinA+y_off*cosA, zOff));
       }
@@ -7978,7 +7991,7 @@ function build3DScene() {
       valores.forEach((v,k)=>{ if(Math.abs(v)>Math.abs(peakV)){peakV=v;peakK=k;} });
       if (Math.abs(peakV)>1e-4) {
         const x=peakK/(N-1)*con.L;
-        const y_off=peakV*dScale*signo;
+        const y_off=peakV*_dS*signo;
         const cosA2=Math.cos(con.angulo*Math.PI/180), sinA2=Math.sin(con.angulo*Math.PI/180);
         const gx=nx1+x*cosA2-y_off*sinA2, gy=ny1+x*sinA2+y_off*cosA2;
         const ps=new THREE.Mesh(
@@ -8005,24 +8018,25 @@ function build3DScene() {
       if (_3dDiagVis.mom) {
         const v=[]; for(let k=0;k<N;k++){const x=k/(N-1)*con.L;
           v.push(-(con.qq2-con.qq1)/(6*con.L)*Math.pow(x,3)-con.qq1/2*x*x+con.C1*x+con.C2);}
-        tipo3DLabel='M'; diag3D(i, v, -1, 0xcc88ff, 0.01);
+        tipo3DLabel='M'; diag3D(i, v, -1, 0xcc88ff, 0.01, dScaleM);
       }
 
       // Cortante (signo +1, verde)
       if (_3dDiagVis.cor) {
         const v=[]; for(let k=0;k<N;k++){const x=k/(N-1)*con.L;
           v.push(-(con.qq2-con.qq1)/(2*con.L)*x*x-con.qq1*x+con.C1);}
-        tipo3DLabel='V'; diag3D(i, v, 1, 0x44ee88, 0.02);
+        tipo3DLabel='V'; diag3D(i, v, 1, 0x44ee88, 0.02, dScaleV);
       }
 
       // Axial (signo +1, rojo)
       if (_3dDiagVis.axi) {
         const v=[]; for(let k=0;k<N;k++){const x=k/(N-1)*con.L;
           v.push(sol.N1+(sol.N4-sol.N1)*(x/con.L));}
-        tipo3DLabel='N'; diag3D(i, v, 1, 0xff6666, 0.03);
+        tipo3DLabel='N'; diag3D(i, v, 1, 0xff6666, 0.03, dScaleN);
       }
 
-      // Deformada — fórmula exacta de drawDeformada
+      // Deformada 3D — fórmula idéntica a drawDeformada 2D
+      // dScaleDef = escalaDeformada(2D) × multiplicador3D independiente
       if (_3dDiagVis.def) {
         const d1=resultados.desplazamientos[b.ni], d2=resultados.desplazamientos[b.nj];
         if (!d1||!d2) return;
@@ -8031,19 +8045,27 @@ function build3DScene() {
         const L=con.L, ang=con.angulo*Math.PI/180;
         const cosA=Math.cos(ang), sinA=Math.sin(ang);
         const nx1=nudos[b.ni].x-cx, ny1=nudos[b.ni].y-cy;
-        const x1d=nx1+d1.Ux_m*dScale*50, y1d=ny1+d1.Uy_m*dScale*50;
+        // Posición del nudo inicio desplazado — igual que drawDeformada 2D línea 3608-3609
+        const x1d=nx1+d1.Ux_m*dScaleDef;
+        const y1d=ny1+d1.Uy_m*dScaleDef;
+        // Desplazamiento axial diferencial — igual que drawDeformada 2D línea 3612-3614
         const u1_ax=d1.Ux_m*cosA+d1.Uy_m*sinA;
         const u4_ax=d2.Ux_m*cosA+d2.Uy_m*sinA;
-        const deltaU=(u4_ax-u1_ax)*dScale*50;
+        const deltaU=(u4_ax-u1_ax)*dScaleDef;
         const NP=11, defPts=[];
         for(let k=0;k<NP;k++){
           const x=k/(NP-1)*L;
+          // Deflexión transversal — igual que drawDeformada 2D líneas 3622-3631
           const y_EI=-(con.qq2-con.qq1)/L*Math.pow(x,5)/120-con.qq1*Math.pow(x,4)/24
                     +con.C1*Math.pow(x,3)/6+con.C2*x*x/2+con.C3*x+con.C4;
           const y_loc=y_EI/EI;
-          const y_esc=(y_loc-con.C4/EI)*dScale*50;
+          const y_esc=(y_loc-con.C4/EI)*dScaleDef;
           const x_esc=x+deltaU*(x/L);
-          defPts.push(new THREE.Vector3(x1d+x_esc*cosA-y_esc*sinA, y1d+x_esc*sinA+y_esc*cosA, 0.04));
+          defPts.push(new THREE.Vector3(
+            x1d+x_esc*cosA-y_esc*sinA,
+            y1d+x_esc*sinA+y_esc*cosA,
+            0.04
+          ));
         }
         scene.add(new THREE.Line(
           new THREE.BufferGeometry().setFromPoints(defPts),
@@ -9173,9 +9195,9 @@ function aplicarComboACargas(cargasOrig, cargasDistOrig) {
         <!-- Escala cargas distribuidas -->
         <label style="font-size:10px;color:#60a5fa;display:flex;align-items:center;gap:3px;">
           C.Dist
-          <input id="d3-scale-dist" type="range" min="0.05" max="2" step="0.05" value="0.4"
+          <input id="d3-scale-dist" type="range" min="0.1" max="3" step="0.05" value="1"
             style="width:55px;" oninput="build3DScene()" title="Escala cargas distribuidas"/>
-          <span id="d3-scale-dist-val" style="width:22px;font-family:monospace;font-size:10px;">0.4</span>
+          <span id="d3-scale-dist-val" style="width:22px;font-family:monospace;font-size:10px;">1.0</span>
         </label>
         <!-- Vista sección / wireframe -->
         <button id="d3-btn-section" onclick="toggle3DSection()"
@@ -9192,14 +9214,55 @@ function aplicarComboACargas(cargasOrig, cargasDistOrig) {
                  cursor:pointer; font-weight:700; transition:all 0.15s;">
           ◈ Alámb.
         </button>
-        <!-- Diagrama toggles -->
-        <div style="display:flex; gap:4px; align-items:center;">
-          <button id="d3-tog-def" onclick="toggle3DDiag('def')" style="font-size:10px;padding:3px 8px;border-radius:3px;cursor:pointer;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.4);color:#86efac;font-weight:700;">DEF</button>
-          <button id="d3-tog-mom" onclick="toggle3DDiag('mom')" style="font-size:10px;padding:3px 8px;border-radius:3px;cursor:pointer;background:rgba(204,136,255,0.12);border:1px solid rgba(204,136,255,0.4);color:#cc88ff;font-weight:700;">M</button>
-          <button id="d3-tog-cor" onclick="toggle3DDiag('cor')" style="font-size:10px;padding:3px 8px;border-radius:3px;cursor:pointer;background:rgba(68,238,136,0.12);border:1px solid rgba(68,238,136,0.4);color:#44ee88;font-weight:700;">V</button>
-          <button id="d3-tog-axi" onclick="toggle3DDiag('axi')" style="font-size:10px;padding:3px 8px;border-radius:3px;cursor:pointer;background:rgba(255,102,102,0.12);border:1px solid rgba(255,102,102,0.4);color:#ff9999;font-weight:700;">N</button>
-          <input id="d3-diag-scale" type="range" min="0.05" max="2" step="0.05" value="0.4"
-            style="width:70px;" oninput="build3DScene()" title="Escala diagramas"/>
+        <!-- Diagrama toggles + escalas individuales -->
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <!-- Fila 1: botones de visibilidad -->
+          <div style="display:flex; gap:4px; align-items:center;">
+            <span style="font-size:9px;color:#6e7681;white-space:nowrap;">DIAG</span>
+            <button id="d3-tog-def" onclick="toggle3DDiag('def')"
+              style="font-size:10px;padding:3px 8px;border-radius:3px;cursor:pointer;
+                     background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.4);
+                     color:#86efac;font-weight:700;">DEF</button>
+            <button id="d3-tog-mom" onclick="toggle3DDiag('mom')"
+              style="font-size:10px;padding:3px 8px;border-radius:3px;cursor:pointer;
+                     background:rgba(204,136,255,0.12);border:1px solid rgba(204,136,255,0.4);
+                     color:#cc88ff;font-weight:700;">M</button>
+            <button id="d3-tog-cor" onclick="toggle3DDiag('cor')"
+              style="font-size:10px;padding:3px 8px;border-radius:3px;cursor:pointer;
+                     background:rgba(68,238,136,0.12);border:1px solid rgba(68,238,136,0.4);
+                     color:#44ee88;font-weight:700;">V</button>
+            <button id="d3-tog-axi" onclick="toggle3DDiag('axi')"
+              style="font-size:10px;padding:3px 8px;border-radius:3px;cursor:pointer;
+                     background:rgba(255,102,102,0.12);border:1px solid rgba(255,102,102,0.4);
+                     color:#ff9999;font-weight:700;">N</button>
+          </div>
+          <!-- Fila 2: escalas individuales por diagrama -->
+          <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+            <!-- Momentos -->
+            <label style="font-size:10px;color:#cc88ff;display:flex;align-items:center;gap:2px;" title="Escala Momento (×escala 2D)">
+              M×<input id="d3-scale-mom" type="range" min="0.1" max="5" step="0.05" value="1"
+                style="width:50px;" oninput="document.getElementById('d3-sv-mom').textContent=parseFloat(this.value).toFixed(1)+'×';build3DScene()"/>
+              <span id="d3-sv-mom" style="width:26px;font-family:monospace;font-size:10px;">1.0×</span>
+            </label>
+            <!-- Cortante -->
+            <label style="font-size:10px;color:#44ee88;display:flex;align-items:center;gap:2px;" title="Escala Cortante (×escala 2D)">
+              V×<input id="d3-scale-cor" type="range" min="0.1" max="5" step="0.05" value="1"
+                style="width:50px;" oninput="document.getElementById('d3-sv-cor').textContent=parseFloat(this.value).toFixed(1)+'×';build3DScene()"/>
+              <span id="d3-sv-cor" style="width:26px;font-family:monospace;font-size:10px;">1.0×</span>
+            </label>
+            <!-- Axial -->
+            <label style="font-size:10px;color:#ff9999;display:flex;align-items:center;gap:2px;" title="Escala Axial (×escala 2D)">
+              N×<input id="d3-scale-axi" type="range" min="0.1" max="5" step="0.05" value="1"
+                style="width:50px;" oninput="document.getElementById('d3-sv-axi').textContent=parseFloat(this.value).toFixed(1)+'×';build3DScene()"/>
+              <span id="d3-sv-axi" style="width:26px;font-family:monospace;font-size:10px;">1.0×</span>
+            </label>
+            <!-- Deformada -->
+            <label style="font-size:10px;color:#86efac;display:flex;align-items:center;gap:2px;" title="Escala Deformada (×escala 2D)">
+              D×<input id="d3-scale-def" type="range" min="0.1" max="5" step="0.05" value="1"
+                style="width:50px;" oninput="document.getElementById('d3-sv-def').textContent=parseFloat(this.value).toFixed(1)+'×';build3DScene()"/>
+              <span id="d3-sv-def" style="width:26px;font-family:monospace;font-size:10px;">1.0×</span>
+            </label>
+          </div>
         </div>
         <button id="d3-btn-close" onclick="cerrar3D()"
           style="font-size:13px; padding:3px 10px; background:rgba(248,81,73,0.15);
