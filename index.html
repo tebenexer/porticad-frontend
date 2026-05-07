@@ -8661,13 +8661,7 @@ function _actualizarTitulo() {
 
 function archivoNuevo() {
   document.querySelectorAll('.menu-drop').forEach(d => d.style.display = 'none');
-  if (nudos.length > 0) {
-    if (!confirm('¿Descartar el modelo actual y comenzar uno nuevo?')) return;
-  }
-  limpiar();
-  archivoActual = null;
-  _actualizarTitulo();
-  setMsg('Nuevo modelo');
+  limpiar(true); // limpiar handles confirm + full reset
 }
 
 function archivoAbrir() {
@@ -8723,34 +8717,100 @@ function _descargarArchivo(nombre) {
   setMsg('Guardado: ' + nombre);
 }
 
-function limpiar() {
+function limpiar(confirmar = true) {
+  if (confirmar && (nudos.length || barras.length)) {
+    if (!confirm('¿Limpiar todo el modelo? Esta acción no se puede deshacer.')) return;
+  }
+
+  // ── Geometría ────────────────────────────────────────────
   nudos = []; barras = []; apoyos = []; cargas = [];
+  propiedadesBarras = {};
+  cargasDistribuidas = {};
+  resortes = {};
+  articulaciones = {};
+
+  // ── Resultados y combos ──────────────────────────────────
   resultados = null;
-  envolvente = null; resultadosPorCombo = {}; combosVisibles = {}; comboDestacado = null;
-  casosCarga = { '__default__': 'Default (todas)' };
+  resultadosPorCombo = {};
+  combosVisibles     = {};
+  comboDestacado     = null;
+  _comboLoading      = null;
+  casosCarga  = { '__default__': 'Default (todas)' };
   combosCarga = {};
-    const _pi = document.getElementById('menu-item-pdf');
-    if (_pi) { _pi.style.opacity='0.4'; _pi.style.cursor='not-allowed'; _pi.onclick=null; } pendNudo = null;
-  propiedadesBarras = {}; cargasDistribuidas = {}; resortes = {}; articulaciones = {};
-  barrasSelSeccion.clear(); barrasSelCDist.clear();
-  nudosSelCarga.clear(); nudosSelResorte.clear(); barrasSelArticulacion.clear();
-  selBoxClear(); moverDrag=false; nudosPosOrig={};
+  comboEditando = null;
+
+  // ── Selecciones y modos temporales ───────────────────────
+  pendNudo        = null;
+  nudoOrigenNudo  = null;
+  barraInspeccionada = null;
+  nudoInspeccionado  = null;
+  barrasSelSeccion.clear();
+  barrasSelCDist.clear();
+  nudosSelCarga.clear();
+  nudosSelResorte.clear();
+  barrasSelArticulacion.clear();
+  selBoxClear();
+  moverDrag = false;
+  nudosPosOrig = {};
+
+  // ── Historial ────────────────────────────────────────────
   undoStack = []; redoStack = [];
-  setTimeout(() => { actualizarBtnMover(); actualizarBtnCopiarPegar(); actualizarBtnsUndoRedo(); }, 50);
+
+  // ── Visualización ────────────────────────────────────────
   distReset();
-  vis = { def:false, mom:false, cor:false, axi:false, rea:false };
+  vis = { def:false, mom:false, cor:false, axi:false, rea:false, eloc:false, eglo:false };
   ['def','mom','cor','axi','rea','eloc','eglo'].forEach(k => {
     const btn = document.getElementById('tog-'+k);
     if (btn) btn.classList.remove('active');
   });
-  document.getElementById('cp-sin-seleccion').style.display  = '';
-  document.getElementById('cp-form').style.display  = 'none';
-  document.getElementById('sec-sin-seleccion').style.display = '';
-  document.getElementById('sec-form').style.display = 'none';
-  document.getElementById('cd-sin-seleccion').style.display  = '';
-  document.getElementById('cd-form').style.display  = 'none';
-  updateStatus(); draw();
-  setMsg('Canvas limpiado');
+
+  // ── Archivo actual ───────────────────────────────────────
+  archivoActual = null;
+  document.title = 'PortiCAD Web';
+
+  // ── PDF/exportar: deshabilitar ───────────────────────────
+  const _pi = document.getElementById('menu-item-pdf');
+  if (_pi) { _pi.style.opacity='0.4'; _pi.style.cursor='not-allowed'; _pi.onclick=null; }
+
+  // ── Panel combo selector ─────────────────────────────────
+  const selCombo = document.getElementById('combo-sel');
+  if (selCombo) { selCombo.innerHTML = '<option value="__default__">Default (todas)</option>'; }
+  renderCasos?.();
+  renderCombos?.();
+  renderComboSelector?.();
+  renderActCombosToggles?.();
+
+  // ── Paneles de edición: volver a sin selección ───────────
+  ['cp','sec','cd','res','art'].forEach(p => {
+    const sinSel = document.getElementById(p+'-sin-seleccion');
+    const form   = document.getElementById(p+'-form');
+    if (sinSel) sinSel.style.display = '';
+    if (form)   form.style.display   = 'none';
+  });
+
+  // ── Resultados en panel derecho ──────────────────────────
+  const tabRes = document.getElementById('tab-resultados');
+  if (tabRes) tabRes.innerHTML = '<div style="color:var(--muted);padding:12px;font-size:13px;">Sin resultados — ejecuta el cálculo primero.</div>';
+
+  // ── Log API ──────────────────────────────────────────────
+  const apiLog = document.getElementById('api-log');
+  if (apiLog) apiLog.innerHTML = '<span class="dim">esperando análisis...</span>';
+
+  // ── Botones de acción ────────────────────────────────────
+  setTimeout(() => {
+    actualizarBtnMover?.();
+    actualizarBtnCopiarPegar?.();
+    actualizarBtnsUndoRedo?.();
+  }, 50);
+
+  // ── 3D: cerrar si estaba abierto ─────────────────────────
+  const modal3d = document.getElementById('modal-3d');
+  if (modal3d && modal3d.style.display !== 'none') cerrar3D?.();
+
+  setMode('select');
+  updateStatus();
+  draw();
+  setMsg('Modelo limpiado — canvas vacío');
 }
 
 function updateStatus() {
