@@ -1481,70 +1481,172 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         <!-- Formulario -->
         <div id="cp-form" style="display:none">
-          <div id="cp-nudos-label" style="font-size:13px; color:var(--blue-text); font-weight:600; margin-bottom:10px; padding:6px 8px; background:var(--blue-dim); border-radius:4px; border-left:3px solid var(--blue)"></div>
 
-          <!-- Cargas existentes por caso en este nudo -->
-          <div class="section-title">Cargas en este nudo por caso</div>
+          <!-- Nudo label -->
+          <div id="cp-nudos-label" style="font-size:13px; color:var(--blue-text); font-weight:600;
+            margin-bottom:10px; padding:6px 10px; background:var(--blue-dim); border-radius:5px;
+            border-left:3px solid var(--blue)"></div>
+
+          <!-- Cargas existentes -->
+          <div class="section-title">Cargas en este nudo</div>
           <div id="cp-cargas-nudo" style="margin-bottom:10px;"></div>
 
-          <!-- Formulario para añadir/editar una carga por caso -->
-          <div class="section-title">Añadir / Editar carga</div>
-
           <!-- Selector de caso -->
-          <select id="cp-caso" onchange="cpCargarCasoExistente()" style="width:100%; font-family:var(--mono); font-size:12px;
-            background:var(--bg); color:var(--text); border:1px solid var(--border);
-            border-radius:4px; padding:5px 8px; margin-bottom:8px; cursor:pointer;">
+          <div class="section-title">Caso de carga</div>
+          <select id="cp-caso" onchange="cpCargarCasoExistente()" style="width:100%;
+            font-family:var(--mono); font-size:12px; background:var(--bg); color:var(--text);
+            border:1px solid var(--border); border-radius:4px; padding:5px 8px;
+            margin-bottom:12px; cursor:pointer;">
             <option value="__default__">Default (todas)</option>
           </select>
 
-          <!-- Modo de entrada -->
-          <div style="display:flex; gap:6px; margin-bottom:8px;">
-            <label class="radio-opt" style="flex:1"><input type="radio" name="cp-modo" value="cartesiano" checked onchange="onCPModoChange()" /> Fx Fy M</label>
-            <label class="radio-opt" style="flex:1"><input type="radio" name="cp-modo" value="polar" onchange="onCPModoChange()" /> Polar</label>
+          <!-- ═══ PANEL PRINCIPAL: visor + inputs ═══ -->
+          <div class="section-title">Definir carga</div>
+
+          <!-- Modo: cartesiano / polar -->
+          <div style="display:flex; gap:5px; margin-bottom:10px;">
+            <label class="radio-opt" style="flex:1; justify-content:center;">
+              <input type="radio" name="cp-modo" value="cartesiano" checked onchange="onCPModoChange()"/> Fx Fy M
+            </label>
+            <label class="radio-opt" style="flex:1; justify-content:center;">
+              <input type="radio" name="cp-modo" value="polar" onchange="onCPModoChange()"/> Polar
+            </label>
           </div>
 
-          <!-- Campos cartesianos -->
-          <div id="cp-panel-cart">
-            <div style="display:flex; gap:5px; margin-bottom:6px;">
-              <div style="flex:1;text-align:center"><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Fx (kN)</div>
-                <input id="cp-Fx" type="number" step="any" placeholder="0" style="width:100%;text-align:center;font-family:var(--mono)"/></div>
-              <div style="flex:1;text-align:center"><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Fy (kN)</div>
-                <input id="cp-Fy" type="number" step="any" placeholder="0" style="width:100%;text-align:center;font-family:var(--mono)"/></div>
-              <div style="flex:1;text-align:center"><div style="font-size:11px;color:var(--muted);margin-bottom:2px">M (kNm)</div>
-                <input id="cp-M" type="number" step="any" placeholder="0" style="width:100%;text-align:center;font-family:var(--mono)"/></div>
+          <!-- Layout: visor a la izquierda, inputs a la derecha -->
+          <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
+
+            <!-- Visor de dirección -->
+            <div style="flex-shrink:0; text-align:center;">
+              <canvas id="cp-polar-canvas" width="72" height="72"
+                style="display:block; border:1px solid var(--border); border-radius:50%;
+                       background:var(--surface2); cursor:crosshair;"
+                onclick="cpCanvasClick(event)"
+                onmousemove="cpCanvasHover(event)">
+              </canvas>
+              <div style="font-size:9px; color:var(--muted); margin-top:3px;">clic para dirección</div>
+            </div>
+
+            <!-- Campos -->
+            <div style="flex:1; display:flex; flex-direction:column; gap:5px;">
+
+              <!-- Cartesiano -->
+              <div id="cp-panel-cart">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px;">
+                  <div>
+                    <div style="font-size:10px; color:#60a5fa; font-weight:700; margin-bottom:2px;">Fx (kN)</div>
+                    <input id="cp-Fx" type="number" step="any" placeholder="0"
+                      style="width:100%; text-align:center; font-family:var(--mono); font-size:13px;
+                             padding:5px 0; border-radius:4px; border:1px solid var(--border); background:var(--bg); color:var(--text);"
+                      oninput="actualizarPolarPreview()"/>
+                  </div>
+                  <div>
+                    <div style="font-size:10px; color:#f87171; font-weight:700; margin-bottom:2px;">Fy (kN)</div>
+                    <input id="cp-Fy" type="number" step="any" placeholder="0"
+                      style="width:100%; text-align:center; font-family:var(--mono); font-size:13px;
+                             padding:5px 0; border-radius:4px; border:1px solid var(--border); background:var(--bg); color:var(--text);"
+                      oninput="actualizarPolarPreview()"/>
+                  </div>
+                  <div style="grid-column:span 2;">
+                    <div style="font-size:10px; color:#c4b5fd; font-weight:700; margin-bottom:2px;">M (kNm)</div>
+                    <input id="cp-M" type="number" step="any" placeholder="0"
+                      style="width:100%; text-align:center; font-family:var(--mono); font-size:13px;
+                             padding:5px 0; border-radius:4px; border:1px solid var(--border); background:var(--bg); color:var(--text);"/>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Polar -->
+              <div id="cp-panel-polar" style="display:none;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px;">
+                  <div>
+                    <div style="font-size:10px; color:#fbbf24; font-weight:700; margin-bottom:2px;">F (kN)</div>
+                    <input id="cp-F" type="number" step="any" placeholder="10"
+                      style="width:100%; text-align:center; font-family:var(--mono); font-size:13px;
+                             padding:5px 0; border-radius:4px; border:1px solid var(--border); background:var(--bg); color:var(--text);"
+                      oninput="actualizarPolarPreview()"/>
+                  </div>
+                  <div>
+                    <div style="font-size:10px; color:#fbbf24; font-weight:700; margin-bottom:2px;">θ (°)</div>
+                    <input id="cp-ang" type="number" step="any" placeholder="270"
+                      style="width:100%; text-align:center; font-family:var(--mono); font-size:13px;
+                             padding:5px 0; border-radius:4px; border:1px solid var(--border); background:var(--bg); color:var(--text);"
+                      oninput="actualizarPolarPreview()"/>
+                  </div>
+                  <div style="grid-column:span 2;">
+                    <div style="font-size:10px; color:#c4b5fd; font-weight:700; margin-bottom:2px;">M (kNm)</div>
+                    <input id="cp-Mp" type="number" step="any" placeholder="0"
+                      style="width:100%; text-align:center; font-family:var(--mono); font-size:13px;
+                             padding:5px 0; border-radius:4px; border:1px solid var(--border); background:var(--bg); color:var(--text);"/>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- Campos polares -->
-          <div id="cp-panel-polar" style="display:none">
-            <div style="display:flex; gap:5px; margin-bottom:6px;">
-              <div style="flex:1;text-align:center"><div style="font-size:11px;color:var(--muted);margin-bottom:2px">F (kN)</div>
-                <input id="cp-F" type="number" step="any" placeholder="10" style="width:100%;text-align:center;font-family:var(--mono)"/></div>
-              <div style="flex:1;text-align:center"><div style="font-size:11px;color:var(--muted);margin-bottom:2px">θ (°)</div>
-                <input id="cp-ang" type="number" step="any" placeholder="270" style="width:100%;text-align:center;font-family:var(--mono)" oninput="actualizarPolarPreview()"/></div>
-              <div style="flex:1;text-align:center"><div style="font-size:11px;color:var(--muted);margin-bottom:2px">M (kNm)</div>
-                <input id="cp-Mp" type="number" step="any" placeholder="0" style="width:100%;text-align:center;font-family:var(--mono)"/></div>
-            </div>
-            <canvas id="cp-polar-canvas" width="50" height="50" style="display:block;margin:4px auto;border:1px solid var(--border);border-radius:50%;background:var(--surface2)"></canvas>
+          <!-- Accesos rápidos en cruz + diagonales -->
+          <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:3px; margin-bottom:10px; max-width:200px; margin-left:auto; margin-right:auto;">
+
+            <!-- Fila 1: ↖ ↑ ↗ -->
+            <button class="dir-btn" onclick="aplicarCargaRapida(-7.07,7.07)"  title="+10kN ↖ 135°"
+              style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="20" y1="20" x2="4" y2="4"/><polyline points="4,11 4,4 11,4"/></svg>
+              <span style="font-size:9px">↖</span>
+            </button>
+            <button class="dir-btn" onclick="aplicarCargaRapida(0,10)"   title="+10kN ↑ 90°"
+              style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="20" x2="12" y2="4"/><polyline points="6,10 12,4 18,10"/></svg>
+              <span style="font-size:9px">↑</span>
+            </button>
+            <button class="dir-btn" onclick="aplicarCargaRapida(7.07,7.07)"   title="+10kN ↗ 45°"
+              style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="20" x2="20" y2="4"/><polyline points="13,4 20,4 20,11"/></svg>
+              <span style="font-size:9px">↗</span>
+            </button>
+
+            <!-- Fila 2: ← ✕ → -->
+            <button class="dir-btn" onclick="aplicarCargaRapida(-10,0)"  title="-10kN ← 180°"
+              style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="20" y1="12" x2="4" y2="12"/><polyline points="10,6 4,12 10,18"/></svg>
+              <span style="font-size:9px">←</span>
+            </button>
+            <button class="dir-btn" onclick="aplicarCargaRapida(0,0)"    title="Limpiar Fx/Fy"
+              style="font-size:13px; opacity:0.5;">✕</button>
+            <button class="dir-btn" onclick="aplicarCargaRapida(10,0)"   title="+10kN → 0°"
+              style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="14,6 20,12 14,18"/></svg>
+              <span style="font-size:9px">→</span>
+            </button>
+
+            <!-- Fila 3: ↙ ↓ ↘ -->
+            <button class="dir-btn" onclick="aplicarCargaRapida(-7.07,-7.07)" title="-10kN ↙ 225°"
+              style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="20" y1="4" x2="4" y2="20"/><polyline points="4,13 4,20 11,20"/></svg>
+              <span style="font-size:9px">↙</span>
+            </button>
+            <button class="dir-btn" onclick="aplicarCargaRapida(0,-10)"  title="-10kN ↓ 270°"
+              style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="4" x2="12" y2="20"/><polyline points="6,14 12,20 18,14"/></svg>
+              <span style="font-size:9px">↓</span>
+            </button>
+            <button class="dir-btn" onclick="aplicarCargaRapida(7.07,-7.07)"  title="+10kN ↘ 315°"
+              style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="4" x2="20" y2="20"/><polyline points="13,20 20,20 20,13"/></svg>
+              <span style="font-size:9px">↘</span>
+            </button>
+
           </div>
 
-          <!-- Accesos rápidos compactos -->
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:3px; margin-bottom:8px;">
-            <button class="dir-btn" onclick="aplicarCargaRapida(0,-10)">↓ -10kN</button>
-            <button class="dir-btn" onclick="aplicarCargaRapida(0,10)">↑ +10kN</button>
-            <button class="dir-btn" onclick="aplicarCargaRapida(-10,0)">← -10kN</button>
-            <button class="dir-btn" onclick="aplicarCargaRapida(10,0)">→ +10kN</button>
-          </div>
-
-          <!-- Botones acción -->
-          <div style="display:flex; gap:6px;">
-            <button class="abtn-ok"     onclick="asignarCargaPuntual()">✔ Añadir/Actualizar</button>
+          <!-- Botones de acción -->
+          <div style="display:flex; gap:6px; margin-bottom:14px;">
+            <button class="abtn-ok" style="flex:1;" onclick="asignarCargaPuntual()">✔ Añadir / Actualizar</button>
             <button class="abtn-cancel" onclick="cancelarCargaPuntual()">✕</button>
           </div>
 
-          <!-- Lista global de cargas -->
-          <div class="section-title" style="margin-top:14px">Todas las cargas</div>
+          <!-- Lista global -->
+          <div class="section-title">Todas las cargas</div>
           <div id="cp-lista" style="font-size:12px; color:var(--muted)">—</div>
+
         </div>
 
       </div>
@@ -5062,42 +5164,113 @@ function onCPModoChange() {
   const modo = document.querySelector('input[name="cp-modo"]:checked').value;
   document.getElementById('cp-panel-cart').style.display  = modo === 'cartesiano' ? '' : 'none';
   document.getElementById('cp-panel-polar').style.display = modo === 'polar'      ? '' : 'none';
-  if (modo === 'polar') setTimeout(actualizarPolarPreview, 30);
+  setTimeout(actualizarPolarPreview, 30);
 }
 
 function actualizarPolarPreview() {
-  const ang = parseFloat(document.getElementById('cp-ang').value) || 270;
-  const c2  = document.getElementById('cp-polar-canvas');
+  const c2 = document.getElementById('cp-polar-canvas');
   if (!c2) return;
   const ctx2 = c2.getContext('2d');
-  ctx2.clearRect(0, 0, 60, 60);
-  const cx = 30, cy = 30, r = 22;
-  ctx2.strokeStyle = '#b8bcc4'; ctx2.lineWidth = 1;
+  const W = c2.width, H = c2.height;
+  const cx = W/2, cy = H/2, r = W/2 - 6;
+
+  ctx2.clearRect(0, 0, W, H);
+
+  // Background circle
+  ctx2.fillStyle = 'rgba(30,36,48,0.6)';
+  ctx2.beginPath(); ctx2.arc(cx,cy,r+4,0,Math.PI*2); ctx2.fill();
+
+  // Grid circle
+  ctx2.strokeStyle = '#334155'; ctx2.lineWidth = 1;
   ctx2.beginPath(); ctx2.arc(cx, cy, r, 0, Math.PI*2); ctx2.stroke();
-  ctx2.strokeStyle = '#d0d4da'; ctx2.lineWidth = 0.5; ctx2.setLineDash([2,2]);
+
+  // Axis lines
+  ctx2.setLineDash([2,3]); ctx2.strokeStyle = '#475569'; ctx2.lineWidth = 0.7;
   ctx2.beginPath(); ctx2.moveTo(cx-r,cy); ctx2.lineTo(cx+r,cy); ctx2.stroke();
   ctx2.beginPath(); ctx2.moveTo(cx,cy-r); ctx2.lineTo(cx,cy+r); ctx2.stroke();
   ctx2.setLineDash([]);
-  const fx = cx + Math.cos(ang * Math.PI/180) * r;
-  const fy = cy - Math.sin(ang * Math.PI/180) * r;
+
+  // Axis labels
+  ctx2.fillStyle = '#64748b'; ctx2.font = `${Math.max(8, W*0.13)}px Consolas,monospace`;
+  ctx2.textAlign = 'center';
+  ctx2.fillText('+X', cx+r-5, cy-4);
+  ctx2.fillText('+Y', cx+4, cy-r+10);
+
+  // Determine angle
+  const modo = document.querySelector('input[name="cp-modo"]:checked')?.value || 'cartesiano';
+  let ang = 270; // default: downward
+  if (modo === 'polar') {
+    ang = parseFloat(document.getElementById('cp-ang')?.value) || 270;
+  } else {
+    const Fx = parseFloat(document.getElementById('cp-Fx')?.value) || 0;
+    const Fy = parseFloat(document.getElementById('cp-Fy')?.value) || 0;
+    if (Math.abs(Fx) > 1e-9 || Math.abs(Fy) > 1e-9)
+      ang = Math.atan2(Fy, Fx) * 180 / Math.PI;
+  }
+
+  // Arrow
+  const rad = ang * Math.PI / 180;
+  const fx = cx + Math.cos(rad) * r * 0.82;
+  const fy = cy - Math.sin(rad) * r * 0.82;
+
+  // Glow
+  ctx2.shadowColor = '#ef4444'; ctx2.shadowBlur = 6;
   ctx2.strokeStyle = '#ef4444'; ctx2.fillStyle = '#ef4444'; ctx2.lineWidth = 2;
   ctx2.beginPath(); ctx2.moveTo(cx,cy); ctx2.lineTo(fx,fy); ctx2.stroke();
+  ctx2.shadowBlur = 0;
+
+  // Arrowhead
   const ha = Math.atan2(fy-cy, fx-cx);
-  ctx2.beginPath(); ctx2.moveTo(fx,fy);
-  ctx2.lineTo(fx-7*Math.cos(ha-0.4), fy-7*Math.sin(ha-0.4));
-  ctx2.lineTo(fx-7*Math.cos(ha+0.4), fy-7*Math.sin(ha+0.4));
+  const hs = Math.max(6, W*0.1);
+  ctx2.beginPath();
+  ctx2.moveTo(fx, fy);
+  ctx2.lineTo(fx - hs*Math.cos(ha-0.4), fy - hs*Math.sin(ha-0.4));
+  ctx2.lineTo(fx - hs*Math.cos(ha+0.4), fy - hs*Math.sin(ha+0.4));
   ctx2.closePath(); ctx2.fill();
-  ctx2.fillStyle = '#52586a'; ctx2.font = '10px Consolas,monospace';
-  ctx2.textAlign = 'center'; ctx2.fillText(ang+'°', cx, 58); ctx2.textAlign = 'left';
+
+  // Center dot
+  ctx2.fillStyle = '#60a5fa';
+  ctx2.beginPath(); ctx2.arc(cx,cy,3,0,Math.PI*2); ctx2.fill();
+
+  // Angle label
+  ctx2.fillStyle = '#fbbf24';
+  ctx2.font = `bold ${Math.max(9, W*0.15)}px Consolas,monospace`;
+  ctx2.textAlign = 'center';
+  ctx2.fillText(Math.round(((ang % 360) + 360) % 360) + '°', cx, H - 3);
+}
+
+// Click on compass canvas to set direction
+function cpCanvasClick(e) {
+  const c2 = document.getElementById('cp-polar-canvas');
+  if (!c2) return;
+  const rect = c2.getBoundingClientRect();
+  const mx = e.clientX - rect.left - c2.width/2;
+  const my = -(e.clientY - rect.top - c2.height/2);
+  const ang = ((Math.atan2(my, mx) * 180 / Math.PI) + 360) % 360;
+  // Switch to polar mode and set angle
+  document.querySelector('input[name="cp-modo"][value="polar"]').checked = true;
+  onCPModoChange();
+  document.getElementById('cp-ang').value = Math.round(ang);
+  actualizarPolarPreview();
+}
+function cpCanvasHover(e) {
+  // No-op for now — could show preview on hover
 }
 
 function aplicarCargaRapida(Fx, Fy) {
-  // Pone los valores en los campos cartesianos y cambia al modo cartesiano
+  if (Fx === 0 && Fy === 0) {
+    // Clear button
+    document.getElementById('cp-Fx').value = 0;
+    document.getElementById('cp-Fy').value = 0;
+    document.querySelector('input[name="cp-modo"][value="cartesiano"]').checked = true;
+    onCPModoChange(); return;
+  }
   document.querySelector('input[name="cp-modo"][value="cartesiano"]').checked = true;
   onCPModoChange();
   document.getElementById('cp-Fx').value = Fx;
   document.getElementById('cp-Fy').value = Fy;
   document.getElementById('cp-M').value  = 0;
+  actualizarPolarPreview();
 }
 
 // Muestra las cargas del nudo seleccionado organizadas por caso
