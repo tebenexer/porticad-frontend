@@ -9179,7 +9179,8 @@ function actualizarContadorLocal() {
 function setMsg(m) { document.getElementById('st-msg').textContent = m; }
 
 function logApi(html) {
-  document.getElementById('api-log').innerHTML = html;
+  const el = document.getElementById('api-log');
+  if (el) el.innerHTML = html;
 }
 
 // ═══════════════════════════════════════════════════════
