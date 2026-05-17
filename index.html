@@ -1431,46 +1431,40 @@ document.addEventListener('DOMContentLoaded', async function() {
           <span class="scale-val" id="esc-dist-val">1.0×</span>
         </div>
 
-        <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;">
-          <span>Escala de resultados</span>
-          <button onclick="autoAjusteEscala()" title="Calcular escala óptima para que los diagramas quepan en el canvas"
-            style="font-size:10px;padding:2px 7px;border-radius:4px;border:1px solid var(--border2);background:var(--bg3);color:var(--fg);cursor:pointer;font-weight:600;letter-spacing:0.02em;line-height:1.5;">
-            ⚡ Auto-ajuste
-          </button>
-        </div>
+        <div class="section-title">Escala de resultados</div>
 
         <!-- Escala deformada -->
         <div class="scale-row">
           <span class="scale-lbl">Deformada</span>
-          <input type="range" id="esc-def" min="1" max="5000" step="1" value="25"
+          <input type="range" id="esc-def" min="10" max="1000" step="0.01" value="25"
                  oninput="onEscalaResultadosChange()" />
           <span class="scale-val" id="esc-def-val">25×</span>
         </div>
         <!-- Escala momentos -->
         <div class="scale-row">
           <span class="scale-lbl">Momentos</span>
-          <input type="range" id="esc-mom" min="0.0001" max="2" step="0.0001" value="0.02"
+          <input type="range" id="esc-mom" min="0.001" max="0.3" step="0.001" value="0.02"
                  oninput="onEscalaResultadosChange()" />
-          <span class="scale-val" id="esc-mom-val">0.020</span>
+          <span class="scale-val" id="esc-mom-val">0.02</span>
         </div>
         <!-- Escala cortante -->
         <div class="scale-row">
           <span class="scale-lbl">Cortante</span>
-          <input type="range" id="esc-cor" min="0.0001" max="2" step="0.0001" value="0.02"
+          <input type="range" id="esc-cor" min="0.001" max="0.3" step="0.001" value="0.02"
                  oninput="onEscalaResultadosChange()" />
-          <span class="scale-val" id="esc-cor-val">0.020</span>
+          <span class="scale-val" id="esc-cor-val">0.02</span>
         </div>
         <!-- Escala axial -->
         <div class="scale-row">
           <span class="scale-lbl">Axial</span>
-          <input type="range" id="esc-axi" min="0.0001" max="2" step="0.0001" value="0.02"
+          <input type="range" id="esc-axi" min="0.001" max="0.3" step="0.001" value="0.02"
                  oninput="onEscalaResultadosChange()" />
-          <span class="scale-val" id="esc-axi-val">0.020</span>
+          <span class="scale-val" id="esc-axi-val">0.02</span>
         </div>
         <!-- Escala envolvente -->
         <div class="scale-row">
           <span class="scale-lbl" style="color:#c4b5fd">Envol.</span>
-          <input type="range" id="esc-env" min="0.0001" max="2" step="0.0001" value="0.025"
+          <input type="range" id="esc-env" min="0.001" max="0.3" step="0.001" value="0.025"
                  oninput="onEscalaResultadosChange()" />
           <span class="scale-val" id="esc-env-val" style="color:#c4b5fd">0.025</span>
         </div>
@@ -2424,72 +2418,6 @@ function onFuenteDiagChange() {
   tamFuenteDiag = parseInt(document.getElementById('esc-font-diag').value) || 11;
   document.getElementById('esc-font-diag-val').textContent = tamFuenteDiag + 'px';
   draw();
-}
-
-function autoAjusteEscala() {
-  if (!resultados?.solicitaciones || !resultados?.constantes) {
-    setMsg('Sin resultados — ejecuta el cálculo primero');
-    return;
-  }
-  const N = 21;
-  let maxM = 0, maxV = 0, maxN = 0, maxDef = 0;
-
-  barras.forEach((b, i) => {
-    const sol = resultados.solicitaciones[i];
-    const con = resultados.constantes[i];
-    if (!sol || !con) return;
-    const L = con.L;
-    for (let k = 0; k < N; k++) {
-      const x = (k / (N - 1)) * L;
-      maxM = Math.max(maxM, Math.abs(-(con.qq2-con.qq1)/(6*L)*Math.pow(x,3) - con.qq1/2*Math.pow(x,2) + con.C1*x + con.C2));
-      maxV = Math.max(maxV, Math.abs(-(con.qq2-con.qq1)/(2*L)*Math.pow(x,2) - con.qq1*x + con.C1));
-      maxN = Math.max(maxN, Math.abs(sol.N1 + (sol.N4 - sol.N1) * (x / L)));
-    }
-  });
-
-  if (resultados.desplazamientos) {
-    resultados.desplazamientos.forEach(d => {
-      if (d) maxDef = Math.max(maxDef, Math.abs(d.Uy_m || 0), Math.abs(d.Ux_m || 0));
-    });
-  }
-
-  // Longitud promedio de barras en unidades mundo
-  const avgL = barras.reduce((s, b, i) => s + (resultados.constantes[i]?.L || 1), 0) / Math.max(barras.length, 1);
-  const targetWorld = avgL * 0.35;
-
-  function setSlider(id, valId, val, decimals) {
-    const sl = document.getElementById(id);
-    const vl = document.getElementById(valId);
-    if (!sl || !vl) return;
-    sl.value = val;
-    vl.textContent = val.toFixed(decimals) + (id === 'esc-def' ? '×' : '');
-  }
-
-  if (maxM > 0.001) {
-    const v = Math.min(2, Math.max(0.0001, targetWorld / maxM));
-    escalaMomentos = v;
-    setSlider('esc-mom', 'esc-mom-val', v, 4);
-    escalaEnvolvente = v;
-    setSlider('esc-env', 'esc-env-val', v, 4);
-  }
-  if (maxV > 0.001) {
-    const v = Math.min(2, Math.max(0.0001, targetWorld / maxV));
-    escalaCortante = v;
-    setSlider('esc-cor', 'esc-cor-val', v, 4);
-  }
-  if (maxN > 0.001) {
-    const v = Math.min(2, Math.max(0.0001, targetWorld / maxN));
-    escalaAxial = v;
-    setSlider('esc-axi', 'esc-axi-val', v, 4);
-  }
-  if (maxDef > 1e-6) {
-    const v = Math.min(5000, Math.max(1, Math.round(targetWorld / maxDef)));
-    escalaDeformada = v;
-    setSlider('esc-def', 'esc-def-val', v, 0);
-  }
-
-  draw();
-  setMsg('⚡ Escala ajustada automáticamente');
 }
 
 function toggleEtiqNudos() {
