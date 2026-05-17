@@ -3994,9 +3994,6 @@ function drawDiagrama(tipo, color, escala) {
     for(let k=1;k<N-1;k++){ if(Math.abs(valores[k])>Math.abs(peakV)){peakV=valores[k];peakK=k;} }
     if (Math.abs(peakV) > 0.01 && Math.abs(peakV) > Math.max(Math.abs(v0),Math.abs(vF))*0.5) {
       const px=ptsLinea[peakK][0], py=ptsLinea[peakK][1];
-      const tw = ctx.measureText(peakV.toFixed(2)).width + 8;
-      ctx.fillStyle = 'rgba(255,255,255,0.88)';
-      ctx.fillRect(px-tw/2, py + (peakV*signo>=0?-22:-4), tw, 15);
       ctx.fillStyle = color;
       ctx.fillText(peakV.toFixed(2), px, py + (peakV*signo>=0?-10:8));
     }
