@@ -1475,6 +1475,14 @@ document.addEventListener('DOMContentLoaded', async function() {
           <span class="scale-val" id="esc-env-val" style="color:#c4b5fd">0.025</span>
         </div>
 
+        <!-- Tamaño fuente valores -->
+        <div class="scale-row" style="margin-top:6px;border-top:1px solid var(--border2);padding-top:6px;">
+          <span class="scale-lbl">Texto diag.</span>
+          <input type="range" id="esc-font-diag" min="8" max="22" step="1" value="11"
+                 oninput="onFuenteDiagChange()" />
+          <span class="scale-val" id="esc-font-diag-val">11px</span>
+        </div>
+
       </div>
 
       <!-- TAB: CARGA PUNTUAL -->
@@ -2384,6 +2392,9 @@ let mostrarEtiqSeccion = true;
 let mostrarCargasPunt = true;
 let mostrarCargasDist = true;
 
+// Tamaño fuente etiquetas de diagramas y reacciones
+let tamFuenteDiag = 11;
+
 // Escalas de resultados
 let escalaDeformada = 25;
 let escalaMomentos  = 0.02;
@@ -2406,6 +2417,12 @@ function onEscalaResultadosChange() {
   const envVal = document.getElementById('esc-env-val');
   if (envVal) envVal.textContent = escalaEnvolvente.toFixed(3);
 
+  draw();
+}
+
+function onFuenteDiagChange() {
+  tamFuenteDiag = parseInt(document.getElementById('esc-font-diag').value) || 11;
+  document.getElementById('esc-font-diag-val').textContent = tamFuenteDiag + 'px';
   draw();
 }
 
@@ -4039,7 +4056,7 @@ function drawDiagrama(tipo, color, escala) {
 
     // Valores en extremos + pico interior
     ctx.fillStyle = color;
-    ctx.font = 'bold 11px Consolas,monospace'; ctx.textAlign = 'center';
+    ctx.font = `bold ${tamFuenteDiag}px Consolas,monospace`; ctx.textAlign = 'center';
     const v0 = valores[0], vF = valores[N-1];
     if (Math.abs(v0) > 0.01) ctx.fillText(v0.toFixed(2), ptsLinea[0][0], ptsLinea[0][1] + (v0*signo>=0?-8:13));
     if (Math.abs(vF) > 0.01) ctx.fillText(vF.toFixed(2), ptsLinea[N-1][0], ptsLinea[N-1][1] + (vF*signo>=0?-8:13));
@@ -4084,7 +4101,7 @@ function drawReacciones() {
       ctx.lineTo(x+dir*(LEN-HEAD), y-HEAD*0.6);
       ctx.lineTo(x+dir*(LEN-HEAD), y+HEAD*0.6);
       ctx.closePath(); ctx.fill();
-      ctx.font='bold 11px Consolas,monospace'; ctx.fillStyle='#93c5fd';
+      ctx.font=`bold ${tamFuenteDiag}px Consolas,monospace`; ctx.fillStyle='#93c5fd';
       ctx.textAlign = dir>0 ? 'left' : 'right';
       ctx.fillText((r.Rx*fF).toFixed(3)+' '+lblF, x+dir*(LEN+4), y-8);
     }
@@ -4099,7 +4116,7 @@ function drawReacciones() {
       ctx.lineTo(x-HEAD*0.6, y+dir*(LEN-HEAD));
       ctx.lineTo(x+HEAD*0.6, y+dir*(LEN-HEAD));
       ctx.closePath(); ctx.fill();
-      ctx.font='bold 11px Consolas,monospace'; ctx.fillStyle='#fca5a5';
+      ctx.font=`bold ${tamFuenteDiag}px Consolas,monospace`; ctx.fillStyle='#fca5a5';
       ctx.textAlign='left';
       ctx.fillText((r.Ry*fF).toFixed(3)+' '+lblF, x+6, y+dir*(LEN+10));
     }
@@ -4129,7 +4146,7 @@ function drawReacciones() {
 
       const lblX = x + (radio + 28) * Math.cos(theta);
       const lblY = y + (radio + 28) * Math.sin(theta);
-      ctx.font='bold 11px Consolas,monospace'; ctx.fillStyle='#c4b5fd';
+      ctx.font=`bold ${tamFuenteDiag}px Consolas,monospace`; ctx.fillStyle='#c4b5fd';
       ctx.textAlign = lblX > x ? 'left' : 'right';
       ctx.fillText((r.Mz*fF).toFixed(3)+' '+lblM, lblX, lblY);
     }
