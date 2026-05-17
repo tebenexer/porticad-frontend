@@ -3989,14 +3989,6 @@ function drawDiagrama(tipo, color, escala) {
     if (Math.abs(v0) > 0.01) ctx.fillText(v0.toFixed(2), ptsLinea[0][0], ptsLinea[0][1] + (v0*signo>=0?-8:13));
     if (Math.abs(vF) > 0.01) ctx.fillText(vF.toFixed(2), ptsLinea[N-1][0], ptsLinea[N-1][1] + (vF*signo>=0?-8:13));
 
-    // Pico interior (máximo absoluto excluyendo extremos)
-    let peakK=1, peakV=0;
-    for(let k=1;k<N-1;k++){ if(Math.abs(valores[k])>Math.abs(peakV)){peakV=valores[k];peakK=k;} }
-    if (Math.abs(peakV) > 0.01 && Math.abs(peakV) > Math.max(Math.abs(v0),Math.abs(vF))*0.5) {
-      const px=ptsLinea[peakK][0], py=ptsLinea[peakK][1];
-      ctx.fillStyle = color;
-      ctx.fillText(peakV.toFixed(2), px, py + (peakV*signo>=0?-10:8));
-    }
     ctx.textAlign = 'left';
   });
 }
