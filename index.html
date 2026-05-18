@@ -1435,6 +1435,14 @@ document.addEventListener('DOMContentLoaded', async function() {
           <span class="scale-val" id="esc-barra-val">2.5px</span>
         </div>
 
+        <!-- Tamaño fuente cargas -->
+        <div class="scale-row">
+          <span class="scale-lbl">Texto cargas</span>
+          <input type="range" id="esc-font-carga" min="8" max="24" step="1" value="12"
+                 oninput="onFuenteCargasChange()" />
+          <span class="scale-val" id="esc-font-carga-val">12px</span>
+        </div>
+
         <!-- Escala cargas puntuales -->
         <div class="scale-row">
           <span class="scale-lbl">C. Puntuales</span>
@@ -2407,6 +2415,8 @@ let mostrarCargasDist = true;
 
 // Tamaño fuente etiquetas de diagramas y reacciones
 let tamFuenteDiag = 11;
+// Tamaño fuente etiquetas de cargas
+let tamFuenteCargas = 12;
 
 // Escalas de resultados
 let escalaDeformada = 25;
@@ -2430,6 +2440,12 @@ function onEscalaResultadosChange() {
   const envVal = document.getElementById('esc-env-val');
   if (envVal) envVal.textContent = escalaEnvolvente.toFixed(3);
 
+  draw();
+}
+
+function onFuenteCargasChange() {
+  tamFuenteCargas = parseInt(document.getElementById('esc-font-carga').value) || 12;
+  document.getElementById('esc-font-carga-val').textContent = tamFuenteCargas + 'px';
   draw();
 }
 
@@ -3797,7 +3813,7 @@ function drawCargas() {
 
       // Etiqueta magnitud
       ctx.fillStyle = arrowColor;
-      ctx.font      = 'bold 12px Consolas, monospace';
+      ctx.font      = `bold ${tamFuenteCargas}px Consolas, monospace`;
       ctx.textAlign = 'center';
       ctx.fillText(mag.toFixed(2)+' kN', sx, sy - 14);
 
@@ -3861,7 +3877,7 @@ function drawMomento(x, y, momento) {
   // Etiqueta desplazada fuera del círculo
   const lblX = x + (radio + 28) * Math.cos(theta);
   const lblY = y + (radio + 28) * Math.sin(theta);
-  ctx.font = 'bold 12px Consolas,monospace';
+  ctx.font = `bold ${tamFuenteCargas}px Consolas,monospace`;
   ctx.fillStyle = '#c4b5fd';
   ctx.textAlign = lblX > x ? 'left' : 'right';
   ctx.fillText(momento.toFixed(2)+' kNm', lblX, lblY);
@@ -6005,7 +6021,7 @@ function drawCargasDistribuidas() {
                                     : `q=${q1.toFixed(1)}→${q2.toFixed(1)} kN/m θ=${c.angulo}°`;
       const midX=(x1+x2)/2, midY=(y1+y2)/2;
       const offsetY=-Math.abs(q1+q2)/2*ESCALA*0.5-14;
-      ctx.font='bold 12px Consolas,monospace';
+      ctx.font=`bold ${tamFuenteCargas}px Consolas,monospace`;
       const tw=ctx.measureText(lbl).width+10;
       ctx.fillStyle='rgba(10,20,40,0.75)';
       ctx.fillRect(midX-tw/2, midY+offsetY-11, tw, 16);
@@ -6044,7 +6060,7 @@ function drawCargasDistribuidas() {
       }
       const lbl=`axial ${ax1.toFixed(1)}→${ax2.toFixed(1)} kN/m`;
       const midX=(x1+x2)/2, midY=(y1+y2)/2+16;
-      ctx.font='bold 12px Consolas,monospace';
+      ctx.font=`bold ${tamFuenteCargas}px Consolas,monospace`;
       const tw=ctx.measureText(lbl).width+10;
       ctx.fillStyle='rgba(10,20,40,0.75)'; ctx.fillRect(midX-tw/2,midY-11,tw,16);
       ctx.fillStyle=comboColor||'#ffaa66'; ctx.textAlign='center';
