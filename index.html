@@ -129,8 +129,9 @@
   .version-tip::after {
     content: attr(data-version);
     position: absolute;
-    bottom: calc(100% + 8px);
-    right: 0;
+    top: 50%;
+    right: calc(100% + 10px);
+    transform: translateY(-50%) translateX(4px);
     background: var(--blue, #3b82f6);
     color: #fff;
     font-size: 11px;
@@ -141,26 +142,28 @@
     white-space: nowrap;
     pointer-events: none;
     opacity: 0;
-    transform: translateY(4px);
     transition: opacity 0.15s, transform 0.15s;
     z-index: 9999;
   }
   .version-tip::before {
     content: '';
     position: absolute;
-    bottom: calc(100% + 4px);
-    right: 14px;
+    top: 50%;
+    right: calc(100% + 2px);
+    transform: translateY(-50%);
     border: 4px solid transparent;
-    border-top-color: var(--blue, #3b82f6);
+    border-left-color: var(--blue, #3b82f6);
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.15s;
     z-index: 9999;
   }
-  .version-tip:hover::after,
+  .version-tip:hover::after {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
   .version-tip:hover::before {
     opacity: 1;
-    transform: translateY(0);
   }
   .status-dot {
     width: 8px; height: 8px; border-radius: 50%;
