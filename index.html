@@ -4622,7 +4622,7 @@ function _construirCdistObj() {
     } else if (c.tipo === 'axial') {
       cdistObj[i].fpara += c.ax1||0;
     } else if (c.tipo === 'global') {
-      const ang=(c.angulo||270)*Math.PI/180;
+      const ang=(c.angulo??270)*Math.PI/180;
       const gx=Math.cos(ang), gy=Math.sin(ang);
       const b=barras[i]; if(!b) return;
       const n1=nudos[b.ni], n2=nudos[b.nj];
@@ -4681,7 +4681,7 @@ function _escalarPorCombo(comboId, cdistObjBase) {
       } else if (c.tipo === 'axial') {
         fpara = (c.ax1||0)*fac;
       } else if (c.tipo === 'global') {
-        const ang=(c.angulo||270)*Math.PI/180;
+        const ang=(c.angulo??270)*Math.PI/180;
         const gx=Math.cos(ang), gy=Math.sin(ang);
         const b=barras[i]; if(!b) return;
         const n1=nudos[b.ni], n2=nudos[b.nj];
@@ -5804,7 +5804,7 @@ function cdActualizarCargasBarra() {
     const ci  = casoKeys.indexOf(c.caso||'__default__');
     const col = COMBO_COLORS[Math.max(0,ci) % COMBO_COLORS.length];
     const lbl = c.tipo==='local'  ? `q=${c.qIzq||0}→${c.qDer||0} kN/m` :
-                c.tipo==='global' ? `q=${c.q1||0}→${c.q2||0} kN/m θ=${c.angulo||270}°` :
+                c.tipo==='global' ? `q=${c.q1||0}→${c.q2||0} kN/m θ=${c.angulo??270}°` :
                                     `ax=${c.ax1||0}→${c.ax2||0} kN/m`;
     return `<div style="display:flex;align-items:center;gap:5px;padding:4px 6px;margin-bottom:4px;
       border-radius:4px;background:rgba(0,0,0,0.04);border-left:3px solid ${col};">
@@ -5959,10 +5959,10 @@ function drawCargasDistribuidas() {
     if (isNaN(i) || i >= barras.length) return;
     const caso = c.caso || '__default__';
     const fac  = ca ? (ca[caso] ?? 0) : 1;
-    if (!porBarra[i]) porBarra[i] = { tipo: c.tipo, q1:0, q2:0, angulo:c.angulo||270, ax1:0, ax2:0 };
+    if (!porBarra[i]) porBarra[i] = { tipo: c.tipo, q1:0, q2:0, angulo:c.angulo??270, ax1:0, ax2:0 };
     const pb = porBarra[i];
     if (c.tipo === 'local')  { pb.q1 += (c.qIzq||0)*fac; pb.q2 += (c.qDer||0)*fac; }
-    if (c.tipo === 'global') { pb.q1 += (c.q1||0)*fac;   pb.q2 += (c.q2||0)*fac; pb.angulo=c.angulo||270; }
+    if (c.tipo === 'global') { pb.q1 += (c.q1||0)*fac;   pb.q2 += (c.q2||0)*fac; pb.angulo=c.angulo??270; }
     if (c.tipo === 'axial')  { pb.ax1 += (c.ax1||0)*fac; pb.ax2 += (c.ax2||0)*fac; }
   });
 
@@ -5983,7 +5983,7 @@ function drawCargasDistribuidas() {
       const q2 = c.tipo==='local' ? c.q2 : c.q2;
       if (Math.abs(q1)<1e-9 && Math.abs(q2)<1e-9) return;
       let nx2=perpX, ny2=perpY;
-      if (c.tipo==='global') { const ang=(c.angulo||270)*Math.PI/180; nx2=Math.cos(ang); ny2=Math.sin(ang); }
+      if (c.tipo==='global') { const ang=(c.angulo??270)*Math.PI/180; nx2=-Math.cos(ang); ny2=Math.sin(ang); }
 
       const q1L = Math.abs(q1)*ESCALA * (q1>=0?1:-1);
       const q2L = Math.abs(q2)*ESCALA * (q2>=0?1:-1);
@@ -8137,10 +8137,10 @@ function build3DScene() {
   Object.entries(cargasDistribuidas).forEach(([key, c]) => {
     const i = c._barraIdx !== undefined ? c._barraIdx : parseInt(key);
     if (isNaN(i) || i >= barras.length) return;
-    if (!porBarra3D[i]) porBarra3D[i] = { tipo:c.tipo, q1:0, q2:0, angulo:c.angulo||270, ax1:0, ax2:0 };
+    if (!porBarra3D[i]) porBarra3D[i] = { tipo:c.tipo, q1:0, q2:0, angulo:c.angulo??270, ax1:0, ax2:0 };
     const pb = porBarra3D[i];
     if (c.tipo==='local')  { pb.q1 += c.qIzq||0; pb.q2 += c.qDer||0; }
-    if (c.tipo==='global') { pb.q1 += c.q1||0;   pb.q2 += c.q2||0; pb.angulo=c.angulo||270; }
+    if (c.tipo==='global') { pb.q1 += c.q1||0;   pb.q2 += c.q2||0; pb.angulo=c.angulo??270; }
     if (c.tipo==='axial')  { pb.ax1 += c.ax1||0; pb.ax2 += c.ax2||0; }
   });
 
@@ -8174,7 +8174,7 @@ function build3DScene() {
         perpX =  uy3;   // ≡ uy_world
         perpY = -ux3;   // ≡ -ux_world
       } else {
-        const angRad = (c.angulo||270) * Math.PI/180;
+        const angRad = (c.angulo??270) * Math.PI/180;
         // La fuerza apunta en (cos,sin). El tail va en dirección opuesta
         perpX = -Math.cos(angRad);
         perpY = -Math.sin(angRad);
