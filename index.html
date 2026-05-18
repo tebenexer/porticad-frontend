@@ -5983,7 +5983,7 @@ function drawCargasDistribuidas() {
       const q2 = c.tipo==='local' ? c.q2 : c.q2;
       if (Math.abs(q1)<1e-9 && Math.abs(q2)<1e-9) return;
       let nx2=perpX, ny2=perpY;
-      if (c.tipo==='global') { const ang=(c.angulo||270)*Math.PI/180; nx2=Math.cos(ang); ny2=-Math.sin(ang); }
+      if (c.tipo==='global') { const ang=(c.angulo||270)*Math.PI/180; nx2=-Math.cos(ang); ny2=Math.sin(ang); }
 
       const q1L = Math.abs(q1)*ESCALA * (q1>=0?1:-1);
       const q2L = Math.abs(q2)*ESCALA * (q2>=0?1:-1);
