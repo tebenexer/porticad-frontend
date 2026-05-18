@@ -4629,8 +4629,8 @@ function _construirCdistObj() {
       const dx=n2.x-n1.x, dy=n2.y-n1.y, Lb=Math.sqrt(dx*dx+dy*dy); if(Lb<1e-9) return;
       const e1x=dx/Lb, e1y=dy/Lb, e2x=-dy/Lb, e2y=dx/Lb;
       cdistObj[i].fpara += (c.q1||0)*(gx*e1x+gy*e1y);
-      cdistObj[i].qIzq  += (c.q1||0)*(gx*e2x+gy*e2y);
-      cdistObj[i].qDer  += (c.q2||0)*(gx*e2x+gy*e2y);
+      cdistObj[i].qIzq  -= (c.q1||0)*(gx*e2x+gy*e2y);
+      cdistObj[i].qDer  -= (c.q2||0)*(gx*e2x+gy*e2y);
     }
   });
   return cdistObj;
@@ -4688,8 +4688,8 @@ function _escalarPorCombo(comboId, cdistObjBase) {
         const dx=n2.x-n1.x, dy=n2.y-n1.y, Lb=Math.sqrt(dx*dx+dy*dy); if(Lb<1e-9) return;
         const e1x=dx/Lb, e1y=dy/Lb, e2x=-dy/Lb, e2y=dx/Lb;
         fpara = (c.q1||0)*fac*(gx*e1x+gy*e1y);
-        qIzq  = (c.q1||0)*fac*(gx*e2x+gy*e2y);
-        qDer  = (c.q2||0)*fac*(gx*e2x+gy*e2y);
+        qIzq  = -(c.q1||0)*fac*(gx*e2x+gy*e2y);
+        qDer  = -(c.q2||0)*fac*(gx*e2x+gy*e2y);
       }
       if (!acumDist[i]) acumDist[i] = { barra:i, fpara:0, fperp:0, qIzq:0, qDer:0 };
       acumDist[i].fpara += fpara;
