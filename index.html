@@ -3815,13 +3815,13 @@ function drawCargas() {
       ctx.fillStyle = arrowColor;
       ctx.font      = `bold ${tamFuenteCargas}px Consolas, monospace`;
       ctx.textAlign = 'center';
-      ctx.fillText(mag.toFixed(2)+' kN', sx, sy - 14);
+      ctx.fillText(mag.toFixed(2)+' kN', sx, sy - tamFuenteCargas * 0.5 - 4);
 
       // Ángulo
       const angDeg = Math.atan2(Fy, Fx) * 180 / Math.PI;
       ctx.fillStyle = '#5599ff';
       ctx.font      = `${tamFuenteCargas}px Consolas, monospace`;
-      ctx.fillText(angDeg.toFixed(1)+'°', sx, sy - 26);
+      ctx.fillText(angDeg.toFixed(1)+'°', sx, sy - tamFuenteCargas * 1.6 - 4);
       ctx.textAlign = 'left';
 
       // Etiqueta combo activo
