@@ -1103,7 +1103,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       <span style="font-size:10px;font-weight:600">Redo</span>
     </button>
   </div>
-  <div class="ml-auto backend-status version-tip" data-version="v1.0001" style="cursor:pointer;" onclick="checkServerStatus()" title="Clic para verificar conexión">
+  <div class="ml-auto backend-status version-tip" data-version="v1.0003" style="cursor:pointer;" onclick="checkServerStatus()" title="Clic para verificar conexión">
     <div class="status-dot checking" id="dot"></div>
     <span id="backend-url" style="font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0.03em;">VERIFICANDO…</span>
   </div>
@@ -5753,7 +5753,7 @@ function joystickGlobalCalc(e) {
 }
 
 function initGlobalJoystick() {
-  globalAng = parseFloat(document.getElementById('cd-angulo')?.value) || 270;
+  globalAng = (v => isNaN(v) ? 270 : v)(parseFloat(document.getElementById('cd-angulo')?.value));
   updateGlobalDirButtons();
   drawGlobalJoystick();
 }
@@ -5796,7 +5796,7 @@ function onCDTipoChange() {
 }
 
 function actualizarDirPreview() {
-  const ang = parseFloat(document.getElementById('cd-angulo').value) || 270;
+  const ang = (v => isNaN(v) ? 270 : v)(parseFloat(document.getElementById('cd-angulo').value));
   const c2 = document.getElementById('cd-dir-canvas');
   if (!c2) return;
   const ctx2 = c2.getContext('2d');
@@ -5874,7 +5874,7 @@ function cdCargarCasoExistente() {
   setCDTipo(ex.tipo);
   onCDTipoChange();
   if (ex.tipo==='local')  { document.getElementById('cd-qIzq').value=ex.qIzq||0; document.getElementById('cd-qDer').value=ex.qDer||0; }
-  if (ex.tipo==='global') { document.getElementById('cd-gq1').value=ex.q1||0; document.getElementById('cd-gq2').value=ex.q2||0; document.getElementById('cd-angulo').value=ex.angulo||270; onGlobalAngInput(); }
+  if (ex.tipo==='global') { document.getElementById('cd-gq1').value=ex.q1||0; document.getElementById('cd-gq2').value=ex.q2||0; document.getElementById('cd-angulo').value=ex.angulo??270; onGlobalAngInput(); }
   if (ex.tipo==='axial')  { document.getElementById('cd-ax1').value=ex.ax1||0; document.getElementById('cd-ax2').value=ex.ax2||0; }
 }
 
@@ -5927,7 +5927,7 @@ function asignarCargaDist() {
   } else if (tipo === 'global') {
     const q1     = parseFloat(document.getElementById('cd-gq1').value)    || 0;
     const q2     = parseFloat(document.getElementById('cd-gq2').value)    || 0;
-    const angulo = parseFloat(document.getElementById('cd-angulo').value) || 270;
+    const angulo = (v => isNaN(v) ? 270 : v)(parseFloat(document.getElementById('cd-angulo').value));
     if (!q1 && !q2) { alert('Ingresa al menos un valor de carga.'); return; }
     carga = { tipo, q1, q2, angulo,
               dirX: Math.cos(angulo*Math.PI/180),
@@ -7620,7 +7620,7 @@ function exportarTXT() {
   let idxG = 1;
   Object.entries(cargasDistribuidas).forEach(([bIdx, c]) => {
     if (c.tipo !== 'global') return;
-    const ang = (c.angulo || 270) * Math.PI / 180;
+    const ang = (c.angulo ?? 270) * Math.PI / 180;
     const dirX = Math.cos(ang), dirY = Math.sin(ang);
     w(`DistGlobal${idxG++}`);
     w(`${f2(c.q1||0)} ${f2(c.q2||0)} ${f2(dirX)} ${f2(dirY)}`);
