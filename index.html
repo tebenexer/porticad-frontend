@@ -3820,7 +3820,7 @@ function drawCargas() {
       // Ángulo
       const angDeg = Math.atan2(Fy, Fx) * 180 / Math.PI;
       ctx.fillStyle = '#5599ff';
-      ctx.font      = '11px Consolas, monospace';
+      ctx.font      = `${tamFuenteCargas}px Consolas, monospace`;
       ctx.fillText(angDeg.toFixed(1)+'°', sx, sy - 26);
       ctx.textAlign = 'left';
 
