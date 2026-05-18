@@ -4214,6 +4214,7 @@ function inspeccionarBarra(idx) {
 
   // Tabla de extremos
   const tbody = document.getElementById('res-tabla-barra');
+  if (!tbody) return;
   const filas = [
     { lbl:'M (kNm)', c:'#cc88ff', v1:mVals[0],   v2:mVals[N-1], arr:mVals },
     { lbl:'V (kN)',  c:'#44ee88', v1:vVals[0],   v2:vVals[N-1], arr:vVals },
@@ -5058,12 +5059,17 @@ async function calcular() {
     draw();
 
   } catch (err) {
-    logApi('<span class="err">✗ SIN CONEXIÓN AL SERVIDOR\n\n' + err.message + '</span>');
+    const esRedError = err instanceof TypeError && (err.message.includes('fetch') || err.message.includes('Failed') || err.message.includes('NetworkError'));
+    const msg = esRedError ? '✗ SIN CONEXIÓN AL SERVIDOR\n\n' + err.message : '✗ Error al procesar resultados\n\n' + err.message;
+    logApi('<span class="err">' + msg + '</span>');
     setMsg('✗ Error: ' + err.message);
-    const _dot = document.getElementById('dot');
-    const _lbl = document.getElementById('backend-url');
-    if (_dot) { _dot.className = 'status-dot off'; }
-    if (_lbl) { _lbl.textContent = 'OFFLINE'; _lbl.style.color = '#ef4444'; }
+    console.error('[calcular]', err);
+    if (esRedError) {
+      const _dot = document.getElementById('dot');
+      const _lbl = document.getElementById('backend-url');
+      if (_dot) { _dot.className = 'status-dot off'; }
+      if (_lbl) { _lbl.textContent = 'OFFLINE'; _lbl.style.color = '#ef4444'; }
+    }
   }
 
   document.getElementById('btn-calc').disabled = false;
@@ -5109,7 +5115,8 @@ function renderResultados() {
     </tr>`;
   });
   html += '</tbody></table>';
-  document.getElementById('res-despl').innerHTML = html;
+  const elDespl = document.getElementById('res-despl');
+  if (elDespl) elDespl.innerHTML = html;
 
   // ── REACCIONES ───────────────────────────────────────
   html = `<table style="width:100%; border-collapse:collapse; ${mono}">
@@ -5135,7 +5142,8 @@ function renderResultados() {
     </tr>`;
   });
   html += '</tbody></table>';
-  document.getElementById('res-reac').innerHTML = hasReac ? html
+  const elReac = document.getElementById('res-reac');
+  if (elReac) elReac.innerHTML = hasReac ? html
     : '<p style="font-size:13px;color:var(--muted);padding:4px 0">Sin reacciones significativas</p>';
 
 }
