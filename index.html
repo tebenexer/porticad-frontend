@@ -6018,23 +6018,27 @@ function drawCargasDistribuidas() {
         ctx.closePath(); ctx.fill();
       }
       // Etiquetas qi / qd sin fondo, más allá de la punta de la flecha
+      // El signo de q define la dirección del offset (positivo/negativo)
       const lblColor = comboColor || lineColor;
-      const off = tamFuenteCargas + 8; // espacio extra fuera del área de carga
+      const off = tamFuenteCargas + 8;
       ctx.font = `bold ${tamFuenteCargas}px Consolas,monospace`;
       ctx.fillStyle = lblColor;
       if (Math.abs(q1) > 1e-9) {
+        const d1 = Math.sign(q1) * (Math.abs(q1)*ESCALA + off);
         ctx.textAlign = 'left';
-        ctx.fillText(`qi=${q1.toFixed(1)} kN/m`, x1 + nx2*(Math.abs(q1)*ESCALA + off) + 3, y1 + ny2*(Math.abs(q1)*ESCALA + off));
+        ctx.fillText(`qi=${q1.toFixed(1)} kN/m`, x1 + nx2*d1 + 3, y1 + ny2*d1);
       }
       if (Math.abs(q2) > 1e-9) {
+        const d2 = Math.sign(q2) * (Math.abs(q2)*ESCALA + off);
         ctx.textAlign = 'right';
-        ctx.fillText(`qd=${q2.toFixed(1)} kN/m`, x2 + nx2*(Math.abs(q2)*ESCALA + off) - 3, y2 + ny2*(Math.abs(q2)*ESCALA + off));
+        ctx.fillText(`qd=${q2.toFixed(1)} kN/m`, x2 + nx2*d2 - 3, y2 + ny2*d2);
       }
       if (c.tipo === 'global') {
         ctx.font = `${tamFuenteCargas}px Consolas,monospace`;
         ctx.textAlign = 'center';
-        const midOff = Math.abs(q1+q2)/2*ESCALA + off;
-        ctx.fillText(`θ=${c.angulo}°`, (x1+x2)/2 + nx2*midOff, (y1+y2)/2 + ny2*midOff - tamFuenteCargas);
+        const qMid = (q1+q2)/2;
+        const dMid = Math.sign(qMid) * (Math.abs(qMid)*ESCALA + off);
+        ctx.fillText(`θ=${c.angulo}°`, (x1+x2)/2 + nx2*dMid, (y1+y2)/2 + ny2*dMid - tamFuenteCargas);
       }
       ctx.textAlign = 'left';
 
