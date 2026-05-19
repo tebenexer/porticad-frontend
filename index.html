@@ -1103,7 +1103,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       <span style="font-size:10px;font-weight:600">Redo</span>
     </button>
   </div>
-  <div class="ml-auto backend-status version-tip" data-version="v1.0004" style="cursor:pointer;" onclick="checkServerStatus()" title="Clic para verificar conexión">
+  <div class="ml-auto backend-status version-tip" data-version="v1.0005" style="cursor:pointer;" onclick="checkServerStatus()" title="Clic para verificar conexión">
     <div class="status-dot checking" id="dot"></div>
     <span id="backend-url" style="font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0.03em;">VERIFICANDO…</span>
   </div>
@@ -4690,6 +4690,63 @@ function cerrarModalTabla() {
   document.getElementById('modal-tabla').style.display = 'none';
   _modalTablaActual = null;
   document.removeEventListener('keydown', document._mtEsc);
+}
+
+function exportarTablaCSV() {
+  if (!resultados || !_modalTablaActual) return;
+  const uD = document.getElementById('mt-unidad').value;
+  const tipo = _modalTablaActual;
+  let rows = [], nombre = '';
+
+  if (tipo === 'despl') {
+    const fD = { m:1, cm:100, mm:1000, in:39.3701 }[uD];
+    nombre = `desplazamientos_${uD}`;
+    rows.push(['Nudo', `Ux (${uD})`, `Uy (${uD})`, 'theta (rad)', `|U| (${uD})`]);
+    resultados.desplazamientos.forEach(d => {
+      const ux  = d.Ux_m * fD;
+      const uy  = d.Uy_m * fD;
+      const mag = Math.hypot(d.Ux_m, d.Uy_m) * fD;
+      rows.push([d.nudo, ux.toFixed(6), uy.toFixed(6), d.theta.toFixed(8), mag.toFixed(6)]);
+    });
+    // Min/Max al pie
+    const data = resultados.desplazamientos.map(d => ({
+      ux: d.Ux_m*fD, uy: d.Uy_m*fD, th: d.theta, mag: Math.hypot(d.Ux_m,d.Uy_m)*fD
+    }));
+    const maxUx  = Math.max(...data.map(d=>Math.abs(d.ux)));
+    const maxUy  = Math.max(...data.map(d=>Math.abs(d.uy)));
+    const maxMag = Math.max(...data.map(d=>d.mag));
+    rows.push([]);
+    rows.push(['MAX |val|', maxUx.toFixed(6), maxUy.toFixed(6), '', maxMag.toFixed(6)]);
+
+  } else {
+    const fF   = { kN:1, ton:0.101972, N:1000, kgf:101.972 }[uD];
+    const lblF = { kN:'kN', ton:'tf', N:'N', kgf:'kgf' }[uD];
+    const lblM = { kN:'kNm', ton:'tf·m', N:'N·m', kgf:'kgf·m' }[uD];
+    nombre = `reacciones_${uD}`;
+    rows.push(['Nudo', `Rx (${lblF})`, `Ry (${lblF})`, `Mz (${lblM})`]);
+    let sRx=0, sRy=0;
+    resultados.reacciones.forEach(r => {
+      const rx=r.Rx*fF, ry=r.Ry*fF, mz=r.Mz*fF;
+      if (Math.abs(rx)+Math.abs(ry)+Math.abs(mz) < 0.001) return;
+      sRx+=rx; sRy+=ry;
+      rows.push([r.nudo, rx.toFixed(5), ry.toFixed(5), mz.toFixed(5)]);
+    });
+    rows.push([]);
+    rows.push(['SUMA', sRx.toFixed(5), sRy.toFixed(5), '—']);
+  }
+
+  const csv = rows.map(r => r.map(c => {
+    const s = String(c);
+    return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g,'""')}"` : s;
+  }).join(',')).join('\r\n');
+
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `porticad_${nombre}.csv`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // Hover en canvas del modal
@@ -9898,6 +9955,8 @@ setApoyoPreset('empotrado');
       <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
         <select id="mt-unidad" onchange="refrescarModalTabla()"
           style="font-family:var(--mono); font-size:12px; background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:3px 8px; cursor:pointer;"></select>
+        <button onclick="exportarTablaCSV()" title="Exportar como CSV"
+          style="font-size:12px; background:var(--surface2); border:1px solid var(--border); color:#34d399; border-radius:4px; padding:3px 12px; cursor:pointer; font-weight:600;">⬇ CSV</button>
         <button onclick="cerrarModalTabla()" style="font-size:13px; background:none; border:1px solid var(--border); color:var(--muted); border-radius:4px; padding:3px 12px; cursor:pointer;">✕ cerrar</button>
       </div>
     </div>
