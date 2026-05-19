@@ -1103,7 +1103,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       <span style="font-size:10px;font-weight:600">Redo</span>
     </button>
   </div>
-  <div class="ml-auto backend-status version-tip" data-version="v1.0003" style="cursor:pointer;" onclick="checkServerStatus()" title="Clic para verificar conexión">
+  <div class="ml-auto backend-status version-tip" data-version="v1.0004" style="cursor:pointer;" onclick="checkServerStatus()" title="Clic para verificar conexión">
     <div class="status-dot checking" id="dot"></div>
     <span id="backend-url" style="font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0.03em;">VERIFICANDO…</span>
   </div>
@@ -2320,28 +2320,34 @@ document.addEventListener('DOMContentLoaded', async function() {
         <div id="res-global">
 
           <!-- Desplazamientos -->
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; gap:4px;">
             <div class="section-title" style="margin:0">Desplazamientos</div>
-            <select id="res-unidad-despl" onchange="renderResultados()"
-              style="font-family:var(--mono); font-size:12px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:2px 6px; cursor:pointer;">
-              <option value="m">m</option>
-              <option value="cm" selected>cm</option>
-              <option value="mm">mm</option>
-              <option value="in">in</option>
-            </select>
+            <div style="display:flex; align-items:center; gap:5px; margin-left:auto;">
+              <select id="res-unidad-despl" onchange="renderResultados()"
+                style="font-family:var(--mono); font-size:12px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:2px 6px; cursor:pointer;">
+                <option value="m">m</option>
+                <option value="cm" selected>cm</option>
+                <option value="mm">mm</option>
+                <option value="in">in</option>
+              </select>
+              <button onclick="expandirTabla('despl')" style="font-size:11px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:3px;padding:1px 7px;cursor:pointer;">⛶ ampliar</button>
+            </div>
           </div>
           <div id="res-despl"><p style="font-size:14px;color:var(--muted)">Corre el análisis primero.</p></div>
 
           <!-- Reacciones -->
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-top:14px; margin-bottom:6px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-top:14px; margin-bottom:6px; gap:4px;">
             <div class="section-title" style="margin:0">Reacciones</div>
-            <select id="res-unidad-fuerza" onchange="renderResultados(); draw()"
-              style="font-family:var(--mono); font-size:12px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:2px 6px; cursor:pointer;">
-              <option value="kN" selected>kN / kNm</option>
-              <option value="ton">ton-f</option>
-              <option value="N">N / Nm</option>
-              <option value="kgf">kgf</option>
-            </select>
+            <div style="display:flex; align-items:center; gap:5px; margin-left:auto;">
+              <select id="res-unidad-fuerza" onchange="renderResultados(); draw()"
+                style="font-family:var(--mono); font-size:12px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:2px 6px; cursor:pointer;">
+                <option value="kN" selected>kN / kNm</option>
+                <option value="ton">ton-f</option>
+                <option value="N">N / Nm</option>
+                <option value="kgf">kgf</option>
+              </select>
+              <button onclick="expandirTabla('reac')" style="font-size:11px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:3px;padding:1px 7px;cursor:pointer;">⛶ ampliar</button>
+            </div>
           </div>
           <div id="res-reac"></div>
 
@@ -4481,6 +4487,209 @@ function cerrarModal() {
   document.getElementById('modal-diagrama').style.display = 'none';
   modalDatos = null;
   document.removeEventListener('keydown', document._modalEsc);
+}
+
+// ─── Modal tablas ampliadas (Desplazamientos / Reacciones) ───────────────────
+let _modalTablaActual = null;
+
+function expandirTabla(tipo) {
+  if (!resultados) return;
+  _modalTablaActual = tipo;
+
+  const sel = document.getElementById('mt-unidad');
+  sel.innerHTML = '';
+  if (tipo === 'despl') {
+    [['m','m'],['cm','cm'],['mm','mm'],['in','in']].forEach(([v,l]) => {
+      const o = document.createElement('option'); o.value=v; o.textContent=l;
+      if (v === (document.getElementById('res-unidad-despl')?.value||'cm')) o.selected=true;
+      sel.appendChild(o);
+    });
+    document.getElementById('mt-icono').textContent = '📐';
+    document.getElementById('mt-titulo').textContent = 'Desplazamientos nodales';
+  } else {
+    [['kN','kN / kNm'],['ton','ton-f'],['N','N / Nm'],['kgf','kgf']].forEach(([v,l]) => {
+      const o = document.createElement('option'); o.value=v; o.textContent=l;
+      if (v === (document.getElementById('res-unidad-fuerza')?.value||'kN')) o.selected=true;
+      sel.appendChild(o);
+    });
+    document.getElementById('mt-icono').textContent = '⚓';
+    document.getElementById('mt-titulo').textContent = 'Reacciones en apoyos';
+  }
+
+  const modal = document.getElementById('modal-tabla');
+  modal.style.display = 'flex';
+  refrescarModalTabla();
+
+  document._mtEsc = e => { if (e.key === 'Escape') cerrarModalTabla(); };
+  document.addEventListener('keydown', document._mtEsc);
+  modal.addEventListener('click', e => { if (e.target === modal) cerrarModalTabla(); }, { once:true });
+}
+
+function refrescarModalTabla() {
+  if (!resultados || !_modalTablaActual) return;
+  const tipo = _modalTablaActual;
+  const uF   = document.getElementById('mt-unidad').value;
+
+  if (tipo === 'despl') _renderTablaDespl(uF);
+  else                  _renderTablaReac(uF);
+}
+
+function _renderTablaDespl(uD) {
+  const fD   = { m:1, cm:100, mm:1000, in:39.3701 }[uD];
+  const data = resultados.desplazamientos.map(d => ({
+    nudo : d.nudo,
+    ux   : d.Ux_m * fD,
+    uy   : d.Uy_m * fD,
+    th   : d.theta,
+    mag  : Math.hypot(d.Ux_m, d.Uy_m) * fD
+  }));
+
+  document.getElementById('mt-subtitulo').textContent =
+    `${data.length} nudo${data.length!==1?'s':''} — unidad: ${uD}`;
+
+  // Stats
+  const maxUx  = data.reduce((a,b) => Math.abs(b.ux)>Math.abs(a.ux)?b:a, data[0]);
+  const maxUy  = data.reduce((a,b) => Math.abs(b.uy)>Math.abs(a.uy)?b:a, data[0]);
+  const maxMag = data.reduce((a,b) => b.mag>a.mag?b:a, data[0]);
+  const maxTh  = data.reduce((a,b) => Math.abs(b.th)>Math.abs(a.th)?b:a, data[0]);
+
+  const stat = (label, val, unit, color, nudo) =>
+    `<div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:8px 14px; min-width:110px; flex:1;">
+       <div style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:3px;">${label}</div>
+       <div style="font-size:15px; font-weight:700; color:${color}; font-family:var(--mono);">${Math.abs(val)<1e-9?'0':val.toFixed(4)}</div>
+       <div style="font-size:10px; color:var(--muted); margin-top:2px;">${unit} · Nudo ${nudo}</div>
+     </div>`;
+
+  document.getElementById('mt-stats').innerHTML =
+    stat('Máx |Ux|', maxUx.ux, uD, '#60a5fa', maxUx.nudo) +
+    stat('Máx |Uy|', maxUy.uy, uD, '#f87171', maxUy.nudo) +
+    stat('Máx |U|',  maxMag.mag, uD, '#34d399', maxMag.nudo) +
+    stat('Máx |θ|',  maxTh.th,  'rad', '#c4b5fd', maxTh.nudo);
+
+  // Tabla
+  const thStyle = 'padding:9px 12px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; text-align:right; border-bottom:2px solid var(--border);';
+  let html = `<table style="width:100%; border-collapse:collapse; font-family:var(--mono); font-size:13px;">
+    <thead><tr style="background:var(--surface2);">
+      <th style="${thStyle} text-align:left; color:var(--muted);">Nudo</th>
+      <th style="${thStyle} color:#60a5fa;">Ux (${uD})</th>
+      <th style="${thStyle} color:#f87171;">Uy (${uD})</th>
+      <th style="${thStyle} color:#c4b5fd;">θ (rad)</th>
+      <th style="${thStyle} color:#34d399;">|U| (${uD})</th>
+    </tr></thead><tbody>`;
+
+  data.forEach((d, k) => {
+    const isMaxUx  = d.nudo === maxUx.nudo;
+    const isMaxUy  = d.nudo === maxUy.nudo;
+    const isMaxMag = d.nudo === maxMag.nudo;
+    const isMaxTh  = d.nudo === maxTh.nudo;
+    const bg = k%2===0 ? 'rgba(255,255,255,0.02)' : 'transparent';
+    const tdS = 'padding:8px 12px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.05);';
+    const hl  = (ok, col) => ok ? `background:${col}22; color:${col}; font-weight:700; border-radius:4px;` : '';
+    html += `<tr style="background:${bg};">
+      <td style="padding:8px 12px; border-bottom:1px solid rgba(255,255,255,0.05); font-weight:600; color:var(--text);">N${d.nudo}</td>
+      <td style="${tdS} ${hl(isMaxUx,'#60a5fa')}">${Math.abs(d.ux)<1e-9?'—':d.ux.toFixed(5)}</td>
+      <td style="${tdS} ${hl(isMaxUy,'#f87171')}">${Math.abs(d.uy)<1e-9?'—':d.uy.toFixed(5)}</td>
+      <td style="${tdS} ${hl(isMaxTh,'#c4b5fd')} color:var(--muted);">${Math.abs(d.th)<1e-9?'—':d.th.toFixed(7)}</td>
+      <td style="${tdS} ${hl(isMaxMag,'#34d399')}">${d.mag<1e-9?'—':d.mag.toFixed(5)}</td>
+    </tr>`;
+  });
+
+  // Fila de mínimos
+  const minUx  = data.reduce((a,b)=>b.ux<a.ux?b:a, data[0]);
+  const minUy  = data.reduce((a,b)=>b.uy<a.uy?b:a, data[0]);
+  const rowS   = 'padding:8px 12px; text-align:right; font-weight:700; border-top:2px solid var(--border);';
+  html += `<tr style="background:rgba(255,255,255,0.04);">
+    <td style="padding:8px 12px; font-size:11px; color:var(--muted); font-weight:700; border-top:2px solid var(--border);">MÍN</td>
+    <td style="${rowS} color:#60a5fa;">${minUx.ux.toFixed(5)}</td>
+    <td style="${rowS} color:#f87171;">${minUy.uy.toFixed(5)}</td>
+    <td style="${rowS} color:var(--muted);">—</td>
+    <td style="${rowS} color:var(--muted);">—</td>
+  </tr>`;
+  html += '</tbody></table>';
+  document.getElementById('mt-cuerpo').innerHTML = html;
+}
+
+function _renderTablaReac(uF) {
+  const fF   = { kN:1, ton:0.101972, N:1000, kgf:101.972 }[uF];
+  const lblF = { kN:'kN', ton:'tf', N:'N', kgf:'kgf' }[uF];
+  const lblM = { kN:'kNm', ton:'tf·m', N:'N·m', kgf:'kgf·m' }[uF];
+
+  const data = resultados.reacciones
+    .filter(r => Math.abs(r.Rx)+Math.abs(r.Ry)+Math.abs(r.Mz) > 0.001)
+    .map(r => ({ nudo:r.nudo, rx:r.Rx*fF, ry:r.Ry*fF, mz:r.Mz*fF }));
+
+  if (!data.length) {
+    document.getElementById('mt-subtitulo').textContent = 'Sin reacciones significativas';
+    document.getElementById('mt-stats').innerHTML = '';
+    document.getElementById('mt-cuerpo').innerHTML =
+      '<p style="color:var(--muted); padding:20px; text-align:center;">Sin reacciones significativas en los apoyos.</p>';
+    return;
+  }
+
+  document.getElementById('mt-subtitulo').textContent =
+    `${data.length} apoyo${data.length!==1?'s':''} con reacción`;
+
+  const sumRx = data.reduce((s,d)=>s+d.rx, 0);
+  const sumRy = data.reduce((s,d)=>s+d.ry, 0);
+  const maxRx = data.reduce((a,b)=>Math.abs(b.rx)>Math.abs(a.rx)?b:a, data[0]);
+  const maxRy = data.reduce((a,b)=>Math.abs(b.ry)>Math.abs(a.ry)?b:a, data[0]);
+  const maxMz = data.reduce((a,b)=>Math.abs(b.mz)>Math.abs(a.mz)?b:a, data[0]);
+
+  const stat = (label, val, unit, color, sub) =>
+    `<div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:8px 14px; min-width:110px; flex:1;">
+       <div style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:3px;">${label}</div>
+       <div style="font-size:15px; font-weight:700; color:${color}; font-family:var(--mono);">${Math.abs(val)<1e-9?'0':val.toFixed(3)}</div>
+       <div style="font-size:10px; color:var(--muted); margin-top:2px;">${unit}${sub?' · '+sub:''}</div>
+     </div>`;
+
+  const eqOk = col => Math.abs(col) < 0.01;
+  document.getElementById('mt-stats').innerHTML =
+    stat('Σ Rx', sumRx, lblF, eqOk(sumRx)?'#34d399':'#f87171', 'equilibrio') +
+    stat('Σ Ry', sumRy, lblF, eqOk(sumRy)?'#34d399':'#f87171', 'equilibrio') +
+    stat('Máx |Rx|', maxRx.rx, lblF, '#60a5fa', 'N'+maxRx.nudo) +
+    stat('Máx |Ry|', maxRy.ry, lblF, '#f87171', 'N'+maxRy.nudo) +
+    stat('Máx |Mz|', maxMz.mz, lblM, '#c4b5fd', 'N'+maxMz.nudo);
+
+  const thStyle = 'padding:9px 12px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; text-align:right; border-bottom:2px solid var(--border);';
+  let html = `<table style="width:100%; border-collapse:collapse; font-family:var(--mono); font-size:13px;">
+    <thead><tr style="background:var(--surface2);">
+      <th style="${thStyle} text-align:left; color:var(--muted);">Nudo</th>
+      <th style="${thStyle} color:#60a5fa;">Rx (${lblF})</th>
+      <th style="${thStyle} color:#f87171;">Ry (${lblF})</th>
+      <th style="${thStyle} color:#c4b5fd;">Mz (${lblM})</th>
+    </tr></thead><tbody>`;
+
+  data.forEach((d, k) => {
+    const isMaxRx = d.nudo === maxRx.nudo;
+    const isMaxRy = d.nudo === maxRy.nudo;
+    const isMaxMz = d.nudo === maxMz.nudo;
+    const bg  = k%2===0 ? 'rgba(255,255,255,0.02)' : 'transparent';
+    const tdS = 'padding:8px 12px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.05);';
+    const hl  = (ok, col) => ok ? `background:${col}22; color:${col}; font-weight:700; border-radius:4px;` : 'color:var(--text);';
+    html += `<tr style="background:${bg};">
+      <td style="padding:8px 12px; border-bottom:1px solid rgba(255,255,255,0.05); font-weight:600; color:var(--text);">N${d.nudo}</td>
+      <td style="${tdS} ${hl(isMaxRx,'#60a5fa')}">${Math.abs(d.rx)<0.001?'—':d.rx.toFixed(4)}</td>
+      <td style="${tdS} ${hl(isMaxRy,'#f87171')}">${Math.abs(d.ry)<0.001?'—':d.ry.toFixed(4)}</td>
+      <td style="${tdS} ${hl(isMaxMz,'#c4b5fd')}">${Math.abs(d.mz)<0.001?'—':d.mz.toFixed(4)}</td>
+    </tr>`;
+  });
+
+  const rowS = 'padding:8px 12px; text-align:right; font-weight:700; border-top:2px solid var(--border);';
+  const eqStyle = col => `color:${eqOk(col)?'#34d399':'#f87171'};`;
+  html += `<tr style="background:rgba(255,255,255,0.04);">
+    <td style="padding:8px 12px; font-size:11px; color:var(--muted); font-weight:700; border-top:2px solid var(--border);">Σ</td>
+    <td style="${rowS} ${eqStyle(sumRx)}">${sumRx.toFixed(3)}</td>
+    <td style="${rowS} ${eqStyle(sumRy)}">${sumRy.toFixed(3)}</td>
+    <td style="${rowS} color:var(--muted);">—</td>
+  </tr>`;
+  html += '</tbody></table>';
+  document.getElementById('mt-cuerpo').innerHTML = html;
+}
+
+function cerrarModalTabla() {
+  document.getElementById('modal-tabla').style.display = 'none';
+  _modalTablaActual = null;
+  document.removeEventListener('keydown', document._mtEsc);
 }
 
 // Hover en canvas del modal
@@ -9676,6 +9885,29 @@ function syncApoyoPanel() {
 setApoyoPreset('empotrado');
 </script>
 <!-- ═══════════════════ MODAL DIAGRAMA ═══════════════════ -->
+<!-- ══════════════ MODAL TABLA RESULTADOS ══════════════ -->
+<div id="modal-tabla" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.72); z-index:9999; align-items:flex-start; justify-content:center; padding-top:48px; overflow-y:auto;">
+  <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:22px 26px; min-width:560px; max-width:92vw; width:780px; position:relative; box-shadow:0 16px 48px rgba(0,0,0,0.5);">
+    <!-- Cabecera -->
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+      <span id="mt-icono" style="font-size:20px;"></span>
+      <div>
+        <div id="mt-titulo" style="font-size:16px; font-weight:700; color:var(--blue-text);"></div>
+        <div id="mt-subtitulo" style="font-size:12px; color:var(--muted); font-family:var(--mono); margin-top:1px;"></div>
+      </div>
+      <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+        <select id="mt-unidad" onchange="refrescarModalTabla()"
+          style="font-family:var(--mono); font-size:12px; background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:3px 8px; cursor:pointer;"></select>
+        <button onclick="cerrarModalTabla()" style="font-size:13px; background:none; border:1px solid var(--border); color:var(--muted); border-radius:4px; padding:3px 12px; cursor:pointer;">✕ cerrar</button>
+      </div>
+    </div>
+    <!-- Stats rápidos -->
+    <div id="mt-stats" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;"></div>
+    <!-- Tabla -->
+    <div id="mt-cuerpo" style="overflow-x:auto;"></div>
+  </div>
+</div>
+
 <div id="modal-diagrama" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center;">
   <div style="background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:18px; min-width:600px; max-width:90vw; position:relative;">
     <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
