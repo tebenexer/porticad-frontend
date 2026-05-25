@@ -9078,7 +9078,7 @@ async function checkServerStatus() {
   label.style.color = '#f59e0b';
 
   const url = document.getElementById('api-url')?.value?.trim()
-            || 'https://porticad-backend-production.up.railway.app';
+            || 'https://porticad-backend.onrender.com';
   try {
     const res = await fetch(url + '/salud', {
       method: 'GET',
@@ -9541,7 +9541,7 @@ function zoomOut() {
 async function cargarContador() {
   try {
     const url = document.getElementById('api-url')?.value?.trim()
-              || 'https://porticad-backend-production.up.railway.app';
+              || 'https://porticad-backend.onrender.com';
     const res  = await fetch(url + '/contador');
     if (!res.ok) return;
     const data = await res.json();
@@ -10022,7 +10022,7 @@ setApoyoPreset('empotrado');
   </div>
   <div class="field">
     <label style="font-size:12px; color:var(--muted);">URL del servidor</label>
-    <input id="api-url" value="https://porticad-backend-production.up.railway.app" style="display:none;" />
+    <input id="api-url" value="https://porticad-backend.onrender.com" style="display:none;" />
   </div>
 </div>
 <!-- Modal para nombre de archivo -->
