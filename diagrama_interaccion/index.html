@@ -196,6 +196,99 @@ canvas#sectionCanvas { display: block; max-width: 100%; }
   background: var(--sidebar); border: 1px solid var(--border);
   border-radius: 8px; padding: 8px 12px;
 }
+
+/* ── Mobile ── */
+@media (max-width: 768px) {
+  body {
+    height: auto;
+    overflow: auto;
+  }
+
+  /* Single-column stack: chart first, inputs second, right-panel last */
+  .main {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    overflow: visible;
+    min-height: unset;
+  }
+
+  /* Reorder: chart panel first (order 1), inputs second (order 2), right-panel third (order 3) */
+  .card:not(.chart-panel):not(.section-card):not(.checks-card) {
+    order: 2;
+  }
+  .chart-panel {
+    order: 1;
+  }
+  .right-panel {
+    order: 3;
+  }
+
+  /* Chart panel: fixed height on mobile so it doesn't collapse */
+  .chart-panel {
+    height: 380px;
+  }
+
+  /* Right panel: two cards side by side above 480px */
+  .right-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    overflow: visible;
+  }
+
+  /* Inputs card body: collapsible on mobile */
+  .card-body.collapsed {
+    display: none;
+  }
+
+  /* Accordion toggle button */
+  #mob-toggle-inputs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    background: none;
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 3px 9px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all .15s;
+  }
+  #mob-toggle-inputs:hover {
+    border-color: var(--accent2);
+    color: var(--accent);
+  }
+
+  /* Hide topbar breadcrumb */
+  .topbar-crumb {
+    display: none;
+  }
+
+  /* Topbar wraps */
+  .topbar {
+    height: auto;
+    min-height: 44px;
+    flex-wrap: wrap;
+    padding: 6px 12px;
+  }
+}
+
+/* Right panel stacks below 480px */
+@media (max-width: 480px) {
+  .right-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* On desktop, hide the accordion toggle button */
+@media (min-width: 769px) {
+  #mob-toggle-inputs {
+    display: none;
+  }
+}
 </style>
 </head>
 <body>
@@ -231,8 +324,9 @@ canvas#sectionCanvas { display: block; max-width: 100%; }
         <path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7z"/>
       </svg>
       Parámetros
+      <button id="mob-toggle-inputs" onclick="toggleMobInputs()" title="Mostrar/ocultar parámetros">&#9660; Parámetros</button>
     </div>
-    <div class="card-body">
+    <div class="card-body" id="inputs-card-body">
 
       <!-- Tipo de sección -->
       <div>
@@ -1074,6 +1168,15 @@ function readURLParams(){
   if(sp.has('fy')) document.getElementById('fy').value=sp.get('fy');
   if(sp.has('Pu')) document.getElementById('Pu').value=sp.get('Pu');
   if(sp.has('Mu')) document.getElementById('Mu').value=sp.get('Mu');
+}
+
+/* ── Accordion toggle for mobile inputs panel ── */
+function toggleMobInputs() {
+  const body = document.getElementById('inputs-card-body');
+  const btn  = document.getElementById('mob-toggle-inputs');
+  if (!body || !btn) return;
+  const collapsed = body.classList.toggle('collapsed');
+  btn.textContent = collapsed ? '▶ Parámetros' : '▼ Parámetros';
 }
 
 /* ── Init ── */

@@ -221,6 +221,81 @@
     .err-box { background: #da363314; border: 1px solid #da363340;
                border-radius: 8px; padding: 12px 14px; color: #f85149; font-size: 13px; }
     .empty-hint { color: #6e7681; font-size: 12px; text-align: center; padding: 30px; }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+      body {
+        overflow: auto;
+        height: auto;
+        min-height: 100vh;
+      }
+
+      /* Stack layout: inputs on top, results below */
+      .main {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+
+      .panel-inputs {
+        border-right: none;
+        border-bottom: 1px solid #21262d;
+      }
+
+      .panel-results {
+        display: flex;
+        flex-direction: column;
+        overflow: visible;
+      }
+
+      /* Summary strip: horizontal scroll, no wrap */
+      .summary-strip {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* Content area: single column */
+      .content-area {
+        grid-template-columns: 1fr;
+        overflow: visible;
+      }
+
+      /* Combos panel: limited height with scroll */
+      .combos-panel {
+        border-right: none;
+        border-bottom: 1px solid #21262d;
+        max-height: 380px;
+        overflow-y: auto;
+      }
+
+      /* Viz panel: full width */
+      .viz-panel {
+        overflow-y: visible;
+      }
+
+      /* Canvas scales to container */
+      canvas#cviz {
+        max-width: 100%;
+        height: auto;
+      }
+
+      .cviz-wrap {
+        overflow: hidden;
+      }
+
+      /* Hide breadcrumb in topbar */
+      .topbar-crumb {
+        display: none;
+      }
+
+      /* Topbar wraps if needed */
+      .topbar {
+        height: auto;
+        min-height: 44px;
+        flex-wrap: wrap;
+        padding: 6px 12px;
+      }
+    }
   </style>
 </head>
 <body>
