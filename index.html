@@ -1102,6 +1102,34 @@ document.addEventListener('DOMContentLoaded', async function() {
       </svg>
       <span style="font-size:10px;font-weight:600">Redo</span>
     </button>
+
+    <!-- ── Multi-Tools ───────────────────────────────────────── -->
+    <div style="width:1px;height:24px;background:#30363d;margin:0 6px;flex-shrink:0;"></div>
+    <div style="position:relative;">
+      <button class="tbtn tb-act" id="btn-multitools" onclick="toggleMultiTools(event)" data-tip="Multi-Tools — otras herramientas" style="gap:5px;color:#58a6ff;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+          <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+          <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+          <rect x="14" y="14" width="7" height="7" rx="1.5"/>
+        </svg>
+        <span style="font-size:10px;font-weight:700">Multi-Tools</span>
+      </button>
+
+      <!-- Panel desplegable -->
+      <div id="multitools-panel" style="display:none;position:absolute;top:calc(100% + 8px);left:0;background:#161b22;border:1px solid #30363d;border-radius:10px;padding:10px 8px;min-width:200px;z-index:2000;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+        <div style="font-size:10px;font-weight:700;color:#58a6ff;padding:4px 8px 8px;letter-spacing:.5px;border-bottom:1px solid #21262d;margin-bottom:8px;">
+          ⚡ MULTI-TOOLS
+        </div>
+        <div id="multitools-links">
+          <!-- aquí se agregarán los links a nuevas herramientas -->
+          <div style="color:#6e7681;font-size:11px;text-align:center;padding:14px 8px;">
+            Próximamente...
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
   <div class="ml-auto backend-status version-tip" data-version="v1.0005" style="cursor:pointer;" onclick="checkServerStatus()" title="Clic para verificar conexión">
     <div class="status-dot checking" id="dot"></div>
@@ -7420,6 +7448,25 @@ function redoAccion() {
   updateStatus(); draw();
   setMsg('Rehacer — ' + redoStack.length + ' pasos restantes');
 }
+
+// ── Multi-Tools ──────────────────────────────────────────────────────────────
+function toggleMultiTools(e) {
+  e.stopPropagation();
+  const panel = document.getElementById('multitools-panel');
+  if (!panel) return;
+  const visible = panel.style.display !== 'none';
+  panel.style.display = visible ? 'none' : 'block';
+}
+
+document.addEventListener('click', function(e) {
+  const panel = document.getElementById('multitools-panel');
+  const btn   = document.getElementById('btn-multitools');
+  if (panel && panel.style.display !== 'none') {
+    if (!panel.contains(e.target) && !btn.contains(e.target)) {
+      panel.style.display = 'none';
+    }
+  }
+});
 
 function actualizarBtnsUndoRedo() {
   const bu = document.getElementById('act-undo');
