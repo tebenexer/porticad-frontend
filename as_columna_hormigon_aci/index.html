@@ -874,6 +874,17 @@ function renderVerif(res, Pu, Mu) {
 }
 
 // ═══════════════════════════════════════════════════════
+// RNG con semilla — textura determinista
+// ═══════════════════════════════════════════════════════
+function seededRng(seed) {
+  let s = seed | 0;
+  return function() {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    return (s >>> 0) / 0xffffffff;
+  };
+}
+
+// ═══════════════════════════════════════════════════════
 // CANVAS — DIBUJAR SECCIÓN
 // ═══════════════════════════════════════════════════════
 function dibujarSeccion(b, h, r, n_barras, d_barra, Ast_req) {
@@ -887,12 +898,66 @@ function dibujarSeccion(b, h, r, n_barras, d_barra, Ast_req) {
   const esc = Math.min((W-2*margin)/b, (H-2*margin)/h);
   const offX = (W - b*esc)/2, offY = (H - h*esc)/2;
 
-  // Sombra y sección
-  ctx.shadowColor='rgba(88,166,255,0.12)'; ctx.shadowBlur=18;
-  ctx.fillStyle='#21262d';
+  // ── Sección con textura hormigón ──────────────────────────
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(offX, offY, b*esc, h*esc);
+  ctx.clip();
+
+  // Base: color hormigón gris cálido
+  ctx.fillStyle = '#b0afa6';
+  ctx.fillRect(offX, offY, b*esc, h*esc);
+
+  // Variación base (gradiente sutil de iluminación)
+  const grd = ctx.createLinearGradient(offX, offY, offX + b*esc, offY + h*esc);
+  grd.addColorStop(0,    'rgba(255,255,245,0.18)');
+  grd.addColorStop(0.45, 'rgba(255,255,245,0.04)');
+  grd.addColorStop(1,    'rgba(0,0,0,0.12)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(offX, offY, b*esc, h*esc);
+
+  // Áridos gruesos: elipses irregulares (grava)
+  const rng = seededRng(b * 1000 + h);
+  const nGrava = Math.floor((b * h * esc * esc) / 120);
+  for (let i = 0; i < nGrava; i++) {
+    const px  = offX + rng() * b * esc;
+    const py  = offY + rng() * h * esc;
+    const sz  = 2.5 + rng() * 5;
+    const rot = rng() * Math.PI;
+    const g   = 115 + Math.floor(rng() * 60);
+    const a   = 0.25 + rng() * 0.35;
+    ctx.fillStyle = `rgba(${g},${g-3},${g-8},${a})`;
+    ctx.beginPath();
+    ctx.ellipse(px, py, sz, sz * (0.5 + rng()*0.6), rot, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // Arena fina: puntos pequeños
+  const nArena = Math.floor((b * h * esc * esc) / 18);
+  for (let i = 0; i < nArena; i++) {
+    const px = offX + rng() * b * esc;
+    const py = offY + rng() * h * esc;
+    const g  = 100 + Math.floor(rng() * 90);
+    ctx.fillStyle = `rgba(${g},${g},${g-4},0.18)`;
+    ctx.fillRect(px, py, 1, 1);
+  }
+
+  // Poros/fisuras superficiales muy leves
+  const nPoros = Math.floor((b * h * esc * esc) / 600);
+  for (let i = 0; i < nPoros; i++) {
+    const px = offX + rng() * b * esc;
+    const py = offY + rng() * h * esc;
+    const r  = 0.8 + rng() * 1.5;
+    ctx.fillStyle = `rgba(60,55,50,${0.15 + rng()*0.2})`;
+    ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2); ctx.fill();
+  }
+
+  ctx.restore();
+
+  // Borde de sección
+  ctx.shadowColor='rgba(88,166,255,0.2)'; ctx.shadowBlur=14;
   ctx.strokeStyle='#58a6ff'; ctx.lineWidth=1.5;
-  ctx.beginPath(); ctx.rect(offX, offY, b*esc, h*esc);
-  ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.rect(offX, offY, b*esc, h*esc); ctx.stroke();
   ctx.shadowBlur=0;
 
   // Línea de recubrimiento
@@ -906,10 +971,26 @@ function dibujarSeccion(b, h, r, n_barras, d_barra, Ast_req) {
 
   pos.forEach(([bx,by]) => {
     const px = offX+bx*esc, py = offY+by*esc;
-    ctx.strokeStyle='#6e7681'; ctx.lineWidth=0.7;
-    ctx.beginPath(); ctx.arc(px,py,rb+1.5,0,Math.PI*2); ctx.stroke();
-    ctx.fillStyle='#d29922';
-    ctx.beginPath(); ctx.arc(px,py,rb,0,Math.PI*2); ctx.fill();
+
+    // Sombra de la barra
+    ctx.fillStyle='rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.arc(px+1, py+1, rb+1, 0, Math.PI*2); ctx.fill();
+
+    // Aro exterior oscuro
+    ctx.fillStyle='#2a2a2a';
+    ctx.beginPath(); ctx.arc(px, py, rb+1.8, 0, Math.PI*2); ctx.fill();
+
+    // Relleno barra (acero — degradado metálico)
+    const gBar = ctx.createRadialGradient(px-rb*0.3, py-rb*0.3, 0, px, py, rb);
+    gBar.addColorStop(0, '#f0c040');
+    gBar.addColorStop(0.5,'#c8922a');
+    gBar.addColorStop(1,  '#7a5010');
+    ctx.fillStyle = gBar;
+    ctx.beginPath(); ctx.arc(px, py, rb, 0, Math.PI*2); ctx.fill();
+
+    // Reflejo metálico
+    ctx.fillStyle='rgba(255,255,255,0.2)';
+    ctx.beginPath(); ctx.arc(px-rb*0.28, py-rb*0.28, rb*0.35, 0, Math.PI*2); ctx.fill();
   });
 
   // Cotas
