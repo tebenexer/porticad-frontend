@@ -496,6 +496,22 @@ let debTimer    = null;
 // TOGGLES
 // ═══════════════════════════════════════════════════════
 function setUnits(u) {
+  if (u === unidades) return;
+
+  // Convertir los campos numéricos Pu y Mu al nuevo sistema ANTES de cambiar la bandera
+  const puEl = document.getElementById('i-Pu');
+  const muEl = document.getElementById('i-Mu');
+  const puV  = parseFloat(puEl.value);
+  const muV  = parseFloat(muEl.value);
+
+  if (!isNaN(puV)) puEl.value = u === 'met'
+    ? (puV / 9.80665).toFixed(2)   // kN → tf
+    : (puV * 9.80665).toFixed(2);  // tf → kN
+
+  if (!isNaN(muV)) muEl.value = u === 'met'
+    ? (muV / 9.80665).toFixed(3)   // kN·m → tf·m
+    : (muV * 9.80665).toFixed(3);  // tf·m → kN·m
+
   unidades = u;
   ['si','met'].forEach(x => document.getElementById('u-'+x).classList.toggle('active', x===u));
   const si = u === 'si';
@@ -525,16 +541,23 @@ function onMatChange() {
 // LECTURA DE INPUTS
 // ═══════════════════════════════════════════════════════
 function getfc() {
-  const v = document.getElementById('i-fc').value === 'custom'
-    ? parseFloat(document.getElementById('i-fc-c').value)
-    : parseFloat(document.getElementById('i-fc').value);
-  return unidades === 'met' ? v / 10.197 : v;
+  const sel = document.getElementById('i-fc').value;
+  if (sel === 'custom') {
+    const v = parseFloat(document.getElementById('i-fc-c').value);
+    // El campo custom muestra kgf/cm² en Métrico, MPa en SI
+    return unidades === 'met' ? v / 10.197 : v;
+  }
+  // El dropdown siempre almacena MPa (21, 24, 28…) — sin conversión
+  return parseFloat(sel);
 }
 function getfy() {
-  const v = document.getElementById('i-fy').value === 'custom'
-    ? parseFloat(document.getElementById('i-fy-c').value)
-    : parseFloat(document.getElementById('i-fy').value);
-  return unidades === 'met' ? v / 10.197 : v;
+  const sel = document.getElementById('i-fy').value;
+  if (sel === 'custom') {
+    const v = parseFloat(document.getElementById('i-fy-c').value);
+    return unidades === 'met' ? v / 10.197 : v;
+  }
+  // El dropdown siempre almacena MPa — sin conversión
+  return parseFloat(sel);
 }
 function getPu() {
   const v = parseFloat(document.getElementById('i-Pu').value);
