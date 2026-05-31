@@ -116,7 +116,7 @@
     /* Content area */
     .content-area {
       display: grid;
-      grid-template-columns: 1fr 300px;
+      grid-template-columns: 1fr 440px;
       overflow: hidden;
     }
 
@@ -173,7 +173,16 @@
     }
     .viz-panel-title { font-size: 10px; font-weight: 700; color: #8b949e; letter-spacing: .5px; text-transform: uppercase; }
 
-    canvas#cviz { display: block; margin: 0 auto; }
+    canvas#cviz { display: block; margin: 0 auto; border-radius: 8px; }
+    .cviz-wrap {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
 
     /* Selected combo info */
     .combo-info {
@@ -396,7 +405,9 @@
         <!-- Sección canvas -->
         <div>
           <div class="viz-panel-title" style="margin-bottom:8px;" id="viz-title">Sección transversal</div>
-          <canvas id="cviz" width="260" height="260"></canvas>
+          <div class="cviz-wrap">
+            <canvas id="cviz" width="380" height="380"></canvas>
+          </div>
         </div>
 
         <!-- Info combinación seleccionada -->
@@ -438,31 +449,38 @@
 // ═══════════════════════════════════════════════════════
 // CATÁLOGO DE BARRAS
 // ═══════════════════════════════════════════════════════
+// nom      : etiqueta principal
+// sys      : 'mm' | 'in'
+// d        : diámetro nominal en cm
+// A        : área en cm²
+// frac     : nombre comercial en fracciones de pulgada
+// equiv    : barra más cercana del otro sistema
+// equivSys : sistema del equivalente ('mm'|'in')
 const BARRAS_MM = [
-  { nom:'∅8',  sys:'mm', d:0.8,  A:0.503  },
-  { nom:'∅10', sys:'mm', d:1.0,  A:0.785  },
-  { nom:'∅12', sys:'mm', d:1.2,  A:1.131  },
-  { nom:'∅14', sys:'mm', d:1.4,  A:1.539  },
-  { nom:'∅16', sys:'mm', d:1.6,  A:2.011  },
-  { nom:'∅18', sys:'mm', d:1.8,  A:2.545  },
-  { nom:'∅20', sys:'mm', d:2.0,  A:3.142  },
-  { nom:'∅22', sys:'mm', d:2.2,  A:3.801  },
-  { nom:'∅25', sys:'mm', d:2.5,  A:4.909  },
-  { nom:'∅28', sys:'mm', d:2.8,  A:6.158  },
-  { nom:'∅32', sys:'mm', d:3.2,  A:8.042  },
-  { nom:'∅36', sys:'mm', d:3.6,  A:10.18  },
+  { nom:'∅8',  sys:'mm', d:0.800, A:0.503,  frac:'—',        equiv:'—',    equivSys:'in' },
+  { nom:'∅10', sys:'mm', d:1.000, A:0.785,  frac:'≈ 3/8"',   equiv:'#3',   equivSys:'in' },
+  { nom:'∅12', sys:'mm', d:1.200, A:1.131,  frac:'≈ 1/2"',   equiv:'#4',   equivSys:'in' },
+  { nom:'∅14', sys:'mm', d:1.400, A:1.539,  frac:'—',        equiv:'—',    equivSys:'in' },
+  { nom:'∅16', sys:'mm', d:1.600, A:2.011,  frac:'≈ 5/8"',   equiv:'#5',   equivSys:'in' },
+  { nom:'∅18', sys:'mm', d:1.800, A:2.545,  frac:'≈ 3/4"',   equiv:'#6',   equivSys:'in' },
+  { nom:'∅20', sys:'mm', d:2.000, A:3.142,  frac:'—',        equiv:'—',    equivSys:'in' },
+  { nom:'∅22', sys:'mm', d:2.200, A:3.801,  frac:'≈ 7/8"',   equiv:'#7',   equivSys:'in' },
+  { nom:'∅25', sys:'mm', d:2.500, A:4.909,  frac:'≈ 1"',     equiv:'#8',   equivSys:'in' },
+  { nom:'∅28', sys:'mm', d:2.800, A:6.158,  frac:'≈ 1-1/8"', equiv:'#9',   equivSys:'in' },
+  { nom:'∅32', sys:'mm', d:3.200, A:8.042,  frac:'≈ 1-1/4"', equiv:'#10',  equivSys:'in' },
+  { nom:'∅36', sys:'mm', d:3.600, A:10.18,  frac:'≈ 1-3/8"', equiv:'#11',  equivSys:'in' },
 ];
 const BARRAS_IN = [
-  { nom:'#3',  sys:'in', d:0.953, A:0.713  },
-  { nom:'#4',  sys:'in', d:1.270, A:1.267  },
-  { nom:'#5',  sys:'in', d:1.588, A:1.979  },
-  { nom:'#6',  sys:'in', d:1.905, A:2.850  },
-  { nom:'#7',  sys:'in', d:2.223, A:3.871  },
-  { nom:'#8',  sys:'in', d:2.540, A:5.067  },
-  { nom:'#9',  sys:'in', d:2.865, A:6.433  },
-  { nom:'#10', sys:'in', d:3.226, A:8.167  },
-  { nom:'#11', sys:'in', d:3.581, A:10.07  },
-  { nom:'#14', sys:'in', d:4.305, A:14.52  },
+  { nom:'#3',  sys:'in', d:0.953, A:0.713,  frac:'3/8"',     equiv:'∅10',  equivSys:'mm' },
+  { nom:'#4',  sys:'in', d:1.270, A:1.267,  frac:'1/2"',     equiv:'∅12',  equivSys:'mm' },
+  { nom:'#5',  sys:'in', d:1.588, A:1.979,  frac:'5/8"',     equiv:'∅16',  equivSys:'mm' },
+  { nom:'#6',  sys:'in', d:1.905, A:2.850,  frac:'3/4"',     equiv:'∅18',  equivSys:'mm' },
+  { nom:'#7',  sys:'in', d:2.223, A:3.871,  frac:'7/8"',     equiv:'∅22',  equivSys:'mm' },
+  { nom:'#8',  sys:'in', d:2.540, A:5.067,  frac:'1"',       equiv:'∅25',  equivSys:'mm' },
+  { nom:'#9',  sys:'in', d:2.865, A:6.433,  frac:'1-1/8"',   equiv:'∅28',  equivSys:'mm' },
+  { nom:'#10', sys:'in', d:3.226, A:8.167,  frac:'1-1/4"',   equiv:'∅32',  equivSys:'mm' },
+  { nom:'#11', sys:'in', d:3.581, A:10.07,  frac:'1-3/8"',   equiv:'∅36',  equivSys:'mm' },
+  { nom:'#14', sys:'in', d:4.305, A:14.52,  frac:'1-3/4"',   equiv:'—',    equivSys:'mm' },
 ];
 
 // ═══════════════════════════════════════════════════════
@@ -731,10 +749,21 @@ function renderCombos(res) {
   const rows = combos.map((c, i) => {
     const rhoW = Math.min(100, (c.rho_prov/0.08)*100).toFixed(0);
     const tag  = i===0 ? '<span class="tag tag-blue">↑ Óptimo</span>'
-               : c.exceso < 5 ? '<span class="tag tag-green">Ajustado</span>'
+               : c.exceso < 5  ? '<span class="tag tag-green">Ajustado</span>'
                : c.exceso < 15 ? '' : '<span class="tag tag-gold">+' + c.exceso.toFixed(0)+'%</span>';
+
+    // Nombre principal + fracción comercial + equivalencia
+    const fracLabel  = c.bar.frac && c.bar.frac !== '—'
+      ? `<div style="font-size:10px;color:#58a6ff;margin-top:1px;">${c.bar.frac}</div>` : '';
+    const equivLabel = c.bar.equiv && c.bar.equiv !== '—'
+      ? `<div style="font-size:10px;color:#8b949e;margin-top:1px;">≡ ${c.bar.equiv}</div>` : '';
+
     return `<tr class="combo-row${i===0?' selected':''}" onclick="selectCombo(${i})" data-idx="${i}">
-      <td><strong>${c.n}${c.bar.nom}</strong></td>
+      <td>
+        <strong>${c.n} × ${c.bar.nom}</strong>
+        ${fracLabel}
+        ${equivLabel}
+      </td>
       <td>${c.Ast_prov.toFixed(2)}</td>
       <td>
         ${(c.rho_prov*100).toFixed(2)}%
@@ -784,8 +813,10 @@ function selectCombo(idx) {
 
   // Info panel
   document.getElementById('combo-info').style.display = 'block';
+  const fracStr  = c.bar.frac  && c.bar.frac  !== '—' ? `  ·  ${c.bar.frac}`  : '';
+  const equivStr = c.bar.equiv && c.bar.equiv !== '—' ? `  ≡  ${c.bar.equiv}` : '';
   document.getElementById('ci-hdr').textContent =
-    `${c.n}×${c.bar.nom}  — ${c.bar.sys==='mm'?'Métrico':'Imperial'}`;
+    `${c.n} × ${c.bar.nom}${fracStr}${equivStr}  — ${c.bar.sys==='mm'?'Métrico':'Imperial'}`;
   document.getElementById('ci-Ast').textContent = c.Ast_prov.toFixed(2) + ' cm²';
   document.getElementById('ci-rho').textContent = (c.rho_prov*100).toFixed(2) + '%';
 
