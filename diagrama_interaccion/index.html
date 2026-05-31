@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Diagrama de Interacción P-M — PortiCAD Multi-Tools</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.14/jspdf.plugin.autotable.min.js"></script>
+<style>
+/* ── Reset y variables ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --sans:    'Inter', system-ui, sans-serif;
+  --mono:    'JetBrains Mono', 'Courier New', monospace;
+  --bg:      #f3f4f6;
+  --surface: #ffffff;
+  --sidebar: #f9fafb;
+  --border:  #e5e7eb;
+  --border2: #d1d5db;
+  --text:    #111827;
+  --muted:   #6b7280;
+  --accent:  #1d4ed8;
+  --accent2: #3b82f6;
+  --green:   #16a34a;
+  --red:     #dc2626;
+  --amber:   #d97706;
+}
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Topbar ── */
+.topbar {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 8px;
+  flex-shrink: 0;
+  z-index: 100;
+}
+.topbar a { color: #58a6ff; font-size: 14px; font-weight: 700; text-decoration: none; }
+.topbar-sep { color: #30363d; font-size: 16px; }
+.topbar-crumb { font-size: 12px; color: #8b949e; display: flex; align-items: center; gap: 6px; }
+.topbar-title { font-size: 13px; font-weight: 600; color: #e6edf3; }
+.badge { background: #1f6feb22; border: 1px solid #1f6feb55; color: #58a6ff;
+         font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; }
+.calc-dot { width: 7px; height: 7px; border-radius: 50%; background: #3fb950; transition: all .3s; }
+.calc-dot.busy { background: #d29922; animation: blink .6s infinite; }
+.calc-dot.err  { background: #f85149; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+.calc-msg { font-size:11px; color:#8b949e; }
+
+/* ── Main layout ── */
+.main {
+  display: grid;
+  grid-template-columns: 280px 1fr 300px;
+  gap: 12px;
+  padding: 12px;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Cards ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.card-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--sidebar);
+  font-size: 12px; font-weight: 700;
+  color: var(--muted);
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-body { padding: 14px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+
+/* ── Inputs ── */
+.field { display: flex; flex-direction: column; gap: 3px; }
+.field label { font-size: 11px; font-weight: 600; color: var(--muted); }
+.field label em { font-style: normal; color: #9ca3af; font-size: 10px; }
+.field input, .field select {
+  border: 1px solid var(--border2); border-radius: 7px;
+  padding: 7px 10px; font-size: 13px; font-family: var(--sans);
+  color: var(--text); background: #fff; width: 100%; outline: none;
+  transition: border-color .15s;
+}
+.field input:focus, .field select:focus { border-color: var(--accent2); box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
+.field select option { background: #fff; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* Radio groups */
+.radio-group { display: flex; gap: 8px; flex-wrap: wrap; }
+.radio-label {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 500; color: var(--text);
+  cursor: pointer; padding: 5px 10px;
+  border: 1px solid var(--border2); border-radius: 7px;
+  transition: all .15s;
+}
+.radio-label:has(input:checked) {
+  border-color: var(--accent2); background: #eff6ff; color: var(--accent);
+}
+.radio-label input { accent-color: var(--accent2); }
+
+/* Separador de sección */
+.sec-sep {
+  font-size: 10px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+/* Error inline */
+.err-inline { font-size: 10px; color: var(--red); min-height: 14px; }
+
+/* Botones */
+.btn { border: none; border-radius: 8px; font-size: 13px; font-weight: 600;
+       cursor: pointer; padding: 9px 14px; transition: all .15s; font-family: var(--sans); }
+.btn-primary   { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #1e40af; }
+.btn-secondary { background: var(--border); color: var(--text); }
+.btn-secondary:hover { background: var(--border2); }
+.btn-row { display: flex; gap: 8px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); }
+.btn-row .btn { flex: 1; }
+
+/* ── Panel central: chart ── */
+.chart-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.chart-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  overflow: hidden;
+}
+canvas#chart {
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+}
+
+/* ── Panel derecho: sección + verificaciones ── */
+.right-panel { display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+.section-card { flex-shrink: 0; }
+.checks-card  { flex: 1; overflow-y: auto; }
+
+canvas#sectionCanvas { display: block; max-width: 100%; }
+
+/* ── Tabla de verificaciones ── */
+.check-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.check-table th {
+  font-size: 10px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .4px;
+  padding: 7px 10px; border-bottom: 1px solid var(--border);
+  text-align: left; background: var(--sidebar);
+}
+.check-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.check-table tr:last-child td { border-bottom: none; }
+
+.status-chip {
+  display: inline-block; font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: 20px;
+}
+.chip-ok   { background: #dcfce7; color: #166534; }
+.chip-warn { background: #fef9c3; color: #854d0e; }
+.chip-err  { background: #fee2e2; color: #991b1b; }
+.chip-na   { background: var(--border); color: var(--muted); }
+
+/* ── Nota ACI ── */
+.aci-note {
+  font-size: 11px; color: var(--muted); line-height: 1.6;
+  background: var(--sidebar); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 12px;
+}
+</style>
+</head>
+<body>
+
+<!-- ── Topbar ── -->
+<div class="topbar">
+  <a href="/">PortiCAD</a>
+  <span class="topbar-sep">›</span>
+  <div class="topbar-crumb">
+    <span>Multi-Tools</span><span>›</span>
+    <span class="topbar-title">Diagrama de Interacción P-M</span>
+  </div>
+  <span class="badge" style="margin-left:8px;">ACI 318</span>
+  <a href="/as_columna_hormigon_aci" style="margin-left:12px;font-size:11px;color:#8b949e;text-decoration:none;
+     border:1px solid #30363d;border-radius:6px;padding:3px 9px;transition:all .15s;"
+     onmouseover="this.style.borderColor='#58a6ff';this.style.color='#58a6ff'"
+     onmouseout="this.style.borderColor='#30363d';this.style.color='#8b949e'">
+    ← Diseño As Columna
+  </a>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:7px;">
+    <div class="calc-dot" id="calc-dot"></div>
+    <span class="calc-msg" id="calc-msg">Listo</span>
+  </div>
+</div>
+
+<!-- ── Main ── -->
+<div class="main">
+
+  <!-- ═══ Inputs ═══ -->
+  <div class="card">
+    <div class="card-header">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7z"/>
+      </svg>
+      Parámetros
+    </div>
+    <div class="card-body">
+
+      <!-- Tipo de sección -->
+      <div>
+        <div class="sec-sep">Tipo de Sección</div>
+        <div class="radio-group" style="margin-top:8px;">
+          <label class="radio-label">
+            <input type="radio" name="sectionType" value="rectangular" checked onchange="onSectionTypeChange()"> Rectangular
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="sectionType" value="circular" onchange="onSectionTypeChange()"> Circular
+          </label>
+        </div>
+      </div>
+
+      <!-- Geometría rectangular -->
+      <div id="rect-geo">
+        <div class="sec-sep">Geometría</div>
+        <div class="row2" style="margin-top:8px;">
+          <div class="field">
+            <label>Ancho b <em>(m)</em></label>
+            <input id="b" type="number" step="0.01" value="0.30" min="0.10" oninput="recalc()">
+            <span class="err-inline" id="b-error"></span>
+          </div>
+          <div class="field">
+            <label>Alto h <em>(m)</em></label>
+            <input id="h" type="number" step="0.01" value="0.30" min="0.10" oninput="recalc()">
+            <span class="err-inline" id="h-error"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Geometría circular -->
+      <div id="circ-geo" style="display:none;">
+        <div class="sec-sep">Geometría</div>
+        <div style="margin-top:8px;" class="field">
+          <label>Diámetro D <em>(m)</em></label>
+          <input id="diameter-circ" type="number" step="0.01" value="0.40" min="0.15" oninput="recalc()">
+          <span class="err-inline" id="diameter-circ-error"></span>
+        </div>
+      </div>
+
+      <!-- Recubrimiento -->
+      <div class="field">
+        <label>Recubrimiento al eje de la barra <em>(m)</em></label>
+        <input id="rec" type="number" step="0.005" value="0.04" min="0.025" oninput="recalc()">
+        <span class="err-inline" id="rec-error"></span>
+      </div>
+
+      <!-- Acero rectangular -->
+      <div id="rect-steel">
+        <div class="sec-sep">Refuerzo Longitudinal</div>
+        <div class="row2" style="margin-top:8px;">
+          <div class="field">
+            <label>Barras cara h (nH)</label>
+            <input id="nH" type="number" value="3" min="2" data-prev="3" oninput="handleSteelInput(event)">
+            <span class="err-inline" id="nH-error"></span>
+          </div>
+          <div class="field">
+            <label>Barras cara b (nV)</label>
+            <input id="nV" type="number" value="3" min="2" data-prev="3" oninput="handleSteelInput(event)">
+            <span class="err-inline" id="nV-error"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Acero circular -->
+      <div id="circ-steel" style="display:none;">
+        <div class="sec-sep">Refuerzo Longitudinal</div>
+        <div class="field" style="margin-top:8px;">
+          <label>Número de barras</label>
+          <input id="numBarsCircular" type="number" value="8" min="4" step="2" data-prev="8" oninput="handleSteelInput(event)">
+          <span class="err-inline" id="numBarsCircular-error"></span>
+        </div>
+      </div>
+
+      <!-- Diámetro de barra -->
+      <div class="field">
+        <label>Diámetro de barra longitudinal</label>
+        <div class="radio-group" style="margin:6px 0;">
+          <label class="radio-label">
+            <input type="radio" name="barUnit" value="pulg" checked onchange="populateDiameters(this.value);recalc()"> Pulgadas
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="barUnit" value="mm" onchange="populateDiameters(this.value);recalc()"> mm
+          </label>
+        </div>
+        <select id="diam" onchange="recalc()"></select>
+      </div>
+
+      <!-- Materiales -->
+      <div>
+        <div class="sec-sep">Materiales</div>
+        <div class="row2" style="margin-top:8px;">
+          <div class="field">
+            <label>f'c <em>(MPa)</em></label>
+            <input id="fc" type="number" step="1" value="28" min="18" max="70" oninput="recalc()">
+            <span class="err-inline" id="fc-error"></span>
+          </div>
+          <div class="field">
+            <label>fy <em>(MPa)</em></label>
+            <input id="fy" type="number" step="5" value="420" min="200" oninput="recalc()">
+            <span class="err-inline" id="fy-error"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Solicitaciones -->
+      <div>
+        <div class="sec-sep">Solicitaciones (Pu, Mu)</div>
+        <div class="row2" style="margin-top:8px;">
+          <div class="field">
+            <label>Pu <em>(kN)</em></label>
+            <input id="Pu" type="number" step="1" value="0" min="0" oninput="recalc()">
+          </div>
+          <div class="field">
+            <label>Mu <em>(kN·m)</em></label>
+            <input id="Mu" type="number" step="0.5" value="0" min="0" oninput="recalc()">
+          </div>
+        </div>
+      </div>
+
+      <!-- Nota -->
+      <div class="aci-note">
+        ε<sub>cu</sub>=0.003 · E<sub>s</sub>=200 000 MPa · bloque Whitney · φ columna atiesada (tied)
+      </div>
+
+      <!-- Botones -->
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="resetForm()">Restablecer</button>
+        <button class="btn btn-primary"   onclick="exportPDF()">Exportar PDF</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ Diagrama P-M ═══ -->
+  <div class="card chart-panel">
+    <div class="card-header">
+      Diagrama de Interacción P–M
+      <span id="load-status-badge" style="margin-left:auto;"></span>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="chart"></canvas>
+    </div>
+  </div>
+
+  <!-- ═══ Sección + verificaciones ═══ -->
+  <div class="right-panel">
+
+    <!-- Sección transversal -->
+    <div class="card section-card">
+      <div class="card-header">Sección Transversal</div>
+      <div style="padding:10px; display:flex; justify-content:center; background:#f9fafb;">
+        <canvas id="sectionCanvas" width="240" height="220"></canvas>
+      </div>
+    </div>
+
+    <!-- Verificaciones -->
+    <div class="card checks-card">
+      <div class="card-header">Verificaciones</div>
+      <div class="card-body" style="padding:0; gap:0;">
+        <table class="check-table">
+          <thead>
+            <tr><th>Parámetro</th><th>Valor</th><th>Estado</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Cuantía ρ</td>
+              <td id="ck-rho-val">—</td>
+              <td><span id="ck-rho" class="status-chip chip-na">—</span></td>
+            </tr>
+            <tr>
+              <td>Sep. horiz.</td>
+              <td id="ck-sh-val">—</td>
+              <td><span id="ck-sh" class="status-chip chip-na">—</span></td>
+            </tr>
+            <tr>
+              <td>Sep. vert.</td>
+              <td id="ck-sv-val">—</td>
+              <td><span id="ck-sv" class="status-chip chip-na">—</span></td>
+            </tr>
+            <tr>
+              <td>Punto (Pu,Mu)</td>
+              <td id="ck-pm-val">—</td>
+              <td><span id="ck-pm" class="status-chip chip-na">—</span></td>
+            </tr>
+            <tr>
+              <td>As total</td>
+              <td id="ck-ast-val">—</td>
+              <td><span id="ck-ast" class="status-chip chip-na">—</span></td>
+            </tr>
+            <tr>
+              <td>φPn máx</td>
+              <td id="ck-pnmax-val">—</td>
+              <td><span id="ck-pnmax" class="status-chip chip-na">kN</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /main -->
+
+<script>
+/* ════════════════════════════════════════════════
+   MOTOR DE CÁLCULO ACI 318 (conservado del original)
+════════════════════════════════════════════════ */
+const Es = 200000;
+const eps_cu = 0.003;
+function beta1(fc){ const b=0.85-Math.max(0,Math.min((fc-28)/7*0.05,0.20)); return Math.max(0.65,Math.min(0.85,b)); }
+const mm   = m  => m*1000;
+const toKN = N  => N/1000;
+const toKNm= Nm => Nm/1e6;
+
+const BARS = {
+  pulg:[
+    {value:9.5,  text:'Ø3/8" — #3'}, {value:12.7, text:'Ø1/2" — #4'},
+    {value:15.9, text:'Ø5/8" — #5'}, {value:19.1, text:'Ø3/4" — #6'},
+    {value:22.2, text:'Ø7/8" — #7'}, {value:25.4, text:'Ø1"  — #8'},
+    {value:28.7, text:'Ø1-1/8" — #9'},{value:32.3,text:'Ø1-1/4" — #10'},
+    {value:35.8, text:'Ø1-3/8" — #11'},{value:43, text:'Ø1-3/4" — #14'},
+    {value:57,   text:'Ø2-1/4" — #18'}
+  ],
+  mm:[
+    {value:6,text:'Ø6 mm'},{value:8,text:'Ø8 mm'},{value:10,text:'Ø10 mm'},
+    {value:12,text:'Ø12 mm'},{value:16,text:'Ø16 mm'},{value:20,text:'Ø20 mm'},
+    {value:25,text:'Ø25 mm'},{value:32,text:'Ø32 mm'},{value:40,text:'Ø40 mm'}
+  ]
+};
+
+function populateDiameters(unit){
+  const sel=document.getElementById('diam'); sel.innerHTML='';
+  BARS[unit].forEach(b=>{const o=document.createElement('option');o.value=b.value;o.textContent=b.text;sel.appendChild(o);});
+  sel.value = unit==='pulg'?'12.7':'12';
+}
+
+function barGrid(d1,d2,cov,nH,nV,dia,type){
+  const Ab=Math.PI*(dia/2)**2, cfg=[];
+  if(type==='rectangular'){
+    const dp=cov+dia/2;
+    if(d1<2*dp||d2<2*dp) return [];
+    const x0=dp,x1=d1-dp,y0=dp,y1=d2-dp;
+    const seen=new Set();
+    const add=(x,y)=>{const k=`${x.toFixed(4)},${y.toFixed(4)}`;if(!seen.has(k)){cfg.push({x,y,Ab});seen.add(k);}};
+    for(let i=0;i<nH;i++){const x=nH>1?x0+i*(x1-x0)/(nH-1):d1/2;add(x,y0);add(x,y1);}
+    for(let i=0;i<nV;i++){
+      const y=nV>1?y0+i*(y1-y0)/(nV-1):d2/2;
+      if(Math.abs(y-y0)>1e-6&&Math.abs(y-y1)>1e-6){add(x0,y);add(x1,y);}
+    }
+    return cfg;
+  } else {
+    const R=d1/2,dp=cov+dia/2,rb=R-dp;
+    if(rb<=0) return [];
+    const cx=R,cy=R;
+    for(let i=0;i<nH;i++){const a=(2*Math.PI/nH)*i-Math.PI/2;cfg.push({x:cx+rb*Math.cos(a),y:cy+rb*Math.sin(a),Ab});}
+    return cfg;
+  }
+}
+
+function phiFromEt(et,fy){
+  const ey=fy/Es;
+  if(et<=ey) return 0.65;
+  if(et>=0.005) return 0.90;
+  return 0.65+(et-ey)/(0.005-ey)*0.25;
+}
+
+function pmRect(c,b,h,fc,fy,bars){
+  const bet=beta1(fc),a=Math.min(bet*c,h);
+  const cc=0.85*fc*b*a;
+  let Fs=0,Ms=cc*(a/2-h/2);
+  let minE=0;
+  bars.forEach(bar=>{
+    const cv=c<1e-6?1e-6:c;
+    const e=eps_cu*(cv-bar.y)/cv;
+    if(e<minE)minE=e;
+    const fs=Math.max(-fy,Math.min(fy,Es*e));
+    Fs+=fs*bar.Ab;
+    Ms+=fs*bar.Ab*(bar.y-h/2);
+  });
+  const et=-minE;
+  return {PkN:toKN(cc+Fs),Mknm:Math.abs(toKNm(Ms)),et};
+}
+
+function pmCirc(c,D,fc,fy,bars){
+  const R=D/2,bet=beta1(fc),a=Math.min(bet*c,D),cv=c<1e-6?1e-6:c;
+  const arg=Math.max(-1,Math.min(1,(R-a)/R));
+  const gamma=2*Math.acos(arg);
+  const Ac=R*R/2*(gamma-Math.sin(gamma));
+  const cc=0.85*fc*Ac;
+  const sh=Math.sin(gamma/2);
+  const d=(4*R*sh**3)/(3*(gamma-Math.sin(gamma))||1e-9);
+  const yc=R-d;
+  let Fs=0,Ms=cc*(yc-R);
+  let minE=0;
+  bars.forEach(bar=>{
+    const e=eps_cu*(cv-bar.y)/cv;
+    if(e<minE)minE=e;
+    const fs=Math.max(-fy,Math.min(fy,Es*e));
+    Fs+=fs*bar.Ab; Ms+=fs*bar.Ab*(bar.y-R);
+  });
+  return {PkN:toKN(cc+Fs),Mknm:Math.abs(toKNm(Ms)),et:-minE};
+}
+
+function buildCurves(p){
+  const {b,h,rec,nH,nV,fc,fy,diam,type,D,nCirc}=p;
+  const nom=[],des=[];
+  const phi0=0.65,k=0.80;
+
+  let cfg,Ag,Ast,Po_N;
+  if(type==='rectangular'){
+    const bm=mm(b),hm=mm(h),cm=mm(rec),dia=parseFloat(diam);
+    cfg=barGrid(bm,hm,cm,nH,nV,dia,'rectangular');
+    if(!cfg.length) return {err:'Barras no caben — revisa recubrimiento/diámetro.'};
+    Ag=bm*hm; Ast=cfg.reduce((s,b)=>s+b.Ab,0);
+    Po_N=0.85*fc*(Ag-Ast)+fy*Ast;
+    const Pnmax=k*Po_N;
+    nom.push({x:0,y:toKN(Po_N),et:-Infinity});
+    des.push({x:0,y:phi0*toKN(Pnmax),et:-Infinity});
+    const cStart=hm*2,N=1000;
+    for(let i=0;i<=N;i++){
+      const c=cStart-(i/N)*(cStart-1e-3);
+      const r=pmRect(c,bm,hm,fc,fy,cfg);
+      const phi=phiFromEt(r.et,fy);
+      nom.push({x:r.Mknm,y:r.PkN,et:r.et});
+      des.push({x:phi*r.Mknm,y:phi*r.PkN,et:r.et,phi});
+    }
+    const Pt=-Ast*fy,Mt=cfg.reduce((s,b)=>s+b.Ab*(-fy)*(b.y-hm/2),0);
+    nom.push({x:Math.abs(toKNm(Mt)),y:toKN(Pt),et:Infinity});
+    des.push({x:0.9*Math.abs(toKNm(Mt)),y:0.9*toKN(Pt),et:Infinity});
+  } else {
+    const Dm=mm(D),cm=mm(rec),dia=parseFloat(diam);
+    cfg=barGrid(Dm,Dm,cm,nCirc,nCirc,dia,'circular');
+    if(!cfg.length) return {err:'Barras no caben — revisa recubrimiento/diámetro.'};
+    Ag=Math.PI*(Dm/2)**2; Ast=cfg.reduce((s,b)=>s+b.Ab,0);
+    Po_N=0.85*fc*(Ag-Ast)+fy*Ast;
+    const Pnmax=k*Po_N;
+    nom.push({x:0,y:toKN(Po_N),et:-Infinity});
+    des.push({x:0,y:phi0*toKN(Pnmax),et:-Infinity});
+    const cStart=Dm*2,N=1000;
+    for(let i=0;i<=N;i++){
+      const c=cStart-(i/N)*(cStart-1e-3);
+      const r=pmCirc(c,Dm,fc,fy,cfg);
+      const phi=phiFromEt(r.et,fy);
+      nom.push({x:r.Mknm,y:r.PkN,et:r.et});
+      des.push({x:phi*r.Mknm,y:phi*r.PkN,et:r.et,phi});
+    }
+    const R=Dm/2,Pt=-Ast*fy,Mt=cfg.reduce((s,b)=>s+b.Ab*(-fy)*(b.y-R),0);
+    nom.push({x:Math.abs(toKNm(Mt)),y:toKN(Pt),et:Infinity});
+    des.push({x:0.9*Math.abs(toKNm(Mt)),y:0.9*toKN(Pt),et:Infinity});
+  }
+  nom.sort((a,b)=>b.y-a.y);
+  des.sort((a,b)=>b.y-a.y);
+  const phiPnmax=phi0*toKN(k*Po_N);
+  return {nom,des,Pnmax:toKN(Po_N),phiPnmax,cfg,Ag,Ast,err:null};
+}
+
+/* ════════════════════════════════════════════════
+   GRÁFICA  —  canvas blanco profesional
+════════════════════════════════════════════════ */
+let gCurves=null, gParams=null;
+
+function niceTick(mn,mx,n){
+  const r=mx-mn;if(!r)return Math.abs(mx)/n||1;
+  const raw=r/(n-1),exp=Math.floor(Math.log10(raw)),f=10**exp;
+  for(const nf of[1,2,5,10]){if(nf*f>=raw)return nf*f;}
+  return f*10;
+}
+
+function plotChart(){
+  const cv=document.getElementById('chart');
+  const ctx=cv.getContext('2d');
+  const wrap=cv.parentElement;
+  const sz=Math.min(wrap.offsetWidth,wrap.offsetHeight)-16;
+  cv.width=sz; cv.height=sz;
+  ctx.clearRect(0,0,sz,sz);
+
+  if(!gCurves||gCurves.err){
+    ctx.fillStyle='#dc2626'; ctx.font='14px Inter,sans-serif'; ctx.textAlign='center';
+    ctx.fillText(gCurves?.err||'Sin datos',sz/2,sz/2); return;
+  }
+
+  const {nom,des,Pnmax,phiPnmax}=gCurves;
+  const {Pu,Mu,fy}=gParams;
+  const mg={t:48,r:24,b:52,l:60};
+  const cw=sz-mg.l-mg.r, ch=sz-mg.t-mg.b;
+
+  // Rangos
+  const allX=[...nom.map(p=>p.x),...des.map(p=>p.x),Mu];
+  const allY=[...nom.map(p=>p.y),...des.map(p=>p.y),Pu];
+  let x0=Math.min(0,...allX),x1=Math.max(0,...allX);
+  let y0=Math.min(0,...allY),y1=Math.max(0,...allY);
+  const bx=(x1-x0)*0.08,by=(y1-y0)*0.08;
+  x0-=bx; x1+=bx; y0-=by; y1+=by;
+  const rx=x1-x0||1, ry=y1-y0||1;
+  const px=(x)=>mg.l+(x-x0)/rx*cw;
+  const py=(y)=>mg.t+ch-(y-y0)/ry*ch;
+
+  // Fondo blanco
+  ctx.fillStyle='#fff';
+  ctx.fillRect(0,0,sz,sz);
+
+  // Grid
+  const txI=niceTick(x0,x1,8), tyI=niceTick(y0,y1,8);
+  ctx.strokeStyle='#f3f4f6'; ctx.lineWidth=1;
+  ctx.beginPath();
+  for(let v=Math.ceil(y0/tyI)*tyI;v<=y1;v+=tyI){ctx.moveTo(mg.l,py(v));ctx.lineTo(mg.l+cw,py(v));}
+  for(let v=Math.ceil(x0/txI)*txI;v<=x1;v+=txI){ctx.moveTo(px(v),mg.t);ctx.lineTo(px(v),mg.t+ch);}
+  ctx.stroke();
+
+  // Ejes
+  ctx.strokeStyle='#9ca3af'; ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(mg.l,py(0)); ctx.lineTo(mg.l+cw,py(0));
+  ctx.moveTo(px(0),mg.t); ctx.lineTo(px(0),mg.t+ch);
+  ctx.stroke();
+
+  // Tick labels
+  ctx.fillStyle='#6b7280'; ctx.font='10px Inter,sans-serif';
+  ctx.textAlign='right'; ctx.textBaseline='middle';
+  for(let v=Math.ceil(y0/tyI)*tyI;v<=y1;v+=tyI){
+    const yp=py(v);
+    if(yp>mg.t+4&&yp<mg.t+ch-4) ctx.fillText(v.toFixed(0),mg.l-4,yp);
+  }
+  ctx.textAlign='center'; ctx.textBaseline='top';
+  for(let v=Math.ceil(x0/txI)*txI;v<=x1;v+=txI){
+    const xp=px(v);
+    if(xp>mg.l+4&&xp<mg.l+cw-4) ctx.fillText(v.toFixed(0),xp,mg.t+ch+4);
+  }
+
+  // Etiquetas de ejes
+  ctx.fillStyle='#374151'; ctx.font='bold 11px Inter,sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='bottom';
+  ctx.fillText('M (kN·m)',mg.l+cw/2,sz-4);
+  ctx.save(); ctx.translate(14,mg.t+ch/2); ctx.rotate(-Math.PI/2);
+  ctx.textBaseline='top'; ctx.fillText('P (kN)',0,0); ctx.restore();
+
+  // Título
+  ctx.fillStyle='#111827'; ctx.font='bold 13px Inter,sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='top';
+  ctx.fillText('Diagrama de Interacción P–M',sz/2,8);
+
+  // Sombreado zona de diseño
+  const limD=des.filter(p=>p.y<=phiPnmax);
+  if(limD.length>0){
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(px(limD[0].x),py(limD[0].y));
+    limD.forEach(p=>ctx.lineTo(px(p.x),py(p.y)));
+    const last=limD[limD.length-1];
+    ctx.lineTo(px(last.x),py(0)); ctx.lineTo(px(0),py(0));
+    ctx.closePath();
+    ctx.fillStyle='rgba(59,130,246,0.07)'; ctx.fill();
+    ctx.restore();
+  }
+
+  // Curva nominal
+  ctx.strokeStyle='#16a34a'; ctx.lineWidth=2;
+  ctx.beginPath();
+  nom.forEach((p,i)=>{const xp=px(p.x),yp=py(p.y);i===0?ctx.moveTo(xp,yp):ctx.lineTo(xp,yp);});
+  ctx.stroke();
+
+  // Curva de diseño (φPn cap)
+  ctx.strokeStyle='#1d4ed8'; ctx.lineWidth=2.5;
+  ctx.beginPath();
+  limD.forEach((p,i)=>{const xp=px(p.x),yp=py(p.y);i===0?ctx.moveTo(xp,yp):ctx.lineTo(xp,yp);});
+  ctx.stroke();
+
+  // Línea Pn máx
+  ctx.save(); ctx.strokeStyle='#9ca3af'; ctx.lineWidth=1; ctx.setLineDash([5,4]);
+  ctx.beginPath();
+  const yPnmax=py(phiPnmax);
+  ctx.moveTo(px(0),yPnmax);
+  const limPt=limD[0]; if(limPt) ctx.lineTo(px(limPt.x),yPnmax);
+  ctx.stroke(); ctx.restore();
+
+  // Líneas de regiones (εt = εy y εt = 0.005)
+  const ey=fy/Es;
+  let bM=0,tM=0;
+  for(let i=0;i<des.length-1;i++){
+    if(des[i].et<=ey&&des[i+1].et>=ey){const f=(ey-des[i].et)/(des[i+1].et-des[i].et);bM=des[i].x+f*(des[i+1].x-des[i].x);break;}
+  }
+  for(let i=0;i<des.length-1;i++){
+    if(des[i].et<=0.005&&des[i+1].et>=0.005){const f=(0.005-des[i].et)/(des[i+1].et-des[i].et);tM=des[i].x+f*(des[i+1].x-des[i].x);break;}
+  }
+  ctx.save(); ctx.strokeStyle='#f87171'; ctx.lineWidth=1; ctx.setLineDash([4,3]);
+  [bM,tM].forEach(xv=>{
+    if(xv>0){
+      ctx.beginPath(); ctx.moveTo(px(xv),py(0)); ctx.lineTo(px(xv),py(phiPnmax)); ctx.stroke();
+    }
+  });
+  ctx.restore();
+
+  // Etiquetas de zonas
+  ctx.fillStyle='#6b7280'; ctx.font='9px Inter,sans-serif'; ctx.textAlign='center';
+  const labelY=mg.t+12;
+  if(bM>0) ctx.fillText('Compresión',px(bM/2),labelY);
+  if(bM>0&&tM>bM) ctx.fillText('Transición',px((bM+tM)/2),labelY);
+  if(tM>0) ctx.fillText('Tensión',px(tM+(x1-tM)*0.4),labelY);
+
+  // Leyenda
+  const leg=[{c:'#16a34a',t:'Curva nominal Pn'},{c:'#1d4ed8',t:'Curva de diseño φPn'}];
+  leg.forEach((l,i)=>{
+    const lx=mg.l+8, ly=mg.t+22+i*16;
+    ctx.strokeStyle=l.c; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(lx,ly); ctx.lineTo(lx+18,ly); ctx.stroke();
+    ctx.fillStyle='#374151'; ctx.font='10px Inter,sans-serif';
+    ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText(l.t,lx+22,ly);
+  });
+
+  // Punto de carga (Pu, Mu)
+  const puntoX=px(Mu), puntoY=py(Pu);
+  // Verificar si está dentro
+  ctx.save();
+  ctx.beginPath();
+  if(limD.length>0){
+    ctx.moveTo(px(limD[0].x),py(limD[0].y));
+    limD.forEach(p=>ctx.lineTo(px(p.x),py(p.y)));
+    const last=limD[limD.length-1];
+    ctx.lineTo(px(last.x),py(0)); ctx.lineTo(px(0),py(0));
+    ctx.closePath();
+  }
+  const inside=ctx.isPointInPath(puntoX,puntoY);
+  ctx.restore();
+
+  // Líneas guía
+  const ptColor=inside?'#16a34a':'#dc2626';
+  ctx.strokeStyle=ptColor+'99'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  ctx.beginPath();
+  ctx.moveTo(puntoX,puntoY); ctx.lineTo(puntoX,py(0));
+  ctx.moveTo(puntoX,puntoY); ctx.lineTo(px(0),puntoY);
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // Círculo del punto
+  ctx.fillStyle=ptColor;
+  ctx.beginPath(); ctx.arc(puntoX,puntoY,5,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#fff'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(puntoX,puntoY,5,0,Math.PI*2); ctx.stroke();
+
+  // Etiqueta (Pu, Mu)
+  ctx.fillStyle=ptColor; ctx.font='bold 11px Inter,sans-serif';
+  ctx.textAlign='left'; ctx.textBaseline='bottom';
+  ctx.fillText(`(${Mu.toFixed(1)}, ${Pu.toFixed(0)})`,puntoX+7,puntoY-3);
+
+  // Actualizar badge en header
+  const badge=document.getElementById('load-status-badge');
+  if(badge){
+    badge.textContent=inside?'✓ Punto dentro':'✗ Punto fuera';
+    badge.style.cssText=`font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;`
+      +(inside?'background:#dcfce7;color:#166534':'background:#fee2e2;color:#991b1b');
+  }
+
+  // Verificaciones
+  updateChecks(inside);
+}
+
+/* ════════════════════════════════════════════════
+   SECCIÓN CON TEXTURA HORMIGÓN
+════════════════════════════════════════════════ */
+function seededRng(seed){let s=seed|0;return()=>{s=(s*1664525+1013904223)&0xffffffff;return(s>>>0)/0xffffffff;};}
+
+function drawSection(p,cfg){
+  const cv=document.getElementById('sectionCanvas');
+  const ctx=cv.getContext('2d');
+  const W=cv.width, H=cv.height;
+  ctx.clearRect(0,0,W,H);
+
+  const {type,b,h,rec,D,diam}=p;
+  const mg=24;
+  const dia_mm=parseFloat(diam);
+
+  let bm,hm,dm;
+  if(type==='rectangular'){bm=mm(b);hm=mm(h);}
+  else {bm=mm(D);hm=mm(D);}
+  const esc=Math.min((W-2*mg)/bm,(H-2*mg)/hm);
+  const ox=(W-bm*esc)/2, oy=(H-hm*esc)/2;
+  const rec_m=mm(rec);
+
+  // Clip y textura hormigón
+  ctx.save();
+  ctx.beginPath();
+  if(type==='rectangular') ctx.rect(ox,oy,bm*esc,hm*esc);
+  else ctx.arc(ox+bm*esc/2,oy+hm*esc/2,bm*esc/2,0,Math.PI*2);
+  ctx.clip();
+
+  ctx.fillStyle='#b5b5ad'; ctx.fillRect(ox,oy,bm*esc,hm*esc);
+
+  const grd=ctx.createLinearGradient(ox,oy,ox+bm*esc,oy+hm*esc);
+  grd.addColorStop(0,'rgba(255,255,245,0.18)'); grd.addColorStop(1,'rgba(0,0,0,0.10)');
+  ctx.fillStyle=grd; ctx.fillRect(ox,oy,bm*esc,hm*esc);
+
+  const rng=seededRng(bm+hm*1000);
+  const nG=Math.floor(bm*hm*esc*esc/150);
+  for(let i=0;i<nG;i++){
+    const x=ox+rng()*bm*esc, y=oy+rng()*hm*esc;
+    const sz=2+rng()*4.5, g=110+Math.floor(rng()*60);
+    ctx.fillStyle=`rgba(${g},${g-3},${g-8},${0.2+rng()*0.3})`;
+    ctx.beginPath(); ctx.ellipse(x,y,sz,sz*(0.5+rng()*0.6),rng()*Math.PI,0,Math.PI*2); ctx.fill();
+  }
+  const nA=Math.floor(bm*hm*esc*esc/22);
+  for(let i=0;i<nA;i++){
+    const x=ox+rng()*bm*esc, y=oy+rng()*hm*esc, g=105+Math.floor(rng()*85);
+    ctx.fillStyle=`rgba(${g},${g},${g},0.15)`; ctx.fillRect(x,y,1,1);
+  }
+  ctx.restore();
+
+  // Borde de sección
+  ctx.strokeStyle='#374151'; ctx.lineWidth=1.5;
+  ctx.beginPath();
+  if(type==='rectangular') ctx.rect(ox,oy,bm*esc,hm*esc);
+  else ctx.arc(ox+bm*esc/2,oy+hm*esc/2,bm*esc/2,0,Math.PI*2);
+  ctx.stroke();
+
+  // Recubrimiento (línea punteada)
+  ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=0.7; ctx.setLineDash([3,3]);
+  ctx.beginPath();
+  if(type==='rectangular') ctx.rect(ox+rec_m*esc,oy+rec_m*esc,(bm-2*rec_m)*esc,(hm-2*rec_m)*esc);
+  else ctx.arc(ox+bm*esc/2,oy+hm*esc/2,(bm/2-rec_m)*esc,0,Math.PI*2);
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // Barras
+  const rb=Math.max(2.5,Math.min(10,dia_mm*esc/2));
+  cfg.forEach(bar=>{
+    const bx=ox+bar.x*esc, by=oy+bar.y*esc;
+    ctx.fillStyle='rgba(0,0,0,0.25)';
+    ctx.beginPath(); ctx.arc(bx+0.8,by+0.8,rb+1,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#1e3a5f';
+    ctx.beginPath(); ctx.arc(bx,by,rb+1.5,0,Math.PI*2); ctx.fill();
+    const gBar=ctx.createRadialGradient(bx-rb*0.3,by-rb*0.3,0,bx,by,rb);
+    gBar.addColorStop(0,'#eca326'); gBar.addColorStop(0.5,'#b87333'); gBar.addColorStop(1,'#6b3a10');
+    ctx.fillStyle=gBar;
+    ctx.beginPath(); ctx.arc(bx,by,rb,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.2)';
+    ctx.beginPath(); ctx.arc(bx-rb*0.28,by-rb*0.28,rb*0.32,0,Math.PI*2); ctx.fill();
+  });
+
+  // Cotas
+  ctx.fillStyle='#374151'; ctx.font='10px Inter,sans-serif'; ctx.textAlign='center';
+  if(type==='rectangular'){
+    ctx.fillText(`b=${b.toFixed(2)}m`,W/2,oy+hm*esc+16);
+    ctx.save(); ctx.translate(ox-14,H/2); ctx.rotate(-Math.PI/2);
+    ctx.fillText(`h=${h.toFixed(2)}m`,0,0); ctx.restore();
+  } else {
+    ctx.fillText(`D=${D.toFixed(2)}m`,W/2,oy+hm*esc+16);
+  }
+}
+
+/* ════════════════════════════════════════════════
+   VERIFICACIONES
+════════════════════════════════════════════════ */
+const MIN_SEP=25; // mm
+
+function chip(id,text,cls){
+  const el=document.getElementById(id);
+  if(el){el.textContent=text; el.className='status-chip '+cls;}
+}
+function val(id,text){const el=document.getElementById(id);if(el)el.textContent=text;}
+
+function updateChecks(inside){
+  if(!gCurves||gCurves.err) return;
+  const {Ag,Ast,cfg,phiPnmax}=gCurves;
+  const p=gParams;
+  const rho=(Ast/Ag)*100;
+
+  val('ck-rho-val',rho.toFixed(2)+'%');
+  chip('ck-rho',rho>=1&&rho<=8?'OK':rho<1?'Bajo':'Alto',rho>=1&&rho<=8?'chip-ok':rho<1?'chip-warn':'chip-err');
+
+  val('ck-ast-val',(Ast/100).toFixed(2)+' cm²');
+  chip('ck-ast','OK','chip-ok');
+  val('ck-pnmax-val',phiPnmax.toFixed(0)+' kN');
+  chip('ck-pnmax','kN','chip-ok');
+
+  if(p.type==='rectangular'){
+    const bm=mm(p.b),hm=mm(p.h),cm=mm(p.rec),dia=parseFloat(p.diam);
+    const dp=cm+dia/2;
+    const sh=p.nH>1?(bm-2*dp-(p.nH-2)*dia)/(p.nH-1):Infinity;
+    const sv=p.nV>1?(hm-2*dp-(p.nV-2)*dia)/(p.nV-1):Infinity;
+    val('ck-sh-val',isFinite(sh)?sh.toFixed(1)+'mm':'—');
+    chip('ck-sh',p.nH<=1||sh>=MIN_SEP?'OK':'Insuf.',p.nH<=1||sh>=MIN_SEP?'chip-ok':'chip-err');
+    val('ck-sv-val',isFinite(sv)?sv.toFixed(1)+'mm':'—');
+    chip('ck-sv',p.nV<=1||sv>=MIN_SEP?'OK':'Insuf.',p.nV<=1||sv>=MIN_SEP?'chip-ok':'chip-err');
+  } else {
+    const Dm=mm(p.D),cm=mm(p.rec),dia=parseFloat(p.diam);
+    const dp=cm+dia/2, rb=Dm/2-dp;
+    const sep=rb>0&&p.nCirc>1?(Math.PI*2*rb-p.nCirc*dia)/p.nCirc:Infinity;
+    val('ck-sh-val',isFinite(sep)?sep.toFixed(1)+'mm (prom)':'—');
+    chip('ck-sh',p.nCirc<=1||sep>=MIN_SEP?'OK':'Insuf.',p.nCirc<=1||sep>=MIN_SEP?'chip-ok':'chip-err');
+    val('ck-sv-val','N/A'); chip('ck-sv','N/A','chip-na');
+  }
+
+  val('ck-pm-val',`(${p.Mu.toFixed(1)}, ${p.Pu.toFixed(0)})`);
+  chip('ck-pm',inside?'Dentro':'Fuera',inside?'chip-ok':'chip-err');
+}
+
+/* ════════════════════════════════════════════════
+   LEER PARÁMETROS + RECALCULAR
+════════════════════════════════════════════════ */
+let _debTimer=null;
+function recalc(){
+  clearTimeout(_debTimer);
+  setDot('busy','Calculando…');
+  _debTimer=setTimeout(_doCalc,80);
+}
+
+function readParams(){
+  const type=document.querySelector('input[name="sectionType"]:checked').value;
+  const p={
+    type, fc:parseFloat(document.getElementById('fc').value)||28,
+    fy:parseFloat(document.getElementById('fy').value)||420,
+    rec:parseFloat(document.getElementById('rec').value)||0.04,
+    diam:document.getElementById('diam').value,
+    Pu:parseFloat(document.getElementById('Pu').value)||0,
+    Mu:parseFloat(document.getElementById('Mu').value)||0,
+  };
+  if(type==='rectangular'){
+    p.b=parseFloat(document.getElementById('b').value)||0.30;
+    p.h=parseFloat(document.getElementById('h').value)||0.30;
+    p.nH=parseInt(document.getElementById('nH').value)||3;
+    p.nV=parseInt(document.getElementById('nV').value)||3;
+  } else {
+    p.D=parseFloat(document.getElementById('diameter-circ').value)||0.40;
+    p.nCirc=parseInt(document.getElementById('numBarsCircular').value)||8;
+  }
+  return p;
+}
+
+function _doCalc(){
+  const p=readParams();
+  const curves=buildCurves(p);
+  gCurves=curves; gParams=p;
+  if(curves.err){ setDot('err',curves.err); return; }
+  setDot('ok','Listo');
+  plotChart();
+  drawSection(p,curves.cfg);
+}
+
+function setDot(s,m){
+  document.getElementById('calc-dot').className='calc-dot '+s;
+  document.getElementById('calc-msg').textContent=m;
+}
+
+/* ════════════════════════════════════════════════
+   VALIDACIÓN DE ACERO (nH, nV, nCirc)
+════════════════════════════════════════════════ */
+function handleSteelInput(e){
+  const el=e.target, errEl=document.getElementById(el.id+'-error');
+  const min=parseInt(el.min)||2;
+  const v=parseInt(el.value);
+  if(isNaN(v)||v<min){el.value=el.dataset.prev||min;if(errEl)errEl.textContent=`Mín. ${min}`;return;}
+  if(el.id==='numBarsCircular'&&v%2!==0&&v!==1){el.value=el.dataset.prev||8;if(errEl)errEl.textContent='Debe ser par';return;}
+  if(errEl) errEl.textContent='';
+  el.dataset.prev=v;
+  recalc();
+}
+
+/* ════════════════════════════════════════════════
+   TOGGLE TIPO DE SECCIÓN
+════════════════════════════════════════════════ */
+function onSectionTypeChange(){
+  const type=document.querySelector('input[name="sectionType"]:checked').value;
+  document.getElementById('rect-geo').style.display   = type==='rectangular'?'block':'none';
+  document.getElementById('circ-geo').style.display   = type==='circular'?'block':'none';
+  document.getElementById('rect-steel').style.display = type==='rectangular'?'block':'none';
+  document.getElementById('circ-steel').style.display = type==='circular'?'block':'none';
+  recalc();
+}
+
+/* ════════════════════════════════════════════════
+   RESET
+════════════════════════════════════════════════ */
+function resetForm(){
+  document.getElementById('b').value=0.30;
+  document.getElementById('h').value=0.30;
+  document.getElementById('rec').value=0.04;
+  document.getElementById('nH').value=3; document.getElementById('nH').dataset.prev=3;
+  document.getElementById('nV').value=3; document.getElementById('nV').dataset.prev=3;
+  document.getElementById('diameter-circ').value=0.40;
+  document.getElementById('numBarsCircular').value=8; document.getElementById('numBarsCircular').dataset.prev=8;
+  document.getElementById('fc').value=28;
+  document.getElementById('fy').value=420;
+  document.getElementById('Pu').value=0;
+  document.getElementById('Mu').value=0;
+  document.querySelector('input[name="sectionType"][value="rectangular"]').checked=true;
+  document.querySelector('input[name="barUnit"][value="pulg"]').checked=true;
+  populateDiameters('pulg');
+  onSectionTypeChange();
+}
+
+/* ════════════════════════════════════════════════
+   EXPORTAR PDF
+════════════════════════════════════════════════ */
+function exportPDF(){
+  const name=prompt('Nombre del archivo PDF:','Diagrama-Interaccion');
+  if(!name) return;
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const p=gParams||readParams();
+  const cChart=document.getElementById('chart');
+  const cSec=document.getElementById('sectionCanvas');
+
+  let y=15;
+  pdf.setFontSize(18); pdf.text('Diagrama de Interacción P-M',105,y,null,null,'center'); y+=8;
+  pdf.setFontSize(10); pdf.text(`Fecha: ${new Date().toLocaleDateString()}`,105,y,null,null,'center'); y+=10;
+
+  // Parámetros
+  const rows=[
+    ['Tipo',p.type==='rectangular'?'Rectangular':'Circular'],
+    ...(p.type==='rectangular'?[['b',p.b+' m'],['h',p.h+' m']]:[[' D',p.D+' m']]),
+    ['Recubrimiento',p.rec+' m'],
+    ['f\'c',p.fc+' MPa'],['fy',p.fy+' MPa'],
+    ['Pu',p.Pu+' kN'],['Mu',p.Mu+' kN·m'],
+  ];
+  pdf.autoTable({startY:y,head:[['Parámetro','Valor']],body:rows,theme:'grid',margin:{left:15,right:105}});
+  y=pdf.lastAutoTable.finalY+10;
+
+  // Dibujo de sección
+  const sw=60,sh=(cSec.height/cSec.width)*sw;
+  pdf.addImage(cSec.toDataURL('image/png'),115,30,sw,sh);
+
+  // Diagrama
+  const dw=170,dh=(cChart.height/cChart.width)*dw;
+  pdf.addImage(cChart.toDataURL('image/png'),(210-dw)/2,y,dw,dh);
+
+  pdf.save(name+'.pdf');
+}
+
+/* ════════════════════════════════════════════════
+   PARÁMETROS DESDE URL (pre-llenado desde As Columna)
+════════════════════════════════════════════════ */
+function readURLParams(){
+  const sp=new URLSearchParams(window.location.search);
+  // b, h en cm → convertir a m
+  if(sp.has('b'))  document.getElementById('b').value=(parseFloat(sp.get('b'))/100).toFixed(3);
+  if(sp.has('h'))  document.getElementById('h').value=(parseFloat(sp.get('h'))/100).toFixed(3);
+  if(sp.has('rec'))document.getElementById('rec').value=(parseFloat(sp.get('rec'))/100).toFixed(4);
+  if(sp.has('fc')) document.getElementById('fc').value=sp.get('fc');
+  if(sp.has('fy')) document.getElementById('fy').value=sp.get('fy');
+  if(sp.has('Pu')) document.getElementById('Pu').value=sp.get('Pu');
+  if(sp.has('Mu')) document.getElementById('Mu').value=sp.get('Mu');
+}
+
+/* ── Init ── */
+window.addEventListener('resize',()=>{ if(gParams) _doCalc(); });
+populateDiameters('pulg');
+readURLParams();
+onSectionTypeChange(); // triggers recalc
+</script>
+</body>
+</html>

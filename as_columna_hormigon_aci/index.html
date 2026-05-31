@@ -345,6 +345,21 @@
       </div>
     </div>
 
+    <!-- Botón diagrama de interacción -->
+    <button onclick="abrirDiagrama()" style="
+        width:100%; padding:10px 12px; border-radius:8px; cursor:pointer;
+        background:#0d1117; border:1px solid #30363d; color:#e6edf3;
+        font-size:12px; font-weight:600; font-family:inherit;
+        display:flex; align-items:center; gap:8px; justify-content:center;
+        transition:all .15s;"
+      onmouseover="this.style.borderColor='#58a6ff';this.style.color='#58a6ff'"
+      onmouseout="this.style.borderColor='#30363d';this.style.color='#e6edf3'">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      Ver Diagrama de Interacción P-M
+    </button>
+
     <div style="margin-top:auto; background:#1f6feb0d; border:1px solid #1f6feb22;
                 border-radius:8px; padding:10px 12px; font-size:11px; color:#8b949e; line-height:1.6;">
       <strong style="color:#58a6ff;">ACI 318-25</strong> · Refuerzo simétrico ·
@@ -1110,6 +1125,20 @@ function clearViz() {
 // INIT
 // ═══════════════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', () => recalc());
+
+// ── Abrir Diagrama de Interacción pasando los parámetros actuales ──
+function abrirDiagrama() {
+  const b   = document.getElementById('i-b').value;
+  const h   = document.getElementById('i-h').value;
+  const r   = document.getElementById('i-r').value;
+  const fc  = getfc();   // siempre en MPa
+  const fy  = getfy();   // siempre en MPa
+  const Pu  = getPu();   // kN
+  const Mu  = getMu();   // kN·m
+  // b, h, r están en cm — el diagrama los espera en cm también (convierte a m internamente)
+  const url = `/diagrama_interaccion?b=${b}&h=${h}&rec=${r}&fc=${fc.toFixed(1)}&fy=${fy.toFixed(0)}&Pu=${Pu.toFixed(1)}&Mu=${Mu.toFixed(2)}`;
+  window.open(url, '_blank');
+}
 </script>
 
 <!-- ══════════════════════════════════════════════════════
