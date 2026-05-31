@@ -234,7 +234,22 @@
     <span class="topbar-title">As Columna H.A.</span>
   </div>
   <span class="badge" style="margin-left:8px;">ACI 318-25</span>
-  <div style="margin-left:auto; display:flex; align-items:center; gap:12px;">
+  <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
+
+    <!-- Botón Diagrama de Interacción -->
+    <button onclick="abrirDiagrama()" title="Ver Diagrama de Interacción P-M"
+      style="background:#1f6feb22;border:1px solid #1f6feb55;border-radius:7px;color:#58a6ff;
+             font-size:12px;font-weight:600;padding:5px 11px;cursor:pointer;
+             display:flex;align-items:center;gap:6px;transition:all .15s;"
+      onmouseover="this.style.background='#1f6feb33';this.style.borderColor='#58a6ff'"
+      onmouseout="this.style.background='#1f6feb22';this.style.borderColor='#1f6feb55'">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      Diagrama P-M
+    </button>
+
+    <!-- Botón Fórmulas ACI -->
     <button onclick="toggleFormulas()" title="Fórmulas y referencias ACI"
       style="background:#21262d;border:1px solid #30363d;border-radius:7px;color:#8b949e;
              font-size:12px;font-weight:600;padding:5px 11px;cursor:pointer;
@@ -248,6 +263,7 @@
       </svg>
       Fórmulas ACI
     </button>
+
     <div class="calc-status">
       <div class="calc-dot ok" id="calc-dot"></div>
       <span id="calc-msg">Listo</span>
