@@ -234,9 +234,24 @@
     <span class="topbar-title">As Columna H.A.</span>
   </div>
   <span class="badge" style="margin-left:8px;">ACI 318-25</span>
-  <div style="margin-left:auto;" class="calc-status">
-    <div class="calc-dot ok" id="calc-dot"></div>
-    <span id="calc-msg">Listo</span>
+  <div style="margin-left:auto; display:flex; align-items:center; gap:12px;">
+    <button onclick="toggleFormulas()" title="Fórmulas y referencias ACI"
+      style="background:#21262d;border:1px solid #30363d;border-radius:7px;color:#8b949e;
+             font-size:12px;font-weight:600;padding:5px 11px;cursor:pointer;
+             display:flex;align-items:center;gap:6px;transition:all .15s;"
+      onmouseover="this.style.borderColor='#58a6ff';this.style.color='#58a6ff'"
+      onmouseout="this.style.borderColor='#30363d';this.style.color='#8b949e'">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      Fórmulas ACI
+    </button>
+    <div class="calc-status">
+      <div class="calc-dot ok" id="calc-dot"></div>
+      <span id="calc-msg">Listo</span>
+    </div>
   </div>
 </div>
 
@@ -897,6 +912,22 @@ function renderVerif(res, Pu, Mu) {
 }
 
 // ═══════════════════════════════════════════════════════
+// MODAL FÓRMULAS
+// ═══════════════════════════════════════════════════════
+function toggleFormulas() {
+  const el = document.getElementById('formulas-overlay');
+  const show = el.style.display !== 'flex';
+  el.style.display = show ? 'flex' : 'none';
+}
+function closeFormulasOutside(e) {
+  if (e.target === document.getElementById('formulas-overlay')) toggleFormulas();
+}
+document.addEventListener('keydown', e => { if (e.key==='Escape') {
+  const el = document.getElementById('formulas-overlay');
+  if (el && el.style.display==='flex') toggleFormulas();
+}});
+
+// ═══════════════════════════════════════════════════════
 // RNG con semilla — textura determinista
 // ═══════════════════════════════════════════════════════
 function seededRng(seed) {
@@ -1080,5 +1111,281 @@ function clearViz() {
 // ═══════════════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', () => recalc());
 </script>
+
+<!-- ══════════════════════════════════════════════════════
+     MODAL FÓRMULAS ACI 318-25
+═══════════════════════════════════════════════════════ -->
+<style>
+.fm-section { display:flex; flex-direction:column; gap:10px; }
+.fm-title { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:700; color:#e6edf3; flex-wrap:wrap; }
+.fm-num { background:#1f6feb; color:#fff; font-size:10px; font-weight:800;
+          width:18px; height:18px; border-radius:50%; display:flex;
+          align-items:center; justify-content:center; flex-shrink:0; }
+.fm-ref { margin-left:auto; color:#3fb950; font-size:10px; font-weight:700;
+          padding:2px 8px; border-radius:20px;
+          background:#23863618; border:1px solid #23863640; white-space:nowrap; }
+.fm-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:8px; }
+.fm-card { background:#0d1117; border:1px solid #21262d; border-radius:8px;
+           padding:10px 12px; display:flex; flex-direction:column; gap:4px; }
+.fm-card-wide { grid-column:1/-1; }
+.fm-lbl  { font-size:10px; font-weight:700; color:#8b949e; letter-spacing:.3px; text-transform:uppercase; }
+.fm-formula { font-size:13px; color:#e6edf3; line-height:1.7;
+              font-family:'Courier New',monospace; }
+.fm-formula strong { color:#58a6ff; }
+.fm-note { font-size:10px; color:#6e7681; line-height:1.5; margin-top:2px; }
+.fm-table { width:100%; border-collapse:collapse; font-size:12px; }
+.fm-table th { background:#0d1117; color:#8b949e; font-size:11px;
+               padding:8px 12px; text-align:left; border-bottom:1px solid #21262d; }
+.fm-table td { padding:9px 12px; border-bottom:1px solid #161b22; color:#e6edf3; }
+.fm-table tr:last-child td { border-bottom:none; }
+.dot-comp  { display:inline-block; width:8px; height:8px; border-radius:50%; background:#f85149; margin-right:5px; vertical-align:middle; }
+.dot-trans { display:inline-block; width:8px; height:8px; border-radius:50%; background:#d29922; margin-right:5px; vertical-align:middle; }
+.dot-tens  { display:inline-block; width:8px; height:8px; border-radius:50%; background:#3fb950; margin-right:5px; vertical-align:middle; }
+</style>
+
+<div id="formulas-overlay" onclick="closeFormulasOutside(event)"
+  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:9000;
+         backdrop-filter:blur(4px);align-items:center;justify-content:center;">
+
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:14px;
+              width:min(800px,96vw);max-height:90vh;overflow:hidden;
+              display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,0.7);">
+
+    <!-- Header -->
+    <div style="padding:16px 20px;border-bottom:1px solid #21262d;
+                display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      <span style="font-size:15px;font-weight:700;color:#e6edf3;">Fórmulas y Referencias — ACI 318-25</span>
+      <span style="background:#1f6feb22;border:1px solid #1f6feb55;color:#58a6ff;
+                   font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;">
+        Columna Rectangular · Refuerzo Simétrico
+      </span>
+      <button onclick="toggleFormulas()" style="margin-left:auto;background:none;border:none;
+              color:#8b949e;font-size:20px;cursor:pointer;line-height:1;padding:0 4px;">✕</button>
+    </div>
+
+    <!-- Body -->
+    <div style="overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:20px;">
+
+      <!-- 1. Límites de refuerzo -->
+      <div class="fm-section">
+        <div class="fm-title">
+          <span class="fm-num">1</span>Límites de Refuerzo Longitudinal
+          <span class="fm-ref">ACI 318-25 §10.6.1.1</span>
+        </div>
+        <div class="fm-grid">
+          <div class="fm-card">
+            <div class="fm-lbl">Cuantía mínima</div>
+            <div class="fm-formula">ρ<sub>mín</sub> = <strong>0.01</strong> (1%)</div>
+            <div class="fm-note">Evita falla frágil por fisuración del hormigón en la transición carga-servicio</div>
+          </div>
+          <div class="fm-card">
+            <div class="fm-lbl">Cuantía máxima</div>
+            <div class="fm-formula">ρ<sub>máx</sub> = <strong>0.08</strong> (8%)</div>
+            <div class="fm-note">Garantiza trabajabilidad del hormigón y confinamiento adecuado</div>
+          </div>
+          <div class="fm-card">
+            <div class="fm-lbl">Definición de cuantía</div>
+            <div class="fm-formula">ρ = A<sub>st</sub> / A<sub>g</sub></div>
+            <div class="fm-note">A<sub>g</sub> = b × h (área bruta); A<sub>st</sub> = área total de refuerzo longitudinal</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Propiedades de materiales -->
+      <div class="fm-section">
+        <div class="fm-title">
+          <span class="fm-num">2</span>Compatibilidad de Deformaciones y β₁
+          <span class="fm-ref">ACI 318-25 §22.2.1 · §22.2.2</span>
+        </div>
+        <div class="fm-grid">
+          <div class="fm-card">
+            <div class="fm-lbl">Deformación última del hormigón</div>
+            <div class="fm-formula">ε<sub>cu</sub> = <strong>0.003</strong></div>
+            <div class="fm-note">ACI §22.2.1.2 — valor límite de deformación en la fibra extrema comprimida</div>
+          </div>
+          <div class="fm-card">
+            <div class="fm-lbl">Módulo de elasticidad del acero</div>
+            <div class="fm-formula">E<sub>s</sub> = <strong>200 000 MPa</strong></div>
+            <div class="fm-note">ACI §20.2.2.2</div>
+          </div>
+          <div class="fm-card">
+            <div class="fm-lbl">Deformación de fluencia del acero</div>
+            <div class="fm-formula">ε<sub>y</sub> = f<sub>y</sub> / E<sub>s</sub></div>
+            <div class="fm-note">Ej: fy = 420 MPa → εy = 0.0021</div>
+          </div>
+          <div class="fm-card">
+            <div class="fm-lbl">Factor β₁ (bloque de compresión)</div>
+            <div class="fm-formula">
+              β<sub>1</sub> = 0.85 &nbsp;&nbsp;&nbsp;(f'c ≤ 28 MPa)<br>
+              β<sub>1</sub> = 0.85 − 0.05·(f'c−28)/7<br>
+              β<sub>1</sub> ≥ <strong>0.65</strong>
+            </div>
+            <div class="fm-note">ACI §22.2.2.3 — f'c en MPa. Relaciona la profundidad del bloque equivalente con la línea neutra: a = β₁·c</div>
+          </div>
+          <div class="fm-card">
+            <div class="fm-lbl">Deformaciones de compatibilidad</div>
+            <div class="fm-formula">
+              ε<sub>s</sub>' = ε<sub>cu</sub>·(c − d')/c<br>
+              ε<sub>t</sub> &nbsp;= ε<sub>cu</sub>·(d − c)/c
+            </div>
+            <div class="fm-note">d' = recubrimiento al centro del acero comprimido; d = h − d' (acero en tensión)</div>
+          </div>
+          <div class="fm-card">
+            <div class="fm-lbl">Tensiones en el acero</div>
+            <div class="fm-formula">
+              f<sub>s</sub>' = min(E<sub>s</sub>·ε<sub>s</sub>', f<sub>y</sub>)<br>
+              f<sub>s</sub> &nbsp;= min(E<sub>s</sub>·ε<sub>t</sub>, f<sub>y</sub>)
+            </div>
+            <div class="fm-note">Limitadas a fy en fluencia (modelo elastoplástico perfecto)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Fuerzas internas -->
+      <div class="fm-section">
+        <div class="fm-title">
+          <span class="fm-num">3</span>Fuerzas Internas en la Sección
+          <span class="fm-ref">ACI 318-25 §22.2.2 · §22.4</span>
+        </div>
+        <div class="fm-grid">
+          <div class="fm-card">
+            <div class="fm-lbl">Bloque de compresión del hormigón</div>
+            <div class="fm-formula">C<sub>c</sub> = 0.85·f'c·<strong>a</strong>·b</div>
+            <div class="fm-note">a = β₁·c; distribución rectangular equivalente de Whitney</div>
+          </div>
+          <div class="fm-card">
+            <div class="fm-lbl">Fuerza neta del acero comprimido</div>
+            <div class="fm-formula">C<sub>s</sub> = A<sub>s</sub>'·(f<sub>s</sub>' − 0.85·f'c)</div>
+            <div class="fm-note">Se descuenta 0.85f'c porque esa área ya está incluida en Cc</div>
+          </div>
+          <div class="fm-card">
+            <div class="fm-lbl">Fuerza del acero en tensión</div>
+            <div class="fm-formula">T<sub>s</sub> = A<sub>s</sub>·f<sub>s</sub></div>
+            <div class="fm-note">Positivo cuando el acero está en tensión (εt > 0)</div>
+          </div>
+          <div class="fm-card">
+            <div class="fm-lbl">Distribución simétrica de refuerzo</div>
+            <div class="fm-formula">A<sub>s</sub> = A<sub>s</sub>' = A<sub>st</sub>/2</div>
+            <div class="fm-note">Barras distribuidas perimetralmente en las 4 caras de la sección</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Equilibrio -->
+      <div class="fm-section">
+        <div class="fm-title">
+          <span class="fm-num">4</span>Ecuaciones de Equilibrio (respecto al centroide)
+          <span class="fm-ref">ACI 318-25 §22.4.2</span>
+        </div>
+        <div class="fm-grid">
+          <div class="fm-card fm-card-wide">
+            <div class="fm-lbl">Resistencia axial nominal</div>
+            <div class="fm-formula">P<sub>n</sub> = C<sub>c</sub> + C<sub>s</sub> − T<sub>s</sub></div>
+            <div class="fm-note">Compresión positiva. Si Pn resulta negativo, la sección está en tensión neta.</div>
+          </div>
+          <div class="fm-card fm-card-wide">
+            <div class="fm-lbl">Resistencia a flexión nominal</div>
+            <div class="fm-formula">M<sub>n</sub> = C<sub>c</sub>·(h/2 − a/2) + C<sub>s</sub>·(h/2 − d') + T<sub>s</sub>·(d − h/2)</div>
+            <div class="fm-note">Momentos medidos desde el centroide geométrico de la sección (h/2)</div>
+          </div>
+          <div class="fm-card fm-card-wide">
+            <div class="fm-lbl">Límite de carga axial máxima</div>
+            <div class="fm-formula">
+              P<sub>n,máx</sub> = <strong>0.80</strong>·[0.85·f'c·(A<sub>g</sub>−A<sub>st</sub>) + f<sub>y</sub>·A<sub>st</sub>] &nbsp; (estribos)<br>
+              P<sub>n,máx</sub> = <strong>0.85</strong>·[0.85·f'c·(A<sub>g</sub>−A<sub>st</sub>) + f<sub>y</sub>·A<sub>st</sub>] &nbsp; (espiral)
+            </div>
+            <div class="fm-note">ACI §22.4.2.1 — limita la capacidad axial para considerar excentricidades accidentales mínimas</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Factor φ -->
+      <div class="fm-section">
+        <div class="fm-title">
+          <span class="fm-num">5</span>Factor de Reducción de Resistencia φ
+          <span class="fm-ref">ACI 318-25 §21.2.1 · §21.2.2</span>
+        </div>
+        <div style="overflow-x:auto;background:#0d1117;border:1px solid #21262d;border-radius:8px;">
+          <table class="fm-table">
+            <thead>
+              <tr>
+                <th>Zona</th>
+                <th>Condición sobre ε<sub>t</sub></th>
+                <th>φ con Estribos</th>
+                <th>φ con Espiral</th>
+                <th>Referencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="dot-comp"></span>Compresión controlada</td>
+                <td>ε<sub>t</sub> ≤ ε<sub>y</sub></td>
+                <td><strong style="color:#f85149;">0.65</strong></td>
+                <td><strong style="color:#d29922;">0.75</strong></td>
+                <td>§21.2.1(b)</td>
+              </tr>
+              <tr>
+                <td><span class="dot-trans"></span>Zona de transición</td>
+                <td>ε<sub>y</sub> &lt; ε<sub>t</sub> &lt; 0.005</td>
+                <td colspan="2" style="text-align:center;font-family:'Courier New',monospace;font-size:11px;">
+                  φ = φ<sub>comp</sub> + (ε<sub>t</sub> − ε<sub>y</sub>) / (0.005 − ε<sub>y</sub>) × (0.90 − φ<sub>comp</sub>)
+                </td>
+                <td>§21.2.2</td>
+              </tr>
+              <tr>
+                <td><span class="dot-tens"></span>Tensión controlada</td>
+                <td>ε<sub>t</sub> ≥ 0.005</td>
+                <td><strong style="color:#3fb950;">0.90</strong></td>
+                <td><strong style="color:#3fb950;">0.90</strong></td>
+                <td>§21.2.1(a)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 6. Verificación final -->
+      <div class="fm-section">
+        <div class="fm-title">
+          <span class="fm-num">6</span>Condición de Diseño y Método de Solución
+          <span class="fm-ref">ACI 318-25 §9.5.1 · §22.4</span>
+        </div>
+        <div class="fm-grid">
+          <div class="fm-card fm-card-wide">
+            <div class="fm-lbl">Condición de resistencia requerida</div>
+            <div class="fm-formula">φP<sub>n</sub> ≥ P<sub>u</sub> &nbsp;&nbsp;&nbsp;y&nbsp;&nbsp;&nbsp; φM<sub>n</sub> ≥ M<sub>u</sub></div>
+            <div class="fm-note">Pu y Mu son las cargas factorizadas de diseño (combinaciones de carga LRFD)</div>
+          </div>
+          <div class="fm-card fm-card-wide">
+            <div class="fm-lbl">Algoritmo de esta herramienta</div>
+            <div class="fm-formula">
+              1. e = M<sub>u</sub> / P<sub>u</sub> &nbsp;(excentricidad)<br>
+              2. Dado ρ → hallar c tal que M<sub>n</sub>(c) = P<sub>n</sub>(c)·e &nbsp;(bisección)<br>
+              3. Calcular φ según ε<sub>t</sub> y verificar φP<sub>n</sub> ≥ P<sub>u</sub><br>
+              4. Búsqueda binaria en ρ ∈ [0.01, 0.08] hasta encontrar ρ<sub>mín</sub> que cumple
+            </div>
+            <div class="fm-note">Solución numérica exacta para sección rectangular con refuerzo simétrico en 4 caras</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Nota final -->
+      <div style="background:#1f6feb0d;border:1px solid #1f6feb22;border-radius:8px;
+                  padding:12px 16px;font-size:11px;color:#8b949e;line-height:1.7;">
+        <strong style="color:#58a6ff;">⚠ Alcance de la herramienta:</strong>
+        Diseño para <strong>carga axial + flexión uniaxial</strong> con refuerzo simétrico.
+        No incluye: diseño de estribos/espiral transversal (ACI §25.7),
+        efectos de esbeltez (ACI §6.2.5), flexión biaxial ni verificación sísmica.
+        Para condiciones especiales se recomienda un análisis más detallado.
+      </div>
+
+    </div><!-- /body modal -->
+  </div>
+</div>
+
 </body>
 </html>
