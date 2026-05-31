@@ -295,6 +295,26 @@
         flex-wrap: wrap;
         padding: 6px 12px;
       }
+
+      /* Toggle bar visible en móvil */
+      #as-inputs-toggle-bar { display: flex !important; }
+
+      /* Panel inputs sin padding propio en móvil (lo maneja el body interno) */
+      .panel-inputs { padding: 0; }
+      #as-inputs-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+      #as-inputs-body.collapsed { display: none; }
+
+      /* Botón diagrama en sidebar: hacerlo más compacto */
+      .panel-inputs button[onclick="abrirDiagrama()"] { font-size: 11px; padding: 8px 10px; }
+
+      /* Summary strip: fuente más pequeña en móvil */
+      .scard-val { font-size: 15px; }
+      .scard-lbl { font-size: 8px; }
+
+      /* Topbar buttons: ocultar texto en pantallas muy pequeñas */
+      @media (max-width: 480px) {
+        .topbar button span:not(.sr-only) { display: none; }
+      }
     }
   </style>
 </head>
@@ -351,6 +371,15 @@
   <!-- ═══ PANEL INPUTS ═══ -->
   <div class="panel-inputs">
 
+    <!-- Toggle bar (solo visible en móvil) -->
+    <div id="as-inputs-toggle-bar" style="display:none;align-items:center;justify-content:space-between;
+         padding:10px 14px;border-bottom:1px solid #21262d;cursor:pointer;background:#161b22;"
+         onclick="toggleAsInputs()">
+      <span style="font-size:12px;font-weight:700;color:#e6edf3;">⚙ Parámetros de diseño</span>
+      <span id="as-inputs-arrow" style="color:#8b949e;font-size:14px;transition:transform .2s;">▲</span>
+    </div>
+
+    <div id="as-inputs-body">
     <div>
       <div class="sec-title" style="margin-bottom:8px;">Unidades de Carga</div>
       <div class="toggle-group">
@@ -457,6 +486,7 @@
       ρ<sub>mín</sub>=1% · ρ<sub>máx</sub>=8%
     </div>
 
+    </div><!-- /as-inputs-body -->
   </div>
 
   <!-- ═══ PANEL RESULTS ═══ -->
@@ -1216,6 +1246,15 @@ function clearViz() {
 // INIT
 // ═══════════════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', () => recalc());
+
+// ── Toggle inputs panel (móvil) ──────────────────────────────────
+function toggleAsInputs() {
+  const body  = document.getElementById('as-inputs-body');
+  const arrow = document.getElementById('as-inputs-arrow');
+  if (!body) return;
+  const collapsed = body.classList.toggle('collapsed');
+  if (arrow) arrow.textContent = collapsed ? '▼' : '▲';
+}
 
 // ── Abrir Diagrama de Interacción pasando los parámetros actuales ──
 function abrirDiagrama() {

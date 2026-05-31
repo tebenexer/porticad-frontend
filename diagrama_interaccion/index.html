@@ -324,7 +324,7 @@ canvas#sectionCanvas { display: block; max-width: 100%; }
         <path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7z"/>
       </svg>
       Parámetros
-      <button id="mob-toggle-inputs" onclick="toggleMobInputs()" title="Mostrar/ocultar parámetros">&#9660; Parámetros</button>
+      <button id="mob-toggle-inputs" onclick="toggleMobInputs()" title="Mostrar/ocultar parámetros">&#9660;</button>
     </div>
     <div class="card-body" id="inputs-card-body">
 
@@ -1176,7 +1176,7 @@ function toggleMobInputs() {
   const btn  = document.getElementById('mob-toggle-inputs');
   if (!body || !btn) return;
   const collapsed = body.classList.toggle('collapsed');
-  btn.textContent = collapsed ? '▶ Parámetros' : '▼ Parámetros';
+  btn.textContent = collapsed ? '▶' : '▼';
 }
 
 /* ── Init ── */
