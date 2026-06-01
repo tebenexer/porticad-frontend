@@ -45,32 +45,45 @@
       background: #161b22;
       border-right: 1px solid #21262d;
       overflow-y: auto;
-      padding: 14px;
+      padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 14px;
     }
+
+    /* Grupos de inputs con card leve */
+    .input-group {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
     .sec-title {
-      font-size: 10px; font-weight: 700; color: #8b949e;
-      letter-spacing: .8px; text-transform: uppercase;
-      padding-bottom: 6px; border-bottom: 1px solid #21262d;
+      font-size: 11px; font-weight: 700; color: #58a6ff;
+      letter-spacing: .6px; text-transform: uppercase;
+      padding-bottom: 8px; border-bottom: 1px solid #21262d;
+      display: flex; align-items: center; gap: 6px;
     }
-    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .field { display: flex; flex-direction: column; gap: 3px; }
-    .field label { font-size: 11px; color: #8b949e; font-weight: 500; }
-    .field label em { font-style: normal; color: #6e7681; font-size: 10px; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label { font-size: 13px; color: #8b949e; font-weight: 500; }
+    .field label em { font-style: normal; color: #6e7681; font-size: 11px; }
     .field input, .field select {
-      background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
-      color: #e6edf3; font-size: 13px; padding: 6px 9px; width: 100%;
+      background: #161b22; border: 1px solid #30363d; border-radius: 7px;
+      color: #e6edf3; font-size: 14px; padding: 8px 11px; width: 100%;
       outline: none; transition: border-color .15s;
     }
-    .field input:focus, .field select:focus { border-color: #58a6ff; }
+    .field input:focus, .field select:focus { border-color: #58a6ff; box-shadow: 0 0 0 3px #1f6feb22; }
     .field select option { background: #161b22; }
 
-    .toggle-group { display: flex; gap: 3px; background: #0d1117;
-                    border: 1px solid #21262d; border-radius: 6px; padding: 3px; width: fit-content; }
-    .tgbtn { background: none; border: none; color: #8b949e; font-size: 11px;
-              font-weight: 600; padding: 3px 10px; border-radius: 4px; cursor: pointer; transition: all .15s; }
+    .toggle-group { display: flex; gap: 4px; background: #0d1117;
+                    border: 1px solid #21262d; border-radius: 7px; padding: 4px; width: fit-content; }
+    .tgbtn { background: none; border: none; color: #8b949e; font-size: 12px;
+              font-weight: 600; padding: 5px 12px; border-radius: 5px; cursor: pointer; transition: all .15s; }
     .tgbtn.active { background: #21262d; color: #e6edf3; }
 
     /* Indicador de cálculo */
@@ -113,17 +126,17 @@
     .scard-unit { font-size: 10px; color: #6e7681; }
     .strip-sep { width: 1px; height: 36px; background: #21262d; margin: 0 4px; }
 
-    /* Content area */
+    /* Content area — viz primero (izq), combos al fondo (der) */
     .content-area {
       display: grid;
-      grid-template-columns: 1fr 440px;
+      grid-template-columns: 400px 1fr;
       overflow: hidden;
     }
 
-    /* Combinations table */
+    /* Combinations table — ahora a la derecha */
     .combos-panel {
       overflow-y: auto;
-      border-right: 1px solid #21262d;
+      border-left: 1px solid #21262d;
     }
     .combos-header {
       position: sticky; top: 0; z-index: 10;
@@ -163,13 +176,14 @@
     .rho-bar-wrap { width: 60px; height: 6px; background: #21262d; border-radius: 3px; display: inline-block; vertical-align: middle; margin-left: 4px; }
     .rho-bar { height: 100%; border-radius: 3px; background: #58a6ff; }
 
-    /* Viz + verif panel */
+    /* Viz + verif panel — ahora columna izquierda de content-area */
     .viz-panel {
       overflow-y: auto;
       padding: 14px;
       display: flex;
       flex-direction: column;
       gap: 14px;
+      border-right: 1px solid #21262d;
     }
     .viz-panel-title { font-size: 10px; font-weight: 700; color: #8b949e; letter-spacing: .5px; text-transform: uppercase; }
 
@@ -389,7 +403,10 @@
     </div>
 
     <div class="input-group">
-      <div class="sec-title">Sección</div>
+      <div class="sec-title">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+        Sección
+      </div>
       <div class="row2">
         <div class="field">
           <label>Ancho b <em>(cm)</em></label>
@@ -416,7 +433,10 @@
     </div>
 
     <div class="input-group">
-      <div class="sec-title">Materiales</div>
+      <div class="sec-title">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        Materiales
+      </div>
       <div class="row2">
         <div class="field">
           <label>f'c <em id="u-fc">(MPa)</em></label>
@@ -452,7 +472,10 @@
     </div>
 
     <div class="input-group">
-      <div class="sec-title">Cargas Factorizadas</div>
+      <div class="sec-title">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        Cargas Factorizadas
+      </div>
       <div class="row2">
         <div class="field">
           <label>Pu <em id="u-pu">(kN)</em></label>
@@ -531,26 +554,10 @@
       </div>
     </div>
 
-    <!-- Content grid -->
+    <!-- Content grid: viz primero (izq), combos a la derecha -->
     <div class="content-area">
 
-      <!-- Tabla de combinaciones -->
-      <div class="combos-panel">
-        <div class="combos-header">
-          <span class="combos-header-title">Combinaciones de Barras</span>
-          <!-- Filtro sistema -->
-          <div class="toggle-group">
-            <button class="tgbtn active" id="f-mm"  onclick="setBarFilter('mm')">mm</button>
-            <button class="tgbtn"        id="f-in"  onclick="setBarFilter('in')">pulgadas</button>
-            <button class="tgbtn"        id="f-all" onclick="setBarFilter('all')">Ambos</button>
-          </div>
-        </div>
-        <div id="combos-body">
-          <div class="empty-hint">Calculando...</div>
-        </div>
-      </div>
-
-      <!-- Panel viz + verif -->
+      <!-- Panel viz + verif — columna izquierda -->
       <div class="viz-panel">
 
         <!-- Sección canvas -->
@@ -592,6 +599,22 @@
         <div id="verif-list" style="display:flex;flex-direction:column;gap:5px;"></div>
 
       </div>
+
+      <!-- Tabla de combinaciones — columna derecha (ancho restante) -->
+      <div class="combos-panel">
+        <div class="combos-header">
+          <span class="combos-header-title">Combinaciones de Barras</span>
+          <div class="toggle-group">
+            <button class="tgbtn active" id="f-mm"  onclick="setBarFilter('mm')">mm</button>
+            <button class="tgbtn"        id="f-in"  onclick="setBarFilter('in')">pulgadas</button>
+            <button class="tgbtn"        id="f-all" onclick="setBarFilter('all')">Ambos</button>
+          </div>
+        </div>
+        <div id="combos-body">
+          <div class="empty-hint">Calculando...</div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
