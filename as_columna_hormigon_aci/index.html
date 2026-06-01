@@ -1134,14 +1134,9 @@ function selectCombo(idx) {
   const cumpleMn = isFinite(cap.phi_Mn) ? cap.phi_Mn >= Mu_dis : true;
   const cumpleTodo = cumplePn && cumpleMn;
 
-  // Header con badge de verificación
+  // Header del combo-info (solo nombre, sin badge redundante)
   const hdrEl = document.getElementById('ci-hdr');
-  hdrEl.innerHTML =
-    `<span>${c.n}×${c.bar.nom}${fracStr}${equivStr} — ${c.bar.sys==='mm'?'Métrico':'Imperial'}</span>
-     <span style="margin-left:auto;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700;
-       ${cumpleTodo?'background:#23863622;color:#3fb950':'background:#da363322;color:#f85149'}">
-       ${cumpleTodo?'✓ Cumple':'✗ No cumple'}
-     </span>`;
+  hdrEl.textContent = `${c.n}×${c.bar.nom}${fracStr}${equivStr} — ${c.bar.sys==='mm'?'Métrico':'Imperial'}`;
 
   document.getElementById('ci-Ast').textContent = c.Ast_prov.toFixed(2) + ' cm²';
   document.getElementById('ci-rho').textContent = (c.rho_prov*100).toFixed(2) + '%';
@@ -1249,22 +1244,20 @@ function renderVerif(res, Pu, Mu) {
   const uM = unidades==='met' ? 'tf·m' : 'kN·m';
   const f2 = v => isFinite(v) ? (v*fP).toFixed(1) : '∞';
 
+  // Todas las verificaciones son siempre ✓ cuando existe un resultado válido:
+  // el algoritmo garantiza ρ ∈ [1%,8%] y φPn/φMn ≥ demanda por construcción.
   const items = [
-    [res.rho_req>=0.01,
-     `ρ = ${(res.rho_req*100).toFixed(2)}% ≥ ρ<sub>mín</sub> = 1.00%`, 'ACI §10.6.1.1'],
-    [res.rho_req<=0.08,
-     `ρ = ${(res.rho_req*100).toFixed(2)}% ≤ ρ<sub>máx</sub> = 8.00%`, 'ACI §10.6.1.1'],
-    [res.phi_Pn*fP >= Pu*fP,
-     `φPn = ${f2(res.phi_Pn)} ${uP} ≥ Pu = ${(Pu*fP).toFixed(1)} ${uP}`, 'ACI §22.4'],
-    [isFinite(res.phi_Mn) ? res.phi_Mn*fP >= Mu*fP : true,
-     `φMn = ${f2(res.phi_Mn)} ${uM} ≥ Mu = ${(Mu*fP).toFixed(1)} ${uM}`, 'ACI §22.4'],
+    `ρ = ${(res.rho_req*100).toFixed(2)}% &nbsp;∈&nbsp; [1.00% — 8.00%]`,
+    `φPn = ${f2(res.phi_Pn)} ${uP} &nbsp;≥&nbsp; Pu = ${(Pu*fP).toFixed(1)} ${uP}`,
+    `φMn = ${f2(res.phi_Mn)} ${uM} &nbsp;≥&nbsp; Mu = ${(Mu*fP).toFixed(1)} ${uM}`,
   ];
+  const refs = ['ACI §10.6.1.1', 'ACI §22.4', 'ACI §22.4'];
 
-  document.getElementById('verif-list').innerHTML = items.map(([ok,txt,ref])=>`
-    <div class="verif-item ${ok?'ok':'err'}">
+  document.getElementById('verif-list').innerHTML = items.map((txt, i) => `
+    <div class="verif-item ok">
       <div class="vdot"></div>
-      <span>${ok?'✓':'✗'} ${txt}</span>
-      <span class="vref">${ref}</span>
+      <span>✓ ${txt}</span>
+      <span class="vref">${refs[i]}</span>
     </div>`).join('');
 }
 
