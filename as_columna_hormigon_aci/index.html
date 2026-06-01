@@ -537,25 +537,25 @@
       </div>
       <div class="strip-sep"></div>
       <div class="scard">
-        <div class="scard-lbl">φPn</div>
+        <div class="scard-lbl" id="s-Pn-lbl">φPn</div>
         <div class="scard-val" id="s-Pn">—</div>
         <div class="scard-unit" id="s-Pn-u">kN</div>
       </div>
       <div class="strip-sep"></div>
       <div class="scard">
-        <div class="scard-lbl">φMn</div>
+        <div class="scard-lbl" id="s-Mn-lbl">φMn</div>
         <div class="scard-val" id="s-Mn">—</div>
         <div class="scard-unit" id="s-Mn-u">kN·m</div>
       </div>
       <div class="strip-sep"></div>
       <div class="scard">
-        <div class="scard-lbl">Factor φ</div>
+        <div class="scard-lbl" id="s-phi-lbl">Factor φ</div>
         <div class="scard-val" id="s-phi">—</div>
         <div class="scard-unit" id="s-zona">—</div>
       </div>
       <div class="strip-sep"></div>
       <div class="scard">
-        <div class="scard-lbl">εt acero</div>
+        <div class="scard-lbl" id="s-et-lbl">εt acero</div>
         <div class="scard-val" id="s-et">—</div>
         <div class="scard-unit">‰</div>
       </div>
@@ -598,6 +598,25 @@
             <div class="ci-row">
               <span class="ci-lbl">Sep. libre mín.</span>
               <span class="ci-val" id="ci-sep">—</span>
+            </div>
+            <!-- Separador -->
+            <div style="border-top:1px solid #21262d;margin:4px 0;"></div>
+            <!-- Capacidad del combo -->
+            <div class="ci-row">
+              <span class="ci-lbl">φPn provisto</span>
+              <span class="ci-val" id="ci-phiPn">—</span>
+            </div>
+            <div class="ci-row">
+              <span class="ci-lbl">φMn provisto</span>
+              <span class="ci-val" id="ci-phiMn">—</span>
+            </div>
+            <div class="ci-row">
+              <span class="ci-lbl">Factor φ</span>
+              <span class="ci-val" id="ci-phi">—</span>
+            </div>
+            <div class="ci-row">
+              <span class="ci-lbl">εt acero</span>
+              <span class="ci-val" id="ci-et">—</span>
             </div>
           </div>
         </div>
@@ -923,14 +942,29 @@ function renderSummary(res, Pu, Mu) {
 
   document.getElementById('s-Ast').textContent = res.Ast_req.toFixed(2) + ' cm²';
   document.getElementById('s-rho').textContent = (res.rho_req*100).toFixed(2) + '%';
+  // Valores requeridos (diseño)
   document.getElementById('s-Pn').textContent  = (res.phi_Pn*fP).toFixed(1);
   document.getElementById('s-Mn').textContent  = (res.phi_Mn*fP).toFixed(1);
+  document.getElementById('s-Pn').className    = 'scard-val';
+  document.getElementById('s-Mn').className    = 'scard-val';
   document.getElementById('s-Pn-u').textContent = uP;
   document.getElementById('s-Mn-u').textContent = uM;
   document.getElementById('s-phi').textContent = res.phi.toFixed(3);
+  document.getElementById('s-phi').className   = 'scard-val';
   const zona = res.et>=0.005 ? 'Tensión' : res.et<=res.p?.ey ? 'Compresión' : 'Transición';
   document.getElementById('s-zona').textContent = zona;
   document.getElementById('s-et').textContent  = (res.et*1000).toFixed(2) + '‰';
+  document.getElementById('s-et').className    = 'scard-val';
+
+  // Resetear labels a valores de diseño requerido
+  const lblPn  = document.getElementById('s-Pn-lbl');
+  const lblMn  = document.getElementById('s-Mn-lbl');
+  const lblPhi = document.getElementById('s-phi-lbl');
+  const lblEt  = document.getElementById('s-et-lbl');
+  if (lblPn)  lblPn.textContent  = 'φPn req.';
+  if (lblMn)  lblMn.textContent  = 'φMn req.';
+  if (lblPhi) lblPhi.textContent = 'Factor φ';
+  if (lblEt)  lblEt.textContent  = 'εt acero';
 }
 
 // ═══════════════════════════════════════════════════════
@@ -997,6 +1031,67 @@ function renderCombos(res) {
 }
 
 // ═══════════════════════════════════════════════════════
+// CALCULAR CAPACIDAD PARA UN Ast DADO
+// Reutiliza los parámetros actuales del diseño
+// ═══════════════════════════════════════════════════════
+function calcCapacidadAst(Ast_cm2, p) {
+  const { b, h, rec: r, fc, fy, Pu: Pu_kN, Mu: Mu_kNm, type: tipo } = p;
+  const fc_  = fc / 10, fy_  = fy / 10, Es_ = 20000;
+  const ecu  = 0.003,   ey   = fy_ / Es_;
+  const dp   = r,       d    = h - r,   Ag  = b * h;
+  const Mu_  = Mu_kNm * 100; // kN·cm
+
+  let beta1 = 0.85;
+  if (fc > 28) beta1 = Math.max(0.65, 0.85 - 0.05*(fc-28)/7);
+
+  const phi_c = tipo === 'espiral' ? 0.75 : 0.65;
+  const kfac  = tipo === 'espiral' ? 0.85 : 0.80;
+
+  function sec(c) {
+    const As = Ast_cm2 / 2, a = beta1 * c;
+    const ec_ = c > 0 ? ecu*(c-dp)/c : -ey;
+    const et  = c > 0 ? ecu*(d-c)/c  : ey;
+    const fsc = Math.max(-fy_, Math.min(fy_, ec_*Es_));
+    const fst = Math.max(-fy_, Math.min(fy_, et*Es_));
+    const Cc  = 0.85*fc_*a*b;
+    const Cs  = As*(fsc - 0.85*fc_);
+    const Ts  = As*fst;
+    const Pn  = Cc + Cs - Ts;
+    const Mn  = Cc*(h/2-a/2) + Cs*(h/2-dp) + Ts*(d-h/2);
+    let phi;
+    if (et <= ey)          phi = phi_c;
+    else if (et >= 0.005)  phi = 0.90;
+    else                   phi = phi_c + (et-ey)/(0.005-ey)*(0.90-phi_c);
+    return { Pn, Mn, phi, et };
+  }
+
+  const Pnmax = () => kfac*(0.85*fc_*(Ag-Ast_cm2) + fy_*Ast_cm2);
+
+  const e = Mu_ > 1e-6 && Pu_kN > 1e-6 ? Mu_/Pu_kN : Mu_ > 1e-6 ? 1e9 : 0;
+
+  if (e < 0.01) {
+    return { phi_Pn: phi_c*Pnmax(), phi_Mn: Infinity, phi: phi_c, et: 0 };
+  }
+
+  // Bisección en c
+  let clo = 1e-3, chi = 5*h;
+  const f = c => { const s = sec(c); return s.Mn - s.Pn * e; };
+  let flo = f(clo);
+  for (let i = 0; i < 80; i++) {
+    const cm = (clo+chi)/2, fm = f(cm);
+    if (Math.abs(fm) < 1e-4 || (chi-clo) < 1e-6) { clo = chi = cm; break; }
+    if (flo*fm < 0) { chi = cm; } else { clo = cm; flo = fm; }
+  }
+  const cs = (clo+chi)/2, s = sec(cs);
+  return {
+    phi_Pn: s.phi * Math.min(s.Pn, Pnmax()),
+    phi_Mn: s.phi * s.Mn / 100, // kN·m
+    phi:    s.phi,
+    et:     s.et,
+  };
+}
+
+// ═══════════════════════════════════════════════════════
 // SELECCIONAR COMBINACIÓN
 // ═══════════════════════════════════════════════════════
 function selectCombo(idx) {
@@ -1019,8 +1114,27 @@ function selectCombo(idx) {
   document.getElementById('combo-info').style.display = 'block';
   const fracStr  = c.bar.frac  && c.bar.frac  !== '—' ? `  ·  ${c.bar.frac}`  : '';
   const equivStr = c.bar.equiv && c.bar.equiv !== '—' ? `  ≡  ${c.bar.equiv}` : '';
-  document.getElementById('ci-hdr').textContent =
-    `${c.n} × ${c.bar.nom}${fracStr}${equivStr}  — ${c.bar.sys==='mm'?'Métrico':'Imperial'}`;
+
+  // Calcular capacidad para este Ast provisto
+  const cap = calcCapacidadAst(c.Ast_prov, lastResult.p);
+  const fP  = unidades === 'met' ? 1/9.80665 : 1;
+  const uP  = unidades === 'met' ? 'tf' : 'kN';
+  const uM  = unidades === 'met' ? 'tf·m' : 'kN·m';
+  const Pu_dis = lastResult.p.Pu;
+  const Mu_dis = lastResult.p.Mu;
+  const cumplePn = cap.phi_Pn >= Pu_dis;
+  const cumpleMn = isFinite(cap.phi_Mn) ? cap.phi_Mn >= Mu_dis : true;
+  const cumpleTodo = cumplePn && cumpleMn;
+
+  // Header con badge de verificación
+  const hdrEl = document.getElementById('ci-hdr');
+  hdrEl.innerHTML =
+    `<span>${c.n}×${c.bar.nom}${fracStr}${equivStr} — ${c.bar.sys==='mm'?'Métrico':'Imperial'}</span>
+     <span style="margin-left:auto;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700;
+       ${cumpleTodo?'background:#23863622;color:#3fb950':'background:#da363322;color:#f85149'}">
+       ${cumpleTodo?'✓ Cumple':'✗ No cumple'}
+     </span>`;
+
   document.getElementById('ci-Ast').textContent = c.Ast_prov.toFixed(2) + ' cm²';
   document.getElementById('ci-rho').textContent = (c.rho_prov*100).toFixed(2) + '%';
 
@@ -1028,7 +1142,6 @@ function selectCombo(idx) {
   excEl.textContent = '+' + c.exceso.toFixed(1)+'%';
   excEl.className   = 'ci-val ' + (c.exceso<15?'ok':'warn');
 
-  // Barras por cara (distribución perimetral)
   const bpc = Math.ceil(c.n/4);
   document.getElementById('ci-bpc').textContent = `≈${bpc} por cara`;
 
@@ -1036,10 +1149,54 @@ function selectCombo(idx) {
   if (isFinite(c.sep_libre)) {
     sepEl.textContent  = c.sep_libre.toFixed(1) + ' cm';
     sepEl.className    = 'ci-val ' + (c.sep_libre >= 2.5 ? 'ok' : 'warn');
-  } else {
-    sepEl.textContent = '—';
-    sepEl.className   = 'ci-val';
+  } else { sepEl.textContent = '—'; sepEl.className = 'ci-val'; }
+
+  // Capacidad del combo en el combo-info
+  const f2 = v => isFinite(v) ? (v*fP).toFixed(1) : '∞';
+  const phiPnEl = document.getElementById('ci-phiPn');
+  const phiMnEl = document.getElementById('ci-phiMn');
+  const phiEl   = document.getElementById('ci-phi');
+  const etEl    = document.getElementById('ci-et');
+  if (phiPnEl) {
+    phiPnEl.textContent = `${f2(cap.phi_Pn)} ${uP}`;
+    phiPnEl.className   = 'ci-val ' + (cumplePn?'ok':'err');
   }
+  if (phiMnEl) {
+    phiMnEl.textContent = `${f2(cap.phi_Mn)} ${uM}`;
+    phiMnEl.className   = 'ci-val ' + (cumpleMn?'ok':'err');
+  }
+  if (phiEl) {
+    const zona = cap.et >= 0.005 ? 'Tensión' : cap.et <= (lastResult.p.fy/200000) ? 'Compresión' : 'Transición';
+    phiEl.textContent = `${cap.phi.toFixed(3)} (${zona})`;
+    phiEl.className   = 'ci-val';
+  }
+  if (etEl) {
+    etEl.textContent = (cap.et*1000).toFixed(2) + ' ‰';
+    etEl.className   = 'ci-val';
+  }
+
+  // ── Actualizar summary strip con valores del combo ──────────────
+  const stripPn  = document.getElementById('s-Pn');
+  const stripMn  = document.getElementById('s-Mn');
+  const stripPhi = document.getElementById('s-phi');
+  const stripZona= document.getElementById('s-zona');
+  const stripEt  = document.getElementById('s-et');
+  const lblPn    = document.getElementById('s-Pn-lbl');
+  const lblMn    = document.getElementById('s-Mn-lbl');
+  const lblPhi   = document.getElementById('s-phi-lbl');
+  const lblEt    = document.getElementById('s-et-lbl');
+
+  if (stripPn)  { stripPn.textContent  = f2(cap.phi_Pn); stripPn.className = 'scard-val '+(cumplePn?'ok':'err'); }
+  if (stripMn)  { stripMn.textContent  = f2(cap.phi_Mn); stripMn.className = 'scard-val '+(cumpleMn?'ok':'err'); }
+  if (stripPhi) { const ey2=lastResult.p.fy/200000; const zona2=cap.et>=0.005?'Tensión':cap.et<=ey2?'Compresión':'Transición';
+                  stripPhi.textContent = cap.phi.toFixed(3); stripPhi.className = 'scard-val'; stripZona.textContent = zona2; }
+  if (stripEt)  { stripEt.textContent  = (cap.et*1000).toFixed(2)+'‰'; stripEt.className = 'scard-val'; }
+
+  // Labels con indicador "(prov.)"
+  if (lblPn)  lblPn.textContent  = 'φPn prov.';
+  if (lblMn)  lblMn.textContent  = 'φMn prov.';
+  if (lblPhi) lblPhi.textContent = 'φ prov.';
+  if (lblEt)  lblEt.textContent  = 'εt prov.';
 
   // Título viz
   document.getElementById('viz-title').textContent =
