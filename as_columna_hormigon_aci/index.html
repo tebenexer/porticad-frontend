@@ -123,7 +123,7 @@
     }
     .scard {
       display: flex; flex-direction: column; gap: 1px;
-      min-width: 90px;
+      min-width: 96px;
     }
     .scard-lbl { font-size: 9px; font-weight: 700; color: #8b949e; letter-spacing: .5px; text-transform: uppercase; }
     .scard-val { font-size: 18px; font-weight: 700; color: #e6edf3; line-height: 1; }
@@ -131,7 +131,17 @@
     .scard-val.warn { color: #d29922; }
     .scard-val.err  { color: #f85149; }
     .scard-unit { font-size: 10px; color: #6e7681; }
-    .strip-sep { width: 1px; height: 36px; background: #21262d; margin: 0 4px; }
+    .strip-sep { width: 1px; height: 52px; background: #21262d; margin: 0 4px; }
+
+    /* Fila del combo seleccionado en cada scard */
+    .scard-prov {
+      font-size: 12px; font-weight: 700; color: #30363d;
+      line-height: 1; margin-top: 1px;
+      display: flex; align-items: center; gap: 3px;
+    }
+    .scard-prov.ok   { color: #3fb950; }
+    .scard-prov.err  { color: #f85149; }
+    .scard-prov.warn { color: #d29922; }
 
     /* Content area — viz primero (izq), combos al fondo (der) */
     .content-area {
@@ -537,26 +547,30 @@
       </div>
       <div class="strip-sep"></div>
       <div class="scard">
-        <div class="scard-lbl" id="s-Pn-lbl">φPn</div>
+        <div class="scard-lbl">φPn</div>
         <div class="scard-val" id="s-Pn">—</div>
+        <div class="scard-prov" id="s-Pn-prov"></div>
         <div class="scard-unit" id="s-Pn-u">kN</div>
       </div>
       <div class="strip-sep"></div>
       <div class="scard">
-        <div class="scard-lbl" id="s-Mn-lbl">φMn</div>
+        <div class="scard-lbl">φMn</div>
         <div class="scard-val" id="s-Mn">—</div>
+        <div class="scard-prov" id="s-Mn-prov"></div>
         <div class="scard-unit" id="s-Mn-u">kN·m</div>
       </div>
       <div class="strip-sep"></div>
       <div class="scard">
-        <div class="scard-lbl" id="s-phi-lbl">Factor φ</div>
+        <div class="scard-lbl">Factor φ</div>
         <div class="scard-val" id="s-phi">—</div>
+        <div class="scard-prov" id="s-phi-prov"></div>
         <div class="scard-unit" id="s-zona">—</div>
       </div>
       <div class="strip-sep"></div>
       <div class="scard">
-        <div class="scard-lbl" id="s-et-lbl">εt acero</div>
+        <div class="scard-lbl">εt acero</div>
         <div class="scard-val" id="s-et">—</div>
+        <div class="scard-prov" id="s-et-prov"></div>
         <div class="scard-unit">‰</div>
       </div>
     </div>
@@ -942,29 +956,21 @@ function renderSummary(res, Pu, Mu) {
 
   document.getElementById('s-Ast').textContent = res.Ast_req.toFixed(2) + ' cm²';
   document.getElementById('s-rho').textContent = (res.rho_req*100).toFixed(2) + '%';
-  // Valores requeridos (diseño)
-  document.getElementById('s-Pn').textContent  = (res.phi_Pn*fP).toFixed(1);
-  document.getElementById('s-Mn').textContent  = (res.phi_Mn*fP).toFixed(1);
-  document.getElementById('s-Pn').className    = 'scard-val';
-  document.getElementById('s-Mn').className    = 'scard-val';
+  // Valores requeridos (diseño) — fila principal
+  document.getElementById('s-Pn').textContent   = (res.phi_Pn*fP).toFixed(1);
+  document.getElementById('s-Mn').textContent   = (res.phi_Mn*fP).toFixed(1);
   document.getElementById('s-Pn-u').textContent = uP;
   document.getElementById('s-Mn-u').textContent = uM;
-  document.getElementById('s-phi').textContent = res.phi.toFixed(3);
-  document.getElementById('s-phi').className   = 'scard-val';
+  document.getElementById('s-phi').textContent  = res.phi.toFixed(3);
   const zona = res.et>=0.005 ? 'Tensión' : res.et<=res.p?.ey ? 'Compresión' : 'Transición';
   document.getElementById('s-zona').textContent = zona;
-  document.getElementById('s-et').textContent  = (res.et*1000).toFixed(2) + '‰';
-  document.getElementById('s-et').className    = 'scard-val';
+  document.getElementById('s-et').textContent   = (res.et*1000).toFixed(2) + '‰';
 
-  // Resetear labels a valores de diseño requerido
-  const lblPn  = document.getElementById('s-Pn-lbl');
-  const lblMn  = document.getElementById('s-Mn-lbl');
-  const lblPhi = document.getElementById('s-phi-lbl');
-  const lblEt  = document.getElementById('s-et-lbl');
-  if (lblPn)  lblPn.textContent  = 'φPn req.';
-  if (lblMn)  lblMn.textContent  = 'φMn req.';
-  if (lblPhi) lblPhi.textContent = 'Factor φ';
-  if (lblEt)  lblEt.textContent  = 'εt acero';
+  // Limpiar filas del combo (se llenan al seleccionar)
+  ['s-Pn-prov','s-Mn-prov','s-phi-prov','s-et-prov'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = ''; el.className = 'scard-prov'; }
+  });
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1175,28 +1181,31 @@ function selectCombo(idx) {
     etEl.className   = 'ci-val';
   }
 
-  // ── Actualizar summary strip con valores del combo ──────────────
-  const stripPn  = document.getElementById('s-Pn');
-  const stripMn  = document.getElementById('s-Mn');
-  const stripPhi = document.getElementById('s-phi');
-  const stripZona= document.getElementById('s-zona');
-  const stripEt  = document.getElementById('s-et');
-  const lblPn    = document.getElementById('s-Pn-lbl');
-  const lblMn    = document.getElementById('s-Mn-lbl');
-  const lblPhi   = document.getElementById('s-phi-lbl');
-  const lblEt    = document.getElementById('s-et-lbl');
+  // ── Fila del combo en el summary strip (no toca los valores requeridos) ──
+  const ey2  = lastResult.p.fy / 200000;
+  const zona2 = cap.et >= 0.005 ? 'Tensión' : cap.et <= ey2 ? 'Compresión' : 'Transición';
 
-  if (stripPn)  { stripPn.textContent  = f2(cap.phi_Pn); stripPn.className = 'scard-val '+(cumplePn?'ok':'err'); }
-  if (stripMn)  { stripMn.textContent  = f2(cap.phi_Mn); stripMn.className = 'scard-val '+(cumpleMn?'ok':'err'); }
-  if (stripPhi) { const ey2=lastResult.p.fy/200000; const zona2=cap.et>=0.005?'Tensión':cap.et<=ey2?'Compresión':'Transición';
-                  stripPhi.textContent = cap.phi.toFixed(3); stripPhi.className = 'scard-val'; stripZona.textContent = zona2; }
-  if (stripEt)  { stripEt.textContent  = (cap.et*1000).toFixed(2)+'‰'; stripEt.className = 'scard-val'; }
+  const provPn  = document.getElementById('s-Pn-prov');
+  const provMn  = document.getElementById('s-Mn-prov');
+  const provPhi = document.getElementById('s-phi-prov');
+  const provEt  = document.getElementById('s-et-prov');
 
-  // Labels con indicador "(prov.)"
-  if (lblPn)  lblPn.textContent  = 'φPn prov.';
-  if (lblMn)  lblMn.textContent  = 'φMn prov.';
-  if (lblPhi) lblPhi.textContent = 'φ prov.';
-  if (lblEt)  lblEt.textContent  = 'εt prov.';
+  if (provPn) {
+    provPn.textContent = `▶ ${f2(cap.phi_Pn)} ${cumplePn?'✓':'✗'}`;
+    provPn.className   = 'scard-prov ' + (cumplePn ? 'ok' : 'err');
+  }
+  if (provMn) {
+    provMn.textContent = `▶ ${f2(cap.phi_Mn)} ${cumpleMn?'✓':'✗'}`;
+    provMn.className   = 'scard-prov ' + (cumpleMn ? 'ok' : 'err');
+  }
+  if (provPhi) {
+    provPhi.textContent = `▶ ${cap.phi.toFixed(3)}`;
+    provPhi.className   = 'scard-prov';
+  }
+  if (provEt) {
+    provEt.textContent = `▶ ${(cap.et*1000).toFixed(2)}‰`;
+    provEt.className   = 'scard-prov';
+  }
 
   // Título viz
   document.getElementById('viz-title').textContent =
