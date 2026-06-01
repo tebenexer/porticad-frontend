@@ -80,6 +80,13 @@
     .field input:focus, .field select:focus { border-color: #58a6ff; box-shadow: 0 0 0 3px #1f6feb22; }
     .field select option { background: #161b22; }
 
+    /* Wrapper del cuerpo de inputs — flex column con gap en desktop */
+    #as-inputs-body {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
     .toggle-group { display: flex; gap: 4px; background: #0d1117;
                     border: 1px solid #21262d; border-radius: 7px; padding: 4px; width: fit-content; }
     .tgbtn { background: none; border: none; color: #8b949e; font-size: 12px;
@@ -129,7 +136,7 @@
     /* Content area — viz primero (izq), combos al fondo (der) */
     .content-area {
       display: grid;
-      grid-template-columns: 400px 1fr;
+      grid-template-columns: 460px 1fr;
       overflow: hidden;
     }
 
