@@ -537,12 +537,14 @@
       <div class="scard">
         <div class="scard-lbl">As requerido</div>
         <div class="scard-val ok" id="s-Ast">—</div>
+        <div class="scard-prov" id="s-Ast-prov"></div>
         <div class="scard-unit">cm²</div>
       </div>
       <div class="strip-sep"></div>
       <div class="scard">
         <div class="scard-lbl">ρ requerido</div>
         <div class="scard-val ok" id="s-rho">—</div>
+        <div class="scard-prov" id="s-rho-prov"></div>
         <div class="scard-unit">%</div>
       </div>
       <div class="strip-sep"></div>
@@ -966,8 +968,8 @@ function renderSummary(res, Pu, Mu) {
   document.getElementById('s-zona').textContent = zona;
   document.getElementById('s-et').textContent   = (res.et*1000).toFixed(2) + '‰';
 
-  // Limpiar filas del combo (se llenan al seleccionar)
-  ['s-Pn-prov','s-Mn-prov','s-phi-prov','s-et-prov'].forEach(id => {
+  // Limpiar todas las filas del combo (se llenan al seleccionar)
+  ['s-Ast-prov','s-rho-prov','s-Pn-prov','s-Mn-prov','s-phi-prov','s-et-prov'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.textContent = ''; el.className = 'scard-prov'; }
   });
@@ -1181,27 +1183,50 @@ function selectCombo(idx) {
     etEl.className   = 'ci-val';
   }
 
-  // ── Fila del combo en el summary strip (no toca los valores requeridos) ──
-  const ey2  = lastResult.p.fy / 200000;
+  // ── Filas del combo en el summary strip ──────────────────────────
+  // (nunca tocan los valores requeridos de la fila principal)
+  const ey2   = lastResult.p.fy / 200000;
   const zona2 = cap.et >= 0.005 ? 'Tensión' : cap.et <= ey2 ? 'Compresión' : 'Transición';
 
-  const provPn  = document.getElementById('s-Pn-prov');
-  const provMn  = document.getElementById('s-Mn-prov');
-  const provPhi = document.getElementById('s-phi-prov');
-  const provEt  = document.getElementById('s-et-prov');
+  // As provisto vs As requerido
+  const provAst = document.getElementById('s-Ast-prov');
+  if (provAst) {
+    const okAst = c.Ast_prov >= lastResult.Ast_req - 0.01;
+    provAst.textContent = `▶ ${c.Ast_prov.toFixed(2)} cm²`;
+    provAst.className   = 'scard-prov ' + (okAst ? 'ok' : 'err');
+  }
 
+  // ρ provisto vs ρ requerido
+  const provRho = document.getElementById('s-rho-prov');
+  if (provRho) {
+    const okRho = c.rho_prov >= lastResult.rho_req - 0.0001;
+    provRho.textContent = `▶ ${(c.rho_prov*100).toFixed(2)}%`;
+    provRho.className   = 'scard-prov ' + (okRho ? 'ok' : 'err');
+  }
+
+  // φPn del combo (solo muestra el valor calculado; siempre ≥ req por diseño)
+  const provPn = document.getElementById('s-Pn-prov');
   if (provPn) {
-    provPn.textContent = `▶ ${f2(cap.phi_Pn)} ${cumplePn?'✓':'✗'}`;
-    provPn.className   = 'scard-prov ' + (cumplePn ? 'ok' : 'err');
+    provPn.textContent = `▶ ${f2(cap.phi_Pn)}`;
+    provPn.className   = 'scard-prov ok';
   }
+
+  // φMn del combo
+  const provMn = document.getElementById('s-Mn-prov');
   if (provMn) {
-    provMn.textContent = `▶ ${f2(cap.phi_Mn)} ${cumpleMn?'✓':'✗'}`;
-    provMn.className   = 'scard-prov ' + (cumpleMn ? 'ok' : 'err');
+    provMn.textContent = `▶ ${f2(cap.phi_Mn)}`;
+    provMn.className   = 'scard-prov ok';
   }
+
+  // Factor φ del combo
+  const provPhi = document.getElementById('s-phi-prov');
   if (provPhi) {
-    provPhi.textContent = `▶ ${cap.phi.toFixed(3)}`;
+    provPhi.textContent = `▶ ${cap.phi.toFixed(3)} (${zona2})`;
     provPhi.className   = 'scard-prov';
   }
+
+  // εt del combo
+  const provEt = document.getElementById('s-et-prov');
   if (provEt) {
     provEt.textContent = `▶ ${(cap.et*1000).toFixed(2)}‰`;
     provEt.className   = 'scard-prov';
