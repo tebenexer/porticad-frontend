@@ -612,8 +612,8 @@
         <div class="combos-header">
           <span class="combos-header-title">Combinaciones de Barras</span>
           <div class="toggle-group">
-            <button class="tgbtn active" id="f-mm"  onclick="setBarFilter('mm')">mm</button>
-            <button class="tgbtn"        id="f-in"  onclick="setBarFilter('in')">pulgadas</button>
+            <button class="tgbtn"        id="f-mm"  onclick="setBarFilter('mm')">mm</button>
+            <button class="tgbtn active" id="f-in"  onclick="setBarFilter('in')">pulgadas</button>
             <button class="tgbtn"        id="f-all" onclick="setBarFilter('all')">Ambos</button>
           </div>
         </div>
@@ -668,7 +668,7 @@ const BARRAS_IN = [
 // ESTADO GLOBAL
 // ═══════════════════════════════════════════════════════
 let unidades    = 'si';
-let barFilter   = 'mm';
+let barFilter   = 'in';
 let lastResult  = null;
 let selectedIdx = 0;
 let debTimer    = null;
