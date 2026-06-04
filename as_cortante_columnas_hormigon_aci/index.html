@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Diseño Estribos Columna — PortiCAD Multi-Tools</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --sans:'Inter',system-ui,sans-serif;
+  --mono:'JetBrains Mono','Courier New',monospace;
+  --bg:#f3f4f6;--surface:#fff;--sidebar:#f9fafb;
+  --border:#e5e7eb;--border2:#d1d5db;
+  --text:#111827;--muted:#6b7280;
+  --accent:#1d4ed8;--accent2:#3b82f6;
+  --green:#16a34a;--red:#dc2626;--amber:#d97706;
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);
+     font-size:13px;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+/* ── Topbar ── */
+.topbar{background:#161b22;border-bottom:1px solid #30363d;height:44px;
+        display:flex;align-items:center;padding:0 16px;gap:8px;flex-shrink:0;z-index:100}
+.topbar a{color:#58a6ff;font-size:14px;font-weight:700;text-decoration:none}
+.topbar-sep{color:#30363d;font-size:16px}
+.topbar-crumb{font-size:12px;color:#8b949e;display:flex;align-items:center;gap:6px}
+.topbar-title{font-size:13px;font-weight:600;color:#e6edf3}
+.badge{background:#1f6feb22;border:1px solid #1f6feb55;color:#58a6ff;
+       font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px}
+.calc-dot{width:7px;height:7px;border-radius:50%;background:#3fb950;transition:all .3s}
+.calc-dot.busy{background:#d29922;animation:blink .6s infinite}
+.calc-dot.err{background:#f85149}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.calc-msg{font-size:11px;color:#8b949e}
+
+/* ── Main layout ── */
+.main{display:grid;grid-template-columns:340px 1fr;flex:1;overflow:hidden}
+
+/* ── Inputs panel ── */
+.panel-inputs{background:#161b22;border-right:1px solid #21262d;
+              overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+.input-group{background:#0d1117;border:1px solid #21262d;border-radius:10px;
+             padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.sec-title{font-size:11px;font-weight:700;color:#58a6ff;letter-spacing:.6px;
+           text-transform:uppercase;padding-bottom:8px;border-bottom:1px solid #21262d;
+           display:flex;align-items:center;gap:6px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:12px;color:#8b949e;font-weight:500}
+.field label em{font-style:normal;color:#6e7681;font-size:11px}
+.field input,.field select{background:#161b22;border:1px solid #30363d;border-radius:7px;
+  color:#e6edf3;font-size:13px;padding:7px 10px;width:100%;outline:none;transition:border-color .15s}
+.field input:focus,.field select:focus{border-color:#58a6ff;box-shadow:0 0 0 3px #1f6feb22}
+.field select option{background:#161b22}
+.radio-group{display:flex;gap:6px;flex-wrap:wrap}
+.rbtn{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:500;color:#8b949e;
+      cursor:pointer;padding:5px 10px;border:1px solid #30363d;border-radius:7px;transition:all .15s}
+.rbtn:has(input:checked){border-color:#58a6ff;background:#1f6feb15;color:#e6edf3}
+.rbtn input{accent-color:#58a6ff}
+.aci-note{background:#1f6feb0d;border:1px solid #1f6feb22;border-radius:8px;
+          padding:10px 12px;font-size:11px;color:#8b949e;line-height:1.6}
+.hidden{display:none!important}
+.sub-group{background:#0a0e15;border:1px solid #1a2030;border-radius:8px;
+           padding:10px 12px;display:flex;flex-direction:column;gap:8px;margin-top:2px}
+.sub-title{font-size:10px;font-weight:700;color:#6e7681;letter-spacing:.5px;text-transform:uppercase}
+
+/* ── Results panel ── */
+.panel-results{overflow:hidden;display:flex;flex-direction:column}
+
+/* Summary strip */
+.summary-strip{background:#161b22;border-bottom:1px solid #21262d;padding:10px 16px;
+               display:flex;gap:8px;align-items:center;overflow-x:auto;flex-shrink:0}
+.scard{display:flex;flex-direction:column;gap:1px;min-width:80px;flex-shrink:0}
+.scard-lbl{font-size:9px;font-weight:700;color:#8b949e;letter-spacing:.5px;text-transform:uppercase}
+.scard-val{font-size:16px;font-weight:700;color:#e6edf3;line-height:1}
+.scard-val.ok{color:#3fb950}.scard-val.warn{color:#d29922}.scard-val.err{color:#f85149}
+.scard-unit{font-size:10px;color:#6e7681}
+.strip-sep{width:1px;height:40px;background:#21262d;margin:0 4px;flex-shrink:0}
+
+/* Results body: 3 columns */
+.results-body{flex:1;display:grid;grid-template-columns:1fr 1fr 360px;overflow:hidden}
+
+/* Cards inside results */
+.res-card{border-right:1px solid #21262d;overflow-y:auto;padding:14px;
+          display:flex;flex-direction:column;gap:12px}
+.res-card:last-child{border-right:none}
+.res-title{font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.5px;
+           text-transform:uppercase;padding-bottom:8px;border-bottom:1px solid #21262d}
+
+/* Zonas table */
+.zone-table{width:100%;border-collapse:collapse;font-size:12px}
+.zone-table th{background:#0d1117;color:#8b949e;font-size:10px;font-weight:700;
+               padding:7px 10px;text-align:left;border-bottom:1px solid #21262d;
+               text-transform:uppercase;letter-spacing:.3px}
+.zone-table td{padding:8px 10px;border-bottom:1px solid #161b22;color:#e6edf3;font-size:12px}
+.zone-table tr:last-child td{border-bottom:none}
+.zone-table tr.zone-conf td{background:#1f6feb08;border-left:3px solid #58a6ff}
+.zone-table tr.zone-std td{background:#23863608;border-left:3px solid #3fb950}
+.zone-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px}
+.badge-blue{background:#1f6feb22;color:#58a6ff}
+.badge-green{background:#23863622;color:#3fb950}
+.badge-amber{background:#9e6a0322;color:#d29922}
+
+/* Verif items */
+.verif-item{display:flex;align-items:flex-start;gap:7px;background:#161b22;
+            border:1px solid #21262d;border-radius:7px;padding:7px 10px;font-size:11px}
+.verif-item.ok{border-color:#23863630}.verif-item.err{border-color:#da363330}
+.verif-item.warn{border-color:#9e6a0330}.verif-item.info{border-color:#1f6feb30}
+.vdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:2px}
+.ok .vdot{background:#3fb950}.err .vdot{background:#f85149}
+.warn .vdot{background:#d29922}.info .vdot{background:#58a6ff}
+.vref{margin-left:auto;color:#6e7681;font-size:10px;white-space:nowrap;padding-left:6px}
+.vtext{flex:1;color:#c9d1d9;line-height:1.4}
+
+/* Viz canvas */
+.viz-section{display:flex;flex-direction:column;gap:8px}
+canvas{display:block;border-radius:8px;background:#0d1117}
+
+/* Spacing breakdown */
+.spacing-row{display:flex;justify-content:space-between;align-items:center;
+             padding:7px 10px;border-radius:7px;background:#0d1117;
+             border:1px solid #21262d;font-size:12px}
+.spacing-row.governing{background:#1f6feb0d;border-color:#1f6feb40}
+.spacing-row span:first-child{color:#8b949e}
+.spacing-row span:last-child{font-weight:700;color:#e6edf3;font-family:var(--mono)}
+.spacing-row.governing span:last-child{color:#58a6ff}
+
+/* Error box */
+.err-box{background:#da363314;border:1px solid #da363340;border-radius:8px;
+         padding:12px 14px;color:#f85149;font-size:13px;margin:4px 0}
+.empty-hint{color:#6e7681;font-size:12px;text-align:center;padding:20px}
+
+/* Formula detail */
+.formula-box{background:#0d1117;border:1px solid #21262d;border-radius:8px;
+             padding:10px 12px;font-family:var(--mono);font-size:11.5px;color:#e6edf3;line-height:1.9}
+.formula-box span.key{color:#58a6ff}
+.formula-box span.val{color:#3fb950}
+.formula-box span.lbl{color:#8b949e;font-size:11px}
+.formula-box span.warn{color:#d29922}
+
+/* Warning note */
+.note-box{background:#9e6a0310;border:1px solid #9e6a0330;border-radius:7px;
+          padding:8px 10px;font-size:11px;color:#d29922;line-height:1.5}
+.note-box.blue{background:#1f6feb10;border-color:#1f6feb30;color:#58a6ff}
+
+@media(max-width:900px){
+  body{overflow:auto;height:auto}
+  .main{grid-template-columns:1fr;height:auto}
+  .results-body{grid-template-columns:1fr;height:auto;overflow:visible}
+  .res-card{border-right:none;border-bottom:1px solid #21262d}
+}
+</style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="topbar">
+  <a href="/">PortiCAD</a>
+  <span class="topbar-sep">›</span>
+  <div class="topbar-crumb">
+    <a href="/as_columna_hormigon_aci" style="color:#8b949e;text-decoration:none">Multi-Tools</a>
+    <span>›</span>
+    <span class="topbar-title">Cortante y Estribos — Columna H.A.</span>
+  </div>
+  <span class="badge" style="margin-left:8px">ACI 318-25</span>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+    <div class="calc-dot" id="calc-dot"></div>
+    <span class="calc-msg" id="calc-msg">Listo</span>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ══════════════ INPUTS ══════════════ -->
+<div class="panel-inputs">
+
+  <!-- Sección -->
+  <div class="input-group">
+    <div class="sec-title">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+      Sección Transversal
+    </div>
+    <div class="radio-group">
+      <label class="rbtn"><input type="radio" name="shape" value="rect" checked onchange="onShapeChange()"> Rectangular</label>
+      <label class="rbtn"><input type="radio" name="shape" value="circ" onchange="onShapeChange()"> Circular</label>
+    </div>
+    <div id="rect-inputs" class="row2">
+      <div class="field"><label>Ancho b <em>(cm)</em></label>
+        <input id="i-b" type="number" value="30" min="10" step="1" oninput="recalc()"></div>
+      <div class="field"><label>Alto h <em>(cm)</em></label>
+        <input id="i-h" type="number" value="30" min="10" step="1" oninput="recalc()"></div>
+    </div>
+    <div id="circ-inputs" class="hidden field">
+      <label>Diámetro D <em>(cm)</em></label>
+      <input id="i-D" type="number" value="40" min="15" step="1" oninput="recalc()">
+    </div>
+    <div class="row2">
+      <div class="field"><label>Altura libre Lc <em>(m)</em></label>
+        <input id="i-Lc" type="number" value="3.0" min="0.5" step="0.1" oninput="recalc()"></div>
+      <div class="field"><label>Recubrimiento libre <em>(cm)</em></label>
+        <input id="i-cov" type="number" value="4" min="2" step="0.5" oninput="recalc()"></div>
+    </div>
+  </div>
+
+  <!-- Materiales -->
+  <div class="input-group">
+    <div class="sec-title">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      Materiales
+    </div>
+    <div class="row2">
+      <div class="field"><label>f'c <em>(MPa)</em></label>
+        <select id="i-fc" onchange="recalc()">
+          <option value="21">21 — f'c 210</option>
+          <option value="24">24 — f'c 240</option>
+          <option value="28" selected>28 — f'c 280</option>
+          <option value="35">35 — f'c 350</option>
+          <option value="42">42 — f'c 420</option>
+        </select></div>
+      <div class="field"><label>fyt estribos <em>(MPa)</em></label>
+        <select id="i-fyt" onchange="recalc()">
+          <option value="280">280 — Gr.40</option>
+          <option value="420" selected>420 — Gr.60</option>
+        </select></div>
+    </div>
+    <div class="field"><label>λ (tipo de hormigón)</label>
+      <select id="i-lambda" onchange="recalc()">
+        <option value="1.0" selected>1.0 — Normal</option>
+        <option value="0.85">0.85 — Semi-liviano</option>
+        <option value="0.75">0.75 — Liviano</option>
+      </select></div>
+  </div>
+
+  <!-- Refuerzo longitudinal -->
+  <div class="input-group">
+    <div class="sec-title">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+      Refuerzo Longitudinal
+    </div>
+    <div class="row2">
+      <div class="field"><label>Ø barra long. <em>(mm)</em></label>
+        <select id="i-db" onchange="recalc()">
+          <option value="9.525">#3 — 3/8"</option>
+          <option value="12.7">#4 — 1/2"</option>
+          <option value="15.875">#5 — 5/8"</option>
+          <option value="19.05" selected>#6 — 3/4"</option>
+          <option value="22.225">#7 — 7/8"</option>
+          <option value="25.4">#8 — 1"</option>
+          <option value="28.575">#9 — 1-1/8"</option>
+          <option value="32.258">#10 — 1-1/4"</option>
+          <option value="35.814">#11 — 1-3/8"</option>
+        </select></div>
+      <div class="field"><label>N° barras totales</label>
+        <input id="i-nlong" type="number" value="8" min="4" step="1" oninput="recalc()"></div>
+    </div>
+  </div>
+
+  <!-- Estribo -->
+  <div class="input-group">
+    <div class="sec-title">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg>
+      Refuerzo Transversal
+    </div>
+
+    <!-- Tipo para rectangular -->
+    <div id="tie-rect-opts">
+      <div class="row2">
+        <div class="field"><label>Ø estribo <em>(mm)</em></label>
+          <select id="i-dt" onchange="recalc()">
+            <option value="9.525">#3 — 3/8"</option>
+            <option value="12.7" selected>#4 — 1/2"</option>
+            <option value="15.875">#5 — 5/8"</option>
+          </select></div>
+        <div class="field"><label>Ramas en cada dirección</label>
+          <select id="i-nramas" onchange="recalc()">
+            <option value="2" selected>2 ramas</option>
+            <option value="3">3 ramas</option>
+            <option value="4">4 ramas</option>
+          </select></div>
+      </div>
+    </div>
+
+    <!-- Tipo para circular -->
+    <div id="tie-circ-opts" class="hidden">
+      <div class="radio-group" style="margin-bottom:6px">
+        <label class="rbtn"><input type="radio" name="lattype" value="spiral" checked onchange="recalc()"> Espiral</label>
+        <label class="rbtn"><input type="radio" name="lattype" value="ties" onchange="recalc()"> Amarres circ.</label>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Ø refuerzo trans. <em>(mm)</em></label>
+          <select id="i-dt-circ" onchange="recalc()">
+            <option value="9.525">#3 — 3/8"</option>
+            <option value="12.7" selected>#4 — 1/2"</option>
+            <option value="15.875">#5 — 5/8"</option>
+          </select></div>
+        <div class="field" id="circ-pitch-field">
+          <label id="circ-pitch-lbl">Paso espiral <em>(mm)</em></label>
+          <input id="i-sp-pitch" type="number" value="60" min="25" max="75" step="5" oninput="recalc()">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cargas -->
+  <div class="input-group">
+    <div class="sec-title">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+      Cargas de Diseño (Últimas)
+    </div>
+    <div class="row2">
+      <div class="field"><label>Pu <em>(kN)</em></label>
+        <input id="i-Pu" type="number" value="500" min="0" step="10" oninput="recalc()"></div>
+      <div class="field"><label>Vu <em>(kN)</em></label>
+        <input id="i-Vu" type="number" value="80" min="0" step="5" oninput="recalc()"></div>
+    </div>
+    <div class="field">
+      <label>Naturaleza de la carga axial</label>
+      <div class="radio-group">
+        <label class="rbtn"><input type="radio" name="axtype" value="comp" checked onchange="recalc()"> Compresión</label>
+        <label class="rbtn"><input type="radio" name="axtype" value="tens" onchange="recalc()"> Tensión</label>
+      </div>
+    </div>
+    <div class="aci-note" style="margin-top:2px;font-size:10px">
+      <strong style="color:#d29922">SMF §18.7.6:</strong> Si aplica diseño sísmico especial, verificar Ve desde momentos probables Mpr. La herramienta usa Vu ingresado como demanda de diseño.
+    </div>
+  </div>
+
+  <!-- Sísmica -->
+  <div class="input-group">
+    <div class="sec-title">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Categoría Sísmica
+    </div>
+    <div class="radio-group" style="flex-direction:column">
+      <label class="rbtn"><input type="radio" name="seismic" value="none" checked onchange="onSeismicChange()">
+        Sin requisitos sísmicos
+      </label>
+      <label class="rbtn"><input type="radio" name="seismic" value="imf" onchange="onSeismicChange()">
+        Marco Intermedio (IMF) — §18.4
+      </label>
+      <label class="rbtn"><input type="radio" name="seismic" value="smf" onchange="onSeismicChange()">
+        Marco Especial (SMF) — §18.7
+      </label>
+    </div>
+
+    <!-- hx — solo para SMF -->
+    <div id="hx-group" class="hidden sub-group">
+      <div class="sub-title">Parámetros SMF §18.7.5.3</div>
+      <div class="field">
+        <label>hx — sep. max. entre barras long. restringidas <em>(mm)</em></label>
+        <input id="i-hx" type="number" value="150" min="50" max="350" step="10" oninput="recalc()">
+      </div>
+      <div style="font-size:10px;color:#6e7681;line-height:1.5">
+        hx = separación horizontal máxima entre barras longitudinales soportadas por ganchos o estribos intermedios.<br>
+        Determina so = 100 + (350−hx)/3 (75 ≤ so ≤ 150 mm)
+      </div>
+    </div>
+  </div>
+
+  <div class="aci-note">
+    <strong style="color:#58a6ff">ACI 318-25</strong> ·
+    Vc §22.5.5.1 · Av_min §9.6.3.4 · s_max §9.7.6.2 ·
+    Amarres §25.7.2 · Confinamiento §18.7.5 · Espiral §25.7.3
+  </div>
+
+</div><!-- /panel-inputs -->
+
+<!-- ══════════════ RESULTS ══════════════ -->
+<div class="panel-results">
+
+  <!-- Summary strip -->
+  <div class="summary-strip" id="summary-strip">
+    <div class="scard">
+      <div class="scard-lbl">Vc</div>
+      <div class="scard-val" id="s-Vc">—</div>
+      <div class="scard-unit">kN</div>
+    </div>
+    <div class="strip-sep"></div>
+    <div class="scard">
+      <div class="scard-lbl">Vs req.</div>
+      <div class="scard-val" id="s-Vs">—</div>
+      <div class="scard-unit">kN</div>
+    </div>
+    <div class="strip-sep"></div>
+    <div class="scard">
+      <div class="scard-lbl">φVn</div>
+      <div class="scard-val" id="s-phiVn">—</div>
+      <div class="scard-unit">kN</div>
+    </div>
+    <div class="strip-sep"></div>
+    <div class="scard">
+      <div class="scard-lbl">s zona std.</div>
+      <div class="scard-val" id="s-sz">—</div>
+      <div class="scard-unit">cm</div>
+    </div>
+    <div class="strip-sep" id="sep-slo" style="display:none"></div>
+    <div class="scard" id="card-slo" style="display:none">
+      <div class="scard-lbl">s zona lo</div>
+      <div class="scard-val" id="s-slo" style="color:#58a6ff">—</div>
+      <div class="scard-unit">cm</div>
+    </div>
+    <div class="strip-sep" id="sep-lo" style="display:none"></div>
+    <div class="scard" id="card-lo" style="display:none">
+      <div class="scard-lbl">Longitud lo</div>
+      <div class="scard-val" id="s-lo" style="color:#58a6ff">—</div>
+      <div class="scard-unit">cm</div>
+    </div>
+    <div class="strip-sep" id="sep-rhog" style="display:none"></div>
+    <div class="scard" id="card-rhog" style="display:none">
+      <div class="scard-lbl">ρg</div>
+      <div class="scard-val" id="s-rhog">—</div>
+      <div class="scard-unit">%</div>
+    </div>
+  </div>
+
+  <!-- 3 columns -->
+  <div class="results-body">
+
+    <!-- ZONAS + BREAKDOWN -->
+    <div class="res-card">
+      <div class="res-title">Espaciamientos por Zona</div>
+      <div id="zones-content"><div class="empty-hint">Calculando…</div></div>
+
+      <div class="res-title" style="margin-top:4px">Descomposición — s Adoptado</div>
+      <div id="spacing-breakdown"></div>
+
+      <div class="res-title" style="margin-top:4px">Fórmulas Aplicadas</div>
+      <div id="formula-detail"></div>
+    </div>
+
+    <!-- VERIFICACIONES -->
+    <div class="res-card">
+      <div class="res-title">Verificaciones ACI 318-25</div>
+      <div id="verif-content" style="display:flex;flex-direction:column;gap:5px">
+        <div class="empty-hint">Calculando…</div>
+      </div>
+
+      <div id="seismic-section" style="display:none">
+        <div class="res-title" style="margin-top:8px">Confinamiento Sísmico</div>
+        <div id="seismic-content" style="display:flex;flex-direction:column;gap:5px"></div>
+      </div>
+    </div>
+
+    <!-- VISUALIZACIÓN -->
+    <div class="res-card">
+      <div class="res-title">Sección Transversal</div>
+      <div class="viz-section">
+        <canvas id="cviz" width="320" height="290"></canvas>
+      </div>
+      <div class="res-title" style="margin-top:8px">Elevación — Zonas de Estribo</div>
+      <canvas id="celev" width="320" height="190"></canvas>
+    </div>
+
+  </div>
+</div><!-- /panel-results -->
+</div><!-- /main -->
+
+<script>
+/* ════════════════════════════════════════════════════════
+   MOTOR DE CÁLCULO — ACI 318-25 (CORREGIDO Y COMPLETO)
+   Correcciones vs versión anterior:
+   1. lo = max(max(b,h), Lc/6, 450) — §18.7.5.1
+   2. IMF: s ≤ min(8db, 24dt, min(b,h)/2, 300) — §18.4.3.3
+   3. SMF: so calculado con hx — §18.7.5.3
+   4. Nu tensión (Nu negativo) reduce Vc — §22.5.7.1
+   5. Verificación ρg — §10.6.1.1
+   6. Verificación Ø min estribo — §25.7.2.2
+   7. Verificación separación libre barras — §10.7.2.1
+   8. Verificación fyt ≤ 420 sísmica — §18.7.5.8
+   9. Primera posición estribo (s/2 de nudo) — §18.7.5.2
+  10. Diseño de espiral para columnas circulares — §25.7.3
+  11. Ash con bc correcto por dirección — §18.7.5.4
+════════════════════════════════════════════════════════ */
+function calcEstribos(p) {
+  const {
+    shape, b_cm, h_cm, D_cm, Lc_m, cov_cm,
+    fc, fyt, lambda,
+    db_mm, nlong, dt_mm, nramas,
+    Pu_kN, Vu_kN, axialType,
+    seismic, hx_mm,
+    latType, dt_circ_mm, sp_pitch_mm
+  } = p;
+
+  /* ── Geometría (mm) ─────────────────────────────── */
+  const b   = shape === 'rect' ? b_cm * 10 : D_cm * 10;
+  const h   = shape === 'rect' ? h_cm * 10 : D_cm * 10;
+  const Lc  = Lc_m * 1000;
+  const cov = cov_cm * 10;          // recubrimiento libre (mm)
+
+  // Para circular usamos dt del selector circular; para rectangular el selector rect
+  const dt_use = shape === 'circ' ? dt_circ_mm : dt_mm;
+  const dt = dt_use;
+  const db = db_mm;
+
+  const bw      = b;
+  const cov_eje = cov + dt + db / 2;   // mm al eje de barra long.
+  const d       = h - cov_eje;          // profundidad efectiva (mm)
+  const Ag      = shape === 'rect'
+                  ? b * h
+                  : Math.PI * (b / 2) ** 2;    // mm²
+
+  /* ── Acero longitudinal ─────────────────────────── */
+  const Ab_long = Math.PI * (db / 2) ** 2;
+  const Ast     = nlong * Ab_long;
+  const rho_g   = Ast / Ag;
+  const rho_w   = Ast / (bw * d);
+
+  /* ── Área de estribo / espiral ──────────────────── */
+  const Ab_dt   = Math.PI * (dt / 2) ** 2;
+  // Av_rama: área total de piernas del estribo en UN plano de corte
+  const Av_rama = nramas * Ab_dt;
+
+  /* ── Axial (compresión +, tensión −) ────────────── */
+  const Nu  = axialType === 'tens' ? -Pu_kN * 1000 : Pu_kN * 1000;
+  const Vu  = Vu_kN * 1000;   // N
+  const phi_v = 0.75;
+
+  /* ════ VERIFICACIONES GEOMÉTRICAS Y DE DETALLE ═════ */
+  const checks = [];   // {lvl:'ok'|'warn'|'err'|'info', msg, ref}
+
+  // §10.6.1.1 — ρg entre 1% y 8%
+  const rho_g_pct = rho_g * 100;
+  if (rho_g < 0.01)
+    checks.push({lvl:'err',  msg:`ρg = ${rho_g_pct.toFixed(2)}% < 1% mínimo requerido`, ref:'§10.6.1.1'});
+  else if (rho_g > 0.08)
+    checks.push({lvl:'err',  msg:`ρg = ${rho_g_pct.toFixed(2)}% > 8% máximo permitido`, ref:'§10.6.1.1'});
+  else
+    checks.push({lvl:'ok',   msg:`ρg = ${rho_g_pct.toFixed(2)}% ∈ [1%, 8%] ✓`, ref:'§10.6.1.1'});
+
+  // §25.7.2.2 — Ø mín del estribo
+  // Si barra long ≥ #11 (35.814 mm) → estribo ≥ #4 (12.7 mm)
+  // Si barra long ≤ #10 (32.258 mm) → estribo ≥ #3 (9.525 mm)
+  const dt_min_req = db >= 35.814 ? 12.7 : 9.525;
+  if (dt < dt_min_req)
+    checks.push({lvl:'err', msg:`Ø estribo ${dt.toFixed(2)} mm < ${dt_min_req} mm requerido para barra #${db>=35.814?'11+':'≤10'}`, ref:'§25.7.2.2'});
+  else
+    checks.push({lvl:'ok',  msg:`Ø estribo OK (${dt} mm ≥ ${dt_min_req} mm mín)`, ref:'§25.7.2.2'});
+
+  // §10.7.2.1 — Separación libre entre barras longitudinales
+  // clear ≥ max(40 mm, 1.5·db)
+  let clear_mm = null;
+  if (shape === 'rect') {
+    // Estimación simplificada: barras distribuidas en el perímetro, cara más larga
+    const n_face  = Math.max(2, Math.round(nlong / 4));  // barras por cara larga
+    const avail_b = b - 2 * (cov + dt) - n_face * db;
+    clear_mm = n_face > 1 ? avail_b / (n_face - 1) : avail_b;
+    const clear_req = Math.max(40, 1.5 * db);
+    if (clear_mm < clear_req)
+      checks.push({lvl:'err',  msg:`Sep. libre ≈ ${clear_mm.toFixed(0)} mm < ${clear_req.toFixed(0)} mm requerido`, ref:'§10.7.2.1'});
+    else
+      checks.push({lvl:'ok',   msg:`Sep. libre ≈ ${clear_mm.toFixed(0)} mm ≥ ${clear_req.toFixed(0)} mm ✓`, ref:'§10.7.2.1'});
+  }
+
+  // §18.7.5.8 — fyt ≤ 420 MPa para refuerzo transversal sísmico
+  if (seismic !== 'none' && fyt > 420)
+    checks.push({lvl:'err', msg:`fyt = ${fyt} MPa > 420 MPa — no admitido para estribos sísmicos`, ref:'§18.7.5.8'});
+
+  /* ════ Vc — ACI 318-25 §22.5.5.1 Tabla 22.5.5.1 ═══ */
+  // Vc = [0.17·λ·(ρw)^(1/3)·√f'c  +  Nu/(6·Ag)] · bw · d
+  // Nu > 0 compresión (aumenta Vc), Nu < 0 tensión (reduce Vc)
+  const Vc_rho_term = 0.17 * lambda * Math.cbrt(rho_w) * Math.sqrt(fc);
+  const Vc_Nu_term  = Nu / (6 * Ag);          // MPa (puede ser negativo)
+  const Vc_raw      = (Vc_rho_term + Vc_Nu_term) * bw * d;   // N
+  const Vc          = Math.max(0, Vc_raw);                    // N ≥ 0
+  const phi_Vc      = phi_v * Vc;
+
+  // Advertencias por tensión axial §22.5.7.1
+  if (Nu < 0) {
+    if (Vc_raw <= 0)
+      checks.push({lvl:'warn', msg:`Tensión axial lleva Vc_raw ≤ 0 → se adopta Vc = 0 (§22.5.7.1)`, ref:'§22.5.7.1'});
+    else
+      checks.push({lvl:'warn', msg:`Tensión axial reduce Vc en ${(Math.abs(Vc_Nu_term*bw*d)/1000).toFixed(1)} kN (§22.5.7.1)`, ref:'§22.5.7.1'});
+  }
+
+  /* ── §22.5.1.2 — Límite máximo de Vn ────────────── */
+  const Vs_max_lim  = 0.66 * Math.sqrt(fc) * bw * d;
+  const phi_Vn_max  = phi_v * (Vc + Vs_max_lim);
+  if (Vu > phi_Vn_max) {
+    return {
+      err: `Sección insuficiente: φVn_max = ${(phi_Vn_max/1000).toFixed(1)} kN < Vu = ${(Vu/1000).toFixed(1)} kN.\n` +
+           `Aumentar b, h o f'c (ACI §22.5.1.2).`
+    };
+  }
+
+  /* ── Vs requerido ───────────────────────────────── */
+  const Vs_req     = Math.max(0, Vu / phi_v - Vc);
+  const needsMinAv = Vu > phi_Vc / 2;   // §9.6.3.4
+
+  /* ── §9.6.3.4 — Av/s mínimo ────────────────────── */
+  // Av/s ≥ max(0.062√f'c / fyt, 0.35/fyt) · bw   [mm²/mm]
+  const Av_s_min  = Math.max(0.062 * Math.sqrt(fc) / fyt, 0.35 / fyt) * bw;
+
+  /* ── Espaciamiento por demanda de cortante ───────── */
+  let s_shear = Infinity;
+  if (Vs_req > 0) s_shear = Av_rama * fyt * d / Vs_req;
+
+  /* ── Espaciamiento por Av_min ───────────────────── */
+  const s_Avmin = needsMinAv ? Av_rama / Av_s_min : Infinity;
+
+  /* ── §9.7.6.2.2 — s_max por cortante ─────────────
+     Si Vs ≤ 0.33√f'c·bw·d → s_max = min(d/2, 600 mm)
+     Si Vs > 0.33√f'c·bw·d → s_max = min(d/4, 300 mm) */
+  const Vs_lim  = 0.33 * Math.sqrt(fc) * bw * d;
+  const s_max_v = (Vs_req <= Vs_lim)
+                  ? Math.min(d / 2, 600)
+                  : Math.min(d / 4, 300);
+
+  /* ── §25.7.2.1 — Detalles de amarre (columnas) ────
+     s ≤ min(16·db_long, 48·dt, menor dim. sección)    */
+  const s_16db   = 16 * db;
+  const s_48dt   = 48 * dt;
+  const s_mindim = Math.min(b, h);
+  const s_detail = Math.min(s_16db, s_48dt, s_mindim);
+
+  /* ── Espaciamiento estándar (zona central) ───────── */
+  const candidates = [
+    isFinite(s_shear) ? s_shear : 9e9,
+    isFinite(s_Avmin) ? s_Avmin : 9e9,
+    s_max_v,
+    s_detail
+  ];
+  const s_std_raw = Math.min(...candidates);
+  // Redondear hacia abajo al cm completo, mínimo 5 cm
+  const s_std = Math.max(50, Math.floor(s_std_raw / 10) * 10);  // mm
+
+  /* ── φVn con s adoptado ─────────────────────────── */
+  const Vs_adopt = Av_rama * fyt * d / s_std;
+  const phi_Vn   = phi_v * (Vc + Vs_adopt);
+
+  /* ════════════════════════════════════════════════════
+     ESPIRAL — Columnas circulares §25.7.3 + §10.7.3.1
+  ════════════════════════════════════════════════════ */
+  let spiral = null;
+  if (shape === 'circ' && latType === 'spiral') {
+    const Dc   = b - 2 * cov;           // diámetro del núcleo (ext. a ext. espiral) mm
+    const Ach  = Math.PI * (Dc / 2) ** 2;
+    const Ab_sp = Math.PI * (dt / 2) ** 2;
+    const pitch = sp_pitch_mm;          // paso de la espiral (mm)
+
+    // ρs mínimo §10.7.3.1
+    const rho_s_min = Math.max(
+      0.45 * (Ag / Ach - 1) * (fc / fyt),
+      0.12 * fc / fyt
+    );
+    // ρs provisto = 4·Ab_sp / (Dc·pitch)
+    const rho_s_prov = 4 * Ab_sp / (Dc * pitch);
+
+    // Límites de paso §25.7.3.3: 25 ≤ pitch ≤ 75 mm (no > 1/6·Dc)
+    const pitch_max = Math.min(75, Dc / 6);
+    const pitch_min = 25;
+    const pitch_ok  = pitch >= pitch_min && pitch <= pitch_max;
+
+    spiral = {
+      Dc_cm:        Dc / 10,
+      Ach_cm2:      Ach / 100,
+      rho_s_min:    rho_s_min,
+      rho_s_prov:   rho_s_prov,
+      cumple:       rho_s_prov >= rho_s_min,
+      pitch_mm:     pitch,
+      pitch_ok,
+      pitch_min,
+      pitch_max_mm: pitch_max,
+      Ab_sp_mm2:    Ab_sp,
+    };
+  }
+
+  /* ════════════════════════════════════════════════════
+     SÍSMICA
+  ════════════════════════════════════════════════════ */
+  let seis = null;
+  if (seismic !== 'none') {
+
+    /* lo §18.7.5.1 (SMF) / §18.4.3.3 (IMF):
+       lo ≥ max(mayor dim. sección, Lc/6, 450 mm)
+       *** BUG ANTERIOR: usaba solo h, no max(b,h) ***  */
+    const max_dim = Math.max(b, h);
+    const lo = Math.max(max_dim, Lc / 6, 450);    // mm
+
+    let s_lo_raw, s_lo_detail;
+
+    if (seismic === 'smf') {
+      /* §18.7.5.3 SMF — s dentro de lo:
+         s ≤ min(menor_dim/4, 6·db_long, so)
+         so = 100 + (350 − hx)/3   [75 ≤ so ≤ 150 mm]
+         hx = separación horizontal máxima entre barras restringidas
+         *** BUG ANTERIOR: so hardcodeado en 100 mm ***  */
+      const hx = Math.max(50, Math.min(350, hx_mm || 150));
+      const so = Math.max(75, Math.min(150, 100 + (350 - hx) / 3));
+      const crit_dim4 = Math.min(b, h) / 4;
+      const crit_6db  = 6 * db;
+      s_lo_raw    = Math.min(crit_dim4, crit_6db, so);
+      s_lo_detail = { type:'smf', crit_dim4, crit_6db, so, hx };
+
+    } else {
+      /* §18.4.3.3 IMF — s dentro de lo:
+         s ≤ min(8·db_long, 24·dt, menor_dim/2, 300 mm)
+         *** BUG ANTERIOR: usaba d/4 en vez de menor_dim/2 *** */
+      const crit_8db  = 8 * db;
+      const crit_24dt = 24 * dt;
+      const crit_dim2 = Math.min(b, h) / 2;
+      const crit_300  = 300;
+      s_lo_raw    = Math.min(crit_8db, crit_24dt, crit_dim2, crit_300);
+      s_lo_detail = { type:'imf', crit_8db, crit_24dt, crit_dim2 };
+    }
+
+    // Redondear hacia abajo a 5 mm; no puede ser mayor que s_std
+    const s_lo_floor = Math.floor(s_lo_raw / 5) * 5;
+    const s_lo_final = Math.min(s_lo_floor, s_std);
+
+    // §18.7.5.2 — Primera posición del estribo desde la cara del nudo
+    const s_first = s_lo_final / 2;
+
+    /* ── §18.7.5.4 SMF — Confinamiento (Ash) ─────────
+       Ash ≥ max(0.3·s·bc·fc/fyt·(Ag/Ach−1), 0.09·s·bc·fc/fyt)
+       bc = dimensión del núcleo (a la cara exterior del estribo)
+            perpendicular a la dirección de Ash considerada
+       Dirección X (barras en X, confinan Y): bc = bc_y
+       Dirección Y (barras en Y, confinan X): bc = bc_x
+       Se verifica la dirección más desfavorable (bc mayor)        */
+    let smfConf = null;
+    if (seismic === 'smf') {
+      const bc_x = b - 2 * cov;   // núcleo en X (a cara exterior del estribo)
+      const bc_y = h - 2 * cov;   // núcleo en Y
+      const Ach_rect = bc_x * bc_y;
+
+      const s = s_lo_final;        // mm
+
+      // Ash para barras en X (confinan en Y): bc = bc_y
+      const Ash_req_x = Math.max(
+        0.3 * s * bc_y * (fc / fyt) * (Ag / Ach_rect - 1),
+        0.09 * s * bc_y * (fc / fyt)
+      );
+      // Ash para barras en Y (confinan en X): bc = bc_x
+      const Ash_req_y = Math.max(
+        0.3 * s * bc_x * (fc / fyt) * (Ag / Ach_rect - 1),
+        0.09 * s * bc_x * (fc / fyt)
+      );
+      const Ash_req_gov = Math.max(Ash_req_x, Ash_req_y);
+      const Ash_prov    = Av_rama;   // mm²
+      const cumpleConf  = Ash_prov >= Ash_req_gov;
+
+      smfConf = {
+        bc_x_cm:          bc_x / 10,
+        bc_y_cm:          bc_y / 10,
+        Ach_cm2:          Ach_rect / 100,
+        Ag_cm2:           Ag / 100,
+        Ash_req_x_cm2:    Ash_req_x / 100,
+        Ash_req_y_cm2:    Ash_req_y / 100,
+        Ash_req_gov_cm2:  Ash_req_gov / 100,
+        Ash_prov_cm2:     Ash_prov / 100,
+        cumpleConf,
+      };
+    }
+
+    seis = {
+      lo_cm:         lo / 10,
+      s_lo_cm:       s_lo_final / 10,
+      s_first_cm:    s_first / 10,
+      s_central_cm:  s_std / 10,
+      seisType:      seismic,
+      smfConf,
+      s_lo_detail,
+    };
+  }
+
+  /* ── Resultado ──────────────────────────────────── */
+  return {
+    ok: true,
+    // Cortante
+    Vc_kN:         Vc / 1000,
+    Vc_raw_kN:     Vc_raw / 1000,
+    phi_Vc_kN:     phi_Vc / 1000,
+    Vs_req_kN:     Vs_req / 1000,
+    phi_Vn_kN:     phi_Vn / 1000,
+    phi_Vn_max_kN: phi_Vn_max / 1000,
+    needsMinAv,
+    // Espaciamientos (cm)
+    s_std_cm:      s_std / 10,
+    s_shear_cm:    isFinite(s_shear) ? s_shear / 10 : null,
+    s_Avmin_cm:    isFinite(s_Avmin) ? s_Avmin / 10 : null,
+    s_maxv_cm:     s_max_v / 10,
+    s_16db_cm:     s_16db / 10,
+    s_48dt_cm:     s_48dt / 10,
+    s_mindim_cm:   s_mindim / 10,
+    s_detail_cm:   s_detail / 10,
+    // Info
+    Av_cm2:        Av_rama / 100,
+    Vc_rho_term,
+    Vc_Nu_term,
+    rho_w,
+    rho_g,
+    d_cm:          d / 10,
+    Ag_cm2:        Ag / 100,
+    Ast_cm2:       Ast / 100,
+    clear_mm,
+    checks,
+    // Espiral
+    spiral,
+    // Sísmica
+    seis,
+    // Viz
+    _viz: {
+      b, h, db, dt, nlong, shape,
+      cov, cov_eje, s_std,
+      lo:   seis ? seis.lo_cm * 10 : null,
+      s_lo: seis ? seis.s_lo_cm * 10 : null,
+      Lc
+    }
+  };
+}
+
+/* ════════════════════════════════════════════════════
+   MOTOR DE RECÁLCULO
+════════════════════════════════════════════════════ */
+let _deb = null;
+function recalc() {
+  clearTimeout(_deb);
+  setDot('busy', 'Calculando…');
+  _deb = setTimeout(_doCalc, 80);
+}
+
+function readParams() {
+  const shape   = document.querySelector('input[name="shape"]:checked').value;
+  const latType = document.querySelector('input[name="lattype"]')
+                  ? document.querySelector('input[name="lattype"]:checked').value
+                  : 'ties';
+  return {
+    shape,
+    b_cm:       parseFloat(document.getElementById('i-b').value)   || 30,
+    h_cm:       parseFloat(document.getElementById('i-h').value)   || 30,
+    D_cm:       parseFloat(document.getElementById('i-D').value)   || 40,
+    Lc_m:       parseFloat(document.getElementById('i-Lc').value)  || 3.0,
+    cov_cm:     parseFloat(document.getElementById('i-cov').value) || 4,
+    fc:         parseFloat(document.getElementById('i-fc').value)  || 28,
+    fyt:        parseFloat(document.getElementById('i-fyt').value) || 420,
+    lambda:     parseFloat(document.getElementById('i-lambda').value) || 1.0,
+    db_mm:      parseFloat(document.getElementById('i-db').value)  || 19.05,
+    nlong:      parseInt(document.getElementById('i-nlong').value) || 8,
+    dt_mm:      parseFloat(document.getElementById('i-dt').value)  || 12.7,
+    nramas:     parseInt(document.getElementById('i-nramas').value) || 2,
+    dt_circ_mm: parseFloat(document.getElementById('i-dt-circ').value) || 12.7,
+    sp_pitch_mm:parseFloat(document.getElementById('i-sp-pitch').value) || 60,
+    Pu_kN:      parseFloat(document.getElementById('i-Pu').value)  || 0,
+    Vu_kN:      parseFloat(document.getElementById('i-Vu').value)  || 0,
+    axialType:  document.querySelector('input[name="axtype"]:checked').value,
+    seismic:    document.querySelector('input[name="seismic"]:checked').value,
+    hx_mm:      parseFloat(document.getElementById('i-hx').value) || 150,
+    latType,
+  };
+}
+
+function _doCalc() {
+  const p   = readParams();
+  const res = calcEstribos(p);
+  if (res.err) {
+    setDot('err', 'Error');
+    renderError(res.err);
+    return;
+  }
+  setDot('ok', 'Listo');
+  renderSummary(res, p);
+  renderZones(res);
+  renderBreakdown(res);
+  renderFormulas(res, p);
+  renderVerif(res, p);
+  renderSpiral(res);
+  drawSection(res._viz);
+  drawElevation(res._viz, res.seis);
+}
+
+function setDot(s, m) {
+  document.getElementById('calc-dot').className = 'calc-dot ' + s;
+  document.getElementById('calc-msg').textContent = m;
+}
+function renderError(msg) {
+  const ids = ['zones-content','verif-content','spacing-breakdown','formula-detail'];
+  ids.forEach(id => {
+    document.getElementById(id).innerHTML = `<div class="err-box">${msg.replace(/\n/g,'<br>')}</div>`;
+  });
+  document.getElementById('seismic-section').style.display = 'none';
+}
+
+function f1(v) { return typeof v === 'number' ? v.toFixed(1) : '—'; }
+function f2(v) { return typeof v === 'number' ? v.toFixed(2) : '—'; }
+function f4(v) { return typeof v === 'number' ? v.toFixed(4) : '—'; }
+function fcm(v) { return v != null ? v.toFixed(1) + ' cm' : '—'; }
+
+/* ── Summary strip ── */
+function renderSummary(r, p) {
+  document.getElementById('s-Vc').textContent  = f1(r.Vc_kN);
+  document.getElementById('s-Vs').textContent  = f1(r.Vs_req_kN);
+
+  const phiEl = document.getElementById('s-phiVn');
+  phiEl.textContent = f1(r.phi_Vn_kN);
+  phiEl.className   = 'scard-val ' + (r.phi_Vn_kN >= p.Vu_kN ? 'ok' : 'err');
+
+  document.getElementById('s-sz').textContent = fcm(r.s_std_cm);
+
+  const hasSeis = !!r.seis;
+  ['sep-slo','sep-lo'].forEach(id => document.getElementById(id).style.display = hasSeis ? '' : 'none');
+  ['card-slo','card-lo'].forEach(id => document.getElementById(id).style.display = hasSeis ? '' : 'none');
+  if (hasSeis) {
+    document.getElementById('s-slo').textContent = fcm(r.seis.s_lo_cm);
+    document.getElementById('s-lo').textContent  = fcm(r.seis.lo_cm);
+  }
+
+  // ρg badge
+  document.getElementById('sep-rhog').style.display  = '';
+  document.getElementById('card-rhog').style.display = '';
+  const rgEl = document.getElementById('s-rhog');
+  rgEl.textContent = (r.rho_g * 100).toFixed(2);
+  rgEl.className   = 'scard-val ' + (r.rho_g >= 0.01 && r.rho_g <= 0.08 ? 'ok' : 'err');
+}
+
+/* ── Tabla de zonas ── */
+function renderZones(r) {
+  const seis = r.seis;
+  let html = `<table class="zone-table">
+    <thead><tr>
+      <th>Zona</th><th>Longitud</th><th>Separación</th><th>Referencia</th>
+    </tr></thead><tbody>`;
+
+  if (seis) {
+    const d = seis.s_lo_detail;
+    let seisCrit = '';
+    if (d.type === 'smf')
+      seisCrit = `min(b/4=${f1(d.crit_dim4/10)}cm, 6db=${f1(d.crit_6db/10)}cm, so=${f1(d.so)}mm)`;
+    else
+      seisCrit = `min(8db=${f1(d.crit_8db/10)}cm, 24dt=${f1(d.crit_24dt/10)}cm, h/2=${f1(d.crit_dim2/10)}cm, 300mm)`;
+
+    html += `
+      <tr class="zone-conf">
+        <td><span class="zone-badge badge-blue">Zona lo — confinamiento</span></td>
+        <td>${f1(seis.lo_cm)} cm <span style="color:#6e7681;font-size:10px">(cada extremo)</span></td>
+        <td><strong style="color:#58a6ff;font-size:14px">${f1(seis.s_lo_cm)} cm</strong><br>
+            <span style="color:#6e7681;font-size:10px">1er estribo a ≤ ${f1(seis.s_first_cm)} cm del nudo</span></td>
+        <td>${seis.seisType==='smf'?'SMF §18.7.5.3':'IMF §18.4.3.3'}</td>
+      </tr>
+      <tr>
+        <td><span class="zone-badge badge-green">Zona central</span></td>
+        <td>Lc − 2×lo = ${f1((r._viz.Lc/10) - 2*seis.lo_cm)} cm</td>
+        <td><strong style="color:#3fb950;font-size:14px">${f1(seis.s_central_cm)} cm</strong></td>
+        <td>§25.7.2.1 + §22.5</td>
+      </tr>`;
+  } else {
+    html += `
+      <tr class="zone-std">
+        <td><span class="zone-badge badge-green">Zona uniforme</span></td>
+        <td>Toda la altura Lc = ${f1(r._viz.Lc/10)} cm</td>
+        <td><strong style="color:#3fb950;font-size:14px">${f1(r.s_std_cm)} cm</strong></td>
+        <td>§25.7.2.1 + §22.5</td>
+      </tr>`;
+  }
+
+  html += `</tbody></table>`;
+  document.getElementById('zones-content').innerHTML = html;
+}
+
+/* ── Descomposición del espaciamiento ── */
+function renderBreakdown(r) {
+  const rows = [
+    {lbl:'16·Ø long.  (§25.7.2.1)',        val: r.s_16db_cm,  always: true},
+    {lbl:'48·Ø estribo  (§25.7.2.1)',       val: r.s_48dt_cm,  always: true},
+    {lbl:'Menor dim. sección  (§25.7.2.1)', val: r.s_mindim_cm,always: true},
+    {lbl:'s_max cortante  (§9.7.6.2.2)',    val: r.s_maxv_cm,  always: true},
+    {lbl:'Demanda Vs  (§22.5.8.1)',         val: r.s_shear_cm, always: false},
+    {lbl:'Av_min  (§9.6.3.4)',              val: r.s_Avmin_cm, always: false},
+  ];
+  const gov = r.s_std_cm;
+  let html = '';
+  rows.forEach(row => {
+    if (!row.always && row.val == null) return;
+    const isGov = row.val != null && Math.abs(row.val - gov) < 0.6;
+    html += `<div class="spacing-row ${isGov ? 'governing' : ''}">
+      <span>${row.lbl}</span>
+      <span>${row.val != null ? row.val.toFixed(1) + ' cm' : 'N/A'}</span>
+    </div>`;
+  });
+  html += `<div class="spacing-row governing" style="margin-top:4px">
+    <span><strong>s ADOPTADO</strong></span>
+    <span><strong>${f1(r.s_std_cm)} cm</strong></span>
+  </div>`;
+  document.getElementById('spacing-breakdown').innerHTML = html;
+}
+
+/* ── Fórmulas aplicadas ── */
+function renderFormulas(r, p) {
+  const rho_pct = (r.rho_w * 100).toFixed(4);
+  const nuSign  = p.axialType === 'tens' ? '−' : '+';
+  document.getElementById('formula-detail').innerHTML = `
+    <div class="formula-box">
+      <span class="lbl">ACI §22.5.5.1 Tabla 22.5.5.1 (con acero long.):</span><br>
+      Vc = [0.17·λ·(ρw)^⅓·√f'c  ${nuSign}  Nu/(6Ag)] · bw · d<br><br>
+      <span class="lbl">ρw = Ast/(bw·d) =</span> <span class="val">${rho_pct}%</span><br>
+      <span class="lbl">d =</span> <span class="val">${f1(r.d_cm)} cm</span>
+      <span class="lbl">&nbsp;&nbsp;Ag =</span> <span class="val">${f2(r.Ag_cm2)} cm²</span><br>
+      <span class="lbl">Ast =</span> <span class="val">${f2(r.Ast_cm2)} cm²</span>
+      <span class="lbl">&nbsp;&nbsp;Av =</span> <span class="val">${f2(r.Av_cm2)} cm²</span><br>
+      <span class="lbl">Vc =</span> <span class="val">${f1(r.Vc_kN)} kN</span>
+      <span class="lbl">&nbsp;→ φVc =</span> <span class="val">${f1(r.phi_Vc_kN)} kN</span><br>
+      <span class="lbl">Vs_req = Vu/φ − Vc =</span> <span class="val">${f1(r.Vs_req_kN)} kN</span><br><br>
+      <span class="lbl">s = Av·fyt·d / Vs_req</span><br>
+      <span class="lbl">Av·fyt·d =</span> <span class="val">${((r.Av_cm2*1e-4) * p.fyt * r.d_cm*10 / 1000).toFixed(1)} kN·mm</span>
+    </div>`;
+}
+
+/* ── Verificaciones generales ── */
+function renderVerif(r, p) {
+  const vOk   = (t, ref) =>
+    `<div class="verif-item ok"><div class="vdot"></div><span class="vtext">✓ ${t}</span><span class="vref">${ref}</span></div>`;
+  const vErr  = (t, ref) =>
+    `<div class="verif-item err"><div class="vdot"></div><span class="vtext">✗ ${t}</span><span class="vref">${ref}</span></div>`;
+  const vWarn = (t, ref) =>
+    `<div class="verif-item warn"><div class="vdot"></div><span class="vtext">⚠ ${t}</span><span class="vref">${ref}</span></div>`;
+  const vInfo = (t, ref) =>
+    `<div class="verif-item info"><div class="vdot"></div><span class="vtext">ℹ ${t}</span><span class="vref">${ref}</span></div>`;
+
+  let items = [];
+
+  // Verificaciones geométricas/detalle del array checks
+  r.checks.forEach(c => {
+    if      (c.lvl === 'ok')   items.push(vOk(c.msg, c.ref));
+    else if (c.lvl === 'err')  items.push(vErr(c.msg, c.ref));
+    else if (c.lvl === 'warn') items.push(vWarn(c.msg, c.ref));
+    else                       items.push(vInfo(c.msg, c.ref));
+  });
+
+  // Cortante Vc
+  items.push(vOk(`Vc = ${f1(r.Vc_kN)} kN (ρw = ${(r.rho_w*100).toFixed(3)}%)`, '§22.5.5.1'));
+
+  // φVn ≥ Vu
+  const cumpleVn = r.phi_Vn_kN >= p.Vu_kN;
+  items.push(cumpleVn
+    ? vOk(`φVn = ${f1(r.phi_Vn_kN)} kN ≥ Vu = ${f1(p.Vu_kN)} kN`, '§22.4')
+    : vErr(`φVn = ${f1(r.phi_Vn_kN)} kN < Vu = ${f1(p.Vu_kN)} kN`, '§22.4'));
+
+  // φVn_max (sección)
+  items.push(vOk(`φVn_max = ${f1(r.phi_Vn_max_kN)} kN ≥ Vu ✓ (sección OK)`, '§22.5.1.2'));
+
+  // Av mínimo §9.6.3.4
+  items.push(r.needsMinAv
+    ? vOk(`Vu > φVc/2 → refuerzo mínimo de cortante requerido y provisto`, '§9.6.3.4')
+    : vInfo(`Vu ≤ φVc/2 → refuerzo mínimo de cortante no requerido`, '§9.6.3.4'));
+
+  // s ≤ s_max_v
+  const ok_smaxv = r.s_std_cm <= r.s_maxv_cm + 0.05;
+  items.push(ok_smaxv
+    ? vOk(`s = ${f1(r.s_std_cm)} cm ≤ s_max = ${f1(r.s_maxv_cm)} cm`, '§9.7.6.2.2')
+    : vErr(`s = ${f1(r.s_std_cm)} cm > s_max = ${f1(r.s_maxv_cm)} cm`, '§9.7.6.2.2'));
+
+  // s ≤ s_detail (25.7.2.1)
+  const ok_sdet = r.s_std_cm <= r.s_detail_cm + 0.05;
+  items.push(ok_sdet
+    ? vOk(`s = ${f1(r.s_std_cm)} cm ≤ s_detalle = ${f1(r.s_detail_cm)} cm (§25.7.2.1)`, '§25.7.2.1')
+    : vErr(`s = ${f1(r.s_std_cm)} cm > s_detalle = ${f1(r.s_detail_cm)} cm`, '§25.7.2.1'));
+
+  document.getElementById('verif-content').innerHTML = items.join('');
+
+  /* ── Sísmica ── */
+  const seisEl  = document.getElementById('seismic-section');
+  const seisCtx = document.getElementById('seismic-content');
+  if (r.seis) {
+    seisEl.style.display = '';
+    const s = r.seis;
+    let seisItems = [];
+
+    // lo
+    const loDetail = p.seismic === 'smf'
+      ? `max(max(b,h)=${f1(Math.max(r._viz.b,r._viz.h)/10)}cm, Lc/6=${f1(r._viz.Lc/60)}cm, 45cm)`
+      : `max(max(b,h)=${f1(Math.max(r._viz.b,r._viz.h)/10)}cm, Lc/6=${f1(r._viz.Lc/60)}cm, 45cm)`;
+    seisItems.push(vOk(`lo = ${f1(s.lo_cm)} cm = ${loDetail}`,
+      p.seismic==='smf'?'§18.7.5.1':'§18.4.3.3'));
+
+    // s dentro de lo
+    const d = s.s_lo_detail;
+    let sloDetail = '';
+    if (d.type==='smf')
+      sloDetail = `min(b/4=${f1(d.crit_dim4/10)}cm, 6db=${f1(d.crit_6db/10)}cm, so=${f1(d.so)}mm [hx=${d.hx}mm])`;
+    else
+      sloDetail = `min(8db=${f1(d.crit_8db/10)}cm, 24dt=${f1(d.crit_24dt/10)}cm, dim/2=${f1(d.crit_dim2/10)}cm, 30cm)`;
+    seisItems.push(vOk(`s_lo = ${f1(s.s_lo_cm)} cm = ${sloDetail}`,
+      p.seismic==='smf'?'§18.7.5.3':'§18.4.3.3'));
+
+    // Primera posición
+    seisItems.push(vInfo(`1er estribo a ≤ ${f1(s.s_first_cm)} cm de la cara del nudo`,
+      '§18.7.5.2'));
+
+    // Confinamiento SMF §18.7.5.4
+    if (s.smfConf) {
+      const c = s.smfConf;
+      seisItems.push(
+        vInfo(`bc_x = ${f1(c.bc_x_cm)} cm · bc_y = ${f1(c.bc_y_cm)} cm · Ach = ${f2(c.Ach_cm2)} cm²`,
+              '§18.7.5.4'),
+        vInfo(`Ash_req (dir X, bc=bc_y) = ${f2(c.Ash_req_x_cm2)} cm² · (dir Y, bc=bc_x) = ${f2(c.Ash_req_y_cm2)} cm²`,
+              '§18.7.5.4'),
+        c.cumpleConf
+          ? vOk(`Ash_prov = ${f2(c.Ash_prov_cm2)} cm² ≥ Ash_req_gov = ${f2(c.Ash_req_gov_cm2)} cm²`,
+                '§18.7.5.4')
+          : vErr(`Ash_prov = ${f2(c.Ash_prov_cm2)} cm² < Ash_req_gov = ${f2(c.Ash_req_gov_cm2)} cm² — Aumentar Ø o ramas`,
+                 '§18.7.5.4')
+      );
+    }
+
+    // Nota §18.7.6 SMF
+    if (p.seismic === 'smf') {
+      seisItems.push(vWarn(
+        `SMF §18.7.6: verificar que Vu ingresado ≥ Ve = (Mpr_sup+Mpr_inf)/Lc. Usar Mpr con 1.25fy.`,
+        '§18.7.6'));
+    }
+
+    seisCtx.innerHTML = seisItems.join('');
+  } else {
+    seisEl.style.display = 'none';
+  }
+}
+
+/* ── Espiral (circular) ── */
+function renderSpiral(r) {
+  // Renderiza info de espiral en la zona de formula si aplica
+  if (!r.spiral) return;
+  const sp = r.spiral;
+  const extra = `
+    <div class="formula-box" style="margin-top:6px">
+      <span class="lbl">Espiral §25.7.3 + §10.7.3.1:</span><br>
+      ρs_min = max(0.45·(Ag/Ach−1)·fc/fyt, 0.12·fc/fyt)<br>
+      <span class="lbl">Ach =</span> <span class="val">${f2(sp.Ach_cm2)} cm²</span>
+      <span class="lbl">  Dc =</span> <span class="val">${f1(sp.Dc_cm)} cm</span><br>
+      <span class="lbl">ρs_min =</span> <span class="val">${(sp.rho_s_min*100).toFixed(3)}%</span>
+      <span class="lbl">  ρs_prov =</span> <span class="${sp.cumple?'val':'warn'}">${(sp.rho_s_prov*100).toFixed(3)}%</span><br>
+      <span class="lbl">Paso ${sp.pitch_mm} mm</span>
+      ${sp.pitch_ok
+        ? '<span class="val"> ✓ (' + sp.pitch_min + '–' + sp.pitch_max_mm.toFixed(0) + ' mm)</span>'
+        : '<span class="warn"> ✗ fuera de rango ' + sp.pitch_min + '–' + sp.pitch_max_mm.toFixed(0) + ' mm</span>'}
+      ${!sp.cumple ? '<br><span class="warn">⚠ ρs_prov < ρs_min — reducir paso o aumentar Ø espiral</span>' : ''}
+    </div>`;
+  document.getElementById('formula-detail').innerHTML += extra;
+}
+
+/* ════════════════════════════════════════════════════
+   CANVAS — SECCIÓN TRANSVERSAL
+════════════════════════════════════════════════════ */
+function seededRng(seed) {
+  let s = seed | 0;
+  return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; };
+}
+
+function drawSection(v) {
+  const cv  = document.getElementById('cviz');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const {b, h, db, dt, nlong, cov, cov_eje, shape} = v;
+  const mg  = 28;
+  const esc = Math.min((W - 2*mg) / b, (H - 2*mg) / h);
+  const ox  = (W - b*esc) / 2;
+  const oy  = (H - h*esc) / 2;
+
+  ctx.save();
+  if (shape === 'circ') {
+    ctx.beginPath(); ctx.arc(W/2, H/2, b/2*esc, 0, Math.PI*2); ctx.clip();
+  } else {
+    ctx.beginPath(); ctx.rect(ox, oy, b*esc, h*esc); ctx.clip();
+  }
+  // Textura hormigón
+  ctx.fillStyle = '#b0afa6'; ctx.fillRect(0,0,W,H);
+  const grd = ctx.createLinearGradient(ox,oy,ox+b*esc,oy+h*esc);
+  grd.addColorStop(0, 'rgba(255,255,245,0.18)'); grd.addColorStop(1, 'rgba(0,0,0,0.10)');
+  ctx.fillStyle = grd; ctx.fillRect(0,0,W,H);
+  const rng = seededRng(b + h * 1000);
+  for (let i = 0; i < Math.floor(b*h*esc*esc/140); i++) {
+    const px=ox+rng()*b*esc, py=oy+rng()*h*esc, sz=2+rng()*4, g=110+Math.floor(rng()*60);
+    ctx.fillStyle = `rgba(${g},${g-3},${g-8},${0.2+rng()*0.3})`;
+    ctx.beginPath(); ctx.ellipse(px,py,sz,sz*(0.5+rng()*0.6),rng()*Math.PI,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+
+  // Borde sección
+  ctx.shadowColor = 'rgba(88,166,255,0.15)'; ctx.shadowBlur = 10;
+  ctx.strokeStyle = '#374151'; ctx.lineWidth = 1.5;
+  if (shape === 'circ') {
+    ctx.beginPath(); ctx.arc(W/2, H/2, b/2*esc, 0, Math.PI*2); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.rect(ox, oy, b*esc, h*esc); ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+
+  // Estribo exterior
+  const tW = Math.max(1.5, dt*esc/6);
+  ctx.strokeStyle = '#5a7a9e'; ctx.lineWidth = tW;
+  if (shape === 'circ') {
+    const r_estr = (b/2 - cov)*esc;
+    ctx.beginPath(); ctx.arc(W/2, H/2, r_estr, 0, Math.PI*2); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.rect(ox+cov*esc, oy+cov*esc, (b-2*cov)*esc, (h-2*cov)*esc); ctx.stroke();
+  }
+
+  // Barras longitudinales
+  const rb  = Math.max(3, Math.min(10, db*esc/2));
+  const pos = shape === 'circ'
+    ? distribBarrasCirc(b/2, cov_eje, nlong)
+    : distribBarrasRect(b, h, cov_eje, nlong);
+
+  pos.forEach(([bx, by]) => {
+    const px = ox+bx*esc, py = oy+by*esc;
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath(); ctx.arc(px+0.8, py+0.8, rb+1, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#1e3a5f';
+    ctx.beginPath(); ctx.arc(px, py, rb+1.5, 0, Math.PI*2); ctx.fill();
+    const gBar = ctx.createRadialGradient(px-rb*0.3, py-rb*0.3, 0, px, py, rb);
+    gBar.addColorStop(0, '#eca326'); gBar.addColorStop(0.5, '#b87333'); gBar.addColorStop(1, '#6b3a10');
+    ctx.fillStyle = gBar; ctx.beginPath(); ctx.arc(px, py, rb, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.beginPath(); ctx.arc(px-rb*0.28, py-rb*0.28, rb*0.32, 0, Math.PI*2); ctx.fill();
+  });
+
+  // Cotas
+  ctx.fillStyle = '#6b7280'; ctx.font = '11px Inter,sans-serif'; ctx.textAlign = 'center';
+  if (shape === 'circ') {
+    ctx.fillText(`D = ${(b/10).toFixed(0)} cm`, W/2, oy+h*esc+18);
+  } else {
+    ctx.fillText(`b = ${(b/10).toFixed(0)} cm`, W/2, oy+h*esc+18);
+    ctx.save(); ctx.translate(ox-18, H/2); ctx.rotate(-Math.PI/2);
+    ctx.fillText(`h = ${(h/10).toFixed(0)} cm`, 0, 0); ctx.restore();
+  }
+}
+
+function distribBarrasRect(b, h, cov, n) {
+  const pos = [], x0=cov, x1=b-cov, y0=cov, y1=h-cov;
+  const extra = Math.max(0, Math.round((n-4)/4));
+  for (let i=0; i<=extra+1; i++) pos.push([x0+i*(x1-x0)/(extra+1), y0]);
+  for (let i=1; i<=extra; i++)   pos.push([x1, y0+i*(y1-y0)/(extra+1)]);
+  for (let i=extra+1; i>=0; i--) pos.push([x0+i*(x1-x0)/(extra+1), y1]);
+  for (let i=extra; i>=1; i--)   pos.push([x0, y0+i*(y1-y0)/(extra+1)]);
+  return pos.slice(0, n);
+}
+
+function distribBarrasCirc(R, cov_eje, n) {
+  const r_bar = R - cov_eje;
+  const cx = R, cy = R;
+  return Array.from({length: n}, (_, i) => {
+    const ang = (2*Math.PI*i/n) - Math.PI/2;
+    return [cx + r_bar*Math.cos(ang), cy + r_bar*Math.sin(ang)];
+  });
+}
+
+/* ════════════════════════════════════════════════════
+   CANVAS — ELEVACIÓN
+════════════════════════════════════════════════════ */
+function drawElevation(v, seis) {
+  const cv  = document.getElementById('celev');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const Lc_mm = v.Lc;
+  const mg = {t:24, b:32, l:56, r:20};
+  const cw = W - mg.l - mg.r;
+  const ch = H - mg.t - mg.b;
+  const esc = ch / Lc_mm;
+  const bw_px = 30;
+  const cx = mg.l + cw / 2;
+
+  // Columna
+  ctx.fillStyle = '#a0a0a0'; ctx.strokeStyle = '#555'; ctx.lineWidth = 1;
+  ctx.fillRect(cx-bw_px/2, mg.t, bw_px, ch);
+  ctx.strokeRect(cx-bw_px/2, mg.t, bw_px, ch);
+
+  const py = mm => mg.t + mm * esc;
+
+  if (seis) {
+    const lo_px = seis.lo_cm * 10 * esc;
+    // Zonas lo
+    ctx.fillStyle = 'rgba(88,166,255,0.22)';
+    ctx.fillRect(cx-bw_px/2, mg.t, bw_px, lo_px);
+    ctx.fillRect(cx-bw_px/2, mg.t+ch-lo_px, bw_px, lo_px);
+
+    // Estribos zona lo superior
+    const s_lo_mm = seis.s_lo_cm * 10;
+    ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = 1.8;
+    for (let y = s_lo_mm/2; y < lo_px/esc; y += s_lo_mm) {
+      const yp = py(y);
+      ctx.beginPath(); ctx.moveTo(cx-bw_px/2-5,yp); ctx.lineTo(cx+bw_px/2+5,yp); ctx.stroke();
+    }
+    // Zona lo inferior
+    const lo_start = Lc_mm - seis.lo_cm*10;
+    for (let y = lo_start+s_lo_mm/2; y < Lc_mm; y += s_lo_mm) {
+      const yp = py(y);
+      ctx.beginPath(); ctx.moveTo(cx-bw_px/2-5,yp); ctx.lineTo(cx+bw_px/2+5,yp); ctx.stroke();
+    }
+    // Zona central
+    const s_c_mm = seis.s_central_cm * 10;
+    ctx.strokeStyle = '#3fb950'; ctx.lineWidth = 1;
+    for (let y = lo_px/esc+s_c_mm; y < lo_start; y += s_c_mm) {
+      const yp = py(y);
+      ctx.beginPath(); ctx.moveTo(cx-bw_px/2-2,yp); ctx.lineTo(cx+bw_px/2+2,yp); ctx.stroke();
+    }
+
+    // Etiquetas
+    ctx.font = '9px Inter,sans-serif'; ctx.textAlign = 'right';
+    ctx.fillStyle = '#58a6ff';
+    ctx.fillText(`lo=${f1(seis.lo_cm)}cm`, cx-bw_px/2-7, mg.t+lo_px*0.45+4);
+    ctx.fillText(`s=${f1(seis.s_lo_cm)}cm`, cx-bw_px/2-7, mg.t+lo_px*0.72);
+    ctx.fillText(`lo=${f1(seis.lo_cm)}cm`, cx-bw_px/2-7, mg.t+ch-lo_px*0.55);
+    ctx.fillStyle = '#3fb950';
+    ctx.fillText(`s=${f1(seis.s_central_cm)}cm`, cx-bw_px/2-7, mg.t+ch/2+4);
+
+    // Líneas divisorias
+    ctx.setLineDash([3,3]); ctx.strokeStyle = '#58a6ff66'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx-bw_px-4,mg.t+lo_px); ctx.lineTo(cx+bw_px+4,mg.t+lo_px); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx-bw_px-4,mg.t+ch-lo_px); ctx.lineTo(cx+bw_px+4,mg.t+ch-lo_px); ctx.stroke();
+    ctx.setLineDash([]);
+
+  } else {
+    const s_mm = v.s_std;
+    ctx.strokeStyle = '#3fb950'; ctx.lineWidth = 1.3;
+    for (let y = s_mm/2; y < Lc_mm; y += s_mm) {
+      const yp = py(y);
+      ctx.beginPath(); ctx.moveTo(cx-bw_px/2-5,yp); ctx.lineTo(cx+bw_px/2+5,yp); ctx.stroke();
+    }
+    ctx.font = '9px Inter,sans-serif'; ctx.textAlign = 'right';
+    ctx.fillStyle = '#3fb950';
+    ctx.fillText(`s = ${f1(v.s_std/10)} cm`, cx-bw_px/2-7, mg.t+ch/2);
+  }
+
+  // Lc label
+  ctx.font = '9px Inter,sans-serif'; ctx.fillStyle = '#8b949e'; ctx.textAlign = 'left';
+  ctx.fillText(`Lc = ${f1(Lc_mm/10)} cm`, cx+bw_px/2+6, mg.t+ch/2);
+  ctx.fillStyle = '#6e7681'; ctx.textAlign = 'center';
+  ctx.fillText('Elevación', W/2, H-6);
+}
+
+/* ════════════════════════════════════════════════════
+   UI HELPERS
+════════════════════════════════════════════════════ */
+function onShapeChange() {
+  const isRect = document.querySelector('input[name="shape"]:checked').value === 'rect';
+  document.getElementById('rect-inputs').style.display   = isRect ? '' : 'none';
+  document.getElementById('circ-inputs').classList.toggle('hidden', isRect);
+  document.getElementById('tie-rect-opts').style.display = isRect ? '' : 'none';
+  document.getElementById('tie-circ-opts').classList.toggle('hidden', isRect);
+  recalc();
+}
+
+function onSeismicChange() {
+  const val = document.querySelector('input[name="seismic"]:checked').value;
+  document.getElementById('hx-group').classList.toggle('hidden', val !== 'smf');
+  recalc();
+}
+
+function readURLParams() {
+  const sp = new URLSearchParams(window.location.search);
+  const map = {b:'i-b', h:'i-h', Lc:'i-Lc', rec:'i-cov', Pu:'i-Pu', Vu:'i-Vu', nlong:'i-nlong'};
+  Object.entries(map).forEach(([key, id]) => {
+    if (sp.has(key)) document.getElementById(id).value = sp.get(key);
+  });
+  if (sp.has('fc')) {
+    const fc = parseFloat(sp.get('fc'));
+    const sel = document.getElementById('i-fc');
+    const opts = [...sel.options].map(o => parseFloat(o.value));
+    sel.value = opts.reduce((a,b) => Math.abs(b-fc) < Math.abs(a-fc) ? b : a);
+  }
+}
+
+/* ── Init ── */
+window.addEventListener('resize', recalc);
+readURLParams();
+onShapeChange();
+onSeismicChange();
+</script>
+</body>
+</html>

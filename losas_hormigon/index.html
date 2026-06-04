@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calculadora de Losas de Hormigón</title>
+  <style>
+    :root {
+      --primary: #1a56a0;
+      --primary-dark: #0f3d7a;
+      --accent: #e8a020;
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --border: #d1d8e0;
+      --text: #1e2b3a;
+      --muted: #6b7a8d;
+      --success: #1a8c4e;
+      --danger: #c0392b;
+      --tab-active: #1a56a0;
+      --tab-inactive: #e2e8f0;
+      --shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* HEADER */
+    header {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+      color: #fff; padding: 18px 24px; display: flex; align-items: center; gap: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    header .logo { font-size: 1.7rem; font-weight: 700; letter-spacing: 1px; }
+    header .subtitle { font-size: 0.85rem; opacity: 0.8; margin-top: 2px; }
+
+    /* TABS */
+    .tabs { display: flex; background: #fff; border-bottom: 2px solid var(--border); padding: 0 24px; }
+    .tab-btn {
+      padding: 14px 24px; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+      border: none; background: none; color: var(--muted); border-bottom: 3px solid transparent;
+      margin-bottom: -2px; transition: all 0.2s;
+    }
+    .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .tab-btn:hover:not(.active) { color: var(--text); background: var(--bg); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* MAIN LAYOUT */
+    .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px; }
+
+    /* CARDS */
+    .card {
+      background: var(--card); border-radius: 10px; box-shadow: var(--shadow);
+      border: 1px solid var(--border); overflow: hidden;
+    }
+    .card-header {
+      background: var(--primary); color: #fff; padding: 14px 20px;
+      font-weight: 700; font-size: 0.95rem; letter-spacing: 0.3px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .card-body { padding: 20px; }
+
+    /* FORM */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    @media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label { font-size: 0.82rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .form-group input, .form-group select {
+      padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 7px;
+      font-size: 1rem; color: var(--text); background: #fff; transition: border-color 0.2s;
+      outline: none;
+    }
+    .form-group input:focus, .form-group select:focus { border-color: var(--primary); }
+    .form-group .hint { font-size: 0.78rem; color: var(--muted); }
+
+    /* FULL WIDTH GROUP */
+    .form-group.full { grid-column: 1 / -1; }
+
+    /* SELECT STYLED */
+    select { cursor: pointer; }
+    optgroup { font-weight: 700; color: var(--primary); }
+
+    /* CALC BUTTON */
+    .btn-calc {
+      margin-top: 6px; padding: 13px 32px; background: var(--accent);
+      color: #fff; border: none; border-radius: 7px; font-size: 1rem; font-weight: 700;
+      cursor: pointer; transition: background 0.2s; letter-spacing: 0.3px;
+    }
+    .btn-calc:hover { background: #c8891a; }
+
+    /* RESULTS */
+    .results-wrapper { margin-top: 24px; }
+    .results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .result-card {
+      background: var(--bg); border: 1.5px solid var(--border); border-radius: 9px;
+      padding: 14px 16px; display: flex; flex-direction: column; gap: 4px;
+    }
+    .result-card .rc-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); letter-spacing: 0.5px; }
+    .result-card .rc-qty { font-size: 1.3rem; font-weight: 700; color: var(--primary); }
+    .result-card .rc-price { font-size: 0.85rem; color: var(--success); font-weight: 600; }
+    .result-card .rc-unit { font-size: 0.75rem; color: var(--muted); }
+    .result-card.highlight { border-color: var(--accent); background: #fff8ec; }
+    .result-card.highlight .rc-qty { color: var(--accent); }
+
+    /* TOTAL STRIP */
+    .total-strip {
+      background: var(--primary); color: #fff; border-radius: 9px; padding: 18px 24px;
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+    }
+    .total-strip .ts-label { font-size: 0.9rem; font-weight: 600; opacity: 0.9; }
+    .total-strip .ts-value { font-size: 1.6rem; font-weight: 800; }
+    .total-strip .ts-sub { font-size: 0.82rem; opacity: 0.75; }
+
+    /* TABLE */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th { background: var(--primary); color: #fff; padding: 10px 14px; text-align: left; font-weight: 600; }
+    td { padding: 9px 14px; border-bottom: 1px solid var(--border); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f0f4fa; }
+    .td-right { text-align: right; font-variant-numeric: tabular-nums; }
+    .td-bold { font-weight: 700; }
+
+    /* EMPTY STATE */
+    .empty-state { text-align: center; padding: 48px 20px; color: var(--muted); }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+    .empty-state p { font-size: 0.95rem; }
+
+    /* SETTINGS */
+    .settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; }
+    .settings-section-title {
+      grid-column: 1 / -1; font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
+      color: var(--muted); letter-spacing: 1px; padding-bottom: 6px;
+      border-bottom: 2px solid var(--border); margin-top: 8px;
+    }
+    .settings-grid .form-group input {
+      font-family: 'Courier New', monospace; font-size: 0.95rem;
+    }
+    .btn-save {
+      padding: 11px 28px; background: var(--success); color: #fff; border: none;
+      border-radius: 7px; font-size: 0.95rem; font-weight: 700; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-save:hover { background: #146b3c; }
+    .btn-reset {
+      padding: 11px 22px; background: #fff; color: var(--danger); border: 1.5px solid var(--danger);
+      border-radius: 7px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-reset:hover { background: #fdecea; }
+    .btn-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+    .toast {
+      position: fixed; bottom: 24px; right: 24px; background: var(--success); color: #fff;
+      padding: 12px 22px; border-radius: 8px; font-weight: 600; font-size: 0.9rem;
+      opacity: 0; transition: opacity 0.3s; z-index: 999; pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+
+    /* INDUSTRIAL BADGE */
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem;
+      font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .badge-industrial { background: #dbeafe; color: #1d4ed8; }
+    .badge-manual { background: #d1fae5; color: #065f46; }
+
+    /* DIVIDER */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 22px 0; }
+
+    /* NOTE */
+    .note {
+      background: #fffbeb; border: 1px solid #f6c94e; border-radius: 7px;
+      padding: 10px 14px; font-size: 0.82rem; color: #7a5a00; margin-top: 16px;
+    }
+    .note strong { font-weight: 700; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">PORTICAD</div>
+    <div class="subtitle">Módulo de Losas de Hormigón Armado</div>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('calcular')">Calculadora</button>
+  <button class="tab-btn" onclick="switchTab('precios')">⚙ Precios y Configuración</button>
+</div>
+
+<!-- ════════════ TAB CALCULADORA ════════════ -->
+<div id="tab-calcular" class="tab-content active">
+<div class="container">
+
+  <div class="card" style="margin-bottom:24px">
+    <div class="card-header">📐 Datos de Entrada</div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Volumen de Losa Requerido</label>
+          <input type="number" id="volumen" placeholder="Ej. 5.50" min="0.01" step="0.01" />
+          <span class="hint">En metros cúbicos (M³)</span>
+        </div>
+        <div class="form-group">
+          <label>Tipo de Losa</label>
+          <select id="tipoLosa">
+            <option value="">— Seleccione un tipo —</option>
+            <optgroup label="Espesor e=0.10m  (Varilla 3/8&quot; @ 0.25m)">
+              <option value="010_124">e=0.10m · Hormigón 1:2:4 con ligadora y winche</option>
+              <option value="010_180">e=0.10m · Hormigón 180 Kg/cm² CEMEX con ligadora y winche</option>
+              <option value="010_210">e=0.10m · Hormigón 210 Kg/cm² CEMEX con ligadora y winche</option>
+              <option value="010_IND">e=0.10m · Hormigón Industrial 210 Kg/cm²</option>
+            </optgroup>
+            <optgroup label="Espesor e=0.12m  (Varilla 3/8&quot; @ 0.25m)">
+              <option value="012_124">e=0.12m · Hormigón 1:2:4 con ligadora y winche</option>
+              <option value="012_180">e=0.12m · Hormigón 180 Kg/cm² CEMEX con ligadora y winche</option>
+              <option value="012_210">e=0.12m · Hormigón 210 Kg/cm² CEMEX con ligadora y winche</option>
+              <option value="012_IND">e=0.12m · Hormigón Industrial 210 Kg/cm²</option>
+            </optgroup>
+            <optgroup label="Espesor e=0.13m  (Varilla 3/8&quot; @ 0.25m)">
+              <option value="013_124">e=0.13m · Hormigón 1:2:4 con ligadora y winche</option>
+              <option value="013_180">e=0.13m · Hormigón 180 Kg/cm² CEMEX con ligadora y winche</option>
+              <option value="013_210">e=0.13m · Hormigón 210 Kg/cm² CEMEX con ligadora y winche</option>
+              <option value="013_IND">e=0.13m · Hormigón Industrial 210 Kg/cm²</option>
+            </optgroup>
+            <optgroup label="Espesor e=0.14m  (Varilla 3/8&quot; @ 0.25m)">
+              <option value="014_124">e=0.14m · Hormigón 1:2:4 con ligadora y winche</option>
+              <option value="014_180">e=0.14m · Hormigón 180 Kg/cm² CEMEX con ligadora y winche</option>
+              <option value="014_210">e=0.14m · Hormigón 210 Kg/cm² CEMEX con ligadora y winche</option>
+              <option value="014_IND">e=0.14m · Hormigón Industrial 210 Kg/cm²</option>
+            </optgroup>
+            <optgroup label="Espesor e=0.15m  (Varilla 3/8&quot; @ 0.25m)">
+              <option value="015_124">e=0.15m · Hormigón 1:2:4 con ligadora y winche</option>
+              <option value="015_180">e=0.15m · Hormigón 180 Kg/cm² CEMEX con ligadora y winche</option>
+              <option value="015_210">e=0.15m · Hormigón 210 Kg/cm² CEMEX con ligadora y winche</option>
+              <option value="015_IND">e=0.15m · Hormigón Industrial 210 Kg/cm²</option>
+            </optgroup>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:18px">
+        <button class="btn-calc" onclick="calcular()">Calcular</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="resultados">
+    <div class="empty-state">
+      <div class="icon">🏗️</div>
+      <p>Ingrese el volumen y seleccione el tipo de losa para ver el presupuesto y materiales.</p>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ════════════ TAB PRECIOS ════════════ -->
+<div id="tab-precios" class="tab-content">
+<div class="container">
+
+  <div class="card">
+    <div class="card-header">⚙ Precios Unitarios y Parámetros</div>
+    <div class="card-body">
+      <p style="font-size:0.85rem; color:var(--muted); margin-bottom:20px;">
+        Modifique los precios unitarios base. Los cambios se aplican inmediatamente al recalcular.
+      </p>
+
+      <div class="settings-grid">
+
+        <div class="settings-section-title">Acero y Alambre</div>
+
+        <div class="form-group">
+          <label>Acero (varilla 3/8") — RD$/QQ</label>
+          <input type="number" id="p_acero" step="0.01" />
+          <span class="hint">Precio por quintal (100 lbs)</span>
+        </div>
+        <div class="form-group">
+          <label>Mano de Obra — Acero (RD$/QQ)</label>
+          <input type="number" id="p_moAcero" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label>Alambre Dulce No.18 — RD$/LB</label>
+          <input type="number" id="p_alambre" step="0.01" />
+        </div>
+
+        <div class="settings-section-title">Componentes de Hormigón (Mezclado en Obra)</div>
+
+        <div class="form-group">
+          <label>Cemento Gris — RD$/Funda</label>
+          <input type="number" id="p_cemento" step="0.01" />
+          <span class="hint">Por funda de 42.5 kg</span>
+        </div>
+        <div class="form-group">
+          <label>Arena Gruesa Lavada — RD$/M³E</label>
+          <input type="number" id="p_arena" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label>Grava 3/4" — RD$/M³E</label>
+          <input type="number" id="p_grava" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label>Agua — RD$/GL</label>
+          <input type="number" id="p_agua" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label>Ligado y Vaciado (ligadora+winche) — RD$/M³</label>
+          <input type="number" id="p_ligado" step="0.01" />
+        </div>
+
+        <div class="settings-section-title">Hormigón Industrial (Puesto en Obra)</div>
+
+        <div class="form-group">
+          <label>Hormigón Industrial 210 Kg/cm² — RD$/M³</label>
+          <input type="number" id="p_hInd210" step="0.01" />
+          <span class="hint">Incluye bomba y colocación</span>
+        </div>
+        <div class="form-group">
+          <label>Hormigón Industrial 180 Kg/cm² — RD$/M³</label>
+          <input type="number" id="p_hInd180" step="0.01" />
+        </div>
+
+        <div class="settings-section-title">Encofrado y Otros</div>
+
+        <div class="form-group">
+          <label>Encofrado Losa Plana h=3.00m — RD$/M²</label>
+          <input type="number" id="p_encofrado" step="0.01" />
+          <span class="hint">Todo costo (mano de obra incluida)</span>
+        </div>
+
+        <div class="settings-section-title">Impuestos</div>
+
+        <div class="form-group">
+          <label>ITBIS (%)</label>
+          <input type="number" id="p_itbis" step="0.1" min="0" max="100" />
+          <span class="hint">Solo aplica a materiales</span>
+        </div>
+
+      </div>
+
+      <hr class="divider" />
+      <div class="btn-row">
+        <button class="btn-save" onclick="guardarPrecios()">Guardar Precios</button>
+        <button class="btn-reset" onclick="resetPrecios()">Restaurar Predeterminados</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── PRECIOS PREDETERMINADOS (extraídos del libro LibroLosasHAee2026.xlsx) ─────
+const DEFAULTS = {
+  p_acero:    2759.32,   // RD$/QQ
+  p_moAcero:  723.91,    // RD$/QQ  mano de obra acero
+  p_alambre:  76.27,     // RD$/LB  alambre dulce No.18
+  p_cemento:  457.63,    // RD$/FDA
+  p_arena:    1398.31,   // RD$/M3E
+  p_grava:    1398.31,   // RD$/M3E
+  p_agua:     1.50,      // RD$/GL
+  p_ligado:   1364.36,   // RD$/M3  ligado+winche
+  p_hInd210:  7843.64,   // RD$/M3  hormigon industrial 210
+  p_hInd180:  7571.61,   // RD$/M3  hormigon industrial 180
+  p_encofrado:932.58,    // RD$/M2
+  p_itbis:    18.0,      // %
+};
+
+// ─── TABLAS DE LOSAS ────────────────────────────────────────────────────────
+// cuantia_acero QQ/M3, alambre_lb_m3 LB/M3
+// mezcla: { cemento FDA/M3, arena M3E/M3, grava M3E/M3, agua GL/M3 }
+// is_industrial: usa precio hormigón industrial directamente
+const LOSAS = {
+  '010_124': { espesor:0.10, acero:1.93, alambre:3.86, tipo_horm:'1:2:4',  is_ind:false, mezcla:{ cemento:8,  arena:0.45, grava:0.90, agua:60 } },
+  '010_180': { espesor:0.10, acero:1.93, alambre:3.86, tipo_horm:'180',    is_ind:false, mezcla:{ cemento:9,  arena:0.57, grava:0.53, agua:60 } },
+  '010_210': { espesor:0.10, acero:1.93, alambre:3.86, tipo_horm:'210',    is_ind:false, mezcla:{ cemento:10, arena:0.55, grava:0.51, agua:60 } },
+  '010_IND': { espesor:0.10, acero:1.93, alambre:3.86, tipo_horm:'IND210', is_ind:true  },
+
+  '012_124': { espesor:0.12, acero:1.60, alambre:3.20, tipo_horm:'1:2:4',  is_ind:false, mezcla:{ cemento:8,  arena:0.45, grava:0.90, agua:60 } },
+  '012_180': { espesor:0.12, acero:1.60, alambre:3.20, tipo_horm:'180',    is_ind:false, mezcla:{ cemento:9,  arena:0.57, grava:0.53, agua:60 } },
+  '012_210': { espesor:0.12, acero:1.60, alambre:3.20, tipo_horm:'210',    is_ind:false, mezcla:{ cemento:10, arena:0.55, grava:0.51, agua:60 } },
+  '012_IND': { espesor:0.12, acero:1.60, alambre:3.20, tipo_horm:'IND210', is_ind:true  },
+
+  '013_124': { espesor:0.13, acero:1.48, alambre:2.96, tipo_horm:'1:2:4',  is_ind:false, mezcla:{ cemento:8,  arena:0.45, grava:0.90, agua:60 } },
+  '013_180': { espesor:0.13, acero:1.48, alambre:2.96, tipo_horm:'180',    is_ind:false, mezcla:{ cemento:9,  arena:0.57, grava:0.53, agua:60 } },
+  '013_210': { espesor:0.13, acero:1.48, alambre:2.96, tipo_horm:'210',    is_ind:false, mezcla:{ cemento:10, arena:0.55, grava:0.51, agua:60 } },
+  '013_IND': { espesor:0.13, acero:1.48, alambre:2.96, tipo_horm:'IND210', is_ind:true  },
+
+  '014_124': { espesor:0.14, acero:1.38, alambre:2.76, tipo_horm:'1:2:4',  is_ind:false, mezcla:{ cemento:8,  arena:0.45, grava:0.90, agua:60 } },
+  '014_180': { espesor:0.14, acero:1.38, alambre:2.76, tipo_horm:'180',    is_ind:false, mezcla:{ cemento:9,  arena:0.57, grava:0.53, agua:60 } },
+  '014_210': { espesor:0.14, acero:1.38, alambre:2.76, tipo_horm:'210',    is_ind:false, mezcla:{ cemento:10, arena:0.55, grava:0.51, agua:60 } },
+  '014_IND': { espesor:0.14, acero:1.38, alambre:2.76, tipo_horm:'IND210', is_ind:true  },
+
+  '015_124': { espesor:0.15, acero:1.28, alambre:2.56, tipo_horm:'1:2:4',  is_ind:false, mezcla:{ cemento:8,  arena:0.45, grava:0.90, agua:60 } },
+  '015_180': { espesor:0.15, acero:1.28, alambre:2.56, tipo_horm:'180',    is_ind:false, mezcla:{ cemento:9,  arena:0.57, grava:0.53, agua:60 } },
+  '015_210': { espesor:0.15, acero:1.28, alambre:2.56, tipo_horm:'210',    is_ind:false, mezcla:{ cemento:10, arena:0.55, grava:0.51, agua:60 } },
+  '015_IND': { espesor:0.15, acero:1.28, alambre:2.56, tipo_horm:'IND210', is_ind:true  },
+};
+
+const TIPO_HORM_LABEL = {
+  '1:2:4':  'Hormigón 1:2:4 (Mezclado en obra)',
+  '180':    'Hormigón 180 Kg/cm² CEMEX',
+  '210':    'Hormigón 210 Kg/cm² CEMEX',
+  'IND210': 'Hormigón Industrial 210 Kg/cm²',
+};
+
+// ─── ESTADO ─────────────────────────────────────────────────────────────────
+let precios = loadPrecios();
+
+function loadPrecios() {
+  try {
+    const stored = localStorage.getItem('porticad_precios_losas');
+    return stored ? { ...DEFAULTS, ...JSON.parse(stored) } : { ...DEFAULTS };
+  } catch { return { ...DEFAULTS }; }
+}
+
+function savePrecios(p) {
+  localStorage.setItem('porticad_precios_losas', JSON.stringify(p));
+}
+
+// ─── TABS ────────────────────────────────────────────────────────────────────
+function switchTab(id) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (id === 'precios') populateSettingsForm();
+}
+
+// ─── CALCULAR ────────────────────────────────────────────────────────────────
+function calcular() {
+  const volInput = parseFloat(document.getElementById('volumen').value);
+  const tipo = document.getElementById('tipoLosa').value;
+
+  if (!volInput || volInput <= 0) { alert('Por favor ingrese un volumen válido mayor que 0.'); return; }
+  if (!tipo) { alert('Por favor seleccione el tipo de losa.'); return; }
+
+  const losa = LOSAS[tipo];
+  const p = precios;
+  const V = volInput;         // M3 de losa pedidos
+  const Vc = V * 1.1;         // M3 de hormigón con 10% desperdicio
+  const itbis = p.p_itbis / 100;
+
+  // ─ Acero ─
+  const qq_acero       = losa.acero * V;
+  const sub_acero      = qq_acero * p.p_acero;
+  const itbis_acero    = sub_acero * itbis;
+  const sub_moAcero    = qq_acero * p.p_moAcero;
+
+  // ─ Alambre ─
+  const lb_alambre     = losa.alambre * V;
+  const sub_alambre    = lb_alambre * p.p_alambre;
+  const itbis_alambre  = sub_alambre * itbis;
+
+  // ─ Encofrado ─ (10 M2 por M3 de losa)
+  const m2_encofrado   = 10 * V;
+  const sub_encofrado  = m2_encofrado * p.p_encofrado;
+
+  // ─ Hormigón ─
+  let sub_horm = 0, itbis_horm = 0;
+  let mat_cemento=0, mat_arena=0, mat_grava=0, mat_agua=0;
+  let costo_cemento=0, costo_arena=0, costo_grava=0, costo_agua=0, costo_ligado=0;
+
+  if (losa.is_ind) {
+    const pu_ind = losa.tipo_horm === 'IND210' ? p.p_hInd210 : p.p_hInd180;
+    sub_horm    = Vc * pu_ind;
+    itbis_horm  = 0;  // precio industrial ya incluye ITBIS o varía
+  } else {
+    const m = losa.mezcla;
+    mat_cemento  = m.cemento  * Vc;
+    mat_arena    = m.arena    * Vc;
+    mat_grava    = m.grava    * Vc;
+    mat_agua     = m.agua     * Vc;
+
+    costo_cemento = mat_cemento * p.p_cemento;
+    costo_arena   = mat_arena   * p.p_arena;
+    costo_grava   = mat_grava   * p.p_grava;
+    costo_agua    = mat_agua    * p.p_agua;
+    costo_ligado  = Vc          * p.p_ligado;
+
+    const sub_materiales = costo_cemento + costo_arena + costo_grava + costo_agua;
+    sub_horm   = sub_materiales + costo_ligado;
+    itbis_horm = sub_materiales * itbis;
+  }
+
+  // ─ Totales ─
+  const subtotal_mats  = sub_acero + sub_alambre + sub_horm;
+  const subtotal_mano  = sub_moAcero + sub_encofrado;
+  const total_itbis    = itbis_acero + itbis_alambre + itbis_horm;
+  const subtotal       = subtotal_mats + subtotal_mano;
+  const total          = subtotal + total_itbis;
+
+  // ─ Render ─
+  const losaLabel = document.getElementById('tipoLosa').options[document.getElementById('tipoLosa').selectedIndex].text;
+  const esIndBadge = losa.is_ind
+    ? '<span class="badge badge-industrial">Industrial</span>'
+    : '<span class="badge badge-manual">Mezclado en obra</span>';
+
+  let materialesHTML = '';
+
+  if (!losa.is_ind) {
+    materialesHTML = `
+      <div class="result-card">
+        <div class="rc-label">Cemento Gris</div>
+        <div class="rc-qty">${fmt(mat_cemento, 1)}</div>
+        <div class="rc-unit">Fundas (FDA)</div>
+        <div class="rc-price">${fmtRD(costo_cemento)}</div>
+      </div>
+      <div class="result-card">
+        <div class="rc-label">Arena Gruesa</div>
+        <div class="rc-qty">${fmt(mat_arena, 2)}</div>
+        <div class="rc-unit">M³ esponjado</div>
+        <div class="rc-price">${fmtRD(costo_arena)}</div>
+      </div>
+      <div class="result-card">
+        <div class="rc-label">Grava 3/4"</div>
+        <div class="rc-qty">${fmt(mat_grava, 2)}</div>
+        <div class="rc-unit">M³ esponjado</div>
+        <div class="rc-price">${fmtRD(costo_grava)}</div>
+      </div>
+      <div class="result-card">
+        <div class="rc-label">Agua</div>
+        <div class="rc-qty">${fmt(mat_agua, 0)}</div>
+        <div class="rc-unit">Galones</div>
+        <div class="rc-price">${fmtRD(costo_agua)}</div>
+      </div>`;
+  } else {
+    const pu_ind = losa.tipo_horm === 'IND210' ? p.p_hInd210 : p.p_hInd180;
+    materialesHTML = `
+      <div class="result-card" style="grid-column:1/-1; background:#dbeafe20; border-color:#93c5fd">
+        <div class="rc-label">Hormigón Industrial 210 Kg/cm²</div>
+        <div class="rc-qty">${fmt(Vc, 2)} M³</div>
+        <div class="rc-unit">Incluye bomba y colocación · ${fmtRD(pu_ind)}/M³</div>
+        <div class="rc-price">${fmtRD(sub_horm)}</div>
+      </div>`;
+  }
+
+  // Desglose tabla
+  const filas = [
+    { desc: 'Acero (Varilla 3/8" @ 0.25m)',   cant: fmt(qq_acero,2),      und: 'QQ',  pu: fmtRD(p.p_acero),     subtotal: fmtRD(sub_acero),   itbis: fmtRD(itbis_acero) },
+    { desc: 'Mano de Obra — Acero',            cant: fmt(qq_acero,2),      und: 'QQ',  pu: fmtRD(p.p_moAcero),   subtotal: fmtRD(sub_moAcero), itbis: '—' },
+    { desc: 'Alambre Dulce No. 18',            cant: fmt(lb_alambre,2),    und: 'LB',  pu: fmtRD(p.p_alambre),   subtotal: fmtRD(sub_alambre), itbis: fmtRD(itbis_alambre) },
+    { desc: 'Encofrado losa plana h=3.00m',   cant: fmt(m2_encofrado,1),  und: 'M²',  pu: fmtRD(p.p_encofrado), subtotal: fmtRD(sub_encofrado),itbis: '—' },
+  ];
+
+  if (!losa.is_ind) {
+    filas.push(
+      { desc: 'Cemento Gris',                  cant: fmt(mat_cemento,1),   und: 'FDA', pu: fmtRD(p.p_cemento),   subtotal: fmtRD(costo_cemento), itbis: fmtRD(costo_cemento*itbis) },
+      { desc: 'Arena Gruesa Lavada',           cant: fmt(mat_arena,2),     und: 'M³E', pu: fmtRD(p.p_arena),     subtotal: fmtRD(costo_arena),   itbis: fmtRD(costo_arena*itbis) },
+      { desc: 'Grava 3/4"',                   cant: fmt(mat_grava,2),     und: 'M³E', pu: fmtRD(p.p_grava),     subtotal: fmtRD(costo_grava),   itbis: fmtRD(costo_grava*itbis) },
+      { desc: 'Agua',                          cant: fmt(mat_agua,0),      und: 'GL',  pu: fmtRD(p.p_agua),      subtotal: fmtRD(costo_agua),    itbis: fmtRD(costo_agua*itbis) },
+      { desc: 'Ligado y vaciado (ligadora+winche)', cant: fmt(Vc,2),       und: 'M³',  pu: fmtRD(p.p_ligado),    subtotal: fmtRD(costo_ligado),  itbis: '—' },
+    );
+  } else {
+    const pu_ind = losa.tipo_horm === 'IND210' ? p.p_hInd210 : p.p_hInd180;
+    filas.push(
+      { desc: 'Hormigón Industrial 210 Kg/cm² (incl. bomba)', cant: fmt(Vc,2), und: 'M³', pu: fmtRD(pu_ind), subtotal: fmtRD(sub_horm), itbis: '—' },
+    );
+  }
+
+  const filasHTML = filas.map(f => `
+    <tr>
+      <td>${f.desc}</td>
+      <td class="td-right">${f.cant}</td>
+      <td>${f.und}</td>
+      <td class="td-right">${f.pu}</td>
+      <td class="td-right">${f.subtotal}</td>
+      <td class="td-right">${f.itbis}</td>
+    </tr>`).join('');
+
+  document.getElementById('resultados').innerHTML = `
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header">
+        📊 Resumen — ${losaLabel.trim()} ${esIndBadge}
+        &nbsp;|&nbsp; Volumen: <strong>${fmt(V,2)} M³</strong>
+      </div>
+      <div class="card-body">
+
+        <p style="font-size:0.82rem;color:var(--muted);margin-bottom:14px;">
+          Volumen hormigón (con 10% desperdicio): <strong>${fmt(Vc,2)} M³</strong>
+          &nbsp;·&nbsp; Encofrado: <strong>${fmt(m2_encofrado,1)} M²</strong>
+        </p>
+
+        <div style="margin-bottom:6px;font-size:0.78rem;font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:.5px">Varilla de Acero</div>
+        <div class="results-grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));margin-bottom:20px">
+          <div class="result-card highlight">
+            <div class="rc-label">Acero 3/8" requerido</div>
+            <div class="rc-qty">${fmt(qq_acero,2)}</div>
+            <div class="rc-unit">Quintales (QQ)</div>
+            <div class="rc-price">${fmtRD(sub_acero)}</div>
+          </div>
+          <div class="result-card">
+            <div class="rc-label">Cuantía</div>
+            <div class="rc-qty">${fmt(losa.acero,2)}</div>
+            <div class="rc-unit">QQ / M³ de losa</div>
+          </div>
+          <div class="result-card">
+            <div class="rc-label">Alambre Dulce No.18</div>
+            <div class="rc-qty">${fmt(lb_alambre,2)}</div>
+            <div class="rc-unit">Libras (LB)</div>
+            <div class="rc-price">${fmtRD(sub_alambre)}</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom:6px;font-size:0.78rem;font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:.5px">Componentes de Hormigón</div>
+        <div class="results-grid" style="margin-bottom:20px">
+          ${materialesHTML}
+        </div>
+
+        <hr class="divider" />
+
+        <div class="total-strip">
+          <div>
+            <div class="ts-label">SUBTOTAL (sin ITBIS)</div>
+            <div class="ts-value">${fmtRD(subtotal)}</div>
+          </div>
+          <div>
+            <div class="ts-label">ITBIS (${p.p_itbis}%)</div>
+            <div class="ts-value" style="font-size:1.2rem">${fmtRD(total_itbis)}</div>
+          </div>
+          <div>
+            <div class="ts-label">TOTAL CON ITBIS</div>
+            <div class="ts-value" style="font-size:1.9rem">${fmtRD(total)}</div>
+            <div class="ts-sub">${fmtRD(total/V)} por M³ de losa</div>
+          </div>
+        </div>
+
+        <div class="note" style="margin-top:18px">
+          <strong>Nota:</strong> El encofrado de losa plana h=3.00m está incluido en el costo total
+          (${fmt(m2_encofrado,1)} M² × ${fmtRD(p.p_encofrado)}/M² = ${fmtRD(sub_encofrado)}).
+          ${losa.is_ind ? 'El precio del hormigón industrial incluye bomba y colocación. No lleva ITBIS separado (ya incluido en precio proveedor).' : ''}
+        </div>
+
+        <hr class="divider" />
+        <div style="font-size:0.85rem;font-weight:700;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Desglose Completo</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Descripción</th>
+              <th style="text-align:right">Cantidad</th>
+              <th>Und.</th>
+              <th style="text-align:right">P.U. (RD$)</th>
+              <th style="text-align:right">Subtotal (RD$)</th>
+              <th style="text-align:right">ITBIS (RD$)</th>
+            </tr></thead>
+            <tbody>
+              ${filasHTML}
+              <tr style="background:#f0f4fa">
+                <td class="td-bold" colspan="4">TOTAL</td>
+                <td class="td-right td-bold">${fmtRD(subtotal)}</td>
+                <td class="td-right td-bold">${fmtRD(total_itbis)}</td>
+              </tr>
+              <tr style="background:#e8f0fe">
+                <td class="td-bold" colspan="5">TOTAL GENERAL (incluye ITBIS)</td>
+                <td class="td-right td-bold" style="color:var(--primary)">${fmtRD(total)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  `;
+}
+
+// ─── SETTINGS ────────────────────────────────────────────────────────────────
+function populateSettingsForm() {
+  Object.keys(DEFAULTS).forEach(k => {
+    const el = document.getElementById(k);
+    if (el) el.value = precios[k];
+  });
+}
+
+function guardarPrecios() {
+  Object.keys(DEFAULTS).forEach(k => {
+    const el = document.getElementById(k);
+    if (el && el.value !== '') precios[k] = parseFloat(el.value) || DEFAULTS[k];
+  });
+  savePrecios(precios);
+  showToast('Precios guardados correctamente ✓');
+}
+
+function resetPrecios() {
+  if (!confirm('¿Restaurar todos los precios a los valores predeterminados del libro de análisis?')) return;
+  precios = { ...DEFAULTS };
+  savePrecios(precios);
+  populateSettingsForm();
+  showToast('Precios restaurados a valores predeterminados');
+}
+
+// ─── UTILS ───────────────────────────────────────────────────────────────────
+function fmt(n, dec) { return n.toFixed(dec).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+function fmtRD(n) { return 'RD$ ' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+populateSettingsForm();
+
+// Allow Enter key to trigger calculation
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('tab-calcular').classList.contains('active')) {
+    calcular();
+  }
+});
+</script>
+</body>
+</html>
