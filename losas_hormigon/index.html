@@ -171,6 +171,13 @@
       padding: 10px 14px; font-size: 0.82rem; color: #7a5a00; margin-top: 16px;
     }
     .note strong { font-weight: 700; }
+
+    /* MATERIAL ICON inside result-card */
+    .rc-icon {
+      position: absolute; top: 10px; right: 10px; opacity: 0.18; pointer-events: none;
+    }
+    .result-card { position: relative; }
+    .result-card:hover .rc-icon { opacity: 0.32; transition: opacity 0.2s; }
   </style>
 </head>
 <body>
@@ -391,6 +398,100 @@ const TIPO_HORM_LABEL = {
   'IND210': 'Hormigón Industrial 210 Kg/cm²',
 };
 
+// ─── ICONOS SVG POR MATERIAL ─────────────────────────────────────────────────
+const ICONS = {
+  acero: `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+    <!-- varillas paralelas diagonales -->
+    <line x1="4" y1="60" x2="60" y2="4"  stroke="#1a56a0" stroke-width="5" stroke-linecap="round"/>
+    <line x1="14" y1="60" x2="60" y2="14" stroke="#1a56a0" stroke-width="5" stroke-linecap="round"/>
+    <line x1="24" y1="60" x2="60" y2="24" stroke="#1a56a0" stroke-width="5" stroke-linecap="round"/>
+    <line x1="4"  y1="50" x2="50" y2="4"  stroke="#1a56a0" stroke-width="5" stroke-linecap="round"/>
+    <!-- transversales -->
+    <line x1="4" y1="4"  x2="60" y2="60" stroke="#e8a020" stroke-width="3" stroke-linecap="round" stroke-dasharray="6 6"/>
+    <line x1="14" y1="4" x2="60" y2="50" stroke="#e8a020" stroke-width="3" stroke-linecap="round" stroke-dasharray="6 6"/>
+  </svg>`,
+
+  cuantia: `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+    <rect x="8" y="8" width="48" height="48" rx="6" stroke="#1a56a0" stroke-width="3"/>
+    <text x="32" y="42" text-anchor="middle" font-size="26" font-weight="800" fill="#1a56a0" font-family="Arial">QQ</text>
+    <line x1="14" y1="26" x2="50" y2="26" stroke="#1a56a0" stroke-width="2"/>
+  </svg>`,
+
+  alambre: `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+    <!-- rollo de alambre -->
+    <circle cx="32" cy="32" r="22" stroke="#6b7a8d" stroke-width="3" stroke-dasharray="8 4"/>
+    <circle cx="32" cy="32" r="14" stroke="#6b7a8d" stroke-width="3" stroke-dasharray="6 4"/>
+    <circle cx="32" cy="32" r="6"  stroke="#6b7a8d" stroke-width="3"/>
+    <line x1="54" y1="32" x2="62" y2="24" stroke="#6b7a8d" stroke-width="3" stroke-linecap="round"/>
+  </svg>`,
+
+  cemento: `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+    <!-- funda de cemento -->
+    <rect x="10" y="18" width="44" height="36" rx="4" fill="#d1d8e0" stroke="#6b7a8d" stroke-width="2.5"/>
+    <!-- parte superior doblada -->
+    <path d="M10 22 Q32 14 54 22" stroke="#6b7a8d" stroke-width="2.5" fill="#e2e8f0"/>
+    <path d="M10 22 L14 18 L50 18 L54 22" fill="#e2e8f0" stroke="#6b7a8d" stroke-width="2"/>
+    <!-- texto CEMENTO -->
+    <text x="32" y="42" text-anchor="middle" font-size="9" font-weight="700" fill="#6b7a8d" font-family="Arial" letter-spacing="1">CEMENTO</text>
+    <!-- líneas de saco -->
+    <line x1="10" y1="34" x2="54" y2="34" stroke="#6b7a8d" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <line x1="10" y1="46" x2="54" y2="46" stroke="#6b7a8d" stroke-width="1.5" stroke-dasharray="4 3"/>
+  </svg>`,
+
+  arena: `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+    <!-- montón de arena -->
+    <path d="M4 54 Q32 12 60 54 Z" fill="#e8c97a" stroke="#c8a020" stroke-width="2.5" stroke-linejoin="round"/>
+    <!-- granitos -->
+    <circle cx="22" cy="44" r="2.5" fill="#c8a020"/>
+    <circle cx="32" cy="36" r="2.5" fill="#c8a020"/>
+    <circle cx="42" cy="44" r="2.5" fill="#c8a020"/>
+    <circle cx="28" cy="48" r="2"   fill="#c8a020"/>
+    <circle cx="38" cy="48" r="2"   fill="#c8a020"/>
+    <circle cx="26" cy="40" r="1.8" fill="#c8a020"/>
+    <circle cx="36" cy="40" r="1.8" fill="#c8a020"/>
+    <!-- base -->
+    <line x1="4" y1="54" x2="60" y2="54" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
+  </svg>`,
+
+  grava: `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+    <!-- piedras irregulares -->
+    <ellipse cx="20" cy="44" rx="11" ry="8"  fill="#b0b8c8" stroke="#6b7a8d" stroke-width="2" transform="rotate(-15 20 44)"/>
+    <ellipse cx="44" cy="46" rx="12" ry="7"  fill="#c0c8d8" stroke="#6b7a8d" stroke-width="2" transform="rotate(10 44 46)"/>
+    <ellipse cx="32" cy="34" rx="10" ry="7"  fill="#d0d8e8" stroke="#6b7a8d" stroke-width="2" transform="rotate(-5 32 34)"/>
+    <ellipse cx="14" cy="30" rx="7"  rx="7" ry="5"  fill="#b8c0d0" stroke="#6b7a8d" stroke-width="1.5" transform="rotate(20 14 30)"/>
+    <ellipse cx="50" cy="32" rx="8"  ry="5"  fill="#c8d0e0" stroke="#6b7a8d" stroke-width="1.5" transform="rotate(-20 50 32)"/>
+  </svg>`,
+
+  agua: `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+    <!-- gota de agua -->
+    <path d="M32 8 C32 8 10 34 10 44 C10 55 20 60 32 60 C44 60 54 55 54 44 C54 34 32 8 32 8 Z"
+          fill="#bfdbfe" stroke="#3b82f6" stroke-width="2.5"/>
+    <!-- reflejo -->
+    <path d="M22 38 C22 38 18 44 20 50" stroke="#93c5fd" stroke-width="2.5" stroke-linecap="round"/>
+  </svg>`,
+
+  industrial: `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+    <!-- camión mezclador simplificado -->
+    <!-- chasis -->
+    <rect x="4" y="36" width="44" height="16" rx="3" fill="#d1d8e0" stroke="#6b7a8d" stroke-width="2"/>
+    <!-- cabina -->
+    <rect x="40" y="28" width="18" height="24" rx="3" fill="#b0b8c8" stroke="#6b7a8d" stroke-width="2"/>
+    <!-- ventana cabina -->
+    <rect x="43" y="30" width="11" height="8" rx="2" fill="#93c5fd" stroke="#6b7a8d" stroke-width="1.5"/>
+    <!-- tambor -->
+    <ellipse cx="22" cy="28" rx="16" ry="12" fill="#e8a020" stroke="#c8801a" stroke-width="2" transform="rotate(-15 22 28)"/>
+    <line x1="10" y1="24" x2="34" y2="32" stroke="#c8801a" stroke-width="2" stroke-linecap="round"/>
+    <line x1="10" y1="30" x2="34" y2="24" stroke="#c8801a" stroke-width="2" stroke-linecap="round"/>
+    <!-- ruedas -->
+    <circle cx="14" cy="52" r="6" fill="#4a5568" stroke="#2d3748" stroke-width="1.5"/>
+    <circle cx="14" cy="52" r="2" fill="#9ca3af"/>
+    <circle cx="34" cy="52" r="6" fill="#4a5568" stroke="#2d3748" stroke-width="1.5"/>
+    <circle cx="34" cy="52" r="2" fill="#9ca3af"/>
+    <circle cx="52" cy="52" r="5" fill="#4a5568" stroke="#2d3748" stroke-width="1.5"/>
+    <circle cx="52" cy="52" r="1.8" fill="#9ca3af"/>
+  </svg>`,
+};
+
 // ─── ESTADO ─────────────────────────────────────────────────────────────────
 let precios = loadPrecios();
 
@@ -493,24 +594,28 @@ function calcular() {
   if (!losa.is_ind) {
     materialesHTML = `
       <div class="result-card">
+        <div class="rc-icon">${ICONS.cemento}</div>
         <div class="rc-label">Cemento Gris</div>
         <div class="rc-qty">${fmt(mat_cemento, 1)}</div>
         <div class="rc-unit">Fundas (FDA)</div>
         <div class="rc-price">${fmtRD(costo_cemento)}</div>
       </div>
       <div class="result-card">
+        <div class="rc-icon">${ICONS.arena}</div>
         <div class="rc-label">Arena Gruesa</div>
         <div class="rc-qty">${fmt(mat_arena, 2)}</div>
         <div class="rc-unit">M³ esponjado</div>
         <div class="rc-price">${fmtRD(costo_arena)}</div>
       </div>
       <div class="result-card">
+        <div class="rc-icon">${ICONS.grava}</div>
         <div class="rc-label">Grava 3/4"</div>
         <div class="rc-qty">${fmt(mat_grava, 2)}</div>
         <div class="rc-unit">M³ esponjado</div>
         <div class="rc-price">${fmtRD(costo_grava)}</div>
       </div>
       <div class="result-card">
+        <div class="rc-icon">${ICONS.agua}</div>
         <div class="rc-label">Agua</div>
         <div class="rc-qty">${fmt(mat_agua, 0)}</div>
         <div class="rc-unit">Galones</div>
@@ -520,6 +625,7 @@ function calcular() {
     const pu_ind = losa.tipo_horm === 'IND210' ? p.p_hInd210 : p.p_hInd180;
     materialesHTML = `
       <div class="result-card" style="grid-column:1/-1; background:#dbeafe20; border-color:#93c5fd">
+        <div class="rc-icon">${ICONS.industrial}</div>
         <div class="rc-label">Hormigón Industrial 210 Kg/cm²</div>
         <div class="rc-qty">${fmt(Vc, 2)} M³</div>
         <div class="rc-unit">Incluye bomba y colocación · ${fmtRD(pu_ind)}/M³</div>
@@ -576,17 +682,20 @@ function calcular() {
         <div style="margin-bottom:6px;font-size:0.78rem;font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:.5px">Varilla de Acero</div>
         <div class="results-grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));margin-bottom:20px">
           <div class="result-card highlight">
+            <div class="rc-icon">${ICONS.acero}</div>
             <div class="rc-label">Acero 3/8" requerido</div>
             <div class="rc-qty">${fmt(qq_acero,2)}</div>
             <div class="rc-unit">Quintales (QQ)</div>
             <div class="rc-price">${fmtRD(sub_acero)}</div>
           </div>
           <div class="result-card">
+            <div class="rc-icon">${ICONS.cuantia}</div>
             <div class="rc-label">Cuantía</div>
             <div class="rc-qty">${fmt(losa.acero,2)}</div>
             <div class="rc-unit">QQ / M³ de losa</div>
           </div>
           <div class="result-card">
+            <div class="rc-icon">${ICONS.alambre}</div>
             <div class="rc-label">Alambre Dulce No.18</div>
             <div class="rc-qty">${fmt(lb_alambre,2)}</div>
             <div class="rc-unit">Libras (LB)</div>
