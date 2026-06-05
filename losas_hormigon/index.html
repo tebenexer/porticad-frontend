@@ -184,7 +184,7 @@
 
 <div class="tabs">
   <button class="tab-btn active" onclick="switchTab('calcular')">Calculadora</button>
-  <button class="tab-btn" onclick="switchTab('precios')">⚙ Precios y Configuración</button>
+  <button class="tab-btn" onclick="switchTab('precios')">⚙ Configuración</button>
 </div>
 
 <!-- ════════════ TAB CALCULADORA ════════════ -->
@@ -201,39 +201,25 @@
           <span class="hint">En metros cúbicos (M³)</span>
         </div>
         <div class="form-group">
-          <label>Tipo de Losa</label>
-          <select id="tipoLosa">
-            <option value="">— Seleccione un tipo —</option>
-            <optgroup label="Espesor e=0.10m  (Varilla 3/8&quot; @ 0.25m)">
-              <option value="010_124">e=0.10m · Hormigón 1:2:4 con ligadora y winche</option>
-              <option value="010_180">e=0.10m · Hormigón 180 Kg/cm² CEMEX con ligadora y winche</option>
-              <option value="010_210">e=0.10m · Hormigón 210 Kg/cm² CEMEX con ligadora y winche</option>
-              <option value="010_IND">e=0.10m · Hormigón Industrial 210 Kg/cm²</option>
-            </optgroup>
-            <optgroup label="Espesor e=0.12m  (Varilla 3/8&quot; @ 0.25m)">
-              <option value="012_124">e=0.12m · Hormigón 1:2:4 con ligadora y winche</option>
-              <option value="012_180">e=0.12m · Hormigón 180 Kg/cm² CEMEX con ligadora y winche</option>
-              <option value="012_210">e=0.12m · Hormigón 210 Kg/cm² CEMEX con ligadora y winche</option>
-              <option value="012_IND">e=0.12m · Hormigón Industrial 210 Kg/cm²</option>
-            </optgroup>
-            <optgroup label="Espesor e=0.13m  (Varilla 3/8&quot; @ 0.25m)">
-              <option value="013_124">e=0.13m · Hormigón 1:2:4 con ligadora y winche</option>
-              <option value="013_180">e=0.13m · Hormigón 180 Kg/cm² CEMEX con ligadora y winche</option>
-              <option value="013_210">e=0.13m · Hormigón 210 Kg/cm² CEMEX con ligadora y winche</option>
-              <option value="013_IND">e=0.13m · Hormigón Industrial 210 Kg/cm²</option>
-            </optgroup>
-            <optgroup label="Espesor e=0.14m  (Varilla 3/8&quot; @ 0.25m)">
-              <option value="014_124">e=0.14m · Hormigón 1:2:4 con ligadora y winche</option>
-              <option value="014_180">e=0.14m · Hormigón 180 Kg/cm² CEMEX con ligadora y winche</option>
-              <option value="014_210">e=0.14m · Hormigón 210 Kg/cm² CEMEX con ligadora y winche</option>
-              <option value="014_IND">e=0.14m · Hormigón Industrial 210 Kg/cm²</option>
-            </optgroup>
-            <optgroup label="Espesor e=0.15m  (Varilla 3/8&quot; @ 0.25m)">
-              <option value="015_124">e=0.15m · Hormigón 1:2:4 con ligadora y winche</option>
-              <option value="015_180">e=0.15m · Hormigón 180 Kg/cm² CEMEX con ligadora y winche</option>
-              <option value="015_210">e=0.15m · Hormigón 210 Kg/cm² CEMEX con ligadora y winche</option>
-              <option value="015_IND">e=0.15m · Hormigón Industrial 210 Kg/cm²</option>
-            </optgroup>
+          <label>Espesor de Losa</label>
+          <select id="espesor">
+            <option value="">— Seleccione espesor —</option>
+            <option value="010">e = 0.10 m</option>
+            <option value="012">e = 0.12 m</option>
+            <option value="013">e = 0.13 m</option>
+            <option value="014">e = 0.14 m</option>
+            <option value="015">e = 0.15 m</option>
+          </select>
+          <span class="hint">Varilla 3/8" @ 0.25m en ambas direcciones</span>
+        </div>
+        <div class="form-group full">
+          <label>Tipo de Hormigón</label>
+          <select id="tipoHorm">
+            <option value="">— Seleccione tipo de hormigón —</option>
+            <option value="124">Hormigón 1:2:4 — Mezclado en obra (ligadora y winche)</option>
+            <option value="180">Hormigón 180 Kg/cm² CEMEX — Tabla Cemex (ligadora y winche)</option>
+            <option value="210">Hormigón 210 Kg/cm² CEMEX — Tabla Cemex (ligadora y winche)</option>
+            <option value="IND">Hormigón Industrial 210 Kg/cm² — Incluye bomba y colocación</option>
           </select>
         </div>
       </div>
@@ -259,7 +245,7 @@
 <div class="container">
 
   <div class="card">
-    <div class="card-header">⚙ Precios Unitarios y Parámetros</div>
+    <div class="card-header">⚙ Configuración</div>
     <div class="card-body">
       <p style="font-size:0.85rem; color:var(--muted); margin-bottom:20px;">
         Modifique los precios unitarios base. Los cambios se aplican inmediatamente al recalcular.
@@ -430,11 +416,14 @@ function switchTab(id) {
 
 // ─── CALCULAR ────────────────────────────────────────────────────────────────
 function calcular() {
-  const volInput = parseFloat(document.getElementById('volumen').value);
-  const tipo = document.getElementById('tipoLosa').value;
+  const volInput  = parseFloat(document.getElementById('volumen').value);
+  const espesor   = document.getElementById('espesor').value;
+  const tipoHorm  = document.getElementById('tipoHorm').value;
+  const tipo = espesor && tipoHorm ? espesor + '_' + tipoHorm : '';
 
   if (!volInput || volInput <= 0) { alert('Por favor ingrese un volumen válido mayor que 0.'); return; }
-  if (!tipo) { alert('Por favor seleccione el tipo de losa.'); return; }
+  if (!espesor)  { alert('Por favor seleccione el espesor de losa.'); return; }
+  if (!tipoHorm) { alert('Por favor seleccione el tipo de hormigón.'); return; }
 
   const losa = LOSAS[tipo];
   const p = precios;
@@ -492,7 +481,9 @@ function calcular() {
   const total          = subtotal + total_itbis;
 
   // ─ Render ─
-  const losaLabel = document.getElementById('tipoLosa').options[document.getElementById('tipoLosa').selectedIndex].text;
+  const espEl   = document.getElementById('espesor');
+  const hormEl  = document.getElementById('tipoHorm');
+  const losaLabel = espEl.options[espEl.selectedIndex].text + ' · ' + hormEl.options[hormEl.selectedIndex].text;
   const esIndBadge = losa.is_ind
     ? '<span class="badge badge-industrial">Industrial</span>'
     : '<span class="badge badge-manual">Mezclado en obra</span>';
