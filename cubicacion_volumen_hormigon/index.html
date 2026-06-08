@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cubicación Hormigón — PortiCAD Multi-Tools</title>
+  <style>
+    :root {
+      --primary: #1a56a0;
+      --primary-dark: #0f3d7a;
+      --accent: #f97316;
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --border: #d1d8e0;
+      --text: #1e2b3a;
+      --muted: #6b7a8d;
+      --success: #1a8c4e;
+      --danger: #c0392b;
+      --shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* HEADER */
+    header {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+      color: #fff; padding: 18px 24px; display: flex; align-items: center; gap: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    header .logo { font-size: 1.7rem; font-weight: 700; letter-spacing: 1px; }
+    header .logo span { color: var(--accent); }
+    header .title-block { flex: 1; }
+    header .tool-name { font-size: 1rem; font-weight: 700; }
+    header .subtitle { font-size: 0.82rem; opacity: 0.75; margin-top: 2px; }
+    header .back-link {
+      font-size: 0.78rem; color: rgba(255,255,255,0.7); text-decoration: none;
+      display: flex; align-items: center; gap: 4px;
+      padding: 5px 10px; border: 1px solid rgba(255,255,255,0.25); border-radius: 6px;
+      transition: all 0.2s;
+    }
+    header .back-link:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+    /* GRAND TOTAL BAR */
+    .total-bar {
+      background: var(--primary-dark);
+      color: #fff;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.25);
+    }
+    .total-bar .gt-label { font-size: 0.78rem; opacity: 0.75; font-weight: 600; letter-spacing: 0.3px; }
+    .total-bar .gt-value { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+    .total-bar .bar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .bar-btn {
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25);
+      color: #fff; padding: 6px 14px; border-radius: 6px; cursor: pointer;
+      font-size: 0.78rem; font-weight: 600; font-family: inherit; transition: background 0.2s; white-space: nowrap;
+    }
+    .bar-btn:hover { background: rgba(255,255,255,0.22); }
+
+    /* LAYOUT */
+    .container { max-width: 1240px; margin: 0 auto; padding: 24px 20px 60px; }
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 20px;
+    }
+    @media (max-width: 860px) {
+      .main-grid { grid-template-columns: 1fr; }
+      .sidebar { order: -1; }
+    }
+
+    /* SECTION CARD */
+    .card {
+      background: var(--card); border-radius: 10px; box-shadow: var(--shadow);
+      border: 1px solid var(--border); overflow: hidden; margin-bottom: 16px;
+    }
+    .card-header {
+      background: var(--primary); color: #fff; padding: 12px 18px;
+      font-weight: 700; font-size: 0.9rem; letter-spacing: 0.3px;
+      display: flex; align-items: center; gap: 10px; cursor: pointer;
+      user-select: none; transition: background 0.2s;
+    }
+    .card-header:hover { background: #1447a0; }
+    .card-header .ch-icon { font-size: 1rem; flex-shrink: 0; }
+    .card-header .ch-title { flex: 1; }
+    .ch-badge {
+      background: rgba(255,255,255,0.2); color: #fff; font-size: 0.75rem;
+      font-weight: 700; padding: 3px 9px; border-radius: 12px; white-space: nowrap;
+    }
+    .ch-toggle { opacity: 0.7; font-size: 0.85rem; transition: transform 0.25s; }
+    .card.collapsed .ch-toggle { transform: rotate(-90deg); }
+    .card-body { padding: 18px; }
+    .card.collapsed .card-body { display: none; }
+
+    /* ENTRY ROW */
+    .entry-row {
+      background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px;
+      padding: 14px; margin-bottom: 10px; transition: border-color 0.2s;
+    }
+    .entry-row:hover { border-color: var(--primary); }
+
+    .entry-name-input {
+      width: 100%; border: none; background: transparent; font-size: 0.82rem;
+      font-weight: 600; color: var(--primary); font-family: inherit;
+      padding: 2px 0 6px; border-bottom: 1px dashed var(--border); margin-bottom: 10px;
+    }
+    .entry-name-input:focus { outline: none; border-bottom-color: var(--primary); }
+    .entry-name-input::placeholder { color: var(--muted); font-weight: 400; }
+
+    .fields-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .fields-row > div { flex: 1; min-width: 88px; }
+
+    .field-label {
+      display: block; font-size: 0.72rem; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px;
+    }
+    input[type="number"] {
+      width: 100%; padding: 7px 9px; border: 1.5px solid var(--border); border-radius: 6px;
+      font-size: 0.88rem; font-family: inherit; color: var(--text);
+      transition: border-color 0.2s, box-shadow 0.2s; background: #fff;
+    }
+    input[type="number"]:focus {
+      outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,86,160,0.12);
+    }
+    input.qty-inp { width: 60px; text-align: center; }
+
+    .entry-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 10px; flex-wrap: wrap; gap: 8px;
+    }
+    .qty-row { display: flex; align-items: center; gap: 6px; }
+    .entry-vol-badge {
+      background: #eff6ff; color: var(--primary); font-size: 0.78rem; font-weight: 700;
+      padding: 4px 10px; border-radius: 5px; border: 1px solid #bfdbfe;
+    }
+
+    /* BUTTONS */
+    .btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 14px;
+      border: none; border-radius: 6px; cursor: pointer; font-size: 0.82rem;
+      font-weight: 600; font-family: inherit; transition: all 0.18s; }
+    .btn-add {
+      width: 100%; justify-content: center; margin-top: 4px;
+      background: #eff6ff; color: var(--primary);
+      border: 1.5px dashed #93c5fd; padding: 9px;
+    }
+    .btn-add:hover { background: #dbeafe; }
+    .btn-remove { background: #fee2e2; color: var(--danger); padding: 5px 9px; font-size: 0.78rem; }
+    .btn-remove:hover { background: var(--danger); color: #fff; }
+
+    /* STAIRCASE */
+    .stair-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px; }
+    @media (max-width: 480px) { .stair-cols { grid-template-columns: 1fr; } }
+    .stair-sub { background: #fff; border: 1.5px solid var(--border); border-radius: 7px; padding: 10px; }
+    .stair-sub h4 { font-size: 0.72rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .stair-sub > div + div { margin-top: 6px; }
+
+    /* SIDEBAR */
+    .sidebar { display: flex; flex-direction: column; gap: 16px; }
+    .sidebar .card { margin-bottom: 0; }
+
+    /* BREAKDOWN */
+    .breakdown-list { display: flex; flex-direction: column; gap: 10px; }
+    .bd-item-header { display: flex; justify-content: space-between; font-size: 0.78rem; font-weight: 600; margin-bottom: 3px; }
+    .bd-pct { color: var(--muted); font-weight: 400; }
+    .bar-track { height: 5px; background: #e5e7eb; border-radius: 3px; overflow: hidden; }
+    .bar-fill { height: 100%; background: var(--primary); border-radius: 3px; transition: width 0.4s ease; }
+
+    /* REPORT */
+    .report-box {
+      background: #f8fafc; border: 1px solid var(--border); border-radius: 6px;
+      padding: 12px; font-family: 'Courier New', monospace; font-size: 0.73rem;
+      white-space: pre-wrap; max-height: 400px; overflow-y: auto; color: var(--text); line-height: 1.55;
+    }
+    .report-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .btn-sm { padding: 6px 12px; font-size: 0.78rem; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-ghost { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: #e2e8f0; }
+
+    /* TOAST */
+    .toast {
+      position: fixed; bottom: 20px; right: 20px; background: #1e2b3a; color: #fff;
+      padding: 9px 16px; border-radius: 8px; font-size: 0.82rem; font-weight: 500;
+      opacity: 0; transform: translateY(8px); transition: all 0.28s; z-index: 9999; pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    /* Empty state */
+    .empty-msg { font-size: 0.8rem; color: var(--muted); text-align: center; padding: 8px 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Porti<span>CAD</span></div>
+  <div class="title-block">
+    <div class="tool-name">Cubicación Volumen Hormigón</div>
+    <div class="subtitle">Calculadora de volúmenes · dimensiones en metros</div>
+  </div>
+  <a href="/" class="back-link">← Volver</a>
+</header>
+
+<!-- Sticky grand total bar -->
+<div class="total-bar">
+  <div>
+    <div class="gt-label">VOLUMEN GENERAL TOTAL</div>
+    <div class="gt-value" id="grandTotal">0.00 m³</div>
+  </div>
+  <div class="bar-actions">
+    <button class="bar-btn" onclick="limpiarTodo()">🗑 Limpiar todo</button>
+    <button class="bar-btn" onclick="imprimirReporte()">🖨 Imprimir / PDF</button>
+    <button class="bar-btn" onclick="copiarReporte()">📋 Copiar reporte</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="main-grid">
+
+    <!-- LEFT: Secciones -->
+    <div>
+
+      <!-- LOSA -->
+      <div class="card" id="card-losa">
+        <div class="card-header" onclick="toggleCard('losa')">
+          <span class="ch-icon">🏗</span>
+          <span class="ch-title">Losa</span>
+          <span class="ch-badge" id="badge-losa">0.00 m³</span>
+          <span class="ch-toggle">▾</span>
+        </div>
+        <div class="card-body">
+          <div id="losaEntries"></div>
+          <button class="btn btn-add" onclick="addEntry('losa')">+ Añadir Losa</button>
+        </div>
+      </div>
+
+      <!-- VIGAS AMARRE -->
+      <div class="card" id="card-amarre">
+        <div class="card-header" onclick="toggleCard('amarre')">
+          <span class="ch-icon">📐</span>
+          <span class="ch-title">Vigas de Amarre (Cadenas)</span>
+          <span class="ch-badge" id="badge-amarre">0.00 m³</span>
+          <span class="ch-toggle">▾</span>
+        </div>
+        <div class="card-body">
+          <div id="amarreEntries"></div>
+          <button class="btn btn-add" onclick="addEntry('amarre')">+ Añadir Viga de Amarre</button>
+        </div>
+      </div>
+
+      <!-- VIGAS CARGA -->
+      <div class="card" id="card-carga">
+        <div class="card-header" onclick="toggleCard('carga')">
+          <span class="ch-icon">🏋</span>
+          <span class="ch-title">Vigas de Carga</span>
+          <span class="ch-badge" id="badge-carga">0.00 m³</span>
+          <span class="ch-toggle">▾</span>
+        </div>
+        <div class="card-body">
+          <div id="cargaEntries"></div>
+          <button class="btn btn-add" onclick="addEntry('carga')">+ Añadir Viga de Carga</button>
+        </div>
+      </div>
+
+      <!-- COLUMNAS AMARRE -->
+      <div class="card" id="card-columnaAmarre">
+        <div class="card-header" onclick="toggleCard('columnaAmarre')">
+          <span class="ch-icon">🔩</span>
+          <span class="ch-title">Columnas de Amarre</span>
+          <span class="ch-badge" id="badge-columnaAmarre">0.00 m³</span>
+          <span class="ch-toggle">▾</span>
+        </div>
+        <div class="card-body">
+          <div id="columnaAmarreEntries"></div>
+          <button class="btn btn-add" onclick="addEntry('columnaAmarre')">+ Añadir Columna de Amarre</button>
+        </div>
+      </div>
+
+      <!-- COLUMNAS CARGA -->
+      <div class="card" id="card-columnaCarga">
+        <div class="card-header" onclick="toggleCard('columnaCarga')">
+          <span class="ch-icon">🏛</span>
+          <span class="ch-title">Columnas de Carga</span>
+          <span class="ch-badge" id="badge-columnaCarga">0.00 m³</span>
+          <span class="ch-toggle">▾</span>
+        </div>
+        <div class="card-body">
+          <div id="columnaCargaEntries"></div>
+          <button class="btn btn-add" onclick="addEntry('columnaCarga')">+ Añadir Columna de Carga</button>
+        </div>
+      </div>
+
+      <!-- DINTELES -->
+      <div class="card" id="card-dintel">
+        <div class="card-header" onclick="toggleCard('dintel')">
+          <span class="ch-icon">🚪</span>
+          <span class="ch-title">Dinteles</span>
+          <span class="ch-badge" id="badge-dintel">0.00 m³</span>
+          <span class="ch-toggle">▾</span>
+        </div>
+        <div class="card-body">
+          <div id="dintelEntries"></div>
+          <button class="btn btn-add" onclick="addEntry('dintel')">+ Añadir Dintel</button>
+        </div>
+      </div>
+
+      <!-- ESCALERA -->
+      <div class="card" id="card-escalera">
+        <div class="card-header" onclick="toggleCard('escalera')">
+          <span class="ch-icon">🪜</span>
+          <span class="ch-title">Escalera</span>
+          <span class="ch-badge" id="badge-escalera">0.00 m³</span>
+          <span class="ch-toggle">▾</span>
+        </div>
+        <div class="card-body">
+          <div id="escaleraEntries"></div>
+          <button class="btn btn-add" onclick="addEntry('escalera')">+ Añadir Escalera</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: Sidebar -->
+    <div class="sidebar">
+
+      <!-- Desglose -->
+      <div class="card">
+        <div class="card-header" style="cursor:default;">
+          <span class="ch-icon">📊</span>
+          <span class="ch-title">Desglose por elemento</span>
+        </div>
+        <div class="card-body">
+          <div class="breakdown-list" id="breakdownList">
+            <p class="empty-msg">Ingresa dimensiones para ver el desglose.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reporte -->
+      <div class="card">
+        <div class="card-header" style="cursor:default;">
+          <span class="ch-icon">📄</span>
+          <span class="ch-title">Reporte detallado</span>
+        </div>
+        <div class="card-body">
+          <div class="report-box" id="reporteDetallado"></div>
+          <div class="report-actions">
+            <button class="btn btn-primary btn-sm" onclick="imprimirReporte()">🖨 PDF</button>
+            <button class="btn btn-ghost btn-sm" onclick="copiarReporte()">📋 Copiar</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SECTIONS = ['losa','amarre','carga','columnaAmarre','columnaCarga','dintel','escalera'];
+const NAMES = {
+  losa:'Losa', amarre:'Vigas de Amarre', carga:'Vigas de Carga',
+  columnaAmarre:'Columnas de Amarre', columnaCarga:'Columnas de Carga',
+  dintel:'Dinteles', escalera:'Escaleras'
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  SECTIONS.forEach(t => addEntry(t));
+  recalcAll();
+});
+
+function toggleCard(type) {
+  document.getElementById(`card-${type}`).classList.toggle('collapsed');
+}
+
+function createFieldsHtml(type) {
+  if (type === 'losa') return `
+    <div class="fields-row">
+      <div><label class="field-label">Largo (m)</label><input type="number" class="dim-input" data-dim="largo" placeholder="0.00" min="0" step="0.01"></div>
+      <div><label class="field-label">Ancho (m)</label><input type="number" class="dim-input" data-dim="ancho" placeholder="0.00" min="0" step="0.01"></div>
+      <div><label class="field-label">Espesor (m)</label><input type="number" class="dim-input" data-dim="espesor" placeholder="0.00" min="0" step="0.01"></div>
+    </div>`;
+  if (type === 'escalera') return `
+    <div class="stair-cols">
+      <div class="stair-sub">
+        <h4>Rampa</h4>
+        <div><label class="field-label">Ancho (m)</label><input type="number" class="dim-input" data-dim="rampaAncho" placeholder="0.00" min="0" step="0.01"></div>
+        <div><label class="field-label">Espesor (m)</label><input type="number" class="dim-input" data-dim="rampaEspesor" placeholder="0.00" min="0" step="0.01"></div>
+        <div><label class="field-label">Longitud (m)</label><input type="number" class="dim-input" data-dim="rampaLongitud" placeholder="0.00" min="0" step="0.01"></div>
+      </div>
+      <div class="stair-sub">
+        <h4>Escalones</h4>
+        <div><label class="field-label">Ancho (m)</label><input type="number" class="dim-input" data-dim="escalonAncho" placeholder="0.00" min="0" step="0.01"></div>
+        <div><label class="field-label">Altura contrahuella (m)</label><input type="number" class="dim-input" data-dim="escalonAltura" placeholder="0.00" min="0" step="0.01"></div>
+        <div><label class="field-label">Prof. huella (m)</label><input type="number" class="dim-input" data-dim="escalonProfundidad" placeholder="0.30" min="0" step="0.01" value="0.30"></div>
+        <div><label class="field-label">Cantidad escalones</label><input type="number" class="dim-input" data-dim="escalonCantidad" placeholder="0" min="0" step="1"></div>
+      </div>
+    </div>`;
+  return `
+    <div class="fields-row">
+      <div><label class="field-label">Longitud (m)</label><input type="number" class="dim-input" data-dim="longitud" placeholder="0.00" min="0" step="0.01"></div>
+      <div><label class="field-label">Base (m)</label><input type="number" class="dim-input" data-dim="base" placeholder="0.00" min="0" step="0.01"></div>
+      <div><label class="field-label">Altura (m)</label><input type="number" class="dim-input" data-dim="altura" placeholder="0.00" min="0" step="0.01"></div>
+    </div>`;
+}
+
+function addEntry(type) {
+  const container = document.getElementById(`${type}Entries`);
+  const idx = container.querySelectorAll('.entry-row').length + 1;
+  const div = document.createElement('div');
+  div.className = 'entry-row';
+  div.dataset.type = type;
+  div.innerHTML = `
+    <input type="text" class="entry-name-input" placeholder="${NAMES[type]} ${idx} — nombre/descripción opcional">
+    ${createFieldsHtml(type)}
+    <div class="entry-footer">
+      <div class="qty-row">
+        <label class="field-label" style="margin:0">Cantidad</label>
+        <input type="number" class="qty-inp" value="1" min="1" step="1">
+      </div>
+      <span class="entry-vol-badge">0.000 m³</span>
+      <button class="btn btn-remove" onclick="removeEntry(this,'${type}')">✕ Eliminar</button>
+    </div>`;
+  container.appendChild(div);
+
+  const numInputs = Array.from(div.querySelectorAll('input[type="number"]'));
+  numInputs.forEach((inp, i) => {
+    inp.addEventListener('input', recalcAll);
+    if (inp.classList.contains('qty-inp')) inp.addEventListener('focus', function(){ this.select(); });
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const next = numInputs[i + 1];
+        if (next) next.focus();
+        else div.closest('.card-body').querySelector('.btn-add')?.focus();
+      }
+    });
+  });
+  div.querySelector('.entry-name-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); numInputs[0]?.focus(); }
+  });
+
+  recalcAll();
+}
+
+function removeEntry(btn, type) {
+  btn.closest('.entry-row').remove();
+  recalcAll();
+}
+
+function calcEntry(entry, type) {
+  const d = name => parseFloat(entry.querySelector(`[data-dim="${name}"]`)?.value) || 0;
+  const qty = parseInt(entry.querySelector('.qty-inp')?.value) || 1;
+  let vol = 0;
+  if (type === 'losa') {
+    vol = d('largo') * d('ancho') * d('espesor');
+  } else if (type === 'escalera') {
+    const nEsc = parseInt(entry.querySelector('[data-dim="escalonCantidad"]')?.value) || 0;
+    vol = (d('rampaAncho') * d('rampaEspesor') * d('rampaLongitud'))
+        + (d('escalonAncho') * d('escalonAltura') * d('escalonProfundidad') / 2) * nEsc;
+  } else {
+    vol = d('longitud') * d('base') * d('altura');
+  }
+  return { unit: vol, total: vol * qty, qty };
+}
+
+function recalcAll() {
+  let grand = 0;
+  const totals = {};
+  SECTIONS.forEach(type => {
+    let sec = 0;
+    document.querySelectorAll(`#${type}Entries .entry-row`).forEach(entry => {
+      const { total } = calcEntry(entry, type);
+      sec += total;
+      entry.querySelector('.entry-vol-badge').textContent = `${total.toFixed(3)} m³`;
+    });
+    totals[type] = sec;
+    grand += sec;
+    document.getElementById(`badge-${type}`).textContent = `${sec.toFixed(2)} m³`;
+  });
+  document.getElementById('grandTotal').textContent = `${grand.toFixed(2)} m³`;
+  updateBreakdown(totals, grand);
+  updateReport(totals, grand);
+}
+
+function updateBreakdown(totals, grand) {
+  const list = document.getElementById('breakdownList');
+  const active = SECTIONS.filter(t => totals[t] > 0);
+  if (!active.length) { list.innerHTML = '<p class="empty-msg">Ingresa dimensiones para ver el desglose.</p>'; return; }
+  list.innerHTML = active.map(type => {
+    const pct = grand > 0 ? (totals[type] / grand * 100).toFixed(1) : 0;
+    return `<div>
+      <div class="bd-item-header"><span>${NAMES[type]}</span><span>${totals[type].toFixed(2)} m³ <span class="bd-pct">${pct}%</span></span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function updateReport(totals, grand) {
+  let txt = 'CUBICACIÓN VOLUMEN DE HORMIGÓN\n';
+  txt += '='.repeat(46) + '\n\n';
+  SECTIONS.forEach(type => {
+    const entries = document.querySelectorAll(`#${type}Entries .entry-row`);
+    if (!entries.length) return;
+    txt += `[ ${NAMES[type].toUpperCase()} ]\n`;
+    let i = 1;
+    entries.forEach(entry => {
+      const label = entry.querySelector('.entry-name-input')?.value.trim() || `${NAMES[type]} ${i}`;
+      const { total, qty } = calcEntry(entry, type);
+      const d = name => parseFloat(entry.querySelector(`[data-dim="${name}"]`)?.value) || 0;
+      let dims = '';
+      if (type === 'losa') dims = `L${d('largo').toFixed(2)}×A${d('ancho').toFixed(2)}×E${d('espesor').toFixed(2)}`;
+      else if (type === 'escalera') {
+        const n = entry.querySelector('[data-dim="escalonCantidad"]')?.value || 0;
+        dims = `Rampa(A${d('rampaAncho').toFixed(2)} E${d('rampaEspesor').toFixed(2)} L${d('rampaLongitud').toFixed(2)}) +Esc×${n}`;
+      } else dims = `L${d('longitud').toFixed(2)}×B${d('base').toFixed(2)}×H${d('altura').toFixed(2)}`;
+      txt += `  ${i}. ${label}\n     ${dims}  ×${qty}  →  ${total.toFixed(3)} m³\n`;
+      i++;
+    });
+    txt += `     ${'─'.repeat(28)}\n     Subtotal: ${totals[type].toFixed(3)} m³\n\n`;
+  });
+  txt += '='.repeat(46) + '\n';
+  txt += `VOLUMEN TOTAL: ${grand.toFixed(2)} m³\n`;
+  txt += '='.repeat(46);
+  document.getElementById('reporteDetallado').textContent = txt;
+}
+
+function imprimirReporte() {
+  const txt = document.getElementById('reporteDetallado').textContent;
+  const win = window.open('', '', 'width=820,height=700');
+  win.document.write(`<html><head><title>Cubicación Hormigón — PortiCAD</title>
+  <style>
+    body { font-family:'Courier New',monospace; white-space:pre; margin:32px; font-size:13px; line-height:1.6; color:#111; }
+    h2 { font-family:Arial,sans-serif; text-align:center; color:#1a56a0; margin-bottom:4px; }
+    p  { font-family:Arial,sans-serif; text-align:center; font-size:12px; color:#666; margin-bottom:24px; }
+  </style></head><body>`);
+  win.document.write('<h2>PortiCAD — Cubicación Volumen Hormigón</h2>');
+  win.document.write(`<p>porticad.app</p>`);
+  win.document.write(txt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'));
+  win.document.write('</body></html>');
+  win.document.close();
+  win.print();
+}
+
+function copiarReporte() {
+  const txt = document.getElementById('reporteDetallado').textContent;
+  navigator.clipboard.writeText(txt).then(() => toast('¡Reporte copiado al portapapeles!'));
+}
+
+function limpiarTodo() {
+  if (!confirm('¿Borrar todos los datos ingresados?')) return;
+  SECTIONS.forEach(type => { document.getElementById(`${type}Entries`).innerHTML = ''; addEntry(type); });
+  toast('Datos limpiados.');
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2600);
+}
+</script>
+</body>
+</html>

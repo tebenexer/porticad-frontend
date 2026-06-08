@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Metrado Mezclas & Morteros — PortiCAD Multi-Tools</title>
+  <style>
+    :root {
+      --primary: #1a56a0;
+      --primary-dark: #0f3d7a;
+      --accent: #10b981;
+      --accent-dark: #059669;
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --border: #d1d8e0;
+      --text: #1e2b3a;
+      --muted: #6b7a8d;
+      --danger: #c0392b;
+      --danger-light: #fee2e2;
+      --warning: #d97706;
+      --shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* HEADER */
+    header {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+      color: #fff; padding: 18px 24px; display: flex; align-items: center; gap: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .logo { font-size: 1.7rem; font-weight: 700; letter-spacing: 1px; }
+    .logo span { color: var(--accent); }
+    .title-block { flex: 1; }
+    .tool-name { font-size: 1rem; font-weight: 700; }
+    .subtitle { font-size: 0.82rem; opacity: 0.75; margin-top: 2px; }
+    .back-link {
+      font-size: 0.78rem; color: rgba(255,255,255,0.7); text-decoration: none;
+      display: flex; align-items: center; gap: 4px;
+      padding: 5px 10px; border: 1px solid rgba(255,255,255,0.25); border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .back-link:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+    /* TABS */
+    .tabs-nav {
+      background: #fff; border-bottom: 2px solid var(--border);
+      display: flex; overflow-x: auto; padding: 0 24px; gap: 0;
+      position: sticky; top: 0; z-index: 90;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+    .tab-btn {
+      padding: 14px 20px; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+      border: none; background: none; color: var(--muted);
+      border-bottom: 3px solid transparent; margin-bottom: -2px;
+      transition: all 0.2s; white-space: nowrap; font-family: inherit;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .tab-btn:hover:not(.active) { color: var(--text); background: var(--bg); }
+    .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* LAYOUT */
+    .container { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
+
+    /* CARD */
+    .card {
+      background: var(--card); border-radius: 10px; box-shadow: var(--shadow);
+      border: 1px solid var(--border); overflow: hidden; margin-bottom: 20px;
+    }
+    .card-header {
+      background: var(--primary); color: #fff; padding: 13px 18px;
+      font-weight: 700; font-size: 0.9rem;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .card-body { padding: 20px; }
+
+    /* SECTION TITLE inside card-body */
+    .section-title {
+      font-size: 0.78rem; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .section-title::after { content:''; flex:1; height:1px; background:var(--border); }
+
+    /* INSUMO ITEM */
+    .insumo-item {
+      background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px;
+      padding: 14px 16px; margin-bottom: 12px; transition: border-color 0.2s;
+    }
+    .insumo-item:hover { border-color: var(--primary); }
+    .insumo-item-header {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;
+    }
+    .insumo-item-header .item-label { font-size: 0.82rem; font-weight: 700; color: var(--primary); flex: 1; }
+    .insumo-item-body { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .insumo-item-body .inp-wrap { flex: 1; min-width: 120px; }
+
+    /* FIELD LABEL */
+    .field-label {
+      display: block; font-size: 0.72rem; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px;
+    }
+
+    /* INPUTS */
+    input[type="number"] {
+      width: 100%; padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 6px;
+      font-size: 0.88rem; font-family: inherit; color: var(--text);
+      transition: border-color 0.2s, box-shadow 0.2s; background: #fff;
+    }
+    input[type="number"]:focus {
+      outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,86,160,0.12);
+    }
+
+    /* BUTTONS */
+    .btn {
+      display: inline-flex; align-items: center; gap: 5px; padding: 8px 14px;
+      border: none; border-radius: 6px; cursor: pointer; font-size: 0.82rem;
+      font-weight: 600; font-family: inherit; transition: all 0.18s; white-space: nowrap;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-success { background: var(--accent); color: #fff; }
+    .btn-success:hover { background: var(--accent-dark); }
+    .btn-danger { background: var(--danger-light); color: var(--danger); }
+    .btn-danger:hover { background: var(--danger); color: #fff; }
+    .btn-ghost { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: #e2e8f0; }
+    .btn-sm { padding: 5px 10px; font-size: 0.76rem; }
+    .btn-clear-all {
+      background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3);
+      color: #fff; padding: 6px 13px; border-radius: 6px; cursor: pointer;
+      font-size: 0.78rem; font-weight: 600; font-family: inherit; transition: background 0.2s;
+    }
+    .btn-clear-all:hover { background: rgba(255,255,255,0.22); }
+
+    /* RESULT TABLE */
+    .result-wrap { margin-top: 12px; }
+    .result-table {
+      width: 100%; border-collapse: collapse; font-size: 0.83rem; border-radius: 6px; overflow: hidden;
+    }
+    .result-table th {
+      background: var(--primary); color: #fff; padding: 9px 12px;
+      font-weight: 600; font-size: 0.78rem; text-align: left;
+    }
+    .result-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    .result-table tbody tr:hover { background: #f0f7ff; }
+    .result-table tbody tr:last-child td { border-bottom: none; }
+    .total-row td { background: #eff6ff; font-weight: 700; color: var(--primary); border-top: 2px solid var(--primary); }
+    .cost-highlight { color: #c0392b; font-weight: 700; font-size: 0.95rem; }
+
+    /* COSTOS TAB: m3 selector bar */
+    .calc-bar {
+      background: #fff; border: 1.5px solid var(--border); border-radius: 8px;
+      padding: 14px 18px; margin-bottom: 20px;
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    }
+    .calc-bar label { font-size: 0.82rem; font-weight: 700; color: var(--primary); white-space: nowrap; }
+    .calc-bar input { width: 130px; }
+
+    /* PRICES TAB: grid layout */
+    .prices-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+    .price-item {
+      background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 12px 14px;
+      display: flex; flex-direction: column; gap: 5px; transition: border-color 0.2s;
+    }
+    .price-item:hover { border-color: var(--primary); }
+    .price-item .price-label { font-size: 0.78rem; font-weight: 600; color: var(--text); }
+    .price-item .price-unit { font-size: 0.7rem; color: var(--muted); }
+    .price-changed { border-color: var(--accent) !important; }
+    .reset-all-btn { margin-top: 10px; }
+
+    /* BLOQUES TAB */
+    .bloques-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 600px) { .bloques-grid { grid-template-columns: 1fr; } }
+    .bloque-converter {
+      background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px;
+      padding: 18px; text-align: center;
+    }
+    .bloque-converter h4 { font-size: 0.85rem; color: var(--primary); font-weight: 700; margin-bottom: 12px; }
+    .bloque-result {
+      margin-top: 12px; padding: 14px; background: #eff6ff;
+      border-radius: 6px; font-size: 1rem; font-weight: 700; color: var(--primary);
+      min-height: 48px; display: flex; align-items: center; justify-content: center;
+    }
+
+    /* SUMMARY BADGE in tab */
+    .result-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: #eff6ff; color: var(--primary); font-size: 0.78rem; font-weight: 700;
+      padding: 4px 10px; border-radius: 5px; border: 1px solid #bfdbfe;
+    }
+    .result-badge.green { background: #d1fae5; color: var(--accent-dark); border-color: #6ee7b7; }
+
+    /* TOAST */
+    .toast {
+      position: fixed; bottom: 20px; right: 20px; background: #1e2b3a; color: #fff;
+      padding: 9px 16px; border-radius: 8px; font-size: 0.82rem; font-weight: 500;
+      opacity: 0; transform: translateY(8px); transition: all 0.28s; z-index: 9999; pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    .empty-state { font-size: 0.82rem; color: var(--muted); text-align: center; padding: 16px; }
+    hr.divider { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Porti<span>CAD</span></div>
+  <div class="title-block">
+    <div class="tool-name">Metrado Mezclas, Morteros y Hormigón</div>
+    <div class="subtitle">Insumos, costos y bloques por partida</div>
+  </div>
+  <a href="/" class="back-link">← Volver</a>
+</header>
+
+<!-- TAB NAV -->
+<div class="tabs-nav">
+  <button class="tab-btn active" onclick="openTab(event,'tab-insumos')">🧱 Insumos por m³/m²</button>
+  <button class="tab-btn" onclick="openTab(event,'tab-costos')">💰 Costos por Partida</button>
+  <button class="tab-btn" onclick="openTab(event,'tab-bloques')">🔲 Calculadora de Bloques</button>
+  <button class="tab-btn" onclick="openTab(event,'tab-precios')">⚙ Precios de Insumos</button>
+</div>
+
+<div class="container">
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- TAB 1: INSUMOS POR m³                       -->
+  <!-- ════════════════════════════════════════════ -->
+  <div id="tab-insumos" class="tab-content active">
+
+    <div class="card">
+      <div class="card-header">🧱 Cálculo de Insumos por Cantidad</div>
+      <div class="card-body">
+        <p style="font-size:0.83rem;color:var(--muted);margin-bottom:20px;">
+          Ingresa la cantidad de m³ (o m²) de cada partida para obtener los insumos necesarios en total.
+        </p>
+
+        <!-- Mortero 1:4 -->
+        <div class="insumo-item">
+          <div class="insumo-item-header">
+            <span class="item-label">MOR 60030007 — Mortero 1:4 para empañete</span>
+          </div>
+          <div class="insumo-item-body">
+            <div class="inp-wrap">
+              <label class="field-label">Cantidad (m³)</label>
+              <input type="number" id="inp-mortero1-4" value="" placeholder="0.00" min="0" step="0.01" oninput="calcInsumos('mortero1-4'); syncMezcla();">
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="clearInsumo('mortero1-4')">✕ Limpiar</button>
+          </div>
+          <div class="result-wrap" id="res-mortero1-4"></div>
+        </div>
+
+        <!-- Mezcla empañete -->
+        <div class="insumo-item">
+          <div class="insumo-item-header">
+            <span class="item-label">MOR 60030002 — Mezcla de empañete</span>
+            <span style="font-size:0.72rem;color:var(--muted);">⟳ Se sincroniza con Mortero 1:4</span>
+          </div>
+          <div class="insumo-item-body">
+            <div class="inp-wrap">
+              <label class="field-label">Cantidad (m³)</label>
+              <input type="number" id="inp-mezclaEmpanete" value="" placeholder="0.00" min="0" step="0.01" oninput="calcInsumos('mezclaEmpanete')">
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="clearInsumo('mezclaEmpanete')">✕ Limpiar</button>
+          </div>
+          <div class="result-wrap" id="res-mezclaEmpanete"></div>
+        </div>
+
+        <!-- Mortero 1:3 -->
+        <div class="insumo-item">
+          <div class="insumo-item-header">
+            <span class="item-label">MOR 60030006 — Mortero 1:3, P/Colocar Bloques</span>
+          </div>
+          <div class="insumo-item-body">
+            <div class="inp-wrap">
+              <label class="field-label">Cantidad (m³)</label>
+              <input type="number" id="inp-mortero1-3" value="" placeholder="0.00" min="0" step="0.01" oninput="calcInsumos('mortero1-3')">
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="clearInsumo('mortero1-3')">✕ Limpiar</button>
+          </div>
+          <div class="result-wrap" id="res-mortero1-3"></div>
+        </div>
+
+        <!-- Hormigón a mano -->
+        <div class="insumo-item">
+          <div class="insumo-item-header">
+            <span class="item-label">HORS 60020008 — Hormigón (1:3:5) a mano</span>
+          </div>
+          <div class="insumo-item-body">
+            <div class="inp-wrap">
+              <label class="field-label">Cantidad (m³)</label>
+              <input type="number" id="inp-hormigonMano" value="" placeholder="0.00" min="0" step="0.01" oninput="calcInsumos('hormigonMano')">
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="clearInsumo('hormigonMano')">✕ Limpiar</button>
+          </div>
+          <div class="result-wrap" id="res-hormigonMano"></div>
+        </div>
+
+        <!-- Hormigón ligadora -->
+        <div class="insumo-item">
+          <div class="insumo-item-header">
+            <span class="item-label">HORS 60020009 — Hormigón (1:3:5) ligadora</span>
+          </div>
+          <div class="insumo-item-body">
+            <div class="inp-wrap">
+              <label class="field-label">Cantidad (m³)</label>
+              <input type="number" id="inp-hormigonLigadora" value="" placeholder="0.00" min="0" step="0.01" oninput="calcInsumos('hormigonLigadora')">
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="clearInsumo('hormigonLigadora')">✕ Limpiar</button>
+          </div>
+          <div class="result-wrap" id="res-hormigonLigadora"></div>
+        </div>
+
+        <!-- Bloques por m² -->
+        <div class="insumo-item">
+          <div class="insumo-item-header">
+            <span class="item-label">BLO 90000006 — Bloques hormigón 6", 3/8" a 0.80 m</span>
+          </div>
+          <div class="insumo-item-body">
+            <div class="inp-wrap">
+              <label class="field-label">Área (m²)</label>
+              <input type="number" id="inp-bloques" value="" placeholder="0.00" min="0" step="0.01" oninput="calcInsumosBloques()">
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="clearInsumo('bloques')">✕ Limpiar</button>
+          </div>
+          <div class="result-wrap" id="res-bloques"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- TAB 2: COSTOS POR PARTIDA                   -->
+  <!-- ════════════════════════════════════════════ -->
+  <div id="tab-costos" class="tab-content">
+
+    <div class="calc-bar">
+      <label>Cantidad a calcular (m³):</label>
+      <input type="number" id="m3Input" value="1" min="0.01" step="0.01">
+      <button class="btn btn-primary" onclick="calcularTodos()">▶ Calcular todos</button>
+      <button class="btn btn-ghost" onclick="limpiarCostos()">✕ Limpiar</button>
+    </div>
+
+    <!-- Mortero 1:4 -->
+    <div class="card">
+      <div class="card-header">MOR 60030007 — Mortero 1:4 para empañete</div>
+      <div class="card-body"><div id="cost-mortero1-4"><p class="empty-state">Ingresa m³ y presiona Calcular.</p></div></div>
+    </div>
+
+    <!-- Mezcla empañete -->
+    <div class="card">
+      <div class="card-header">MOR 60030002 — Mezcla de empañete</div>
+      <div class="card-body"><div id="cost-mezclaEmpanete"><p class="empty-state">Ingresa m³ y presiona Calcular.</p></div></div>
+    </div>
+
+    <!-- Mortero 1:3 -->
+    <div class="card">
+      <div class="card-header">MOR 60030006 — Mortero 1:3, P/Colocar Bloques</div>
+      <div class="card-body"><div id="cost-mortero1-3"><p class="empty-state">Ingresa m³ y presiona Calcular.</p></div></div>
+    </div>
+
+    <!-- Hormigón a mano -->
+    <div class="card">
+      <div class="card-header">HORS 60020008 — Hormigón (1:3:5) a mano</div>
+      <div class="card-body"><div id="cost-hormigonMano"><p class="empty-state">Ingresa m³ y presiona Calcular.</p></div></div>
+    </div>
+
+    <!-- Hormigón ligadora -->
+    <div class="card">
+      <div class="card-header">HORS 60020009 — Hormigón (1:3:5) ligadora</div>
+      <div class="card-body"><div id="cost-hormigonLigadora"><p class="empty-state">Ingresa m³ y presiona Calcular.</p></div></div>
+    </div>
+
+  </div>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- TAB 3: BLOQUES                              -->
+  <!-- ════════════════════════════════════════════ -->
+  <div id="tab-bloques" class="tab-content">
+    <div class="card">
+      <div class="card-header">🔲 Calculadora de Bloques — Bloque 6"×8"×16"</div>
+      <div class="card-body">
+        <p style="font-size:0.83rem;color:var(--muted);margin-bottom:20px;">
+          Conversión entre área (m²) y cantidad de bloques. Factor: <strong>13 bloques / m²</strong>.
+        </p>
+        <div class="bloques-grid">
+          <!-- m² → bloques -->
+          <div class="bloque-converter">
+            <h4>📐 Área → Bloques</h4>
+            <label class="field-label">Área (m²)</label>
+            <input type="number" id="areaInput" value="" placeholder="0.00" min="0" step="0.01" oninput="calcBloquesDesdeArea()">
+            <div class="bloque-result" id="res-area-bloques">—</div>
+            <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="document.getElementById('areaInput').value='';document.getElementById('res-area-bloques').textContent='—'">Limpiar</button>
+          </div>
+          <!-- Bloques → m² -->
+          <div class="bloque-converter">
+            <h4>🧱 Bloques → Área</h4>
+            <label class="field-label">Cantidad de bloques</label>
+            <input type="number" id="bloquesInput" value="" placeholder="0" min="0" step="1" oninput="calcAreaDesdeBloques()">
+            <div class="bloque-result" id="res-bloques-area">—</div>
+            <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="document.getElementById('bloquesInput').value='';document.getElementById('res-bloques-area').textContent='—'">Limpiar</button>
+          </div>
+        </div>
+
+        <hr class="divider">
+        <div class="section-title">Desglose completo de insumos por m²</div>
+        <div class="insumo-item">
+          <div class="insumo-item-body">
+            <div class="inp-wrap">
+              <label class="field-label">Área (m²)</label>
+              <input type="number" id="inp-bloques-detalle" value="" placeholder="0.00" min="0" step="0.01" oninput="calcInsumosBloqueDetalle()">
+            </div>
+          </div>
+          <div class="result-wrap" id="res-bloques-detalle"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- TAB 4: PRECIOS                              -->
+  <!-- ════════════════════════════════════════════ -->
+  <div id="tab-precios" class="tab-content">
+    <div class="card">
+      <div class="card-header">⚙ Precios de Insumos — se guardan automáticamente</div>
+      <div class="card-body">
+        <p style="font-size:0.83rem;color:var(--muted);margin-bottom:16px;">
+          Los precios se guardan en tu navegador (localStorage). Al modificar un precio se recalculan los costos.
+        </p>
+        <div class="prices-grid" id="pricesGrid"></div>
+        <button class="btn btn-ghost reset-all-btn" onclick="resetPrecios()">↺ Restablecer precios por defecto</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────────────────
+
+const PARTIDAS = {
+  'mortero1-4': {
+    label: 'Mortero 1:4 para empañete',
+    unit: 'm³',
+    insumos: {
+      'Agua':               { qty: 0.61,  unit: 'camión' },
+      'Cemento':            { qty: 9.46,  unit: 'fundas' },
+      'Jornal':             { qty: 0.5,   unit: 'día'    },
+      'Mezcla de empañete': { qty: 1.102, unit: 'm³'     }
+    }
+  },
+  'mezclaEmpanete': {
+    label: 'Mezcla de empañete',
+    unit: 'm³',
+    insumos: {
+      'Arena fina': { qty: 1.02, unit: 'm³'    },
+      'Cal':        { qty: 3.06, unit: 'fundas' },
+      'Jornal':     { qty: 0.5,  unit: 'día'    }
+    }
+  },
+  'mortero1-3': {
+    label: 'Mortero 1:3, P/Colocar Bloques',
+    unit: 'm³',
+    insumos: {
+      'Agua':         { qty: 0.61,  unit: 'camión' },
+      'Arena gruesa': { qty: 0.98,  unit: 'm³'     },
+      'Cemento':      { qty: 11.51, unit: 'fundas'  },
+      'Jornal':       { qty: 0.5,   unit: 'día'     }
+    }
+  },
+  'hormigonMano': {
+    label: 'Hormigón (1:3:5) a mano',
+    unit: 'm³',
+    insumos: {
+      'Arena triturada':       { qty: 0.5229, unit: 'm³'     },
+      'Grava triturada':       { qty: 0.8544, unit: 'm³'     },
+      'Agua':                  { qty: 0.06,   unit: 'camión' },
+      'Cemento':               { qty: 6.4,    unit: 'fundas'  },
+      'Ligado y vaciado mano': { qty: 1.38,   unit: 'm³'     }
+    }
+  },
+  'hormigonLigadora': {
+    label: 'Hormigón (1:3:5) ligadora',
+    unit: 'm³',
+    insumos: {
+      'Ligado y vaciado, ligadora': { qty: 1.38, unit: 'm³' }
+    }
+  },
+  'bloques': {
+    label: 'Bloques 6"×8"×16"',
+    unit: 'm²',
+    insumos: {
+      'Bloque 6"×8"×16" liso':         { qty: 11.7925, unit: 'u'   },
+      'Transp. Bloque 6"×8"×16"':       { qty: 11.7925, unit: 'u'   },
+      'Mortero 1:3 colocar bloques':    { qty: 0.0352,  unit: 'm³'  },
+      'Hormigón (1:3:5) a mano':        { qty: 0.03,    unit: 'm³'  },
+      'Acero grado 60, 3/8"':           { qty: 0.0247,  unit: 'qq'  },
+      'Pino amer. 2"×10"×12" bruto':    { qty: 3.3333,  unit: 'pt'  },
+      'Oper. 1ra., ALBAÑIL':            { qty: 0.023,   unit: 'día' },
+      'M.O. Corte y amarre varilla':    { qty: 0.97,    unit: ''    },
+      'M.O. Llenar hueco bloque':       { qty: 1.93,    unit: ''    },
+      'M.O. Coloc. bloque 6×8×16':      { qty: 21.65,   unit: ''    }
+    }
+  }
+};
+
+const DEFAULT_PRICES = {
+  'Agua':                          { label: 'Agua (camión 2,500 gls)',                  value: 45.24,   unit: 'camión' },
+  'Cemento':                       { label: 'Cemento Gris 94 lb',                       value: 525.00,  unit: 'funda'  },
+  'Arena fina':                    { label: 'Arena Fina',                               value: 1600.00, unit: 'm³'     },
+  'Cal':                           { label: 'Cal Hidratada (20 Kg)',                    value: 271.02,  unit: 'funda'  },
+  'Jornal':                        { label: 'Jornal (0.5 día)',                          value: 828.89,  unit: 'día'    },
+  'Arena gruesa':                  { label: 'Arena Gruesa Lavada',                      value: 1800.00, unit: 'm³'     },
+  'Arena triturada':               { label: 'Arena Triturada',                          value: 1600.00, unit: 'm³'     },
+  'Grava triturada':               { label: 'Grava Triturada',                          value: 1800.00, unit: 'm³'     },
+  'Ligado y vaciado mano':         { label: 'Ligado y vaciado a mano',                  value: 1439.04, unit: 'm³'     },
+  'Ligado y vaciado, ligadora':    { label: 'Ligado y vaciado, ligadora',               value: 463.44,  unit: 'm³'     },
+  'Mezcla de empañete':            { label: 'Mezcla de empañete (+3% desp.)',            value: 2875.77, unit: 'm³'     },
+  'Bloque 6"×8"×16" liso':         { label: 'Bloque 6"×8"×16" liso (Bisono)',           value: 42.00,   unit: 'u'      },
+  'Transp. Bloque 6"×8"×16"':      { label: 'Transp. Bloque 6"×8"×16" (Zona metro)',   value: 5.84,    unit: 'u'      },
+  'Acero grado 60, 3/8"':          { label: 'Acero grado 60, 3/8"',                    value: 3467.93, unit: 'qq'     },
+  'Pino amer. 2"×10"×12" bruto':   { label: 'Pino amer. 2"×10"×12" bruto (20 pt)',     value: 48.50,   unit: 'pt'     },
+  'Oper. 1ra., ALBAÑIL':           { label: 'Operario 1ra., ALBAÑIL (OP1AL)',           value: 1803.88, unit: 'día'    },
+  'M.O. Corte y amarre varilla':   { label: 'M.O. Corte y amarre varilla vertical',    value: 11.80,   unit: ''       },
+  'M.O. Llenar hueco bloque':      { label: 'M.O. Llenar hueco bloque',                value: 23.60,   unit: ''       },
+  'M.O. Coloc. bloque 6×8×16':     { label: 'M.O. Coloc. bloque 6×8×16"',             value: 21.65,   unit: ''       },
+  'Mortero 1:3 colocar bloques':   { label: 'Mortero 1:3 P/colocar bloques',           value: 0,       unit: 'm³'     },
+  'Hormigón (1:3:5) a mano':       { label: 'Hormigón (1:3:5) a mano',                value: 0,       unit: 'm³'     },
+};
+
+const BLOQUES_POR_M2 = 13;
+const LS_KEY = 'porticad_mezclas_prices';
+
+// ── Price storage ─────────────────────────────────────────────────────────────
+
+function getPrices() {
+  const saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+  const prices = {};
+  for (const key in DEFAULT_PRICES) {
+    prices[key] = saved[key] !== undefined ? saved[key] : DEFAULT_PRICES[key].value;
+  }
+  return prices;
+}
+
+function savePrices(prices) {
+  localStorage.setItem(LS_KEY, JSON.stringify(prices));
+}
+
+// ── Build prices tab ──────────────────────────────────────────────────────────
+
+function buildPricesGrid() {
+  const prices = getPrices();
+  const grid = document.getElementById('pricesGrid');
+  grid.innerHTML = '';
+  for (const key in DEFAULT_PRICES) {
+    const def = DEFAULT_PRICES[key];
+    const val = prices[key];
+    const changed = val !== def.value;
+    const div = document.createElement('div');
+    div.className = 'price-item' + (changed ? ' price-changed' : '');
+    div.id = `price-item-${key.replace(/[^a-zA-Z0-9]/g,'_')}`;
+    div.innerHTML = `
+      <span class="price-label">${def.label}</span>
+      ${def.unit ? `<span class="price-unit">por ${def.unit}</span>` : ''}
+      <input type="number" id="price-${key.replace(/[^a-zA-Z0-9]/g,'_')}"
+        value="${val}" min="0" step="0.01"
+        data-key="${key}"
+        oninput="onPriceChange(this)">`;
+    grid.appendChild(div);
+  }
+}
+
+function onPriceChange(inp) {
+  const key = inp.dataset.key;
+  const prices = getPrices();
+  prices[key] = parseFloat(inp.value) || 0;
+  savePrices(prices);
+  const itemId = `price-item-${key.replace(/[^a-zA-Z0-9]/g,'_')}`;
+  const item = document.getElementById(itemId);
+  if (item) item.classList.toggle('price-changed', prices[key] !== DEFAULT_PRICES[key].value);
+  toast('Precio guardado.');
+}
+
+function resetPrecios() {
+  if (!confirm('¿Restablecer todos los precios por defecto?')) return;
+  localStorage.removeItem(LS_KEY);
+  buildPricesGrid();
+  toast('Precios restablecidos.');
+}
+
+// ── Insumos tab ───────────────────────────────────────────────────────────────
+
+function renderInsumosTable(insumos, cantidad) {
+  if (!cantidad || isNaN(cantidad) || cantidad <= 0) return '';
+  let html = `<table class="result-table"><thead><tr>
+    <th>Insumo</th><th>Por unidad</th><th>Total necesario</th>
+  </tr></thead><tbody>`;
+  for (const ins in insumos) {
+    const { qty, unit } = insumos[ins];
+    const total = (qty * cantidad).toFixed(3);
+    html += `<tr><td>${ins}</td><td>${qty} ${unit}</td><td><strong>${total} ${unit}</strong></td></tr>`;
+  }
+  html += `</tbody></table>`;
+  return html;
+}
+
+function calcInsumos(key) {
+  const val = parseFloat(document.getElementById(`inp-${key}`)?.value);
+  document.getElementById(`res-${key}`).innerHTML = renderInsumosTable(PARTIDAS[key].insumos, val);
+}
+
+function calcInsumosBloques() {
+  const val = parseFloat(document.getElementById('inp-bloques')?.value);
+  document.getElementById('res-bloques').innerHTML = renderInsumosTable(PARTIDAS['bloques'].insumos, val);
+}
+
+function calcInsumosBloqueDetalle() {
+  const val = parseFloat(document.getElementById('inp-bloques-detalle')?.value);
+  document.getElementById('res-bloques-detalle').innerHTML = renderInsumosTable(PARTIDAS['bloques'].insumos, val);
+}
+
+function syncMezcla() {
+  const val = document.getElementById('inp-mortero1-4').value;
+  const inp = document.getElementById('inp-mezclaEmpanete');
+  inp.value = val;
+  calcInsumos('mezclaEmpanete');
+}
+
+function clearInsumo(key) {
+  const inputId = key === 'bloques' ? 'inp-bloques' : `inp-${key}`;
+  const inp = document.getElementById(inputId);
+  if (inp) inp.value = '';
+  const res = document.getElementById(`res-${key}`);
+  if (res) res.innerHTML = '';
+  if (key === 'mortero1-4') {
+    document.getElementById('inp-mezclaEmpanete').value = '';
+    document.getElementById('res-mezclaEmpanete').innerHTML = '';
+  }
+}
+
+// ── Costos tab ────────────────────────────────────────────────────────────────
+
+function renderCostTable(key, m3, prices) {
+  const partida = PARTIDAS[key];
+  let total = 0;
+  let html = `<table class="result-table"><thead><tr>
+    <th>Insumo</th><th>Cant./m³</th><th>Precio unit.</th><th>Costo (${m3} m³)</th>
+  </tr></thead><tbody>`;
+  for (const ins in partida.insumos) {
+    const { qty, unit } = partida.insumos[ins];
+    const price = prices[ins] || 0;
+    const cost = qty * price * m3;
+    total += cost;
+    html += `<tr>
+      <td>${ins}</td>
+      <td>${qty} ${unit}</td>
+      <td>$${price.toFixed(2)}</td>
+      <td>$${cost.toFixed(2)}</td>
+    </tr>`;
+  }
+  html += `<tr class="total-row">
+    <td colspan="3">Costo Total (${m3} ${partida.unit})</td>
+    <td><span class="cost-highlight">$${total.toFixed(2)}</span></td>
+  </tr></tbody></table>`;
+  return html;
+}
+
+function calcularTodos() {
+  const m3 = parseFloat(document.getElementById('m3Input').value);
+  if (!m3 || m3 <= 0) { toast('Ingresa una cantidad válida.'); return; }
+  const prices = getPrices();
+  ['mortero1-4','mezclaEmpanete','mortero1-3','hormigonMano','hormigonLigadora'].forEach(key => {
+    document.getElementById(`cost-${key}`).innerHTML = renderCostTable(key, m3, prices);
+  });
+}
+
+function limpiarCostos() {
+  ['mortero1-4','mezclaEmpanete','mortero1-3','hormigonMano','hormigonLigadora'].forEach(key => {
+    document.getElementById(`cost-${key}`).innerHTML = '<p class="empty-state">Ingresa m³ y presiona Calcular.</p>';
+  });
+}
+
+// ── Bloques tab ───────────────────────────────────────────────────────────────
+
+function calcBloquesDesdeArea() {
+  const area = parseFloat(document.getElementById('areaInput').value);
+  const el = document.getElementById('res-area-bloques');
+  if (!area || area <= 0) { el.textContent = '—'; return; }
+  el.textContent = `${Math.ceil(area * BLOQUES_POR_M2)} bloques`;
+}
+
+function calcAreaDesdeBloques() {
+  const b = parseFloat(document.getElementById('bloquesInput').value);
+  const el = document.getElementById('res-bloques-area');
+  if (!b || b <= 0) { el.textContent = '—'; return; }
+  el.textContent = `${(b / BLOQUES_POR_M2).toFixed(2)} m²`;
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+
+function openTab(evt, id) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  evt.currentTarget.classList.add('active');
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+window.addEventListener('DOMContentLoaded', () => {
+  buildPricesGrid();
+});
+</script>
+</body>
+</html>
