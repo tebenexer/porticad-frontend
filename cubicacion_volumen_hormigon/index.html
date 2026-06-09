@@ -196,6 +196,46 @@
 
     /* Empty state */
     .empty-msg { font-size: 0.8rem; color: var(--muted); text-align: center; padding: 8px 0; }
+
+    /* AMARRE TYPE SELECTOR */
+    .amarre-type-bar {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      padding: 10px 14px; background: #f0f7ff; border: 1.5px solid #bfdbfe;
+      border-radius: 8px; margin-bottom: 14px;
+    }
+    .amarre-type-bar .type-label {
+      font-size: 0.75rem; font-weight: 700; color: var(--primary);
+      text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;
+    }
+    .type-btn {
+      padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; font-weight: 700;
+      font-family: inherit; cursor: pointer; transition: all 0.18s;
+      border: 1.5px solid #93c5fd; background: #fff; color: var(--primary);
+    }
+    .type-btn:hover { background: #dbeafe; }
+    .type-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    /* AMARRE STEEL SUMMARY */
+    .steel-summary {
+      margin-top: 14px; border-radius: 8px; overflow: hidden;
+      border: 1.5px solid #93c5fd;
+    }
+    .steel-summary-header {
+      background: var(--primary); color: #fff; padding: 9px 14px;
+      font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 7px;
+    }
+    .steel-summary-body {
+      background: #f0f7ff; padding: 12px 14px;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px;
+    }
+    .steel-stat {
+      background: #fff; border-radius: 6px; padding: 10px 12px;
+      border: 1px solid #bfdbfe; text-align: center;
+    }
+    .steel-stat .st-value { font-size: 1.1rem; font-weight: 700; color: var(--primary); }
+    .steel-stat .st-label { font-size: 0.7rem; color: var(--muted); margin-top: 2px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+    .steel-stat.accent .st-value { color: #b45309; }
+    .steel-stat.accent { border-color: #fcd34d; background: #fffbeb; }
   </style>
 </head>
 <body>
@@ -251,8 +291,43 @@
           <span class="ch-toggle">▾</span>
         </div>
         <div class="card-body">
+          <!-- Selector de tipo -->
+          <div class="amarre-type-bar">
+            <span class="type-label">Tipo de viga:</span>
+            <button class="type-btn" onclick="setAmarreType('15x20',this)">15×20 cm</button>
+            <button class="type-btn" onclick="setAmarreType('20x20',this)">20×20 cm</button>
+            <button class="type-btn active" onclick="setAmarreType('custom',this)">Personalizado</button>
+          </div>
           <div id="amarreEntries"></div>
           <button class="btn btn-add" onclick="addEntry('amarre')">+ Añadir Viga de Amarre</button>
+          <!-- Resumen acero -->
+          <div class="steel-summary" id="amarre-steel" style="display:none">
+            <div class="steel-summary-header">
+              🔩 Resumen — <span id="steel-type-label">—</span>
+            </div>
+            <div class="steel-summary-body">
+              <div class="steel-stat">
+                <div class="st-value" id="steel-ml">0.00 m</div>
+                <div class="st-label">Longitud total vigas</div>
+              </div>
+              <div class="steel-stat">
+                <div class="st-value" id="steel-vol">0.000 m³</div>
+                <div class="st-label">Volumen total</div>
+              </div>
+              <div class="steel-stat accent">
+                <div class="st-value" id="steel-estribos">0.00 qq</div>
+                <div class="st-label" id="steel-estribos-label">Estribos 3/8"</div>
+              </div>
+              <div class="steel-stat accent">
+                <div class="st-value" id="steel-varillas">0.00 qq</div>
+                <div class="st-label" id="steel-varillas-label">Varillas 3/8"</div>
+              </div>
+              <div class="steel-stat accent" style="border-color:#f97316;background:#fff7ed;">
+                <div class="st-value" style="color:#c2410c;" id="steel-total-qq">0.00 qq</div>
+                <div class="st-label">Total acero 3/8"</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -373,6 +448,24 @@ const NAMES = {
   dintel:'Dinteles', escalera:'Escaleras'
 };
 
+// ── Vigas de Amarre: tipos y cuantías de acero ────────────────────────────────
+const AMARRE_TYPES = {
+  '15x20': {
+    label: 'Viga 15×20 cm',
+    base: 0.15, altura: 0.20,
+    estribos:  { qq: 1.933, label: 'Estribos 3/8"'              },
+    varillas:  { qq: 1.899, label: 'Varillas transversales 3/8"' }
+  },
+  '20x20': {
+    label: 'Viga 20×20 cm',
+    base: 0.20, altura: 0.20,
+    estribos:  { qq: 1.65,  label: 'Estribos 3/8"'              },
+    varillas:  { qq: 1.46,  label: 'Varillas longitudinales 3/8"' }
+  },
+  'custom': null
+};
+let currentAmarreType = 'custom';
+
 document.addEventListener('DOMContentLoaded', () => {
   SECTIONS.forEach(t => addEntry(t));
   recalcAll();
@@ -380,6 +473,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function toggleCard(type) {
   document.getElementById(`card-${type}`).classList.toggle('collapsed');
+}
+
+// ── Tipo de viga de amarre ────────────────────────────────────────────────────
+function setAmarreType(type, btn) {
+  currentAmarreType = type;
+  // Highlight active button
+  document.querySelectorAll('.amarre-type-bar .type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const cfg = AMARRE_TYPES[type];
+  // Update all existing amarre entries
+  document.querySelectorAll('#amarreEntries .entry-row').forEach(entry => {
+    applyAmarreDims(entry, cfg);
+  });
+  recalcAll();
+}
+
+function applyAmarreDims(entry, cfg) {
+  const baseInp   = entry.querySelector('[data-dim="base"]');
+  const alturaInp = entry.querySelector('[data-dim="altura"]');
+  if (!baseInp || !alturaInp) return;
+  if (cfg) {
+    baseInp.value   = cfg.base;
+    alturaInp.value = cfg.altura;
+    baseInp.readOnly   = true;
+    alturaInp.readOnly = true;
+    baseInp.style.background   = '#f0f7ff';
+    alturaInp.style.background = '#f0f7ff';
+    baseInp.title   = 'Fijado por tipo de viga';
+    alturaInp.title = 'Fijado por tipo de viga';
+  } else {
+    baseInp.readOnly   = false;
+    alturaInp.readOnly = false;
+    baseInp.style.background   = '';
+    alturaInp.style.background = '';
+    baseInp.title   = '';
+    alturaInp.title = '';
+  }
 }
 
 function createFieldsHtml(type) {
@@ -432,6 +563,11 @@ function addEntry(type) {
     </div>`;
   container.appendChild(div);
 
+  // Apply fixed dims if amarre type is selected
+  if (type === 'amarre') {
+    applyAmarreDims(div, AMARRE_TYPES[currentAmarreType]);
+  }
+
   const numInputs = Array.from(div.querySelectorAll('input[type="number"]'));
   numInputs.forEach((inp, i) => {
     inp.addEventListener('input', recalcAll);
@@ -439,7 +575,9 @@ function addEntry(type) {
     inp.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        const next = numInputs[i + 1];
+        // Skip read-only inputs
+        let next = numInputs[i + 1];
+        while (next && next.readOnly) next = numInputs[numInputs.indexOf(next) + 1];
         if (next) next.focus();
         else div.closest('.card-body').querySelector('.btn-add')?.focus();
       }
@@ -476,20 +614,53 @@ function calcEntry(entry, type) {
 function recalcAll() {
   let grand = 0;
   const totals = {};
+  let amarreML = 0; // metros lineales totales de vigas de amarre
+
   SECTIONS.forEach(type => {
     let sec = 0;
     document.querySelectorAll(`#${type}Entries .entry-row`).forEach(entry => {
-      const { total } = calcEntry(entry, type);
+      const { total, qty } = calcEntry(entry, type);
       sec += total;
       entry.querySelector('.entry-vol-badge').textContent = `${total.toFixed(3)} m³`;
+      // Acumular metros lineales de amarre
+      if (type === 'amarre') {
+        const longitud = parseFloat(entry.querySelector('[data-dim="longitud"]')?.value) || 0;
+        amarreML += longitud * qty;
+      }
     });
     totals[type] = sec;
     grand += sec;
     document.getElementById(`badge-${type}`).textContent = `${sec.toFixed(2)} m³`;
   });
+
   document.getElementById('grandTotal').textContent = `${grand.toFixed(2)} m³`;
+  updateAmarreSteel(amarreML, totals['amarre']);
   updateBreakdown(totals, grand);
-  updateReport(totals, grand);
+  updateReport(totals, grand, amarreML);
+}
+
+function updateAmarreSteel(ml, vol) {
+  const panel = document.getElementById('amarre-steel');
+  const cfg   = AMARRE_TYPES[currentAmarreType];
+
+  if (!cfg || vol <= 0) {
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = 'block';
+
+  const qqEstribos  = cfg.estribos.qq  * vol;
+  const qqVarillas  = cfg.varillas.qq  * vol;
+  const qqTotal     = qqEstribos + qqVarillas;
+
+  document.getElementById('steel-type-label').textContent      = cfg.label;
+  document.getElementById('steel-ml').textContent              = `${ml.toFixed(2)} m`;
+  document.getElementById('steel-vol').textContent             = `${vol.toFixed(3)} m³`;
+  document.getElementById('steel-estribos').textContent        = `${qqEstribos.toFixed(3)} qq`;
+  document.getElementById('steel-estribos-label').textContent  = cfg.estribos.label;
+  document.getElementById('steel-varillas').textContent        = `${qqVarillas.toFixed(3)} qq`;
+  document.getElementById('steel-varillas-label').textContent  = cfg.varillas.label;
+  document.getElementById('steel-total-qq').textContent        = `${qqTotal.toFixed(3)} qq`;
 }
 
 function updateBreakdown(totals, grand) {
@@ -505,7 +676,7 @@ function updateBreakdown(totals, grand) {
   }).join('');
 }
 
-function updateReport(totals, grand) {
+function updateReport(totals, grand, amarreML) {
   let txt = 'CUBICACIÓN VOLUMEN DE HORMIGÓN\n';
   txt += '='.repeat(46) + '\n\n';
   SECTIONS.forEach(type => {
@@ -526,7 +697,22 @@ function updateReport(totals, grand) {
       txt += `  ${i}. ${label}\n     ${dims}  ×${qty}  →  ${total.toFixed(3)} m³\n`;
       i++;
     });
-    txt += `     ${'─'.repeat(28)}\n     Subtotal: ${totals[type].toFixed(3)} m³\n\n`;
+    txt += `     ${'─'.repeat(28)}\n     Subtotal: ${totals[type].toFixed(3)} m³\n`;
+
+    // Acero vigas de amarre
+    if (type === 'amarre') {
+      const cfg = AMARRE_TYPES[currentAmarreType];
+      if (cfg && totals['amarre'] > 0) {
+        const qqE = cfg.estribos.qq * totals['amarre'];
+        const qqV = cfg.varillas.qq * totals['amarre'];
+        txt += `     Tipo: ${cfg.label}\n`;
+        txt += `     Long. total: ${(amarreML||0).toFixed(2)} m\n`;
+        txt += `     ${cfg.estribos.label}: ${qqE.toFixed(3)} qq\n`;
+        txt += `     ${cfg.varillas.label}: ${qqV.toFixed(3)} qq\n`;
+        txt += `     TOTAL acero 3/8": ${(qqE+qqV).toFixed(3)} qq\n`;
+      }
+    }
+    txt += '\n';
   });
   txt += '='.repeat(46) + '\n';
   txt += `VOLUMEN TOTAL: ${grand.toFixed(2)} m³\n`;
