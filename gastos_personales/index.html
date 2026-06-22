@@ -93,6 +93,11 @@ tr:hover td{background:var(--surface2);}
 .items-table input,.items-table select{padding:6px 8px;font-size:.82rem;}
 .item-row{background:var(--surface2);border-radius:6px;}
 
+/* EDIT ROW inline */
+.edit-row{background:var(--surface2);border:1px solid var(--accent);border-radius:8px;padding:8px 10px;margin-bottom:8px;}
+.edit-row input,.edit-row select{padding:5px 8px;font-size:.82rem;}
+.edit-row-actions{display:flex;gap:6px;margin-top:7px;justify-content:flex-end;}
+
 /* MISC */
 .badge{display:inline-block;padding:2px 7px;border-radius:99px;font-size:.68rem;font-weight:600;}
 .badge-gray{background:var(--surface2);color:var(--muted);}
@@ -936,18 +941,57 @@ async function saveBudgets(){
 // ══════════════════════════════════════════════════════
 //  CONFIG
 // ══════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
+//  CONFIG — RENDER
+// ══════════════════════════════════════════════════════
 function renderConfig(){
   if(!STATE)return;
   document.getElementById('cfg-currency').value=STATE.config.currency||'$';
   document.getElementById('cfg-owner').value=STATE.config.owner||'';
-  document.getElementById('accounts-list').innerHTML=STATE.accounts.map(a=>`<div style="display:flex;align-items:center;gap:9px;margin-bottom:7px;"><span class="dot" style="background:${a.color};width:11px;height:11px;"></span><span style="flex:1;font-size:.83rem;">${a.name} <span class="badge badge-gray">${a.type}</span></span><button class="btn btn-danger btn-sm" onclick="deleteAccount('${a.id}')">✕</button></div>`).join('')||'<div style="font-size:.76rem;color:var(--muted);">Sin cuentas</div>';
-  document.getElementById('persons-list').innerHTML=STATE.persons.map(p=>`<div style="display:flex;align-items:center;gap:9px;margin-bottom:7px;"><span class="avatar" style="background:${p.color};font-size:.58rem;">${p.name[0]}</span><span style="flex:1;font-size:.83rem;">${p.name} <span class="badge badge-gray">${p.rel}</span></span><button class="btn btn-danger btn-sm" onclick="deletePerson('${p.id}')">✕</button></div>`).join('');
-  document.getElementById('cats-list').innerHTML=STATE.categories.map(c=>`<div style="display:flex;align-items:center;gap:9px;margin-bottom:7px;"><span style="font-size:.95rem;">${c.icon}</span><span class="dot" style="background:${c.color};width:9px;height:9px;"></span><span style="flex:1;font-size:.83rem;">${c.name}</span><button class="btn btn-danger btn-sm" onclick="deleteCategory('${c.id}')">✕</button></div>`).join('');
+  renderAccountsList();
+  renderPersonsList();
+  renderCatsList();
   renderColorRows();
 }
+
+function renderAccountsList(){
+  const typeLabels={efectivo:'Efectivo',banco:'Banco',tarjeta:'Tarjeta crédito',digital:'Billetera digital',otro:'Otro'};
+  document.getElementById('accounts-list').innerHTML=STATE.accounts.map(a=>`
+    <div id="acc-row-${a.id}" style="display:flex;align-items:center;gap:9px;margin-bottom:7px;">
+      <span class="dot" style="background:${a.color};width:11px;height:11px;flex-shrink:0;"></span>
+      <span style="flex:1;font-size:.83rem;">${a.name} <span class="badge badge-gray">${typeLabels[a.type]||a.type}</span></span>
+      <button class="btn btn-ghost btn-sm" onclick="startEditAccount('${a.id}')">✏️</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteAccount('${a.id}')">✕</button>
+    </div>`).join('')||'<div style="font-size:.76rem;color:var(--muted);">Sin cuentas</div>';
+}
+
+function renderPersonsList(){
+  const relLabels={yo:'Titular',pareja:'Pareja',familiar:'Familiar',socio:'Socio/Trabajo',otro:'Otro'};
+  document.getElementById('persons-list').innerHTML=STATE.persons.map(p=>`
+    <div id="per-row-${p.id}" style="display:flex;align-items:center;gap:9px;margin-bottom:7px;">
+      <span class="avatar" style="background:${p.color};font-size:.58rem;flex-shrink:0;">${p.name[0]}</span>
+      <span style="flex:1;font-size:.83rem;">${p.name} <span class="badge badge-gray">${relLabels[p.rel]||p.rel}</span></span>
+      <button class="btn btn-ghost btn-sm" onclick="startEditPerson('${p.id}')">✏️</button>
+      <button class="btn btn-danger btn-sm" onclick="deletePerson('${p.id}')">✕</button>
+    </div>`).join('')||'<div style="font-size:.76rem;color:var(--muted);">Sin personas</div>';
+}
+
+function renderCatsList(){
+  document.getElementById('cats-list').innerHTML=STATE.categories.map(c=>`
+    <div id="cat-row-${c.id}" style="display:flex;align-items:center;gap:9px;margin-bottom:7px;">
+      <span style="font-size:.95rem;flex-shrink:0;">${c.icon}</span>
+      <span class="dot" style="background:${c.color};width:9px;height:9px;flex-shrink:0;"></span>
+      <span style="flex:1;font-size:.83rem;">${c.name}</span>
+      <button class="btn btn-ghost btn-sm" onclick="startEditCategory('${c.id}')">✏️</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteCategory('${c.id}')">✕</button>
+    </div>`).join('')||'<div style="font-size:.76rem;color:var(--muted);">Sin categorias</div>';
+}
+
+// ── COLORES ──
 function renderColorRows(){
   [['acc-color-row',selAccColor],['person-color-row',selPersonColor],['cat-color-row',selCatColor]].forEach(([id,sel])=>{
-    document.getElementById(id).innerHTML=COLORS.map(c=>`<div class="color-swatch ${c===sel?'selected':''}" style="background:${c};" onclick="selectColor('${id}','${c}')"></div>`).join('');
+    const el=document.getElementById(id);if(!el)return;
+    el.innerHTML=COLORS.map(c=>`<div class="color-swatch ${c===sel?'selected':''}" style="background:${c};" onclick="selectColor('${id}','${c}')"></div>`).join('');
   });
 }
 function selectColor(rowId,color){
@@ -956,6 +1000,121 @@ function selectColor(rowId,color){
   if(rowId==='cat-color-row')selCatColor=color;
   renderColorRows();
 }
+// Color rows para edicion inline
+function renderEditColorRow(containerId, currentColor, varName){
+  document.getElementById(containerId).innerHTML=COLORS.map(c=>
+    `<div class="color-swatch ${c===window[varName]?'selected':''}" style="background:${c};" onclick="window['${varName}']='${c}';renderEditColorRow('${containerId}','${c}','${varName}')"></div>`
+  ).join('');
+}
+
+// ══════════════════════════════════════════════════════
+//  EDICION INLINE — CUENTAS
+// ══════════════════════════════════════════════════════
+function startEditAccount(id){
+  const a=STATE.accounts.find(x=>x.id===id);if(!a)return;
+  window._editAccColor=a.color;
+  const typeOpts=['efectivo','banco','tarjeta','digital','otro'].map(t=>`<option value="${t}" ${a.type===t?'selected':''}>${{efectivo:'Efectivo',banco:'Banco',tarjeta:'Tarjeta crédito',digital:'Billetera digital',otro:'Otro'}[t]}</option>`).join('');
+  const row=document.getElementById('acc-row-'+id);
+  row.outerHTML=`<div id="acc-row-${id}" class="edit-row">
+    <div class="form-row">
+      <div class="form-group"><label>Nombre</label><input type="text" id="edit-acc-name-${id}" value="${a.name}"></div>
+      <div class="form-group"><label>Tipo</label><select id="edit-acc-type-${id}">${typeOpts}</select></div>
+    </div>
+    <div style="margin-top:8px;"><label style="font-size:.72rem;color:var(--muted);font-weight:600;">Color</label>
+      <div class="color-row" id="edit-acc-color-${id}" style="margin-top:4px;"></div>
+    </div>
+    <div class="edit-row-actions">
+      <button class="btn btn-ghost btn-sm" onclick="cancelEditAccount('${id}')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEditAccount('${id}')">Guardar</button>
+    </div>
+  </div>`;
+  renderEditColorRow('edit-acc-color-'+id, a.color, '_editAccColor');
+}
+function cancelEditAccount(id){ renderAccountsList(); }
+async function saveEditAccount(id){
+  const name=document.getElementById('edit-acc-name-'+id)?.value.trim();
+  const type=document.getElementById('edit-acc-type-'+id)?.value;
+  if(!name){alert('El nombre no puede estar vacio.');return;}
+  const idx=STATE.accounts.findIndex(x=>x.id===id);
+  const updated={...STATE.accounts[idx],name,type,color:window._editAccColor};
+  await fsSet('accounts',id,updated);
+  STATE.accounts[idx]=updated;
+  STATE.accounts.sort((a,b)=>a.name.localeCompare(b.name));
+  renderAccountsList();
+}
+
+// ══════════════════════════════════════════════════════
+//  EDICION INLINE — PERSONAS
+// ══════════════════════════════════════════════════════
+function startEditPerson(id){
+  const p=STATE.persons.find(x=>x.id===id);if(!p)return;
+  window._editPerColor=p.color;
+  const relOpts=['yo','pareja','familiar','socio','otro'].map(r=>`<option value="${r}" ${p.rel===r?'selected':''}>${{yo:'Yo (titular)',pareja:'Pareja',familiar:'Familiar',socio:'Socio/Trabajo',otro:'Otro'}[r]}</option>`).join('');
+  const row=document.getElementById('per-row-'+id);
+  row.outerHTML=`<div id="per-row-${id}" class="edit-row">
+    <div class="form-row">
+      <div class="form-group"><label>Nombre</label><input type="text" id="edit-per-name-${id}" value="${p.name}"></div>
+      <div class="form-group"><label>Relacion</label><select id="edit-per-rel-${id}">${relOpts}</select></div>
+    </div>
+    <div style="margin-top:8px;"><label style="font-size:.72rem;color:var(--muted);font-weight:600;">Color avatar</label>
+      <div class="color-row" id="edit-per-color-${id}" style="margin-top:4px;"></div>
+    </div>
+    <div class="edit-row-actions">
+      <button class="btn btn-ghost btn-sm" onclick="cancelEditPerson('${id}')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEditPerson('${id}')">Guardar</button>
+    </div>
+  </div>`;
+  renderEditColorRow('edit-per-color-'+id, p.color, '_editPerColor');
+}
+function cancelEditPerson(id){ renderPersonsList(); }
+async function saveEditPerson(id){
+  const name=document.getElementById('edit-per-name-'+id)?.value.trim();
+  const rel=document.getElementById('edit-per-rel-'+id)?.value;
+  if(!name){alert('El nombre no puede estar vacio.');return;}
+  const idx=STATE.persons.findIndex(x=>x.id===id);
+  const updated={...STATE.persons[idx],name,rel,color:window._editPerColor};
+  await fsSet('persons',id,updated);
+  STATE.persons[idx]=updated;
+  renderPersonsList();
+}
+
+// ══════════════════════════════════════════════════════
+//  EDICION INLINE — CATEGORIAS
+// ══════════════════════════════════════════════════════
+function startEditCategory(id){
+  const c=STATE.categories.find(x=>x.id===id);if(!c)return;
+  window._editCatColor=c.color;
+  const row=document.getElementById('cat-row-'+id);
+  row.outerHTML=`<div id="cat-row-${id}" class="edit-row">
+    <div class="form-row">
+      <div class="form-group"><label>Nombre</label><input type="text" id="edit-cat-name-${id}" value="${c.name}"></div>
+      <div class="form-group" style="max-width:80px;"><label>Icono</label><input type="text" id="edit-cat-icon-${id}" value="${c.icon}" style="text-align:center;"></div>
+    </div>
+    <div style="margin-top:8px;"><label style="font-size:.72rem;color:var(--muted);font-weight:600;">Color</label>
+      <div class="color-row" id="edit-cat-color-${id}" style="margin-top:4px;"></div>
+    </div>
+    <div class="edit-row-actions">
+      <button class="btn btn-ghost btn-sm" onclick="cancelEditCategory('${id}')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEditCategory('${id}')">Guardar</button>
+    </div>
+  </div>`;
+  renderEditColorRow('edit-cat-color-'+id, c.color, '_editCatColor');
+}
+function cancelEditCategory(id){ renderCatsList(); }
+async function saveEditCategory(id){
+  const name=document.getElementById('edit-cat-name-'+id)?.value.trim();
+  const icon=document.getElementById('edit-cat-icon-'+id)?.value.trim()||'📦';
+  if(!name){alert('El nombre no puede estar vacio.');return;}
+  const idx=STATE.categories.findIndex(x=>x.id===id);
+  const updated={...STATE.categories[idx],name,icon,color:window._editCatColor};
+  await fsSet('categories',id,updated);
+  STATE.categories[idx]=updated;
+  renderCatsList();
+}
+
+// ══════════════════════════════════════════════════════
+//  CONFIG — AGREGAR / ELIMINAR
+// ══════════════════════════════════════════════════════
 async function saveConfig(){
   const data={currency:document.getElementById('cfg-currency').value||'$',owner:document.getElementById('cfg-owner').value||'Yo'};
   await fsSet('config','main',data);STATE.config=data;alert('Configuracion guardada.');
@@ -966,27 +1125,27 @@ async function addAccount(){
   if(!name){alert('Ingresa un nombre.');return;}
   const a={id:uid(),name,type,color:selAccColor};
   await fsSet('accounts',a.id,a);STATE.accounts.push(a);STATE.accounts.sort((a,b)=>a.name.localeCompare(b.name));
-  document.getElementById('new-acc-name').value='';renderConfig();
+  document.getElementById('new-acc-name').value='';renderAccountsList();
 }
-async function deleteAccount(id){confirm2('Eliminar cuenta','Se eliminara la cuenta.',async()=>{await fsDel('accounts',id);STATE.accounts=STATE.accounts.filter(a=>a.id!==id);renderConfig();});}
+async function deleteAccount(id){confirm2('Eliminar cuenta','Se eliminara la cuenta.',async()=>{await fsDel('accounts',id);STATE.accounts=STATE.accounts.filter(a=>a.id!==id);renderAccountsList();});}
 async function addPerson(){
   const name=document.getElementById('new-person-name').value.trim();
   const rel=document.getElementById('new-person-rel').value;
   if(!name){alert('Ingresa un nombre.');return;}
   const p={id:uid(),name,rel,color:selPersonColor};
   await fsSet('persons',p.id,p);STATE.persons.push(p);
-  document.getElementById('new-person-name').value='';renderConfig();
+  document.getElementById('new-person-name').value='';renderPersonsList();
 }
-async function deletePerson(id){confirm2('Eliminar persona','Se eliminara la persona.',async()=>{await fsDel('persons',id);STATE.persons=STATE.persons.filter(p=>p.id!==id);renderConfig();});}
+async function deletePerson(id){confirm2('Eliminar persona','Se eliminara la persona.',async()=>{await fsDel('persons',id);STATE.persons=STATE.persons.filter(p=>p.id!==id);renderPersonsList();});}
 async function addCategory(){
   const name=document.getElementById('new-cat-name').value.trim();
   const icon=document.getElementById('new-cat-icon').value.trim()||'📦';
   if(!name){alert('Ingresa un nombre.');return;}
   const c={id:uid(),name,icon,color:selCatColor};
   await fsSet('categories',c.id,c);STATE.categories.push(c);
-  document.getElementById('new-cat-name').value='';document.getElementById('new-cat-icon').value='';renderConfig();
+  document.getElementById('new-cat-name').value='';document.getElementById('new-cat-icon').value='';renderCatsList();
 }
-async function deleteCategory(id){confirm2('Eliminar categoria','Se eliminara la categoria.',async()=>{await fsDel('categories',id);STATE.categories=STATE.categories.filter(c=>c.id!==id);renderConfig();});}
+async function deleteCategory(id){confirm2('Eliminar categoria','Se eliminara la categoria.',async()=>{await fsDel('categories',id);STATE.categories=STATE.categories.filter(c=>c.id!==id);renderCatsList();});}
 
 // ══════════════════════════════════════════════════════
 //  EXPORT
