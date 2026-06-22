@@ -310,7 +310,62 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0;}
       <div class="card">
         <h3>General</h3>
         <div class="form-group" style="margin-bottom:11px;"><label>Moneda / Simbolo</label><input type="text" id="cfg-currency" style="width:80px;"></div>
-        <div class="form-group" style="margin-bottom:14px;"><label>Tu nombre</label><input type="text" id="cfg-owner"></div>
+        <div class="form-group" style="margin-bottom:11px;"><label>Tu nombre</label><input type="text" id="cfg-owner"></div>
+        <div class="form-group" style="margin-bottom:14px;">
+          <label>Zona horaria</label>
+          <select id="cfg-timezone">
+            <optgroup label="— America Latina —">
+              <option value="America/Caracas">Venezuela (UTC-4) — Caracas</option>
+              <option value="America/Bogota">Colombia (UTC-5) — Bogotá</option>
+              <option value="America/Lima">Peru (UTC-5) — Lima</option>
+              <option value="America/Guayaquil">Ecuador (UTC-5) — Guayaquil</option>
+              <option value="America/Panama">Panama (UTC-5) — Panama</option>
+              <option value="America/Mexico_City">Mexico Centro (UTC-6) — Ciudad de Mexico</option>
+              <option value="America/Monterrey">Mexico Norte (UTC-6) — Monterrey</option>
+              <option value="America/Tijuana">Mexico Pacifico (UTC-7/8) — Tijuana</option>
+              <option value="America/Costa_Rica">Costa Rica (UTC-6) — San Jose</option>
+              <option value="America/Guatemala">Guatemala (UTC-6)</option>
+              <option value="America/El_Salvador">El Salvador (UTC-6)</option>
+              <option value="America/Tegucigalpa">Honduras (UTC-6)</option>
+              <option value="America/Managua">Nicaragua (UTC-6)</option>
+              <option value="America/Santo_Domingo">Republica Dominicana (UTC-4)</option>
+              <option value="America/Puerto_Rico">Puerto Rico (UTC-4)</option>
+              <option value="America/Cuba">Cuba (UTC-5)</option>
+              <option value="America/Santiago">Chile (UTC-3/4) — Santiago</option>
+              <option value="America/Argentina/Buenos_Aires">Argentina (UTC-3) — Buenos Aires</option>
+              <option value="America/Montevideo">Uruguay (UTC-3) — Montevideo</option>
+              <option value="America/Asuncion">Paraguay (UTC-3/4) — Asuncion</option>
+              <option value="America/La_Paz">Bolivia (UTC-4) — La Paz</option>
+              <option value="America/Guyana">Guyana (UTC-4)</option>
+              <option value="America/Suriname">Surinam (UTC-3)</option>
+              <option value="America/Sao_Paulo">Brasil (UTC-3) — Sao Paulo</option>
+              <option value="America/Manaus">Brasil Oeste (UTC-4) — Manaos</option>
+              <option value="America/Havana">Cuba (UTC-5)</option>
+            </optgroup>
+            <optgroup label="— Norte America —">
+              <option value="America/New_York">USA Este (UTC-5) — New York</option>
+              <option value="America/Chicago">USA Centro (UTC-6) — Chicago</option>
+              <option value="America/Denver">USA Montana (UTC-7) — Denver</option>
+              <option value="America/Los_Angeles">USA Pacifico (UTC-8) — Los Angeles</option>
+              <option value="America/Anchorage">USA Alaska (UTC-9)</option>
+              <option value="Pacific/Honolulu">USA Hawaii (UTC-10)</option>
+              <option value="America/Toronto">Canada Este — Toronto</option>
+              <option value="America/Vancouver">Canada Pacifico — Vancouver</option>
+            </optgroup>
+            <optgroup label="— Europa —">
+              <option value="Europe/Madrid">Espana (UTC+1) — Madrid</option>
+              <option value="Atlantic/Canary">Espana Canarias (UTC+0)</option>
+              <option value="Europe/London">Reino Unido (UTC+0) — Londres</option>
+              <option value="Europe/Paris">Francia (UTC+1) — Paris</option>
+              <option value="Europe/Berlin">Alemania (UTC+1) — Berlin</option>
+              <option value="Europe/Rome">Italia (UTC+1) — Roma</option>
+              <option value="Europe/Lisbon">Portugal (UTC+0) — Lisboa</option>
+            </optgroup>
+            <optgroup label="— Otros —">
+              <option value="UTC">UTC (UTC+0)</option>
+            </optgroup>
+          </select>
+        </div>
         <button class="btn btn-primary btn-sm" onclick="saveConfig()">Guardar</button>
         <hr>
         <div style="font-size:.76rem;color:var(--muted);margin-bottom:9px;">Exportar datos</div>
@@ -438,7 +493,9 @@ let selAccColor = COLORS[0], selPersonColor = COLORS[3], selCatColor = COLORS[1]
 // ══════════════════════════════════════════════════════
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 function fmt(n) { return (STATE?.config?.currency||'$') + Number(n).toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-function currentMonth() { return new Date().toISOString().slice(0,7); }
+function userTZ() { return STATE?.config?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Caracas'; }
+function todayInTZ() { return new Date().toLocaleDateString('en-CA',{timeZone:userTZ()}); }
+function currentMonth() { return todayInTZ().slice(0,7); }
 function monthLabel(ym) { const [y,m]=ym.split('-'); return new Date(y,m-1).toLocaleString('es',{month:'long',year:'numeric'}); }
 function txInMonth(txs,ym) { return txs.filter(t=>t.fecha.startsWith(ym)); }
 function getCat(id) { return STATE.categories.find(c=>c.id===id)||{name:'Sin cat',icon:'?',color:'#888'}; }
@@ -661,7 +718,7 @@ function openAddGasto(id){
     if(!t.items||!t.items.length) addItemRow();
   }else{
     document.getElementById('g-tipo').value='gasto';
-    document.getElementById('g-fecha').value=new Date().toISOString().slice(0,10);
+    document.getElementById('g-fecha').value=todayInTZ();
     document.getElementById('g-proveedor').value='';
     document.getElementById('g-notes').value='';
     const first=tagsEl.querySelector('.tag');if(first)first.classList.add('selected');
@@ -948,6 +1005,7 @@ function renderConfig(){
   if(!STATE)return;
   document.getElementById('cfg-currency').value=STATE.config.currency||'$';
   document.getElementById('cfg-owner').value=STATE.config.owner||'';
+  document.getElementById('cfg-timezone').value=STATE.config.timezone||Intl.DateTimeFormat().resolvedOptions().timeZone||'America/Caracas';
   renderAccountsList();
   renderPersonsList();
   renderCatsList();
@@ -1116,7 +1174,11 @@ async function saveEditCategory(id){
 //  CONFIG — AGREGAR / ELIMINAR
 // ══════════════════════════════════════════════════════
 async function saveConfig(){
-  const data={currency:document.getElementById('cfg-currency').value||'$',owner:document.getElementById('cfg-owner').value||'Yo'};
+  const data={
+    currency:document.getElementById('cfg-currency').value||'$',
+    owner:document.getElementById('cfg-owner').value||'Yo',
+    timezone:document.getElementById('cfg-timezone').value||'America/Caracas',
+  };
   await fsSet('config','main',data);STATE.config=data;alert('Configuracion guardada.');
 }
 async function addAccount(){
