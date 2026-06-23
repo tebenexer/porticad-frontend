@@ -858,43 +858,44 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
 <!-- ═══════════════════════════════════════════════════════════════
-     Supabase Auth — reemplaza SUPABASE_URL y SUPABASE_ANON_KEY
-     con los valores de tu proyecto en supabase.com
+     Firebase Auth — mismo proyecto que Gastos Personales
      ═══════════════════════════════════════════════════════════════ -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script>
-// ── Configuración Supabase ────────────────────────────────────────
-const SUPABASE_URL      = 'https://iltuxpidyagewmbvhhtv.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_Zn1_MUZuUCQp3Hea7Sexkg_UHLuTJIJ';
-let _sb = null;
-try {
-  _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-} catch(e) {
-  console.warn('Supabase init error:', e.message);
-}
+// ── Configuración Firebase ────────────────────────────────────────
+const _fbConfig = {
+  apiKey: "AIzaSyBcmTo28tpDlyvbBqE8FwQcZVoVDTjePDQ",
+  authDomain: "porticad-gastos.firebaseapp.com",
+  projectId: "porticad-gastos",
+  storageBucket: "porticad-gastos.firebasestorage.app",
+  messagingSenderId: "91275396132",
+  appId: "1:91275396132:web:2b53b8df006244511744b1"
+};
+// Inicializar solo si no hay app previa (evita doble-init si se carga en la misma página)
+if (!firebase.apps.length) firebase.initializeApp(_fbConfig);
+const _fbAuth = firebase.auth();
 
 let _sesionActiva = false;
 
 // ── Estado del botón Calcular según sesión ────────────────────────
 function _actualizarEstadoCalc() {
-  const btnCalc     = document.getElementById('btn-calc');
-  const btnMobCalc  = document.getElementById('mob-btn-calc');
-  const btnLogin    = document.getElementById('btn-login-topbar');
-  const btnLogout   = document.getElementById('btn-logout-topbar');
-  const userLabel   = document.getElementById('user-label-topbar');
+  const btnCalc    = document.getElementById('btn-calc');
+  const btnMobCalc = document.getElementById('mob-btn-calc');
+  const btnLogin   = document.getElementById('btn-login-topbar');
+  const btnLogout  = document.getElementById('btn-logout-topbar');
+  const userLabel  = document.getElementById('user-label-topbar');
 
   if (_sesionActiva) {
     if (btnCalc)    { btnCalc.disabled = false; btnCalc.title = ''; btnCalc.style.opacity = '1'; }
     if (btnMobCalc) { btnMobCalc.disabled = false; btnMobCalc.style.opacity = '1'; }
     if (btnLogin)   btnLogin.style.display  = 'none';
     if (btnLogout)  btnLogout.style.display = '';
-    const u = _sb?.auth.getUser ? null : null;
-    _sb?.auth.getUser().then(({data}) => {
-      if (userLabel && data?.user?.email) {
-        userLabel.textContent = data.user.email.split('@')[0];
-        userLabel.style.display = '';
-      }
-    });
+    const user = _fbAuth.currentUser;
+    if (userLabel && user) {
+      userLabel.textContent = user.displayName || user.email.split('@')[0];
+      userLabel.style.display = '';
+    }
   } else {
     if (btnCalc)    { btnCalc.disabled = true; btnCalc.title = 'Inicia sesión para calcular'; btnCalc.style.opacity = '0.45'; }
     if (btnMobCalc) { btnMobCalc.disabled = true; btnMobCalc.style.opacity = '0.45'; }
@@ -924,49 +925,43 @@ async function authAccion(modo) {
   msg.textContent = modo === 'login' ? 'Iniciando sesión...' : 'Registrando cuenta...';
   msg.style.color = '#94a3b8';
 
-  let result;
-  if (modo === 'login') {
-    result = await _sb?.auth.signInWithPassword({ email, password: pass });
-  } else {
-    result = await _sb?.auth.signUp({ email, password: pass });
-  }
-
-  if (result.error) {
-    msg.textContent = result.error.message;
+  try {
+    if (modo === 'login') {
+      await _fbAuth.signInWithEmailAndPassword(email, pass);
+    } else {
+      await _fbAuth.createUserWithEmailAndPassword(email, pass);
+      msg.textContent = '✓ Cuenta creada. ¡Bienvenido!';
+      msg.style.color = '#22c55e';
+    }
+    // onAuthStateChanged se encarga del resto
+  } catch(e) {
+    const errores = {
+      'auth/user-not-found':'No existe una cuenta con ese email.',
+      'auth/wrong-password':'Contraseña incorrecta.',
+      'auth/email-already-in-use':'Ya existe una cuenta con ese email.',
+      'auth/invalid-email':'Email inválido.',
+      'auth/weak-password':'La contraseña debe tener al menos 6 caracteres.',
+      'auth/too-many-requests':'Demasiados intentos. Espera unos minutos.',
+      'auth/invalid-credential':'Email o contraseña incorrectos.',
+    };
+    msg.textContent = errores[e.code] || e.message;
     msg.style.color = '#f87171';
-    return;
   }
-
-  if (modo === 'register' && !result.data?.session) {
-    msg.textContent = '✓ Revisa tu correo para confirmar la cuenta.';
-    msg.style.color = '#22c55e';
-    return;
-  }
-
-  _sesionActiva = true;
-  cerrarModalLogin();
-  _actualizarEstadoCalc();
-  setMsg('✓ Sesión iniciada');
 }
 
 async function cerrarSesion() {
-  await _sb?.auth.signOut();
-  _sesionActiva = false;
-  _actualizarEstadoCalc();
+  await _fbAuth.signOut();
   setMsg('Sesión cerrada');
 }
 
-// ── Verificar sesión al cargar ────────────────────────────────────
-document.addEventListener('DOMContentLoaded', async function() {
-  const { data } = await _sb?.auth.getSession();
-  _sesionActiva = !!data?.session;
+// ── Observador de sesión ──────────────────────────────────────────
+_fbAuth.onAuthStateChanged(user => {
+  _sesionActiva = !!user;
   _actualizarEstadoCalc();
-
-  // Escuchar cambios de sesión (refresh de token, etc.)
-  _sb?.auth.onAuthStateChange((_event, session) => {
-    _sesionActiva = !!session;
-    _actualizarEstadoCalc();
-  });
+  if (user) {
+    cerrarModalLogin();
+    setMsg('✓ Sesión iniciada como ' + (user.displayName || user.email.split('@')[0]));
+  }
 });
 </script>
 </head>
