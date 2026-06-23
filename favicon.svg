@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 390" role="img" aria-label="PortiCAD logo">
+  <title>PortiCAD</title>
+  <!-- Background -->
+  <rect x="28" y="8" width="624" height="370" rx="6" fill="#f4f6f9"/>
+
+  <!-- P grande azul -->
+  <text x="52" y="355" font-family="'Arial Black','Franklin Gothic Heavy',Impact,sans-serif" font-size="295" font-weight="900" fill="#1a5ba8">P</text>
+
+  <!-- orti pequeño azul -->
+  <text x="228" y="178" font-family="'Arial Black','Franklin Gothic Heavy',Impact,sans-serif" font-size="72" font-weight="900" fill="#1a5ba8">orti</text>
+
+  <!-- CAD grande naranja -->
+  <text x="218" y="356" font-family="'Arial Black','Franklin Gothic Heavy',Impact,sans-serif" font-size="126" font-weight="900" fill="#e87010">CAD</text>
+
+  <!-- Nodos del pórtico -->
+  <circle cx="42" cy="20" r="9" fill="#1a1a2e"/>
+  <circle cx="638" cy="20" r="9" fill="#1a1a2e"/>
+
+  <!-- Viga superior -->
+  <line x1="42" y1="20" x2="638" y2="20" stroke="#1a1a2e" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Columna izquierda -->
+  <line x1="42" y1="20" x2="42" y2="375" stroke="#1a1a2e" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Columna derecha -->
+  <line x1="638" y1="20" x2="638" y2="375" stroke="#1a1a2e" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Placa base izquierda -->
+  <line x1="20" y1="375" x2="74" y2="375" stroke="#1a1a2e" stroke-width="5.5" stroke-linecap="round"/>
+
+  <!-- Placa base derecha -->
+  <line x1="616" y1="375" x2="660" y2="375" stroke="#1a1a2e" stroke-width="5.5" stroke-linecap="round"/>
+
+  <!-- Empotramientos izquierda -->
+  <line x1="27" y1="375" x2="19" y2="390" stroke="#1a1a2e" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="36" y1="375" x2="28" y2="390" stroke="#1a1a2e" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="45" y1="375" x2="37" y2="390" stroke="#1a1a2e" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="54" y1="375" x2="46" y2="390" stroke="#1a1a2e" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="63" y1="375" x2="55" y2="390" stroke="#1a1a2e" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="72" y1="375" x2="64" y2="390" stroke="#1a1a2e" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Empotramientos derecha -->
+  <line x1="623" y1="375" x2="615" y2="390" stroke="#1a1a2e" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="632" y1="375" x2="624" y2="390" stroke="#1a1a2e" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="641" y1="375" x2="633" y2="390" stroke="#1a1a2e" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="650" y1="375" x2="642" y2="390" stroke="#1a1a2e" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="659" y1="375" x2="651" y2="390" stroke="#1a1a2e" stroke-width="2.5" stroke-linecap="round"/>
+</svg>
