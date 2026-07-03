@@ -1,0 +1,1619 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+<title>Dibujo CAD — PortiCAD Multi-Tools</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="shortcut icon" href="/favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root{
+  --sans:'Inter', system-ui, sans-serif;
+  --mono:'JetBrains Mono','Courier New', monospace;
+  --panel:#161b22;
+  --panel2:#0d1117;
+  --border:#30363d;
+  --border2:#21262d;
+  --text:#e6edf3;
+  --muted:#8b949e;
+  --accent:#58a6ff;
+  --accent-dim:#1f6feb22;
+  --green:#3fb950;
+  --red:#f85149;
+  --amber:#d29922;
+  --cyan:#22d3ee;
+}
+html,body{
+  height:100%;
+  font-family:var(--sans);
+  background:var(--panel2);
+  color:var(--text);
+  overflow:hidden;
+}
+body{ display:flex; flex-direction:column; }
+
+/* ── Topbar ── */
+.topbar{
+  background:var(--panel); border-bottom:1px solid var(--border);
+  height:44px; display:flex; align-items:center; padding:0 16px; gap:8px;
+  flex-shrink:0; z-index:200; position:relative;
+}
+.topbar a{ color:var(--accent); font-size:14px; font-weight:700; text-decoration:none; }
+.topbar-sep{ color:var(--border); font-size:16px; }
+.topbar-crumb{ font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+.topbar-title{ font-size:13px; font-weight:600; color:var(--text); }
+.badge{ background:var(--accent-dim); border:1px solid #1f6feb55; color:var(--accent);
+        font-size:10px; font-weight:700; padding:2px 7px; border-radius:20px; }
+
+/* ── Multi-Tools dropdown ── */
+.mt-wrap{ position:relative; margin-left:auto; }
+.mt-btn{
+  display:flex; align-items:center; gap:6px; background:none; border:1px solid var(--border);
+  border-radius:7px; padding:6px 11px; color:var(--accent); font-size:11px; font-weight:700;
+  cursor:pointer; font-family:inherit; transition:.15s;
+}
+.mt-btn:hover{ background:var(--border2); }
+.mt-panel{
+  display:none; position:absolute; top:calc(100% + 8px); right:0; background:var(--panel);
+  border:1px solid var(--border); border-radius:10px; padding:10px 8px; min-width:230px;
+  z-index:2000; box-shadow:0 8px 32px rgba(0,0,0,.5);
+}
+.mt-panel a{
+  display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:7px;
+  text-decoration:none; color:var(--text); transition:background .15s;
+}
+.mt-panel a:hover{ background:var(--border2); }
+.mt-panel a svg{ flex-shrink:0; }
+.mt-panel .mt-t{ font-size:12px; font-weight:600; }
+.mt-panel .mt-d{ font-size:10px; color:var(--muted); }
+.mt-hd{ font-size:10px; font-weight:700; color:var(--accent); padding:4px 8px 8px;
+        letter-spacing:.5px; border-bottom:1px solid var(--border2); margin-bottom:8px; }
+
+/* ── Toolbar ── */
+.toolbar{
+  background:var(--panel); border-bottom:1px solid var(--border);
+  height:46px; display:flex; align-items:center; padding:0 10px; gap:3px;
+  flex-shrink:0; overflow-x:auto; overflow-y:hidden; z-index:150;
+}
+.toolbar::-webkit-scrollbar{ height:0; }
+.tbtn{
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+  background:none; border:1px solid transparent; border-radius:7px; padding:5px 10px;
+  color:var(--muted); cursor:pointer; transition:.12s; font-family:inherit; flex-shrink:0;
+}
+.tbtn:hover{ background:var(--border2); color:var(--text); }
+.tbtn.active{ background:var(--accent-dim); border-color:#1f6feb55; color:var(--accent); }
+.tbtn span{ font-size:9px; font-weight:600; white-space:nowrap; }
+.tsep{ width:1px; height:26px; background:var(--border); margin:0 5px; flex-shrink:0; }
+
+/* ── Canvas ── */
+.canvas-wrap{ flex:1; position:relative; overflow:hidden; background:var(--panel2); min-height:0; }
+#cad{ display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; }
+#cad.tool-select{ cursor:default; }
+#cad.tool-copy-pick{ cursor:default; }
+#cad.tool-offset-pick{ cursor:default; }
+#cad.tool-offset-fixed{ cursor:default; }
+#cad.tool-pan{ cursor:grab; }
+#cad.panning{ cursor:grabbing; }
+
+/* ── Status bar ── */
+.statusbar{
+  position:absolute; left:0; right:0; bottom:0; height:26px;
+  background:rgba(22,27,34,.92); border-top:1px solid var(--border);
+  display:flex; align-items:center; padding:0 12px; gap:16px;
+  font-family:var(--mono); font-size:11px; color:var(--muted); z-index:100;
+  backdrop-filter:blur(4px);
+}
+.statusbar .hint{ color:var(--text); }
+.statusbar .sp{ margin-left:auto; display:flex; gap:16px; }
+.statusbar b{ color:var(--accent); font-weight:600; }
+
+/* ── Mobile ── */
+@media (max-width:768px){
+  .topbar-crumb{ display:none; }
+  .badge{ display:none; }
+  .tbtn span{ display:none; }
+  .tbtn{ padding:7px; }
+  .statusbar{ font-size:10px; gap:10px; padding:0 8px; }
+  .statusbar .hint{ display:none; }
+  .statusbar .sp{ gap:10px; margin-left:0; width:100%; justify-content:space-between; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Topbar ── -->
+<div class="topbar">
+  <a href="/">PortiCAD</a>
+  <span class="topbar-sep">›</span>
+  <div class="topbar-crumb">
+    <span>Multi-Tools</span><span>›</span>
+    <span class="topbar-title">Dibujo CAD</span>
+  </div>
+  <span class="badge">BETA</span>
+
+  <div class="mt-wrap">
+    <button class="mt-btn" onclick="toggleMT(event)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+        <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+      </svg>
+      Multi-Tools
+    </button>
+    <div class="mt-panel" id="mt-panel">
+      <div class="mt-hd">⚡ MULTI-TOOLS</div>
+      <a href="/">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f85149" stroke-width="2"><path d="M3 12l2-2 7-7 7 7 2 2M5 10v10h14V10"/></svg>
+        <div><div class="mt-t">Análisis Estructural</div><div class="mt-d">Pórticos · vigas · columnas</div></div>
+      </a>
+      <a href="/as_columna_hormigon_aci">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="12" y1="8" x2="12" y2="16"/></svg>
+        <div><div class="mt-t">As Columna H.A.</div><div class="mt-d">Diseño acero · ACI 318-25</div></div>
+      </a>
+      <a href="/diagrama_interaccion">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <div><div class="mt-t">Diagrama Interacción P-M</div><div class="mt-d">Curva P-M · Rectangular · Circular</div></div>
+      </a>
+      <a href="/as_cortante_columnas_hormigon_aci">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d29922" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg>
+        <div><div class="mt-t">Estribos Columna H.A.</div><div class="mt-d">Cortante & estribos · ACI 318-25</div></div>
+      </a>
+      <a href="/losas_hormigon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><rect x="2" y="7" width="20" height="10" rx="2"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="7" y1="7" x2="7" y2="17"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="17" y1="7" x2="17" y2="17"/></svg>
+        <div><div class="mt-t">Losas de Hormigón</div><div class="mt-d">Presupuesto & materiales por M³</div></div>
+      </a>
+      <a href="/cubicacion_volumen_hormigon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+        <div><div class="mt-t">Cubicación Hormigón</div><div class="mt-d">Volumen · losas, vigas, columnas</div></div>
+      </a>
+      <a href="/metrado_mezclas_morteros">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/></svg>
+        <div><div class="mt-t">Metrado Mezclas & Morteros</div><div class="mt-d">Insumos, costos & bloques</div></div>
+      </a>
+      <div style="border-top:1px solid var(--border2);margin:4px 0;"></div>
+      <a href="/gastos_personales/">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
+        <div><div class="mt-t">Gastos Personales</div><div class="mt-d">Control financiero & presupuesto</div></div>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toolbar ── -->
+<div class="toolbar" id="toolbar">
+  <button class="tbtn active" id="tool-select" onclick="setTool('select')" title="Seleccionar / Mover (V)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l7.07 17 2.51-7.39L21 11.07z"/></svg>
+    <span>Sel</span>
+  </button>
+  <button class="tbtn" id="tool-select-box" onclick="setTool('select-box')" title="Seleccionar por área — arrastra (B)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="1" stroke-dasharray="3.5 3.5"/></svg>
+    <span>Área</span>
+  </button>
+  <button class="tbtn" id="tool-line" onclick="setTool('line')" title="Línea (L)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="19" x2="19" y2="5"/></svg>
+    <span>Línea</span>
+  </button>
+  <button class="tbtn" id="tool-polyline" onclick="setTool('polyline')" title="Polilínea (P)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19L12 6L20 14"/><circle cx="4" cy="19" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="6" r="1.6" fill="currentColor" stroke="none"/><circle cx="20" cy="14" r="1.6" fill="currentColor" stroke="none"/></svg>
+    <span>Polilínea</span>
+  </button>
+  <button class="tbtn" id="tool-rect" onclick="setTool('rect')" title="Rectángulo (R)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="14" rx="1"/></svg>
+    <span>Rect.</span>
+  </button>
+  <button class="tbtn" id="tool-circle" onclick="setTool('circle')" title="Círculo (C)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/></svg>
+    <span>Círculo</span>
+  </button>
+  <button class="tbtn" id="tool-pan" onclick="setTool('pan')" title="Desplazar (Espacio+arrastrar)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-4.53a1.87 1.87 0 0 1 2.64-2.64L7 15"/></svg>
+    <span>Mano</span>
+  </button>
+
+  <div class="tsep"></div>
+  <button class="tbtn" id="btn-undo" onclick="undo()" title="Deshacer (Ctrl+Z)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M3 13C5 7 11 4 17 6s8 8 5 13"/></svg>
+    <span>Deshacer</span>
+  </button>
+  <button class="tbtn" id="btn-redo" onclick="redo()" title="Rehacer (Ctrl+Y)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M21 13C19 7 13 4 7 6S-1 14 2 19"/></svg>
+    <span>Rehacer</span>
+  </button>
+
+  <div class="tsep"></div>
+  <button class="tbtn active" id="tool-grid" onclick="toggleGrid()" title="Mostrar/ocultar grilla">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+    <span>Grilla</span>
+  </button>
+  <button class="tbtn active" id="tool-snap" onclick="toggleSnap()" title="Snap a grilla (F9)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="9"/></svg>
+    <span>Snap</span>
+  </button>
+  <button class="tbtn" id="tool-ortho" onclick="toggleOrtho()" title="Modo ortogonal (F8)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V4h16"/></svg>
+    <span>Ortog.</span>
+  </button>
+
+  <div class="tsep"></div>
+  <button class="tbtn" onclick="zoomBtn(1.25)" title="Acercar (+)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+    <span>Zoom+</span>
+  </button>
+  <button class="tbtn" onclick="zoomBtn(0.8)" title="Alejar (-)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+    <span>Zoom-</span>
+  </button>
+  <button class="tbtn" onclick="fitView()" title="Ajustar vista (F)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+    <span>Ajustar</span>
+  </button>
+
+  <div class="tsep"></div>
+  <button class="tbtn" id="tool-copy" onclick="clickCopyBtn()" title="Copiar — elige el objeto y luego el punto base/destino">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    <span>Copiar</span>
+  </button>
+  <button class="tbtn" id="tool-offset" onclick="clickOffsetBtn('offset')" title="Offset — la distancia sigue al mouse en cada clic (O)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="7" width="10" height="10" rx="1"/><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"/></svg>
+    <span>Offset</span>
+  </button>
+  <button class="tbtn" id="tool-offset-fixed" onclick="clickOffsetBtn('offset-fixed')" title="Offset Fijo — escribe la distancia y Enter, luego clic en cualquier objeto para desfasarlo">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+    <span>Offset Fijo</span>
+  </button>
+  <button class="tbtn" id="btn-delete" onclick="deleteSelected()" title="Eliminar seleccionado (Supr)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/></svg>
+    <span>Borrar</span>
+  </button>
+  <button class="tbtn" onclick="clearAll()" title="Limpiar todo el lienzo" style="color:var(--red);">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2"/></svg>
+    <span>Limpiar</span>
+  </button>
+</div>
+
+<!-- ── Canvas ── -->
+<div class="canvas-wrap">
+  <canvas id="cad"></canvas>
+  <div class="statusbar">
+    <span class="hint" id="hint">Selecciona una herramienta para empezar a dibujar</span>
+    <div class="sp">
+      <span>X: <b id="coord-x">0.00</b> m</span>
+      <span>Y: <b id="coord-y">0.00</b> m</span>
+      <span>Zoom: <b id="zoom-lbl">100%</b></span>
+      <span>Grilla: <b id="grid-lbl">0.5 m</b></span>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════
+   ESTADO GLOBAL
+════════════════════════════════════════════════ */
+const canvas = document.getElementById('cad');
+const ctx = canvas.getContext('2d');
+let dpr = window.devicePixelRatio || 1;
+
+let entities = [];           // formas dibujadas
+let history = [];            // pila de snapshots (JSON) para undo/redo
+let histIndex = -1;
+let selected = new Set();    // índices seleccionados (soporta selección múltiple)
+
+let tool = 'select';
+let view = { ox: 0, oy: 0, scale: 50 }; // px de pantalla por unidad (metro)
+const MIN_SCALE = 4, MAX_SCALE = 1200;
+
+let gridOn = true, snapOn = true, orthoOn = false;
+const SNAP_STEP = 0.5; // metros
+
+let drawState = null;   // { type, p1, raw } mientras se traza una forma ('raw' = punto derivado del mouse)
+let typedBuffer = '';   // valor numérico que el usuario está tecleando (longitud/ancho,alto/r,valor)
+let mouseScreen = { x: 0, y: 0 };
+let mouseWorld = { x: 0, y: 0 };
+
+let isPanning = false, panStart = null;
+let isDraggingEntity = false, dragOrigin = null, dragOrigEntities = null;
+let boxSelect = null;   // { startScreen, curScreen, shift } mientras se arrastra el recuadro de selección
+let copySource = null;  // clones de las entidades a duplicar (capturados al iniciar Copiar)
+let copyState = null;   // { base, raw } tras fijar el punto base de copia
+let offsetSource = null; // clones de las entidades a desfasar (línea/rect/círculo/polilínea)
+let spaceHeld = false;
+let inputIsTouch = false; // último tipo de entrada usado — el umbral de clic es más amplio en táctil
+
+const STORAGE_KEY = 'porticad_dibujo_cad_v1';
+
+/* ════════════════════════════════════════════════
+   TRANSFORMACIÓN MUNDO ↔ PANTALLA
+════════════════════════════════════════════════ */
+function toScreen(wx, wy) { return { x: view.ox + wx * view.scale, y: view.oy - wy * view.scale }; }
+function toWorld(sx, sy)  { return { x: (sx - view.ox) / view.scale, y: (view.oy - sy) / view.scale }; }
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  dpr = window.devicePixelRatio || 1;
+  canvas.width  = Math.round(rect.width  * dpr);
+  canvas.height = Math.round(rect.height * dpr);
+  canvas.style.width  = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  draw();
+}
+
+function centerView() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  view.ox = rect.width / 2;
+  view.oy = rect.height / 2;
+}
+
+/* ════════════════════════════════════════════════
+   HISTORIAL (UNDO / REDO)
+════════════════════════════════════════════════ */
+function pushHistory() {
+  history = history.slice(0, histIndex + 1);
+  history.push(JSON.stringify(entities));
+  histIndex++;
+  if (history.length > 100) { history.shift(); histIndex--; }
+  updateHistoryButtons();
+  saveLocal();
+}
+function undo() {
+  if (histIndex <= 0) { if (histIndex === 0) { histIndex = -1; entities = []; selected.clear(); updateHistoryButtons(); draw(); saveLocal(); } return; }
+  histIndex--;
+  entities = JSON.parse(history[histIndex]);
+  selected.clear();
+  updateHistoryButtons(); draw(); saveLocal();
+}
+function redo() {
+  if (histIndex >= history.length - 1) return;
+  histIndex++;
+  entities = JSON.parse(history[histIndex]);
+  selected.clear();
+  updateHistoryButtons(); draw(); saveLocal();
+}
+function updateHistoryButtons() {
+  document.getElementById('btn-undo').classList.toggle('disabled', histIndex < 0);
+  document.getElementById('btn-redo').classList.toggle('disabled', histIndex >= history.length - 1);
+}
+
+function saveLocal() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(entities)); } catch (e) {}
+}
+function loadLocal() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) { entities = JSON.parse(raw); history = [JSON.stringify(entities)]; histIndex = 0; }
+  } catch (e) {}
+}
+
+/* ════════════════════════════════════════════════
+   HERRAMIENTAS
+════════════════════════════════════════════════ */
+const TOOL_HINTS = {
+  select:     'Clic para seleccionar · arrastra para mover · Shift+clic suma · Supr para borrar',
+  'select-box': 'Arrastra para seleccionar por área (previsualizada) · mantén Shift para sumar',
+  line:       'Clic, clic para el segundo punto · escribe un valor (m) y Enter para longitud exacta · Esc cancela',
+  polyline:   'Clic para cada vértice · escribe una longitud (m) y Enter por tramo · clic cerca del inicio cierra · Enter (sin escribir) termina · Supr deshace el último vértice',
+  rect:       'Clic en una esquina y la opuesta · escribe ancho,alto (o un valor = cuadrado) y Enter · Esc cancela',
+  circle:     'Clic en el centro y el radio · escribe r,valor o d,valor (o un número = radio) y Enter · Esc cancela',
+  pan:        'Arrastra para desplazar la vista',
+  copy:       'Selecciona el objeto a copiar — clic, o arrastra un área · Shift+clic para elegir varios + Enter · Esc cancela',
+  copyPlace:  'Clic: punto base · clic: coloca una copia (puedes seguir colocando más) · escribe una distancia y Enter · Esc/Enter vacío termina',
+  offset:     'Selecciona línea/rectángulo/círculo/polilínea a desfasar — clic, o arrastra un área · Shift+clic para elegir varios + Enter · Esc cancela',
+  offsetPlace:'Mueve el mouse hacia el lado deseado y clic para crear el offset (puedes seguir) · escribe una distancia y Enter · Esc/Enter vacío termina',
+  'offset-fixed': 'Escribe una distancia y Enter para fijarla · luego clic sobre cualquier objeto para desfasarlo (repite en otros objetos) · Esc/Enter vacío termina',
+};
+
+let copyPhase = 'pick';   // 'pick' (eligiendo el objeto) → 'place' (colocando copias)
+let offsetPhase = 'pick'; // 'pick' (eligiendo el objeto) → 'place' (definiendo lado/distancia) — solo aplica al Offset dinámico
+let offsetLocked = null;  // distancia fija (modo "Offset Fijo"): se conserva hasta salir de la herramienta
+
+// "¿estamos en algún modo de offset?" — para Esc/clic-derecho, que salen igual en ambos modos
+function isOffsetTool() { return tool === 'offset' || tool === 'offset-fixed'; }
+
+function isBusy() {
+  return !!drawState || !!copyState
+    || (tool === 'copy' && copyPhase === 'place')
+    || (tool === 'offset' && offsetPhase === 'place')
+    || tool === 'offset-fixed';
+}
+
+function setTool(t) {
+  // Salir de una polilínea en curso (Esc, cambio de herramienta, etc.) la termina, igual que Enter.
+  if (drawState && drawState.type === 'polyline' && t !== 'polyline') {
+    finishPolyline(false);
+  }
+  tool = t;
+  drawState = null;
+  typedBuffer = '';
+  boxSelect = null;
+  copyState = null; copySource = null;
+  offsetSource = null;
+  offsetLocked = null;
+  if (t === 'copy') copyPhase = 'pick';
+  if (t === 'offset') offsetPhase = 'pick';
+  if (t !== 'select' && t !== 'select-box') selected.clear();
+  ['select','select-box','line','polyline','rect','circle','pan','copy','offset','offset-fixed'].forEach(k => document.getElementById('tool-' + k).classList.toggle('active', k === t));
+  canvas.className = 'tool-' + t + (t === 'copy' ? '-' + copyPhase : t === 'offset' ? '-' + offsetPhase : '');
+  document.getElementById('hint').textContent = TOOL_HINTS[t] || '';
+  draw();
+}
+
+// Botón "Copiar": si ya había algo seleccionado, pasa directo a colocar;
+// si no, entra en modo selección para elegir primero el objeto a copiar.
+function clickCopyBtn() {
+  const preSelected = [...selected];
+  setTool('copy');
+  if (preSelected.length > 0) {
+    selected = new Set(preSelected);
+    beginCopyPlacement();
+  }
+}
+
+function beginCopyPlacement() {
+  copySource = [...selected].map(i => JSON.parse(JSON.stringify(entities[i])));
+  copyState = null;
+  copyPhase = 'place';
+  canvas.className = 'tool-copy-place';
+  document.getElementById('hint').textContent = TOOL_HINTS.copyPlace;
+  draw();
+}
+
+// Botón "Offset" (dinámico): igual que Copiar — primero eliges el/los objeto(s), luego colocas.
+// Botón "Offset Fijo": no requiere elegir antes — escribes la distancia y luego haces clic
+// directamente sobre cualquier objeto (uno por uno) para desfasarlo con esa distancia fija.
+function clickOffsetBtn(mode) {
+  if (mode === 'offset-fixed') { setTool('offset-fixed'); return; }
+  const preSelected = [...selected];
+  setTool('offset');
+  if (preSelected.length > 0) {
+    selected = new Set(preSelected);
+    beginOffsetPlacement();
+  }
+}
+
+function beginOffsetPlacement() {
+  offsetSource = [...selected]
+    .map(i => entities[i])
+    .filter(e => isOffsettable(e.type))
+    .map(e => JSON.parse(JSON.stringify(e)));
+  if (offsetSource.length === 0) {
+    setTool('select');
+    document.getElementById('hint').textContent = '⚠ El offset solo aplica a líneas, rectángulos, círculos y polilíneas';
+    return;
+  }
+  offsetPhase = 'place';
+  canvas.className = 'tool-offset-place';
+  document.getElementById('hint').textContent = TOOL_HINTS.offsetPlace;
+  draw();
+}
+
+function toggleGrid() {
+  gridOn = !gridOn;
+  document.getElementById('tool-grid').classList.toggle('active', gridOn);
+  draw();
+}
+function toggleSnap() {
+  snapOn = !snapOn;
+  document.getElementById('tool-snap').classList.toggle('active', snapOn);
+}
+function toggleOrtho() {
+  orthoOn = !orthoOn;
+  document.getElementById('tool-ortho').classList.toggle('active', orthoOn);
+}
+
+function snapWorld(p) {
+  if (!snapOn) return p;
+  return { x: Math.round(p.x / SNAP_STEP) * SNAP_STEP, y: Math.round(p.y / SNAP_STEP) * SNAP_STEP };
+}
+function applyOrtho(p1, p2) {
+  if (!orthoOn) return p2;
+  const dx = Math.abs(p2.x - p1.x), dy = Math.abs(p2.y - p1.y);
+  return dx >= dy ? { x: p2.x, y: p1.y } : { x: p1.x, y: p2.y };
+}
+
+/* ════════════════════════════════════════════════
+   GRILLA ADAPTATIVA (secuencia 1-2-5)
+════════════════════════════════════════════════ */
+function computeGridStep() {
+  const targetPx = 60;
+  const raw = targetPx / view.scale;
+  const exp = Math.floor(Math.log10(raw));
+  const f = Math.pow(10, exp);
+  for (const n of [1, 2, 5, 10]) { if (n * f >= raw) return n * f; }
+  return 10 * f;
+}
+
+function drawGrid() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const W = rect.width, H = rect.height;
+  const step = computeGridStep();
+  const majorEvery = 5;
+
+  const wTL = toWorld(0, 0), wBR = toWorld(W, H);
+  const x0 = Math.floor(wTL.x / step) * step, x1 = wBR.x;
+  const y0 = Math.floor(wBR.y / step) * step, y1 = wTL.y;
+
+  ctx.lineWidth = 1;
+  let i = 0;
+  for (let x = x0; x <= x1 + step; x += step, i++) {
+    const sx = toScreen(x, 0).x;
+    const isMajor = Math.round(x / step) % majorEvery === 0;
+    ctx.strokeStyle = isMajor ? '#21262d' : '#171c23';
+    ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, H); ctx.stroke();
+  }
+  i = 0;
+  for (let y = y0; y <= y1 + step; y += step, i++) {
+    const sy = toScreen(0, y).y;
+    const isMajor = Math.round(y / step) % majorEvery === 0;
+    ctx.strokeStyle = isMajor ? '#21262d' : '#171c23';
+    ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
+  }
+
+  // Ejes
+  const origin = toScreen(0, 0);
+  ctx.lineWidth = 1.3;
+  ctx.strokeStyle = 'rgba(248,81,73,0.45)';
+  ctx.beginPath(); ctx.moveTo(0, origin.y); ctx.lineTo(W, origin.y); ctx.stroke();
+  ctx.strokeStyle = 'rgba(63,185,80,0.45)';
+  ctx.beginPath(); ctx.moveTo(origin.x, 0); ctx.lineTo(origin.x, H); ctx.stroke();
+
+  document.getElementById('grid-lbl').textContent = (step >= 1 ? step.toFixed(step % 1 === 0 ? 0 : 1) : step.toFixed(2)) + ' m';
+}
+
+/* ════════════════════════════════════════════════
+   DIBUJO DE ENTIDADES
+════════════════════════════════════════════════ */
+function strokeEntity(e, selected) {
+  ctx.lineWidth = selected ? 2.4 : 1.6;
+  ctx.strokeStyle = selected ? '#58a6ff' : '#e6edf3';
+  ctx.beginPath();
+  if (e.type === 'line') {
+    const a = toScreen(e.p1.x, e.p1.y), b = toScreen(e.p2.x, e.p2.y);
+    ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+  } else if (e.type === 'rect') {
+    const a = toScreen(Math.min(e.p1.x, e.p2.x), Math.max(e.p1.y, e.p2.y));
+    const b = toScreen(Math.max(e.p1.x, e.p2.x), Math.min(e.p1.y, e.p2.y));
+    ctx.rect(a.x, a.y, b.x - a.x, b.y - a.y);
+  } else if (e.type === 'circle') {
+    const c = toScreen(e.c.x, e.c.y);
+    ctx.arc(c.x, c.y, e.r * view.scale, 0, Math.PI * 2);
+  } else if (e.type === 'polyline') {
+    e.pts.forEach((pt, k) => { const s = toScreen(pt.x, pt.y); k === 0 ? ctx.moveTo(s.x, s.y) : ctx.lineTo(s.x, s.y); });
+    if (e.closed) ctx.closePath();
+  }
+  ctx.stroke();
+  if (selected) {
+    ctx.fillStyle = '#58a6ff';
+    handlesOf(e).forEach(h => { const s = toScreen(h.x, h.y); ctx.beginPath(); ctx.arc(s.x, s.y, 3.5, 0, Math.PI * 2); ctx.fill(); });
+  }
+}
+function handlesOf(e) {
+  if (e.type === 'line') return [e.p1, e.p2];
+  if (e.type === 'rect') return [e.p1, e.p2, { x: e.p1.x, y: e.p2.y }, { x: e.p2.x, y: e.p1.y }];
+  if (e.type === 'circle') return [e.c];
+  if (e.type === 'polyline') return e.pts;
+  return [];
+}
+
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+/* ════════════════════════════════════════════════
+   ENTRADA DE DIMENSIÓN TECLEADA (línea / rect / círculo)
+════════════════════════════════════════════════ */
+function drawStateP1() {
+  if (drawState.type === 'polyline') return drawState.pts[drawState.pts.length - 1];
+  return drawState.p1;
+}
+
+function effectiveP2() {
+  const p1 = drawStateP1(), m = drawState.raw;
+  if (!typedBuffer) return m;
+  const buf = typedBuffer.trim();
+
+  if (drawState.type === 'line' || drawState.type === 'polyline') {
+    const len = parseFloat(buf);
+    if (isNaN(len) || len <= 0) return m;
+    const a = (m.x === p1.x && m.y === p1.y) ? 0 : Math.atan2(m.y - p1.y, m.x - p1.x);
+    return { x: p1.x + len * Math.cos(a), y: p1.y + len * Math.sin(a) };
+  }
+  if (drawState.type === 'rect') {
+    const parts = buf.split(',');
+    let w = parseFloat(parts[0]);
+    if (isNaN(w) || w <= 0) return m;
+    let h = parts.length > 1 ? parseFloat(parts[1]) : NaN;
+    if (isNaN(h) || h <= 0) h = w; // sin coma (o alto incompleto) → cuadrado
+    const sx = (m.x >= p1.x) ? 1 : -1, sy = (m.y >= p1.y) ? 1 : -1;
+    return { x: p1.x + sx * Math.abs(w), y: p1.y + sy * Math.abs(h) };
+  }
+  if (drawState.type === 'circle') {
+    let r = null;
+    const rm = /^r,?\s*(-?[\d.]+)/i.exec(buf);
+    const dm = /^d,?\s*(-?[\d.]+)/i.exec(buf);
+    if (rm) r = parseFloat(rm[1]);
+    else if (dm) r = parseFloat(dm[1]) / 2;
+    else if (/^-?[\d.]+$/.test(buf)) r = parseFloat(buf);
+    if (r === null || isNaN(r) || r <= 0) return m;
+    const a = (m.x === p1.x && m.y === p1.y) ? 0 : Math.atan2(m.y - p1.y, m.x - p1.x);
+    return { x: p1.x + r * Math.cos(a), y: p1.y + r * Math.sin(a) };
+  }
+  return m;
+}
+
+function commitTyped() {
+  if (!drawState || !typedBuffer) return;
+  const p2 = effectiveP2();
+  if (p2 === drawState.raw) return; // el valor tecleado aún no es válido/completo
+  if (drawState.type === 'polyline') {
+    if (dist(p2, drawStateP1()) < 1e-6) return;
+    drawState.pts.push(p2);
+    typedBuffer = '';
+    draw();
+    return;
+  }
+  commitDraw(drawState.p1, p2);
+  typedBuffer = '';
+  if (drawState.type === 'line') { drawState = { type: 'line', p1: p2, raw: p2 }; }
+  else { drawState = null; }
+  draw();
+}
+
+function finishPolyline(closed) {
+  if (drawState && drawState.type === 'polyline' && drawState.pts.length >= 2) {
+    entities.push({ type: 'polyline', pts: drawState.pts.map(p => ({ x: p.x, y: p.y })), closed: !!closed });
+    pushHistory();
+  }
+  drawState = null;
+  typedBuffer = '';
+  draw();
+}
+
+function roundRectPath(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function drawTypedTooltip(pt, text) {
+  ctx.save();
+  ctx.font = '12px "JetBrains Mono", monospace';
+  const padX = 8, h = 22;
+  const w = ctx.measureText(text).width + padX * 2;
+  const x = pt.x + 12, y = pt.y - h - 12;
+  roundRectPath(x, y, w, h, 5);
+  ctx.fillStyle = '#1f6feb'; ctx.fill();
+  ctx.strokeStyle = '#79c0ff'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  ctx.fillText(text, x + padX, y + h / 2 + 1);
+  ctx.restore();
+}
+
+function drawPreview() {
+  if (!drawState) return;
+  const p1 = drawStateP1(), p2 = effectiveP2();
+  ctx.save();
+  ctx.setLineDash([6, 4]);
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = '#58a6ff';
+  let label = '';
+  ctx.beginPath();
+  if (drawState.type === 'polyline') {
+    // segmentos ya confirmados, en trazo sólido
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    drawState.pts.forEach((pt, k) => { const s = toScreen(pt.x, pt.y); k === 0 ? ctx.moveTo(s.x, s.y) : ctx.lineTo(s.x, s.y); });
+    ctx.stroke();
+    // tramo actual, punteado
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    const a = toScreen(p1.x, p1.y), b = toScreen(p2.x, p2.y);
+    ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+    label = dist(p1, p2).toFixed(2) + ' m';
+    // resaltar el punto de inicio (clic cerca cierra la polilínea)
+    const s0 = toScreen(drawState.pts[0].x, drawState.pts[0].y);
+    ctx.save(); ctx.setLineDash([]); ctx.strokeStyle = '#3fb950'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(s0.x, s0.y, 6, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  } else if (drawState.type === 'line') {
+    const a = toScreen(p1.x, p1.y), b = toScreen(p2.x, p2.y);
+    ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+    label = dist(p1, p2).toFixed(2) + ' m';
+  } else if (drawState.type === 'rect') {
+    const a = toScreen(Math.min(p1.x, p2.x), Math.max(p1.y, p2.y));
+    const b = toScreen(Math.max(p1.x, p2.x), Math.min(p1.y, p2.y));
+    ctx.rect(a.x, a.y, b.x - a.x, b.y - a.y);
+    label = Math.abs(p2.x - p1.x).toFixed(2) + ' × ' + Math.abs(p2.y - p1.y).toFixed(2) + ' m';
+  } else if (drawState.type === 'circle') {
+    const c = toScreen(p1.x, p1.y), r = dist(p1, p2) * view.scale;
+    ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+    label = 'r = ' + dist(p1, p2).toFixed(2) + ' m';
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+  const bp = toScreen(p2.x, p2.y);
+  if (typedBuffer) {
+    drawTypedTooltip(bp, typedBuffer + ' ↵');
+  } else {
+    ctx.fillStyle = '#58a6ff';
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.textBaseline = 'bottom'; ctx.textAlign = 'left';
+    ctx.fillText(label, bp.x + 10, bp.y - 8);
+  }
+  // punto de origen
+  const ap = toScreen(p1.x, p1.y);
+  ctx.fillStyle = '#58a6ff';
+  ctx.beginPath(); ctx.arc(ap.x, ap.y, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+/* ════════════════════════════════════════════════
+   SELECCIÓN POR ÁREA (recuadro con previsualización)
+════════════════════════════════════════════════ */
+function entityBBox(e) {
+  if (e.type === 'circle') return { x0: e.c.x - e.r, x1: e.c.x + e.r, y0: e.c.y - e.r, y1: e.c.y + e.r };
+  if (e.type === 'polyline') {
+    const xs = e.pts.map(p => p.x), ys = e.pts.map(p => p.y);
+    return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+  }
+  return {
+    x0: Math.min(e.p1.x, e.p2.x), x1: Math.max(e.p1.x, e.p2.x),
+    y0: Math.min(e.p1.y, e.p2.y), y1: Math.max(e.p1.y, e.p2.y),
+  };
+}
+function bboxIntersects(a, b) {
+  return !(a.x1 < b.x0 || a.x0 > b.x1 || a.y1 < b.y0 || a.y0 > b.y1);
+}
+
+function drawMarquee() {
+  if (!boxSelect) return;
+  const s = boxSelect.startScreen, c = boxSelect.curScreen;
+  const x = Math.min(s.x, c.x), y = Math.min(s.y, c.y), w = Math.abs(c.x - s.x), h = Math.abs(c.y - s.y);
+  ctx.save();
+  ctx.fillStyle = 'rgba(88,166,255,0.12)';
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = 1; ctx.setLineDash([5, 4]);
+  ctx.strokeRect(x, y, w, h);
+  ctx.restore();
+}
+
+/* ════════════════════════════════════════════════
+   COPIAR (punto base + punto destino, estilo AutoCAD)
+════════════════════════════════════════════════ */
+function effectiveCopyOffset() {
+  const base = copyState.base, m = copyState.raw;
+  let dx = m.x - base.x, dy = m.y - base.y;
+  if (typedBuffer) {
+    const len = parseFloat(typedBuffer);
+    if (!isNaN(len) && len > 0) {
+      const a = (dx === 0 && dy === 0) ? 0 : Math.atan2(dy, dx);
+      dx = len * Math.cos(a); dy = len * Math.sin(a);
+    }
+  }
+  return { dx, dy };
+}
+
+function placeCopy(off) {
+  const newIdx = [];
+  copySource.forEach(src => {
+    entities.push(translateEntity(src, off.dx, off.dy));
+    newIdx.push(entities.length - 1);
+  });
+  selected = new Set(newIdx);
+  pushHistory();
+}
+
+function drawEntityPath(e) {
+  ctx.beginPath();
+  if (e.type === 'line') {
+    const a = toScreen(e.p1.x, e.p1.y), b = toScreen(e.p2.x, e.p2.y);
+    ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+  } else if (e.type === 'rect') {
+    const a = toScreen(Math.min(e.p1.x, e.p2.x), Math.max(e.p1.y, e.p2.y));
+    const b = toScreen(Math.max(e.p1.x, e.p2.x), Math.min(e.p1.y, e.p2.y));
+    ctx.rect(a.x, a.y, b.x - a.x, b.y - a.y);
+  } else if (e.type === 'circle') {
+    const c = toScreen(e.c.x, e.c.y);
+    ctx.arc(c.x, c.y, e.r * view.scale, 0, Math.PI * 2);
+  } else if (e.type === 'polyline') {
+    e.pts.forEach((pt, k) => { const s = toScreen(pt.x, pt.y); k === 0 ? ctx.moveTo(s.x, s.y) : ctx.lineTo(s.x, s.y); });
+    if (e.closed) ctx.closePath();
+  }
+}
+
+/* ════════════════════════════════════════════════
+   OFFSET (desfase paralelo — línea / rectángulo / círculo / polilínea)
+════════════════════════════════════════════════ */
+function isOffsettable(type) { return type === 'line' || type === 'rect' || type === 'circle' || type === 'polyline'; }
+
+// Intersección de dos rectas infinitas (a1-a2) y (b1-b2). null si son paralelas.
+function lineIntersect(a1, a2, b1, b2) {
+  const d1x = a2.x - a1.x, d1y = a2.y - a1.y;
+  const d2x = b2.x - b1.x, d2y = b2.y - b1.y;
+  const denom = d1x * d2y - d1y * d2x;
+  if (Math.abs(denom) < 1e-9) return null;
+  const t = ((b1.x - a1.x) * d2y - (b1.y - a1.y) * d2x) / denom;
+  return { x: a1.x + t * d1x, y: a1.y + t * d1y };
+}
+
+function computeOffsetInfo(e, m) {
+  if (e.type === 'line') {
+    const p1 = e.p1, p2 = e.p2;
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    const L = Math.hypot(dx, dy) || 1e-9;
+    const nx = -dy / L, ny = dx / L;
+    const signedDist = (m.x - p1.x) * nx + (m.y - p1.y) * ny;
+    return { sign: signedDist >= 0 ? 1 : -1, dist: Math.abs(signedDist), nx, ny };
+  }
+  if (e.type === 'rect') {
+    const x0 = Math.min(e.p1.x, e.p2.x), x1 = Math.max(e.p1.x, e.p2.x);
+    const y0 = Math.min(e.p1.y, e.p2.y), y1 = Math.max(e.p1.y, e.p2.y);
+    const inside = m.x > x0 && m.x < x1 && m.y > y0 && m.y < y1;
+    let d;
+    if (inside) {
+      d = Math.min(m.x - x0, x1 - m.x, m.y - y0, y1 - m.y);
+    } else {
+      const dx = Math.max(x0 - m.x, 0, m.x - x1), dy = Math.max(y0 - m.y, 0, m.y - y1);
+      d = Math.hypot(dx, dy);
+      if (d === 0) d = Math.max(x0 - m.x, m.x - x1, y0 - m.y, m.y - y1, 0);
+    }
+    return { sign: inside ? -1 : 1, dist: d };
+  }
+  if (e.type === 'circle') {
+    const d = dist(m, e.c);
+    return { sign: d >= e.r ? 1 : -1, dist: Math.abs(d - e.r) };
+  }
+  if (e.type === 'polyline') {
+    const pts = e.pts;
+    const segs = [];
+    for (let i = 0; i < pts.length - 1; i++) segs.push([pts[i], pts[i + 1]]);
+    if (e.closed && pts.length > 2) segs.push([pts[pts.length - 1], pts[0]]);
+    if (segs.length === 0) return null;
+    let best = null, bestD = Infinity;
+    segs.forEach(([a, b]) => { const d = distPointToSeg(m, a, b); if (d < bestD) { bestD = d; best = [a, b]; } });
+    const [a, b] = best;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const L = Math.hypot(dx, dy) || 1e-9;
+    const nx = -dy / L, ny = dx / L;
+    const signedDist = (m.x - a.x) * nx + (m.y - a.y) * ny;
+    return { sign: signedDist >= 0 ? 1 : -1, dist: Math.abs(signedDist) };
+  }
+  return null;
+}
+
+function applyOffset(e, sign, magnitude, info) {
+  if (e.type === 'line') {
+    const ox = info.nx * sign * magnitude, oy = info.ny * sign * magnitude;
+    return { type: 'line', p1: { x: e.p1.x + ox, y: e.p1.y + oy }, p2: { x: e.p2.x + ox, y: e.p2.y + oy } };
+  }
+  if (e.type === 'rect') {
+    const x0 = Math.min(e.p1.x, e.p2.x), x1 = Math.max(e.p1.x, e.p2.x);
+    const y0 = Math.min(e.p1.y, e.p2.y), y1 = Math.max(e.p1.y, e.p2.y);
+    let m = magnitude;
+    if (sign < 0) { const maxShrink = Math.max(0, Math.min(x1 - x0, y1 - y0) / 2 - 0.02); m = Math.min(m, maxShrink); }
+    return { type: 'rect', p1: { x: x0 - sign * m, y: y0 - sign * m }, p2: { x: x1 + sign * m, y: y1 + sign * m } };
+  }
+  if (e.type === 'circle') {
+    return { type: 'circle', c: { x: e.c.x, y: e.c.y }, r: Math.max(0.02, e.r + sign * magnitude) };
+  }
+  if (e.type === 'polyline') {
+    const pts = e.pts, n = pts.length;
+    const segCount = e.closed ? n : n - 1;
+    if (segCount < 1) return null;
+    const offLines = [];
+    for (let i = 0; i < segCount; i++) {
+      const a = pts[i], b = pts[(i + 1) % n];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const L = Math.hypot(dx, dy) || 1e-9;
+      const nx = -dy / L, ny = dx / L;
+      const ox = nx * sign * magnitude, oy = ny * sign * magnitude;
+      offLines.push({ p1: { x: a.x + ox, y: a.y + oy }, p2: { x: b.x + ox, y: b.y + oy } });
+    }
+    const newPts = [];
+    if (e.closed) {
+      for (let i = 0; i < n; i++) {
+        const prev = offLines[(i - 1 + segCount) % segCount], cur = offLines[i % segCount];
+        newPts.push(lineIntersect(prev.p1, prev.p2, cur.p1, cur.p2) || cur.p1);
+      }
+    } else {
+      newPts.push(offLines[0].p1);
+      for (let i = 1; i < segCount; i++) {
+        newPts.push(lineIntersect(offLines[i - 1].p1, offLines[i - 1].p2, offLines[i].p1, offLines[i].p2) || offLines[i].p1);
+      }
+      newPts.push(offLines[segCount - 1].p2);
+    }
+    return { type: 'polyline', pts: newPts, closed: e.closed };
+  }
+  return null;
+}
+
+function offsetMagnitude(info) {
+  if (typedBuffer) {
+    const v = parseFloat(typedBuffer);
+    if (!isNaN(v) && v > 0) return v;
+  }
+  if (tool === 'offset-fixed' && offsetLocked !== null) return offsetLocked;
+  return info.dist;
+}
+
+function placeOffset() {
+  const m = mouseWorld;
+  const newIdx = [];
+  let usedMag = null;
+  offsetSource.forEach(src => {
+    const info = computeOffsetInfo(src, m);
+    if (!info) return;
+    const mag = offsetMagnitude(info);
+    usedMag = mag;
+    if (mag <= 1e-6) return;
+    entities.push(applyOffset(src, info.sign, mag, info));
+    newIdx.push(entities.length - 1);
+  });
+  if (newIdx.length) { selected = new Set(newIdx); pushHistory(); }
+  // Modo "Offset Fijo": el valor recién tecleado queda fijo para las siguientes colocaciones.
+  if (tool === 'offset-fixed' && typedBuffer && usedMag !== null) offsetLocked = usedMag;
+  typedBuffer = '';
+  draw();
+}
+
+function drawOffsetPreview() {
+  if (tool !== 'offset' || offsetPhase !== 'place' || !offsetSource || offsetSource.length === 0) return;
+  const m = mouseWorld;
+  ctx.save();
+  ctx.setLineDash([5, 4]);
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = '#f59e0b';
+  let mag = 0, any = false;
+  offsetSource.forEach(src => {
+    const info = computeOffsetInfo(src, m);
+    if (!info) return;
+    mag = offsetMagnitude(info);
+    any = true;
+    drawEntityPath(applyOffset(src, info.sign, mag, info));
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+  if (any) {
+    const mp = toScreen(m.x, m.y);
+    if (typedBuffer) {
+      drawTypedTooltip(mp, typedBuffer + ' ↵');
+    } else {
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '11px "JetBrains Mono", monospace';
+      ctx.textBaseline = 'bottom'; ctx.textAlign = 'left';
+      ctx.fillText(mag.toFixed(2) + ' m', mp.x + 10, mp.y - 8);
+    }
+  }
+  ctx.restore();
+}
+
+// Offset Fijo: sin fase de selección — busca en vivo el objeto bajo el cursor y
+// previsualiza su desfase con la distancia fija (o la que se esté tecleando).
+function drawOffsetFixedPreview() {
+  if (tool !== 'offset-fixed') return;
+  const hit = hitTest(mouseScreen.x, mouseScreen.y);
+  if (hit < 0) return;
+  const src = entities[hit];
+  if (!isOffsettable(src.type)) return;
+  const info = computeOffsetInfo(src, mouseWorld);
+  if (!info) return;
+  const mag = offsetMagnitude(info);
+  ctx.save();
+  ctx.setLineDash([5, 4]);
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = '#f59e0b';
+  drawEntityPath(applyOffset(src, info.sign, mag, info));
+  ctx.stroke();
+  ctx.setLineDash([]);
+  const mp = toScreen(mouseWorld.x, mouseWorld.y);
+  if (typedBuffer) {
+    drawTypedTooltip(mp, typedBuffer + ' ↵');
+  } else {
+    const locked = offsetLocked !== null;
+    ctx.fillStyle = '#f59e0b';
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.textBaseline = 'bottom'; ctx.textAlign = 'left';
+    ctx.fillText(mag.toFixed(2) + ' m' + (locked ? ' 🔒' : ''), mp.x + 10, mp.y - 8);
+  }
+  ctx.restore();
+}
+
+function placeOffsetFixed(sx, sy) {
+  const hit = hitTest(sx, sy);
+  if (hit < 0) return;
+  const src = entities[hit];
+  if (!isOffsettable(src.type)) return;
+  const info = computeOffsetInfo(src, mouseWorld);
+  if (!info) return;
+  const mag = offsetMagnitude(info);
+  if (mag <= 1e-6) return;
+  entities.push(applyOffset(src, info.sign, mag, info));
+  selected = new Set([entities.length - 1]);
+  if (typedBuffer) {
+    const v = parseFloat(typedBuffer);
+    if (!isNaN(v) && v > 0) offsetLocked = v;
+    typedBuffer = '';
+  }
+  pushHistory();
+  draw();
+}
+
+function drawCopyPreview() {
+  if (!copyState || !copySource) return;
+  const off = effectiveCopyOffset();
+  ctx.save();
+  ctx.setLineDash([5, 4]);
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = '#3fb950';
+  copySource.forEach(src => { drawEntityPath(translateEntity(src, off.dx, off.dy)); ctx.stroke(); });
+  ctx.setLineDash([]);
+
+  const bp = toScreen(copyState.base.x, copyState.base.y);
+  const mp = toScreen(copyState.base.x + off.dx, copyState.base.y + off.dy);
+  ctx.strokeStyle = 'rgba(63,185,80,0.6)'; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(bp.x, bp.y); ctx.lineTo(mp.x, mp.y); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#3fb950';
+  ctx.beginPath(); ctx.arc(bp.x, bp.y, 3, 0, Math.PI * 2); ctx.fill();
+
+  if (typedBuffer) {
+    drawTypedTooltip(mp, typedBuffer + ' ↵');
+  } else {
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.textBaseline = 'bottom'; ctx.textAlign = 'left';
+    ctx.fillText(Math.hypot(off.dx, off.dy).toFixed(2) + ' m', mp.x + 10, mp.y - 8);
+  }
+  ctx.restore();
+}
+
+function draw() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  ctx.clearRect(0, 0, rect.width, rect.height);
+  if (gridOn) drawGrid();
+  entities.forEach((e, i) => strokeEntity(e, selected.has(i)));
+  drawPreview();
+  drawCopyPreview();
+  drawOffsetPreview();
+  drawOffsetFixedPreview();
+  drawMarquee();
+}
+
+/* ════════════════════════════════════════════════
+   HIT-TESTING (selección)
+════════════════════════════════════════════════ */
+function distPointToSeg(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  let t = len2 === 0 ? 0 : ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  const proj = { x: a.x + t * dx, y: a.y + t * dy };
+  return dist(p, proj);
+}
+
+// Punto-en-polígono (ray casting) — para el interior de polilíneas cerradas
+function pointInPolygon(p, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i].x, yi = pts[i].y, xj = pts[j].x, yj = pts[j].y;
+    const intersect = ((yi > p.y) !== (yj > p.y)) && (p.x < (xj - xi) * (p.y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+function polygonArea(pts) {
+  let a = 0;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) a += (pts[j].x + pts[i].x) * (pts[j].y - pts[i].y);
+  return Math.abs(a / 2);
+}
+
+// Umbral de clic: más generoso en pantallas táctiles (dedo) que con mouse (cursor preciso)
+function hitThreshPx() { return inputIsTouch ? 14 : 8; }
+
+function hitTest(sx, sy) {
+  const threshWorld = hitThreshPx() / view.scale;
+  const p = toWorld(sx, sy);
+  const inside = []; // candidatos por clic "adentro" de un área (rect/círculo/polilínea cerrada) — desempate por menor área
+
+  for (let i = entities.length - 1; i >= 0; i--) {
+    const e = entities[i];
+    if (e.type === 'line') {
+      if (distPointToSeg(p, e.p1, e.p2) <= threshWorld) return i;
+    } else if (e.type === 'rect') {
+      const x0 = Math.min(e.p1.x, e.p2.x), x1 = Math.max(e.p1.x, e.p2.x);
+      const y0 = Math.min(e.p1.y, e.p2.y), y1 = Math.max(e.p1.y, e.p2.y);
+      const corners = [{x:x0,y:y0},{x:x1,y:y0},{x:x1,y:y1},{x:x0,y:y1}];
+      let nearEdge = false;
+      for (let k = 0; k < 4; k++) {
+        if (distPointToSeg(p, corners[k], corners[(k + 1) % 4]) <= threshWorld) { nearEdge = true; break; }
+      }
+      if (nearEdge) return i;
+      if (p.x > x0 && p.x < x1 && p.y > y0 && p.y < y1) inside.push({ i, area: (x1 - x0) * (y1 - y0) });
+    } else if (e.type === 'circle') {
+      const d = dist(p, e.c);
+      if (Math.abs(d - e.r) <= threshWorld) return i;
+      if (d < e.r) inside.push({ i, area: Math.PI * e.r * e.r });
+    } else if (e.type === 'polyline') {
+      const pts = e.pts;
+      let nearEdge = false;
+      for (let k = 0; k < pts.length - 1; k++) { if (distPointToSeg(p, pts[k], pts[k + 1]) <= threshWorld) { nearEdge = true; break; } }
+      if (!nearEdge && e.closed && pts.length > 2 && distPointToSeg(p, pts[pts.length - 1], pts[0]) <= threshWorld) nearEdge = true;
+      if (nearEdge) return i;
+      if (e.closed && pts.length > 2 && pointInPolygon(p, pts)) inside.push({ i, area: polygonArea(pts) });
+    }
+  }
+  if (inside.length) { inside.sort((a, b) => a.area - b.area); return inside[0].i; }
+  return -1;
+}
+
+function translateEntity(e, dx, dy) {
+  const c = JSON.parse(JSON.stringify(e));
+  if (c.type === 'line' || c.type === 'rect') { c.p1.x += dx; c.p1.y += dy; c.p2.x += dx; c.p2.y += dy; }
+  else if (c.type === 'circle') { c.c.x += dx; c.c.y += dy; }
+  else if (c.type === 'polyline') { c.pts.forEach(pt => { pt.x += dx; pt.y += dy; }); }
+  return c;
+}
+
+/* ════════════════════════════════════════════════
+   ZOOM / PAN
+════════════════════════════════════════════════ */
+function zoomAt(sx, sy, factor) {
+  const before = toWorld(sx, sy);
+  view.scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, view.scale * factor));
+  view.ox = sx - before.x * view.scale;
+  view.oy = sy + before.y * view.scale;
+  updateZoomLabel();
+  draw();
+}
+function zoomBtn(factor) {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  zoomAt(rect.width / 2, rect.height / 2, factor);
+}
+function updateZoomLabel() {
+  document.getElementById('zoom-lbl').textContent = Math.round(view.scale / 50 * 100) + '%';
+}
+function fitView() {
+  if (entities.length === 0) { centerView(); view.scale = 50; updateZoomLabel(); draw(); return; }
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  entities.forEach(e => {
+    const pts = e.type === 'circle' ? [{x:e.c.x-e.r,y:e.c.y-e.r},{x:e.c.x+e.r,y:e.c.y+e.r}]
+      : e.type === 'polyline' ? e.pts : [e.p1, e.p2];
+    pts.forEach(p => { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); });
+  });
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const w = Math.max(x1 - x0, 0.5), h = Math.max(y1 - y0, 0.5);
+  const pad = 0.9;
+  view.scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, Math.min(rect.width / w, rect.height / h) * pad));
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  view.ox = rect.width / 2 - cx * view.scale;
+  view.oy = rect.height / 2 + cy * view.scale;
+  updateZoomLabel();
+  draw();
+}
+
+/* ════════════════════════════════════════════════
+   ACCIONES
+════════════════════════════════════════════════ */
+function deleteSelected() {
+  if (selected.size === 0) return;
+  [...selected].sort((a, b) => b - a).forEach(i => entities.splice(i, 1));
+  selected.clear();
+  pushHistory(); draw();
+}
+function clearAll() {
+  if (entities.length === 0) return;
+  if (!confirm('¿Borrar todo el dibujo? Esta acción no se puede deshacer fácilmente.')) return;
+  entities = []; selected.clear();
+  pushHistory(); draw();
+}
+
+/* ════════════════════════════════════════════════
+   INTERACCIÓN — PUNTERO (mouse + touch unificados)
+════════════════════════════════════════════════ */
+function updateCoordLabels(w) {
+  document.getElementById('coord-x').textContent = w.x.toFixed(2);
+  document.getElementById('coord-y').textContent = w.y.toFixed(2);
+}
+
+function pointerDown(sx, sy, button, shiftKey) {
+  mouseScreen = { x: sx, y: sy };
+  mouseWorld = toWorld(sx, sy);
+
+  const wantsPan = tool === 'pan' || button === 1 || spaceHeld;
+  if (wantsPan) {
+    isPanning = true;
+    panStart = { sx, sy, ox: view.ox, oy: view.oy };
+    canvas.classList.add('panning');
+    return;
+  }
+
+  if (tool === 'select') {
+    const hit = hitTest(sx, sy);
+    if (hit >= 0) {
+      if (!selected.has(hit)) selected = shiftKey ? new Set([...selected, hit]) : new Set([hit]);
+      isDraggingEntity = true;
+      dragOrigin = snapWorld(mouseWorld);
+      dragOrigEntities = {};
+      selected.forEach(idx => { dragOrigEntities[idx] = JSON.parse(JSON.stringify(entities[idx])); });
+    } else if (!shiftKey) {
+      selected.clear();
+    }
+    draw();
+    return;
+  }
+
+  if (tool === 'select-box') {
+    boxSelect = { startScreen: { x: sx, y: sy }, curScreen: { x: sx, y: sy }, shift: shiftKey };
+    draw();
+    return;
+  }
+
+  if (tool === 'copy' && copyPhase === 'pick') {
+    const hit = hitTest(sx, sy);
+    if (hit >= 0) {
+      if (!selected.has(hit)) selected = shiftKey ? new Set([...selected, hit]) : new Set([hit]);
+      if (!shiftKey) beginCopyPlacement();
+      draw();
+      return;
+    }
+    if (!shiftKey) selected.clear();
+    boxSelect = { startScreen: { x: sx, y: sy }, curScreen: { x: sx, y: sy }, shift: shiftKey };
+    draw();
+    return;
+  }
+
+  if (tool === 'copy' && copyPhase === 'place') {
+    const p = snapWorld(mouseWorld);
+    if (!copyState) {
+      copyState = { base: p, raw: p };
+      typedBuffer = '';
+    } else {
+      copyState.raw = applyOrtho(copyState.base, p);
+      placeCopy(effectiveCopyOffset());
+      typedBuffer = '';
+    }
+    draw();
+    return;
+  }
+
+  if (tool === 'offset' && offsetPhase === 'pick') {
+    const hit = hitTest(sx, sy);
+    if (hit >= 0) {
+      if (!selected.has(hit)) selected = shiftKey ? new Set([...selected, hit]) : new Set([hit]);
+      if (!shiftKey) beginOffsetPlacement();
+      draw();
+      return;
+    }
+    if (!shiftKey) selected.clear();
+    boxSelect = { startScreen: { x: sx, y: sy }, curScreen: { x: sx, y: sy }, shift: shiftKey };
+    draw();
+    return;
+  }
+
+  if (tool === 'offset' && offsetPhase === 'place') {
+    placeOffset();
+    return;
+  }
+
+  if (tool === 'offset-fixed') {
+    placeOffsetFixed(sx, sy);
+    return;
+  }
+
+  if (tool === 'polyline') {
+    const p = snapWorld(mouseWorld);
+    if (!drawState) {
+      drawState = { type: 'polyline', pts: [p], raw: p };
+      typedBuffer = '';
+    } else {
+      const rawPt = applyOrtho(drawStateP1(), p);
+      drawState.raw = rawPt;
+      const first = drawState.pts[0];
+      const sClick = toScreen(p.x, p.y), sFirst = toScreen(first.x, first.y);
+      if (drawState.pts.length >= 2 && dist(sClick, sFirst) <= 10) {
+        finishPolyline(true);
+      } else {
+        const next = effectiveP2();
+        if (dist(next, drawStateP1()) > 1e-6) drawState.pts.push(next);
+        typedBuffer = '';
+      }
+    }
+    draw();
+    return;
+  }
+
+  if (tool === 'line' || tool === 'rect' || tool === 'circle') {
+    const p = snapWorld(mouseWorld);
+    if (!drawState) {
+      drawState = { type: tool, p1: p, raw: p };
+      typedBuffer = '';
+    } else {
+      drawState.raw = applyOrtho(drawState.p1, p);
+      const p2 = effectiveP2();
+      commitDraw(drawState.p1, p2);
+      typedBuffer = '';
+      if (tool === 'line') {
+        drawState = { type: 'line', p1: p2, raw: p2 }; // encadenar polilínea
+      } else {
+        drawState = null;
+      }
+    }
+    draw();
+  }
+}
+
+function commitDraw(p1, p2) {
+  let e = null;
+  if (drawState.type === 'line') {
+    if (dist(p1, p2) < 1e-6) return;
+    e = { type: 'line', p1, p2 };
+  } else if (drawState.type === 'rect') {
+    if (Math.abs(p1.x - p2.x) < 1e-6 || Math.abs(p1.y - p2.y) < 1e-6) return;
+    e = { type: 'rect', p1, p2 };
+  } else if (drawState.type === 'circle') {
+    const r = dist(p1, p2);
+    if (r < 1e-6) return;
+    e = { type: 'circle', c: p1, r };
+  }
+  if (e) { entities.push(e); pushHistory(); }
+}
+
+function pointerMove(sx, sy) {
+  mouseScreen = { x: sx, y: sy };
+  mouseWorld = toWorld(sx, sy);
+  updateCoordLabels(snapOn ? snapWorld(mouseWorld) : mouseWorld);
+
+  if (isPanning) {
+    view.ox = panStart.ox + (sx - panStart.sx);
+    view.oy = panStart.oy + (sy - panStart.sy);
+    draw();
+    return;
+  }
+  if (boxSelect) {
+    boxSelect.curScreen = { x: sx, y: sy };
+    draw();
+    return;
+  }
+  if (isDraggingEntity && selected.size > 0) {
+    const cur = snapWorld(mouseWorld);
+    const dx = cur.x - dragOrigin.x, dy = cur.y - dragOrigin.y;
+    selected.forEach(idx => { entities[idx] = translateEntity(dragOrigEntities[idx], dx, dy); });
+    draw();
+    return;
+  }
+  if (copyState) {
+    let p = snapWorld(mouseWorld);
+    p = applyOrtho(copyState.base, p);
+    copyState.raw = p;
+    draw();
+    return;
+  }
+  if (drawState) {
+    let p = snapWorld(mouseWorld);
+    p = applyOrtho(drawStateP1(), p);
+    drawState.raw = p;
+    draw();
+    return;
+  }
+  if (tool === 'offset' && offsetPhase === 'place') {
+    draw();
+    return;
+  }
+  if (tool === 'offset-fixed') {
+    draw();
+  }
+}
+
+function pointerUp() {
+  if (isPanning) { isPanning = false; canvas.classList.remove('panning'); return; }
+  if (boxSelect) {
+    const s = boxSelect.startScreen, c = boxSelect.curScreen;
+    const dragPx = Math.hypot(c.x - s.x, c.y - s.y);
+    let hits = [];
+    if (dragPx < (inputIsTouch ? 8 : 5)) {
+      const h = hitTest(s.x, s.y);
+      if (h >= 0) hits = [h];
+    } else {
+      const a = toWorld(s.x, s.y), b = toWorld(c.x, c.y);
+      const box = { x0: Math.min(a.x, b.x), x1: Math.max(a.x, b.x), y0: Math.min(a.y, b.y), y1: Math.max(a.y, b.y) };
+      entities.forEach((e, i) => { if (bboxIntersects(entityBBox(e), box)) hits.push(i); });
+    }
+    const shiftHeld = boxSelect.shift;
+    if (shiftHeld) hits.forEach(i => selected.add(i));
+    else selected = new Set(hits);
+    boxSelect = null;
+    if (tool === 'copy' && copyPhase === 'pick' && !shiftHeld && selected.size > 0) {
+      beginCopyPlacement();
+    } else if (tool === 'offset' && offsetPhase === 'pick' && !shiftHeld && selected.size > 0) {
+      beginOffsetPlacement();
+    } else {
+      draw();
+    }
+    return;
+  }
+  if (isDraggingEntity) { isDraggingEntity = false; pushHistory(); }
+}
+
+/* ── Mouse ── */
+canvas.addEventListener('mousedown', e => { inputIsTouch = false; e.preventDefault(); pointerDown(e.offsetX, e.offsetY, e.button, e.shiftKey); });
+canvas.addEventListener('mousemove', e => { inputIsTouch = false; pointerMove(e.offsetX, e.offsetY); });
+window.addEventListener('mouseup', pointerUp);
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  if (drawState && drawState.type === 'polyline') { finishPolyline(false); }
+  else if (drawState) { drawState = null; typedBuffer = ''; draw(); }
+  else if (tool === 'copy' || isOffsetTool()) { setTool('select'); }
+});
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  zoomAt(e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0 ? 1.12 : 1 / 1.12);
+}, { passive: false });
+
+/* ── Touch ── */
+let lastTouchDist = null;
+function touchPoint(t) { const r = canvas.getBoundingClientRect(); return { x: t.clientX - r.left, y: t.clientY - r.top }; }
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  inputIsTouch = true;
+  if (e.touches.length === 1) {
+    const p = touchPoint(e.touches[0]);
+    pointerDown(p.x, p.y, 0, false);
+  } else if (e.touches.length === 2) {
+    isDraggingEntity = false; isPanning = false; drawState = null; boxSelect = null; copyState = null;
+    const a = touchPoint(e.touches[0]), b = touchPoint(e.touches[1]);
+    lastTouchDist = dist(a, b);
+  }
+}, { passive: false });
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 1) {
+    const p = touchPoint(e.touches[0]);
+    pointerMove(p.x, p.y);
+  } else if (e.touches.length === 2 && lastTouchDist) {
+    const a = touchPoint(e.touches[0]), b = touchPoint(e.touches[1]);
+    const d = dist(a, b);
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    zoomAt(mid.x, mid.y, d / lastTouchDist);
+    lastTouchDist = d;
+  }
+}, { passive: false });
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  if (e.touches.length === 0) { pointerUp(); lastTouchDist = null; }
+}, { passive: false });
+
+/* ════════════════════════════════════════════════
+   TECLADO
+════════════════════════════════════════════════ */
+window.addEventListener('keydown', e => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea') return;
+
+  if (e.code === 'Space' && !spaceHeld) { spaceHeld = true; canvas.style.cursor = 'grab'; }
+
+  // Entrada de dimensión tecleada: mientras se traza una forma, los dígitos van al valor, no a los atajos
+  if (drawState) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (drawState.type === 'polyline' && !typedBuffer) { finishPolyline(false); return; }
+      commitTyped();
+      return;
+    }
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      if (typedBuffer) { typedBuffer = typedBuffer.slice(0, -1); }
+      else if (drawState.type === 'polyline' && drawState.pts.length > 1) { drawState.pts.pop(); }
+      draw();
+      return;
+    }
+    if (/^[0-9.,-]$/.test(e.key) || e.key === 'r' || e.key === 'R' || e.key === 'd' || e.key === 'D') {
+      e.preventDefault(); typedBuffer += e.key; draw(); return;
+    }
+  }
+
+  // Entrada de distancia tecleada mientras se colocan copias
+  if (copyState) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (typedBuffer) { placeCopy(effectiveCopyOffset()); typedBuffer = ''; draw(); }
+      else { copyState = null; copySource = null; setTool('select'); }
+      return;
+    }
+    if (e.key === 'Backspace') { e.preventDefault(); typedBuffer = typedBuffer.slice(0, -1); draw(); return; }
+    if (/^[0-9.]$/.test(e.key)) { e.preventDefault(); typedBuffer += e.key; draw(); return; }
+  }
+
+  // Entrada de distancia tecleada mientras se coloca el offset (modo dinámico)
+  if (tool === 'offset' && offsetPhase === 'place') {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (typedBuffer) { placeOffset(); }
+      else { setTool('select'); }
+      return;
+    }
+    if (e.key === 'Backspace') { e.preventDefault(); typedBuffer = typedBuffer.slice(0, -1); draw(); return; }
+    if (/^[0-9.]$/.test(e.key)) { e.preventDefault(); typedBuffer += e.key; draw(); return; }
+  }
+
+  // Offset Fijo: Enter fija (o refija) el valor tecleado — no coloca nada por sí solo,
+  // luego cada clic sobre un objeto usa esa distancia fija.
+  if (tool === 'offset-fixed') {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (typedBuffer) {
+        const v = parseFloat(typedBuffer);
+        if (!isNaN(v) && v > 0) offsetLocked = v;
+        typedBuffer = '';
+        draw();
+      } else {
+        setTool('select');
+      }
+      return;
+    }
+    if (e.key === 'Backspace') { e.preventDefault(); typedBuffer = typedBuffer.slice(0, -1); draw(); return; }
+    if (/^[0-9.]$/.test(e.key)) { e.preventDefault(); typedBuffer += e.key; draw(); return; }
+  }
+
+  // Confirmar con Enter una selección múltiple (Shift+clic) en la fase de "elegir objeto" (Offset dinámico / Copiar)
+  if (((tool === 'copy' && copyPhase === 'pick') || (tool === 'offset' && offsetPhase === 'pick')) && e.key === 'Enter') {
+    e.preventDefault();
+    if (selected.size > 0) { tool === 'copy' ? beginCopyPlacement() : beginOffsetPlacement(); }
+    return;
+  }
+
+  if (e.key === 'Escape') {
+    if (copyState) { copyState = null; copySource = null; typedBuffer = ''; setTool('select'); return; }
+    if (tool === 'copy' || isOffsetTool()) { setTool('select'); return; }
+    if (drawState && drawState.type === 'polyline') { finishPolyline(false); return; }
+    drawState = null; typedBuffer = ''; boxSelect = null; selected.clear(); draw(); return;
+  }
+  if (e.key === 'Delete' || e.key === 'Backspace') { if (selected.size > 0) { e.preventDefault(); deleteSelected(); } return; }
+  if (e.ctrlKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
+  if (e.ctrlKey && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo(); return; }
+  if (e.key === 'F8') { e.preventDefault(); toggleOrtho(); return; }
+  if (e.key === 'F9') { e.preventDefault(); toggleSnap(); return; }
+
+  if (tag === 'body' && !isBusy()) {
+    if (e.key.toLowerCase() === 'v') setTool('select');
+    else if (e.key.toLowerCase() === 'b') setTool('select-box');
+    else if (e.key.toLowerCase() === 'l') setTool('line');
+    else if (e.key.toLowerCase() === 'p') setTool('polyline');
+    else if (e.key.toLowerCase() === 'r') setTool('rect');
+    else if (e.key.toLowerCase() === 'c') setTool('circle');
+    else if (e.key.toLowerCase() === 'o') clickOffsetBtn();
+    else if (e.key.toLowerCase() === 'f') fitView();
+    else if (e.key === '+' || e.key === '=') zoomBtn(1.2);
+    else if (e.key === '-') zoomBtn(0.83);
+  }
+});
+window.addEventListener('keyup', e => {
+  if (e.code === 'Space') { spaceHeld = false; canvas.style.cursor = ''; }
+});
+
+/* ════════════════════════════════════════════════
+   MULTI-TOOLS DROPDOWN
+════════════════════════════════════════════════ */
+function toggleMT(e) {
+  e.stopPropagation();
+  const p = document.getElementById('mt-panel');
+  p.style.display = p.style.display === 'block' ? 'none' : 'block';
+}
+document.addEventListener('click', () => { document.getElementById('mt-panel').style.display = 'none'; });
+
+/* ════════════════════════════════════════════════
+   INIT
+════════════════════════════════════════════════ */
+window.addEventListener('resize', () => { resizeCanvas(); });
+loadLocal();
+centerView();
+resizeCanvas();
+updateZoomLabel();
+updateHistoryButtons();
+setTool('select');
+</script>
+</body>
+</html>
