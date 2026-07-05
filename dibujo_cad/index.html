@@ -134,6 +134,11 @@ body{ display:flex; flex-direction:column; }
 /* ── Canvas ── */
 .canvas-wrap{ flex:1; position:relative; overflow:hidden; background:var(--panel2); min-height:0; }
 #cad{ display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; }
+.text-input-overlay{
+  display:none; position:absolute; z-index:80; background:var(--panel2);
+  border:1.5px solid var(--cyan); border-radius:4px; padding:1px 5px;
+  color:var(--cyan); font-family:'Inter', sans-serif; outline:none; min-width:60px;
+}
 #cad.tool-select{ cursor:default; }
 #cad.tool-copy-pick{ cursor:default; }
 #cad.tool-offset-pick{ cursor:default; }
@@ -349,6 +354,16 @@ body{ display:flex; flex-direction:column; }
     <span>Ortog.</span>
   </button>
 
+  <div class="tgroup-label">Anotar</div>
+  <button class="tbtn" id="tool-dim-btn" onclick="toggleDimMenu(event)" title="Acotar — elige el tipo de cota (lineal, alineada, angular, longitud de arco, radio, diámetro)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="18" x2="20" y2="18"/><line x1="4" y1="14" x2="4" y2="21"/><line x1="20" y1="14" x2="20" y2="21"/><path d="M4 18l3-1.6M20 18l-3-1.6"/></svg>
+    <span>Acotar ▾</span>
+  </button>
+  <button class="tbtn" id="tool-text" onclick="setTool('text')" title="Texto — clic para colocar una etiqueta">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="12" y1="4" x2="12" y2="20"/><line x1="9" y1="20" x2="15" y2="20"/></svg>
+    <span>Texto</span>
+  </button>
+
   <div class="tgroup-label">Editar</div>
   <button class="tbtn" id="tool-copy" onclick="clickCopyBtn()" title="Copiar — elige el objeto y luego el punto base/destino">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -373,16 +388,6 @@ body{ display:flex; flex-direction:column; }
   <button class="tbtn" id="tool-extend" onclick="clickExtendBtn()" title="Alargar — elige el borde límite y luego clic cerca del extremo a alargar">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="12" x2="16" y2="12"/><polyline points="12 6 18 12 12 18"/></svg>
     <span>Alargar</span>
-  </button>
-
-  <div class="tgroup-label">Anotar</div>
-  <button class="tbtn" id="tool-dim-btn" onclick="toggleDimMenu(event)" title="Acotar — elige el tipo de cota (lineal, alineada, angular, longitud de arco, radio, diámetro)">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="18" x2="20" y2="18"/><line x1="4" y1="14" x2="4" y2="21"/><line x1="20" y1="14" x2="20" y2="21"/><path d="M4 18l3-1.6M20 18l-3-1.6"/></svg>
-    <span>Acotar ▾</span>
-  </button>
-  <button class="tbtn" id="tool-text" onclick="setTool('text')" title="Texto — clic para colocar una etiqueta">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="12" y1="4" x2="12" y2="20"/><line x1="9" y1="20" x2="15" y2="20"/></svg>
-    <span>Texto</span>
   </button>
 </div>
 
@@ -439,6 +444,7 @@ body{ display:flex; flex-direction:column; }
 <!-- ── Canvas ── -->
 <div class="canvas-wrap">
   <canvas id="cad"></canvas>
+  <input type="text" id="text-input-overlay" class="text-input-overlay" autocomplete="off" spellcheck="false"/>
   <div class="statusbar">
     <span class="hint" id="hint">Selecciona una herramienta para empezar a dibujar</span>
     <div class="sp">
@@ -582,7 +588,7 @@ const TOOL_HINTS = {
   'dim-arclength': 'Clic en un arco (no en un círculo completo) · mueve el mouse y clic para colocar la línea de cota · Esc cancela',
   'dim-radius':    'Clic en un círculo o un arco · mueve el mouse y clic para colocar la línea guía y el texto "R" · Esc cancela',
   'dim-diameter':  'Clic en un círculo o un arco · mueve el mouse y clic para colocar la línea guía y el texto "⌀" · Esc cancela',
-  text: 'Clic en el punto de inserción y escribe el texto de la etiqueta',
+  text: 'Clic en el punto de inserción y escribe el texto de la etiqueta · doble clic sobre un texto existente para editarlo',
 };
 
 let copyPhase = 'pick';   // 'pick' (eligiendo el objeto) → 'place' (colocando copias)
@@ -593,6 +599,7 @@ let trimExtendPhase = 'pick';   // 'pick' (eligiendo bordes de corte) → 'actio
 let trimExtendBoundary = null;  // clones de las entidades usadas como borde de corte/límite
 let arcDraw = null;        // { method: 'arc-3p'|'arc-cse'|'arc-ser', pts:[...], raw } mientras se dibuja un arco
 let dimDraw = null;        // estado (variable según el método) mientras se coloca una cota
+let textEdit = null;       // { p, idx, h } mientras el cuadro de texto flotante está abierto (nuevo texto o edición)
 const DIM_COLOR = '#22d3ee';
 
 // "¿estamos en algún modo de offset?" — para Esc/clic-derecho, que salen igual en ambos modos
@@ -610,10 +617,12 @@ function isBusy() {
     || (tool === 'fillet' && !!filletPick)
     || (isTrimExtendTool() && trimExtendPhase === 'action')
     || (isArcDrawTool(tool) && !!arcDraw)
-    || (isDimTool(tool) && !!dimDraw);
+    || (isDimTool(tool) && !!dimDraw)
+    || !!textEdit;
 }
 
 function setTool(t) {
+  if (textEdit) commitTextInput();
   // Salir de una polilínea en curso (Esc, cambio de herramienta, etc.) la termina, igual que Enter.
   if (drawState && drawState.type === 'polyline' && t !== 'polyline') {
     finishPolyline(false);
@@ -1202,6 +1211,58 @@ function drawDimPreview() {
     drawDimEntity(fakeE, false);
   }
 }
+
+/* ── Texto — cuadro flotante real sobre el lienzo (crear etiqueta nueva o editar una existente) ── */
+function beginTextInput(p, idx) {
+  const input = document.getElementById('text-input-overlay');
+  const existing = idx !== null ? entities[idx] : null;
+  const h = existing ? existing.h : 0.3;
+  const s = toScreen(p.x, p.y);
+  const fontPx = Math.max(11, h * view.scale);
+  input.style.left = s.x + 'px';
+  input.style.top = (s.y - fontPx * 0.85) + 'px';
+  input.style.fontSize = fontPx + 'px';
+  input.value = existing ? existing.str : '';
+  input.style.display = 'block';
+  textEdit = { p: { x: p.x, y: p.y }, idx: idx !== null ? idx : null, h };
+  document.getElementById('hint').textContent = 'Escribe el texto de la etiqueta · Enter confirma · Esc cancela';
+  setTimeout(() => { input.focus(); input.select(); }, 0);
+  draw();
+}
+function commitTextInput() {
+  if (!textEdit) return;
+  const input = document.getElementById('text-input-overlay');
+  const val = input.value.trim();
+  input.style.display = 'none';
+  const te = textEdit; textEdit = null;
+  if (te.idx !== null) {
+    if (val) { entities[te.idx] = { type: 'text', p: te.p, str: val, h: te.h }; }
+    else { entities.splice(te.idx, 1); selected.clear(); }
+    pushHistory();
+  } else if (val) {
+    entities.push({ type: 'text', p: te.p, str: val, h: te.h });
+    selected = new Set([entities.length - 1]);
+    pushHistory();
+  }
+  document.getElementById('hint').textContent = TOOL_HINTS[tool] || '';
+  draw();
+}
+function cancelTextInput() {
+  if (!textEdit) return;
+  document.getElementById('text-input-overlay').style.display = 'none';
+  textEdit = null;
+  document.getElementById('hint').textContent = TOOL_HINTS[tool] || '';
+  draw();
+}
+(function initTextOverlay() {
+  const input = document.getElementById('text-input-overlay');
+  input.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); commitTextInput(); }
+    else if (e.key === 'Escape') { e.preventDefault(); cancelTextInput(); }
+  });
+  input.addEventListener('blur', () => { if (textEdit) commitTextInput(); });
+})();
 
 function strokeEntity(e, selected) {
   if (e.type === 'text') { drawTextEntity(e, selected); return; }
@@ -2807,14 +2868,8 @@ function pointerDown(sx, sy, button, shiftKey) {
   }
 
   if (tool === 'text') {
-    const p = snapWorld(mouseWorld);
-    const str = prompt('Texto de la etiqueta:');
-    if (str && str.trim()) {
-      entities.push({ type: 'text', p, str: str.trim(), h: 0.3 });
-      selected = new Set([entities.length - 1]);
-      pushHistory();
-    }
-    draw();
+    if (textEdit) return;
+    beginTextInput(snapWorld(mouseWorld), null);
     return;
   }
 
@@ -2982,6 +3037,14 @@ canvas.addEventListener('contextmenu', e => {
   else if (isArcDrawTool(tool) && arcDraw) { arcDraw = null; typedBuffer = ''; draw(); }
   else if (isDimTool(tool) && dimDraw) { dimDraw = null; selected.clear(); document.getElementById('hint').textContent = TOOL_HINTS[tool]; draw(); }
   else if (tool === 'copy' || isOffsetTool() || isTrimExtendTool()) { setTool('select'); }
+});
+canvas.addEventListener('dblclick', e => {
+  if (textEdit || isBusy()) return;
+  const hit = hitTest(e.offsetX, e.offsetY);
+  if (hit >= 0 && entities[hit].type === 'text') {
+    selected = new Set([hit]);
+    beginTextInput(entities[hit].p, hit);
+  }
 });
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
