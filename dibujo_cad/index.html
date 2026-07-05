@@ -85,6 +85,12 @@ body{ display:flex; flex-direction:column; }
 .file-menu-item.danger{ color:#ff8a80; }
 #file-name-label{ font-size:11px; color:var(--muted); margin-left:2px; }
 
+/* ── Menú desplegable "Arco" (se posiciona con JS junto al botón, escapa el overflow de la barra) ── */
+.arc-menu-panel{
+  display:none; position:fixed; background:var(--panel); border:1px solid var(--border);
+  border-radius:10px; padding:8px 6px; min-width:200px; z-index:2000; box-shadow:0 8px 32px rgba(0,0,0,.5);
+}
+
 /* ── Fila principal: barra lateral + lienzo (la topbar de arriba queda solo para menús) ── */
 .main-row{ display:flex; flex-direction:row; flex:1; min-height:0; overflow:hidden; }
 
@@ -320,6 +326,10 @@ body{ display:flex; flex-direction:column; }
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/></svg>
     <span>Círculo</span>
   </button>
+  <button class="tbtn" id="tool-arc-btn" onclick="toggleArcMenu(event)" title="Arco — elige el método (3 puntos, centro-inicio-fin, inicio-fin-radio)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16a10 10 0 0 1 16 0"/><circle cx="4" cy="17" r="1.4" fill="currentColor" stroke="none"/><circle cx="20" cy="17" r="1.4" fill="currentColor" stroke="none"/></svg>
+    <span>Arco ▾</span>
+  </button>
 
   <div class="tgroup-label">Vista</div>
   <button class="tbtn" id="tool-pan" onclick="setTool('pan')" title="Desplazar (Espacio+arrastrar)">
@@ -363,6 +373,66 @@ body{ display:flex; flex-direction:column; }
   <button class="tbtn" id="tool-extend" onclick="clickExtendBtn()" title="Alargar — elige el borde límite y luego clic cerca del extremo a alargar">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="12" x2="16" y2="12"/><polyline points="12 6 18 12 12 18"/></svg>
     <span>Alargar</span>
+  </button>
+
+  <div class="tgroup-label">Anotar</div>
+  <button class="tbtn" id="tool-dim-btn" onclick="toggleDimMenu(event)" title="Acotar — elige el tipo de cota (lineal, alineada, angular, longitud de arco, radio, diámetro)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="18" x2="20" y2="18"/><line x1="4" y1="14" x2="4" y2="21"/><line x1="20" y1="14" x2="20" y2="21"/><path d="M4 18l3-1.6M20 18l-3-1.6"/></svg>
+    <span>Acotar ▾</span>
+  </button>
+  <button class="tbtn" id="tool-text" onclick="setTool('text')" title="Texto — clic para colocar una etiqueta">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="12" y1="4" x2="12" y2="20"/><line x1="9" y1="20" x2="15" y2="20"/></svg>
+    <span>Texto</span>
+  </button>
+</div>
+
+<!-- Menú desplegable "Acotar" (position:fixed, se posiciona junto al botón al abrirse) -->
+<div class="arc-menu-panel" id="dim-menu-panel">
+  <div class="mt-hd" style="border-bottom:1px solid var(--border2);padding-bottom:8px;margin-bottom:6px;">ACOTAR</div>
+  <button class="file-menu-item" onclick="pickDimMethod('dim-linear')">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="18" x2="20" y2="18"/><line x1="4" y1="12" x2="4" y2="21"/><line x1="20" y1="12" x2="20" y2="21"/></svg>
+    Lineal
+  </button>
+  <button class="file-menu-item" onclick="pickDimMethod('dim-aligned')">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="19" x2="19" y2="5"/><line x1="8" y1="22" x2="2" y2="16"/><line x1="22" y1="8" x2="16" y2="2"/></svg>
+    Alineada
+  </button>
+  <button class="file-menu-item" onclick="pickDimMethod('dim-angular')">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16"/><path d="M4 20L16 6"/><path d="M9 20a8 8 0 0 1 3.2-11.6"/></svg>
+    Angular
+  </button>
+  <button class="file-menu-item" onclick="pickDimMethod('dim-arclength')">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16a10 10 0 0 1 16 0"/><path d="M4 20a12 12 0 0 1 16 0"/></svg>
+    Longitud de Arco
+  </button>
+  <button class="file-menu-item" onclick="pickDimMethod('dim-radius')">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="18" y2="6"/></svg>
+    Radio
+  </button>
+  <button class="file-menu-item" onclick="pickDimMethod('dim-diameter')">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><line x1="4" y1="18" x2="20" y2="6"/></svg>
+    Diámetro
+  </button>
+</div>
+
+<!-- Menú desplegable "Arco" (position:fixed, se posiciona junto al botón al abrirse) -->
+<div class="arc-menu-panel" id="arc-menu-panel">
+  <div class="mt-hd" style="border-bottom:1px solid var(--border2);padding-bottom:8px;margin-bottom:6px;">ARCO</div>
+  <button class="file-menu-item" onclick="pickArcMethod('arc-3p')">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16a10 10 0 0 1 16 0"/></svg>
+    3 Puntos
+  </button>
+  <button class="file-menu-item" onclick="pickArcMethod('arc-cse')">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><path d="M12 6a6 6 0 0 1 6 6"/></svg>
+    Centro, Inicio, Fin
+  </button>
+  <button class="file-menu-item" onclick="pickArcMethod('arc-ser')">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16a10 10 0 0 1 16 0"/><line x1="4" y1="16" x2="20" y2="16"/></svg>
+    Inicio, Fin, Radio
+  </button>
+  <button class="file-menu-item" onclick="pickArcMethod('arc-sed')">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16a10 10 0 0 1 12 3"/><line x1="4" y1="16" x2="4" y2="9"/><polyline points="1 12 4 9 7 12"/></svg>
+    Inicio, Fin, Dirección
   </button>
 </div>
 
@@ -502,6 +572,17 @@ const TOOL_HINTS = {
   trimAction: 'Clic sobre el tramo de línea que quieres recortar (se elimina esa parte) · puedes seguir recortando otras líneas · Esc termina',
   extend:     'Elige el/los borde(s) hasta donde alargar — clic, o arrastra un área · Shift+clic para elegir varios + Enter · Esc cancela',
   extendAction:'Clic cerca del extremo de la línea que quieres alargar hasta el borde elegido · puedes seguir alargando otras líneas · Esc termina',
+  'arc-3p':   'Clic en el punto de inicio, clic en un punto por donde pasa el arco, clic en el punto final · Esc cancela',
+  'arc-cse':  'Clic en el centro, clic en el punto de inicio (define el radio), clic en el punto final (define el barrido) · Esc cancela',
+  'arc-ser':  'Clic en el inicio, clic en el final · mueve el mouse para definir el radio (o escribe un valor) y clic/Enter para confirmar · Esc cancela',
+  'arc-sed':  'Clic en el inicio, clic en el final · mueve el mouse para definir la dirección tangente en el inicio (o escribe un ángulo en grados) y clic/Enter para confirmar · Esc cancela',
+  'dim-linear':    'Clic en el primer punto, clic en el segundo · mueve el mouse y clic para colocar la línea de cota (horizontal o vertical, según hacia dónde muevas el mouse) · Esc cancela',
+  'dim-aligned':   'Clic en el primer punto, clic en el segundo · mueve el mouse y clic para colocar la línea de cota (paralela a los dos puntos) · Esc cancela',
+  'dim-angular':   'Clic en la primera línea, clic en la segunda línea · mueve el mouse y clic para definir el radio del arco de cota · Esc cancela',
+  'dim-arclength': 'Clic en un arco (no en un círculo completo) · mueve el mouse y clic para colocar la línea de cota · Esc cancela',
+  'dim-radius':    'Clic en un círculo o un arco · mueve el mouse y clic para colocar la línea guía y el texto "R" · Esc cancela',
+  'dim-diameter':  'Clic en un círculo o un arco · mueve el mouse y clic para colocar la línea guía y el texto "⌀" · Esc cancela',
+  text: 'Clic en el punto de inserción y escribe el texto de la etiqueta',
 };
 
 let copyPhase = 'pick';   // 'pick' (eligiendo el objeto) → 'place' (colocando copias)
@@ -510,10 +591,16 @@ let offsetLocked = null;  // distancia fija (modo "Offset Fijo"): se conserva ha
 let filletPick = null;    // { idx, clickPt } tras elegir la primera línea a empalmar
 let trimExtendPhase = 'pick';   // 'pick' (eligiendo bordes de corte) → 'action' (recortando/alargando líneas)
 let trimExtendBoundary = null;  // clones de las entidades usadas como borde de corte/límite
+let arcDraw = null;        // { method: 'arc-3p'|'arc-cse'|'arc-ser', pts:[...], raw } mientras se dibuja un arco
+let dimDraw = null;        // estado (variable según el método) mientras se coloca una cota
+const DIM_COLOR = '#22d3ee';
 
 // "¿estamos en algún modo de offset?" — para Esc/clic-derecho, que salen igual en ambos modos
 function isOffsetTool() { return tool === 'offset' || tool === 'offset-fixed'; }
 function isTrimExtendTool() { return tool === 'trim' || tool === 'extend'; }
+function isDimTool(t) { return t === 'dim-linear' || t === 'dim-aligned' || t === 'dim-angular' || t === 'dim-arclength' || t === 'dim-radius' || t === 'dim-diameter'; }
+function isAnnotationType(t) { return t === 'text' || (typeof t === 'string' && t.indexOf('dim-') === 0); }
+function isArcDrawTool(t) { return t === 'arc-3p' || t === 'arc-cse' || t === 'arc-ser' || t === 'arc-sed'; }
 
 function isBusy() {
   return !!drawState || !!copyState
@@ -521,7 +608,9 @@ function isBusy() {
     || (tool === 'offset' && offsetPhase === 'place')
     || tool === 'offset-fixed'
     || (tool === 'fillet' && !!filletPick)
-    || (isTrimExtendTool() && trimExtendPhase === 'action');
+    || (isTrimExtendTool() && trimExtendPhase === 'action')
+    || (isArcDrawTool(tool) && !!arcDraw)
+    || (isDimTool(tool) && !!dimDraw);
 }
 
 function setTool(t) {
@@ -538,11 +627,17 @@ function setTool(t) {
   offsetLocked = null;
   filletPick = null;
   trimExtendBoundary = null;
+  arcDraw = null;
+  dimDraw = null;
   if (t === 'copy') copyPhase = 'pick';
   if (t === 'offset') offsetPhase = 'pick';
   if (t === 'trim' || t === 'extend') trimExtendPhase = 'pick';
   if (t !== 'select' && t !== 'select-box') selected.clear();
-  ['select','select-box','line','polyline','rect','circle','pan','copy','offset','offset-fixed','fillet','trim','extend'].forEach(k => document.getElementById('tool-' + k).classList.toggle('active', k === t));
+  ['select','select-box','line','polyline','rect','circle','pan','copy','offset','offset-fixed','fillet','trim','extend','text'].forEach(k => document.getElementById('tool-' + k).classList.toggle('active', k === t));
+  const arcBtn = document.getElementById('tool-arc-btn');
+  if (arcBtn) arcBtn.classList.toggle('active', isArcDrawTool(t));
+  const dimBtn = document.getElementById('tool-dim-btn');
+  if (dimBtn) dimBtn.classList.toggle('active', isDimTool(t));
   canvas.className = 'tool-' + t + (t === 'copy' ? '-' + copyPhase : t === 'offset' ? '-' + offsetPhase : isTrimExtendTool() ? '-' + trimExtendPhase : '');
   document.getElementById('hint').textContent = TOOL_HINTS[t] || '';
   draw();
@@ -551,6 +646,34 @@ function setTool(t) {
 // Botones "Recortar" / "Alargar": entran en modo "elegir bordes de corte" (igual que Offset).
 function clickTrimBtn() { setTool('trim'); }
 function clickExtendBtn() { setTool('extend'); }
+
+// Menú desplegable "Arco"
+function toggleArcMenu(e) {
+  e.stopPropagation();
+  const panel = document.getElementById('arc-menu-panel');
+  if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
+  const btnRect = e.currentTarget.getBoundingClientRect();
+  panel.style.top = btnRect.top + 'px';
+  panel.style.left = (btnRect.right + 6) + 'px';
+  panel.style.display = 'block';
+}
+function closeArcMenu() { document.getElementById('arc-menu-panel').style.display = 'none'; }
+document.addEventListener('click', () => closeArcMenu());
+function pickArcMethod(method) { closeArcMenu(); setTool(method); }
+
+// Menú desplegable "Acotar"
+function toggleDimMenu(e) {
+  e.stopPropagation();
+  const panel = document.getElementById('dim-menu-panel');
+  if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
+  const btnRect = e.currentTarget.getBoundingClientRect();
+  panel.style.top = btnRect.top + 'px';
+  panel.style.left = (btnRect.right + 6) + 'px';
+  panel.style.display = 'block';
+}
+function closeDimMenu() { document.getElementById('dim-menu-panel').style.display = 'none'; }
+document.addEventListener('click', () => closeDimMenu());
+function pickDimMethod(method) { closeDimMenu(); setTool(method); }
 
 function beginTrimExtendAction() {
   trimExtendBoundary = [...selected].map(i => JSON.parse(JSON.stringify(entities[i])));
@@ -686,7 +809,403 @@ function drawGrid() {
 /* ════════════════════════════════════════════════
    DIBUJO DE ENTIDADES
 ════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════
+   ARCOS — geometría angular compartida (recortar círculos, empalmar arcos, etc.)
+   Convención: ángulos en radianes, sentido matemático estándar (CCW con Y hacia
+   arriba). a0 en [0,2π), a1 en [a0, a0+2π]. El arco va de a0 a a1 en sentido CCW.
+════════════════════════════════════════════════ */
+function normalizeAngle(a) { return ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI); }
+function angleInArc(theta, a0, a1) {
+  let t = theta;
+  while (t < a0 - 1e-9) t += 2 * Math.PI;
+  return t <= a1 + 1e-6;
+}
+function arcPoint(c, r, a) { return { x: c.x + r * Math.cos(a), y: c.y + r * Math.sin(a) }; }
+// Ángulos (respecto al círculo c1,r1) donde se cruza con el círculo c2,r2.
+function circleCircleAngles(c1, r1, c2, r2) {
+  const dx = c2.x - c1.x, dy = c2.y - c1.y;
+  const d = Math.hypot(dx, dy);
+  if (d < 1e-9 || d > r1 + r2 + 1e-9 || d < Math.abs(r1 - r2) - 1e-9) return [];
+  const a = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
+  const h2 = r1 * r1 - a * a;
+  if (h2 < 0) return [];
+  const h = Math.sqrt(Math.max(0, h2));
+  const xm = c1.x + a * dx / d, ym = c1.y + a * dy / d;
+  const p1 = { x: xm + h * dy / d, y: ym - h * dx / d };
+  const p2 = { x: xm - h * dy / d, y: ym + h * dx / d };
+  return [Math.atan2(p1.y - c1.y, p1.x - c1.x), Math.atan2(p2.y - c1.y, p2.x - c1.x)];
+}
+
+/* ════════════════════════════════════════════════
+   DIBUJAR ARCO — 3 métodos estilo AutoCAD:
+   3 Puntos · Centro-Inicio-Fin · Inicio-Fin-Radio
+════════════════════════════════════════════════ */
+// Centro y radio de la circunferencia que pasa por 3 puntos. null si están alineados.
+function circumcircle(p1, p2, p3) {
+  const ax = p1.x, ay = p1.y, bx = p2.x, by = p2.y, cx = p3.x, cy = p3.y;
+  const d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
+  if (Math.abs(d) < 1e-9) return null;
+  const ux = ((ax * ax + ay * ay) * (by - cy) + (bx * bx + by * by) * (cy - ay) + (cx * cx + cy * cy) * (ay - by)) / d;
+  const uy = ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by) * (ax - cx) + (cx * cx + cy * cy) * (bx - ax)) / d;
+  const c = { x: ux, y: uy };
+  return { c, r: dist(c, p1) };
+}
+
+// Ángulos a0,a1 (a0<a1, sweep CCW) de un arco centrado en c que pasa por p1 (inicio), pThrough
+// (un punto contenido en el arco) y p2 (fin), en ese orden.
+function arcAnglesThroughPoints(c, p1, p2, pThrough) {
+  const a1 = normalizeAngle(Math.atan2(p1.y - c.y, p1.x - c.x));
+  const a2 = normalizeAngle(Math.atan2(pThrough.y - c.y, pThrough.x - c.x));
+  const a3 = normalizeAngle(Math.atan2(p2.y - c.y, p2.x - c.x));
+  const rel2 = normalizeAngle(a2 - a1), rel3 = normalizeAngle(a3 - a1);
+  if (rel2 <= rel3) return { a0: a1, a1: a1 + rel3 };
+  return { a0: a3, a1: a3 + normalizeAngle(a1 - a3) };
+}
+
+// Arco que pasa por 3 puntos (inicio, punto intermedio, fin). null si están alineados.
+function threePointArc(p1, pThrough, p2) {
+  const circ = circumcircle(p1, pThrough, p2);
+  if (!circ) return null;
+  const angles = arcAnglesThroughPoints(circ.c, p1, p2, pThrough);
+  return { type: 'arc', c: circ.c, r: circ.r, a0: angles.a0, a1: angles.a1 };
+}
+
+// Arco definido por cuerda (p1,p2) + radio, curvando hacia el lado donde está mouseP.
+// typedR (si se da) fija el radio exacto; si no, se calcula siguiendo la distancia del mouse a la cuerda.
+function computeSERArc(p1, p2, mouseP, typedR) {
+  const dx = p2.x - p1.x, dy = p2.y - p1.y;
+  const L = Math.hypot(dx, dy);
+  if (L < 1e-9) return null;
+  const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+  const nx = -dy / L, ny = dx / L;
+  const cross = (mouseP.x - p1.x) * dy - (mouseP.y - p1.y) * dx;
+  const side = cross >= 0 ? 1 : -1;
+  const half = L / 2;
+  let r;
+  if (typedR != null && !isNaN(typedR) && typedR > 0) r = Math.max(half + 1e-6, typedR);
+  else {
+    const perpDist = Math.abs(cross) / L;
+    r = Math.max(half + 1e-6, Math.hypot(half, perpDist));
+  }
+  const h = Math.sqrt(Math.max(0, r * r - half * half));
+  const c = { x: mx + side * h * nx, y: my + side * h * ny };
+  const dirx = mouseP.x - c.x, diry = mouseP.y - c.y;
+  const dlen = Math.hypot(dirx, diry) || 1;
+  const throughPt = { x: c.x + r * dirx / dlen, y: c.y + r * diry / dlen };
+  const angles = arcAnglesThroughPoints(c, p1, p2, throughPt);
+  return { type: 'arc', c, r, a0: angles.a0, a1: angles.a1 };
+}
+
+// Arco definido por inicio (p1), fin (p2) y la dirección tangente en p1 (hacia dirPoint).
+function computeSEDArc(p1, p2, dirPoint) {
+  let dx = dirPoint.x - p1.x, dy = dirPoint.y - p1.y;
+  const dlen = Math.hypot(dx, dy);
+  if (dlen < 1e-9) return null;
+  dx /= dlen; dy /= dlen;
+  const nx = -dy, ny = dx; // perpendicular a la dirección (recta del radio en p1)
+  const chordx = p2.x - p1.x, chordy = p2.y - p1.y;
+  if (Math.hypot(chordx, chordy) < 1e-9) return null;
+  const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+  const cnx = -chordy, cny = chordx; // perpendicular a la cuerda
+  const c = lineIntersect(p1, { x: p1.x + nx, y: p1.y + ny }, { x: mx, y: my }, { x: mx + cnx, y: my + cny });
+  if (!c) return null; // dirección paralela a la cuerda: sin centro único
+  const r = dist(c, p1);
+  const angleP1 = normalizeAngle(Math.atan2(p1.y - c.y, p1.x - c.x));
+  const angleP2 = normalizeAngle(Math.atan2(p2.y - c.y, p2.x - c.x));
+  const tangCCWx = -(p1.y - c.y), tangCCWy = (p1.x - c.x); // rotate90(P1-C): tangente si el barrido creciente pasa por p1 primero
+  const dot = tangCCWx * dx + tangCCWy * dy;
+  let a0, a1;
+  if (dot >= 0) { a0 = angleP1; a1 = angleP1 + normalizeAngle(angleP2 - angleP1); }
+  else { a0 = angleP2; a1 = angleP2 + normalizeAngle(angleP1 - angleP2); }
+  return { type: 'arc', c, r, a0, a1 };
+}
+
+function commitArcDraw(entity) {
+  if (!entity) { document.getElementById('hint').textContent = '⚠ Esos puntos no forman un arco válido (¿están alineados?)'; return; }
+  entities.push(entity);
+  selected = new Set([entities.length - 1]);
+  pushHistory();
+  arcDraw = null;
+  typedBuffer = '';
+  document.getElementById('hint').textContent = TOOL_HINTS[tool];
+}
+
+function drawArcDrawPreview() {
+  if (!isArcDrawTool(tool) || !arcDraw) return;
+  const pts = arcDraw.pts;
+  ctx.save();
+  ctx.setLineDash([6, 4]);
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = '#58a6ff';
+
+  if (arcDraw.method === 'arc-ser' && pts.length === 2) {
+    let typedR = null;
+    if (typedBuffer) { const v = parseFloat(typedBuffer); if (!isNaN(v) && v > 0) typedR = v; }
+    const arc = computeSERArc(pts[0], pts[1], mouseWorld, typedR);
+    if (arc) { drawEntityPath(arc); ctx.stroke(); }
+    ctx.setLineDash([]);
+    const chord0 = toScreen(pts[0].x, pts[0].y), chord1 = toScreen(pts[1].x, pts[1].y);
+    ctx.fillStyle = '#58a6ff';
+    [chord0, chord1].forEach(s => { ctx.beginPath(); ctx.arc(s.x, s.y, 3, 0, Math.PI * 2); ctx.fill(); });
+    if (arc) {
+      const mp = toScreen(mouseWorld.x, mouseWorld.y);
+      const label = 'r=' + arc.r.toFixed(2) + ' m';
+      if (typedBuffer) drawTypedTooltip(mp, typedBuffer + ' ↵');
+      else { ctx.font = '11px "JetBrains Mono", monospace'; ctx.textBaseline = 'bottom'; ctx.textAlign = 'left'; ctx.fillText(label, mp.x + 10, mp.y - 8); }
+    }
+  } else if (arcDraw.method === 'arc-sed' && pts.length === 2) {
+    let dirPoint = mouseWorld;
+    if (typedBuffer) {
+      const v = parseFloat(typedBuffer);
+      if (!isNaN(v)) { const rad = v * Math.PI / 180; dirPoint = { x: pts[0].x + Math.cos(rad), y: pts[0].y + Math.sin(rad) }; }
+    }
+    const arc = computeSEDArc(pts[0], pts[1], dirPoint);
+    if (arc) { drawEntityPath(arc); ctx.stroke(); }
+    // línea guía mostrando la dirección tangente en el punto de inicio
+    ctx.strokeStyle = 'rgba(63,185,80,0.7)'; ctx.beginPath();
+    const dx = dirPoint.x - pts[0].x, dy = dirPoint.y - pts[0].y, dlen = Math.hypot(dx, dy) || 1;
+    const guideLen = Math.max(2, dist(pts[0], pts[1]) * 0.6);
+    const a0s = toScreen(pts[0].x, pts[0].y), a1s = toScreen(pts[0].x + dx / dlen * guideLen, pts[0].y + dy / dlen * guideLen);
+    ctx.moveTo(a0s.x, a0s.y); ctx.lineTo(a1s.x, a1s.y); ctx.stroke();
+    ctx.setLineDash([]);
+    const chord0 = toScreen(pts[0].x, pts[0].y), chord1 = toScreen(pts[1].x, pts[1].y);
+    ctx.fillStyle = '#58a6ff';
+    [chord0, chord1].forEach(s => { ctx.beginPath(); ctx.arc(s.x, s.y, 3, 0, Math.PI * 2); ctx.fill(); });
+    const mp = toScreen(mouseWorld.x, mouseWorld.y);
+    if (typedBuffer) drawTypedTooltip(mp, typedBuffer + '° ↵');
+    else if (arc) { ctx.font = '11px "JetBrains Mono", monospace'; ctx.textBaseline = 'bottom'; ctx.textAlign = 'left'; ctx.fillText('r=' + arc.r.toFixed(2) + ' m', mp.x + 10, mp.y - 8); }
+  } else if (pts.length === 1) {
+    if (arcDraw.method === 'arc-cse') {
+      // centro fijo: mostrar el radio en vivo (círculo guía) hacia el mouse
+      const c = toScreen(pts[0].x, pts[0].y);
+      const rr = dist(pts[0], mouseWorld) * view.scale;
+      ctx.beginPath(); ctx.arc(c.x, c.y, rr, 0, Math.PI * 2); ctx.stroke();
+    } else {
+      const a = toScreen(pts[0].x, pts[0].y), b = toScreen(mouseWorld.x, mouseWorld.y);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    const s = toScreen(pts[0].x, pts[0].y);
+    ctx.fillStyle = '#58a6ff'; ctx.beginPath(); ctx.arc(s.x, s.y, 3, 0, Math.PI * 2); ctx.fill();
+  } else if (pts.length === 2) {
+    // 2 puntos fijos (3p: inicio+intermedio; cse: centro+inicio) — previsualizar según el método
+    let previewEnt = null;
+    if (arcDraw.method === 'arc-3p') previewEnt = threePointArc(pts[0], pts[1], mouseWorld);
+    else if (arcDraw.method === 'arc-cse') {
+      const r = dist(pts[0], pts[1]);
+      if (r > 1e-6) {
+        const a0 = normalizeAngle(Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x));
+        const aEndRaw = normalizeAngle(Math.atan2(mouseWorld.y - pts[0].y, mouseWorld.x - pts[0].x));
+        previewEnt = { type: 'arc', c: pts[0], r, a0, a1: a0 + normalizeAngle(aEndRaw - a0) };
+      }
+    }
+    if (previewEnt) { drawEntityPath(previewEnt); ctx.stroke(); }
+    else { const a = toScreen(pts[1].x, pts[1].y), b = toScreen(mouseWorld.x, mouseWorld.y); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#58a6ff';
+    pts.forEach(p => { const s = toScreen(p.x, p.y); ctx.beginPath(); ctx.arc(s.x, s.y, 3, 0, Math.PI * 2); ctx.fill(); });
+  }
+  ctx.restore();
+}
+
+/* ════════════════════════════════════════════════
+   ANOTACIONES — cotas (lineal, alineada, angular, longitud de arco,
+   radio, diámetro) y texto. Son entidades independientes (no asociativas):
+   miden la geometría en el momento de crearlas, luego se comportan como
+   cualquier otro objeto (se seleccionan, mueven, copian y borran igual).
+════════════════════════════════════════════════ */
+function dimColor(sel) { return sel ? '#58a6ff' : DIM_COLOR; }
+
+// Geometría de una cota lineal: línea de cota horizontal o vertical según e.axis.
+function dimLinearGeom(e) {
+  let d1, d2;
+  if (e.axis === 'v') { d1 = { x: e.dimP.x, y: e.p1.y }; d2 = { x: e.dimP.x, y: e.p2.y }; }
+  else { d1 = { x: e.p1.x, y: e.dimP.y }; d2 = { x: e.p2.x, y: e.dimP.y }; }
+  const value = e.axis === 'v' ? Math.abs(e.p2.y - e.p1.y) : Math.abs(e.p2.x - e.p1.x);
+  return { d1, d2, value };
+}
+// Geometría de una cota alineada: línea de cota paralela a p1-p2, desfasada hacia dimP.
+function dimAlignedGeom(e) {
+  const dx = e.p2.x - e.p1.x, dy = e.p2.y - e.p1.y, L = Math.hypot(dx, dy) || 1e-9;
+  const ux = dx / L, uy = dy / L, nx = -uy, ny = ux;
+  const off = (e.dimP.x - e.p1.x) * nx + (e.dimP.y - e.p1.y) * ny;
+  const d1 = { x: e.p1.x + off * nx, y: e.p1.y + off * ny };
+  const d2 = { x: e.p2.x + off * nx, y: e.p2.y + off * ny };
+  return { d1, d2, value: L };
+}
+// Geometría de una cota angular: elige el barrido (vertex->p1->p2 o vertex->p2->p1) que contiene armPt.
+function dimAngularGeom(e) {
+  const ang1 = normalizeAngle(Math.atan2(e.p1.y - e.vertex.y, e.p1.x - e.vertex.x));
+  const ang2 = normalizeAngle(Math.atan2(e.p2.y - e.vertex.y, e.p2.x - e.vertex.x));
+  const angArm = normalizeAngle(Math.atan2(e.armPt.y - e.vertex.y, e.armPt.x - e.vertex.x));
+  const sweep12 = normalizeAngle(ang2 - ang1);
+  let a0, a1;
+  if (angleInArc(angArm, ang1, ang1 + sweep12)) { a0 = ang1; a1 = ang1 + sweep12; }
+  else { a0 = ang2; a1 = ang2 + normalizeAngle(ang1 - ang2); }
+  const radius = Math.max(0.05, dist(e.vertex, e.armPt));
+  return { a0, a1, radius, angleDeg: (a1 - a0) * 180 / Math.PI };
+}
+
+// Ancho aproximado (en unidades del mundo) del texto de una entidad 'text', para bbox/hit-test.
+function textWidth(e) {
+  ctx.save();
+  ctx.font = '100px "Inter", sans-serif';
+  const w100 = ctx.measureText(e.str).width;
+  ctx.restore();
+  return (w100 / 100) * e.h;
+}
+
+// Punta de flecha (triángulo relleno): ápice en tipW, apuntando en la dirección fromW→tipW.
+function drawArrowHead(tipW, fromW, size) {
+  const a = toScreen(fromW.x, fromW.y), b = toScreen(tipW.x, tipW.y);
+  const ang = Math.atan2(b.y - a.y, b.x - a.x);
+  const back = ang + Math.PI, spread = 0.3;
+  const p1 = { x: b.x + size * Math.cos(back - spread), y: b.y + size * Math.sin(back - spread) };
+  const p2 = { x: b.x + size * Math.cos(back + spread), y: b.y + size * Math.sin(back + spread) };
+  ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.closePath(); ctx.fill();
+}
+
+// Texto de cota: se dibuja en pantalla, rotado según 'angleRad' (ángulo de pantalla) sin quedar cabeza abajo.
+function dimText(str, posW, angleRad, color) {
+  const s = toScreen(posW.x, posW.y);
+  ctx.save();
+  ctx.translate(s.x, s.y);
+  let ang = angleRad || 0;
+  const na = ((ang % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  if (na > Math.PI / 2 && na < 3 * Math.PI / 2) ang += Math.PI;
+  ctx.rotate(ang);
+  ctx.fillStyle = color;
+  ctx.font = '12px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.fillText(str, 0, -4);
+  ctx.restore();
+}
+
+function drawDimEntity(e, isSel) {
+  const col = dimColor(isSel);
+  const arrowSize = 8;
+  ctx.save();
+  ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = isSel ? 2.2 : 1.4;
+
+  if (e.type === 'dim-linear' || e.type === 'dim-aligned') {
+    const g = e.type === 'dim-linear' ? dimLinearGeom(e) : dimAlignedGeom(e);
+    const oShoot = 8 / view.scale;
+    [[e.p1, g.d1], [e.p2, g.d2]].forEach(([base, d]) => {
+      const dx = d.x - base.x, dy = d.y - base.y, len = Math.hypot(dx, dy);
+      const ext = len < 1e-9 ? d : { x: d.x + (dx / len) * oShoot, y: d.y + (dy / len) * oShoot };
+      const a = toScreen(base.x, base.y), b = toScreen(ext.x, ext.y);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    });
+    const sd1 = toScreen(g.d1.x, g.d1.y), sd2 = toScreen(g.d2.x, g.d2.y);
+    ctx.beginPath(); ctx.moveTo(sd1.x, sd1.y); ctx.lineTo(sd2.x, sd2.y); ctx.stroke();
+    drawArrowHead(g.d1, g.d2, arrowSize);
+    drawArrowHead(g.d2, g.d1, arrowSize);
+    const mid = { x: (g.d1.x + g.d2.x) / 2, y: (g.d1.y + g.d2.y) / 2 };
+    const dxL = g.d2.x - g.d1.x, dyL = g.d2.y - g.d1.y, lenL = Math.hypot(dxL, dyL) || 1e-9;
+    const nx = -dyL / lenL, ny = dxL / lenL, textGap = 10 / view.scale;
+    const textP = { x: mid.x + nx * textGap, y: mid.y + ny * textGap };
+    const sAng = Math.atan2(toScreen(g.d2.x, g.d2.y).y - toScreen(g.d1.x, g.d1.y).y, toScreen(g.d2.x, g.d2.y).x - toScreen(g.d1.x, g.d1.y).x);
+    dimText(g.value.toFixed(2) + ' m', textP, sAng, col);
+  } else if (e.type === 'dim-angular') {
+    const g = dimAngularGeom(e);
+    const c = toScreen(e.vertex.x, e.vertex.y);
+    ctx.beginPath(); ctx.arc(c.x, c.y, g.radius * view.scale, -g.a0, -g.a1, true); ctx.stroke();
+    const ep0 = arcPoint(e.vertex, g.radius, g.a0), ep1 = arcPoint(e.vertex, g.radius, g.a1);
+    [ep0, ep1].forEach(p => { const s = toScreen(p.x, p.y); ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(s.x, s.y); ctx.stroke(); });
+    const t0 = arcPoint(e.vertex, g.radius, g.a0 + 0.01), t1 = arcPoint(e.vertex, g.radius, g.a1 - 0.01);
+    drawArrowHead(ep0, t0, arrowSize);
+    drawArrowHead(ep1, t1, arrowSize);
+    const midA = g.a0 + (g.a1 - g.a0) / 2;
+    const textP = arcPoint(e.vertex, g.radius + 14 / view.scale, midA);
+    dimText(g.angleDeg.toFixed(1) + '°', textP, 0, col);
+  } else if (e.type === 'dim-arclength') {
+    const c = toScreen(e.c.x, e.c.y);
+    ctx.beginPath(); ctx.arc(c.x, c.y, e.dimR * view.scale, -e.a0, -e.a1, true); ctx.stroke();
+    const p0 = arcPoint(e.c, e.r, e.a0), p1 = arcPoint(e.c, e.r, e.a1);
+    const d0 = arcPoint(e.c, e.dimR, e.a0), d1p = arcPoint(e.c, e.dimR, e.a1);
+    [[p0, d0], [p1, d1p]].forEach(([a, b]) => { const sa = toScreen(a.x, a.y), sb = toScreen(b.x, b.y); ctx.beginPath(); ctx.moveTo(sa.x, sa.y); ctx.lineTo(sb.x, sb.y); ctx.stroke(); });
+    const t0 = arcPoint(e.c, e.dimR, e.a0 + 0.01), t1 = arcPoint(e.c, e.dimR, e.a1 - 0.01);
+    drawArrowHead(d0, t0, arrowSize);
+    drawArrowHead(d1p, t1, arrowSize);
+    const midA = e.a0 + (e.a1 - e.a0) / 2;
+    const textP = arcPoint(e.c, e.dimR + 14 / view.scale, midA);
+    dimText('⌢ ' + (e.r * (e.a1 - e.a0)).toFixed(2) + ' m', textP, 0, col);
+  } else if (e.type === 'dim-radius') {
+    const ang = Math.atan2(e.anchor.y - e.c.y, e.anchor.x - e.c.x);
+    const onCirc = arcPoint(e.c, e.r, ang);
+    const a = toScreen(onCirc.x, onCirc.y), b = toScreen(e.anchor.x, e.anchor.y);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    drawArrowHead(onCirc, e.anchor, arrowSize);
+    dimText('R ' + e.r.toFixed(2) + ' m', e.anchor, 0, col);
+  } else if (e.type === 'dim-diameter') {
+    const ang = Math.atan2(e.anchor.y - e.c.y, e.anchor.x - e.c.x);
+    const p1 = arcPoint(e.c, e.r, ang), p2 = arcPoint(e.c, e.r, ang + Math.PI);
+    const s1 = toScreen(p1.x, p1.y), s2 = toScreen(p2.x, p2.y);
+    ctx.beginPath(); ctx.moveTo(s1.x, s1.y); ctx.lineTo(s2.x, s2.y); ctx.stroke();
+    drawArrowHead(p1, p2, arrowSize);
+    drawArrowHead(p2, p1, arrowSize);
+    let textP = e.anchor;
+    if (dist(e.c, e.anchor) > e.r) {
+      const sa = toScreen(p1.x, p1.y), sb = toScreen(e.anchor.x, e.anchor.y);
+      ctx.beginPath(); ctx.moveTo(sa.x, sa.y); ctx.lineTo(sb.x, sb.y); ctx.stroke();
+    } else {
+      textP = arcPoint(e.c, e.r + 14 / view.scale, ang);
+    }
+    dimText('⌀ ' + (e.r * 2).toFixed(2) + ' m', textP, 0, col);
+  }
+  ctx.restore();
+}
+
+function drawTextEntity(e, isSel) {
+  const col = dimColor(isSel);
+  const s = toScreen(e.p.x, e.p.y);
+  ctx.save();
+  ctx.font = Math.max(6, e.h * view.scale).toFixed(1) + 'px "Inter", sans-serif';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = col;
+  ctx.fillText(e.str, s.x, s.y);
+  if (isSel) {
+    const w = textWidth(e) * view.scale, h = e.h * view.scale;
+    ctx.strokeStyle = col; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+    ctx.strokeRect(s.x - 2, s.y - h - 2, w + 4, h + 6);
+  }
+  ctx.restore();
+}
+
+function drawDimPreview() {
+  if (!isDimTool(tool) || !dimDraw) return;
+  if (dimDraw.method === 'dim-linear' || dimDraw.method === 'dim-aligned') {
+    const pts = dimDraw.pts;
+    if (pts.length === 1) {
+      ctx.save(); ctx.setLineDash([6, 4]); ctx.lineWidth = 1.4; ctx.strokeStyle = DIM_COLOR;
+      const a = toScreen(pts[0].x, pts[0].y), b = toScreen(mouseWorld.x, mouseWorld.y);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.restore();
+    } else if (pts.length === 2) {
+      const fakeE = { type: dimDraw.method, p1: pts[0], p2: pts[1], dimP: mouseWorld, axis: null };
+      if (dimDraw.method === 'dim-linear') {
+        const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+        fakeE.axis = Math.abs(mouseWorld.y - mid.y) >= Math.abs(mouseWorld.x - mid.x) ? 'h' : 'v';
+      }
+      drawDimEntity(fakeE, false);
+    }
+  } else if (dimDraw.method === 'dim-angular' && dimDraw.vertex) {
+    const fakeE = { type: 'dim-angular', vertex: dimDraw.vertex, p1: dimDraw.click1, p2: dimDraw.click2, armPt: mouseWorld };
+    drawDimEntity(fakeE, false);
+  } else if (dimDraw.method === 'dim-arclength') {
+    const e = dimDraw.e;
+    const fakeE = { type: 'dim-arclength', c: e.c, r: e.r, a0: e.a0, a1: e.a1, dimR: Math.max(0.05, dist(e.c, mouseWorld)) };
+    drawDimEntity(fakeE, false);
+  } else if (dimDraw.method === 'dim-radius' || dimDraw.method === 'dim-diameter') {
+    const e = dimDraw.e;
+    const fakeE = { type: dimDraw.method, c: e.c, r: e.r, anchor: mouseWorld };
+    drawDimEntity(fakeE, false);
+  }
+}
+
 function strokeEntity(e, selected) {
+  if (e.type === 'text') { drawTextEntity(e, selected); return; }
+  if (isAnnotationType(e.type)) { drawDimEntity(e, selected); return; }
   ctx.lineWidth = selected ? 2.4 : 1.6;
   ctx.strokeStyle = selected ? '#58a6ff' : '#e6edf3';
   ctx.beginPath();
@@ -700,6 +1219,9 @@ function strokeEntity(e, selected) {
   } else if (e.type === 'circle') {
     const c = toScreen(e.c.x, e.c.y);
     ctx.arc(c.x, c.y, e.r * view.scale, 0, Math.PI * 2);
+  } else if (e.type === 'arc') {
+    const c = toScreen(e.c.x, e.c.y);
+    ctx.arc(c.x, c.y, e.r * view.scale, -e.a0, -e.a1, true);
   } else if (e.type === 'polyline') {
     e.pts.forEach((pt, k) => { const s = toScreen(pt.x, pt.y); k === 0 ? ctx.moveTo(s.x, s.y) : ctx.lineTo(s.x, s.y); });
     if (e.closed) ctx.closePath();
@@ -714,6 +1236,7 @@ function handlesOf(e) {
   if (e.type === 'line') return [e.p1, e.p2];
   if (e.type === 'rect') return [e.p1, e.p2, { x: e.p1.x, y: e.p2.y }, { x: e.p2.x, y: e.p1.y }];
   if (e.type === 'circle') return [e.c];
+  if (e.type === 'arc') return [arcPoint(e.c, e.r, e.a0), arcPoint(e.c, e.r, e.a1)];
   if (e.type === 'polyline') return e.pts;
   return [];
 }
@@ -877,9 +1400,49 @@ function drawPreview() {
 ════════════════════════════════════════════════ */
 function entityBBox(e) {
   if (e.type === 'circle') return { x0: e.c.x - e.r, x1: e.c.x + e.r, y0: e.c.y - e.r, y1: e.c.y + e.r };
+  if (e.type === 'arc') {
+    const pts = [arcPoint(e.c, e.r, e.a0), arcPoint(e.c, e.r, e.a1)];
+    [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2].forEach(a => { if (angleInArc(a, e.a0, e.a1)) pts.push(arcPoint(e.c, e.r, a)); });
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+  }
   if (e.type === 'polyline') {
     const xs = e.pts.map(p => p.x), ys = e.pts.map(p => p.y);
     return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+  }
+  if (e.type === 'dim-linear' || e.type === 'dim-aligned') {
+    const g = e.type === 'dim-linear' ? dimLinearGeom(e) : dimAlignedGeom(e);
+    const xs = [e.p1.x, e.p2.x, g.d1.x, g.d2.x], ys = [e.p1.y, e.p2.y, g.d1.y, g.d2.y];
+    return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+  }
+  if (e.type === 'dim-angular') {
+    const g = dimAngularGeom(e);
+    const pts = [e.vertex, arcPoint(e.vertex, g.radius, g.a0), arcPoint(e.vertex, g.radius, g.a1)];
+    [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2].forEach(a => { if (angleInArc(a, g.a0, g.a1)) pts.push(arcPoint(e.vertex, g.radius, a)); });
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+  }
+  if (e.type === 'dim-arclength') {
+    const pts = [arcPoint(e.c, e.dimR, e.a0), arcPoint(e.c, e.dimR, e.a1), arcPoint(e.c, e.r, e.a0), arcPoint(e.c, e.r, e.a1)];
+    [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2].forEach(a => { if (angleInArc(a, e.a0, e.a1)) pts.push(arcPoint(e.c, e.dimR, a)); });
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+  }
+  if (e.type === 'dim-radius') {
+    const ang = Math.atan2(e.anchor.y - e.c.y, e.anchor.x - e.c.x);
+    const onCirc = arcPoint(e.c, e.r, ang);
+    const xs = [onCirc.x, e.anchor.x], ys = [onCirc.y, e.anchor.y];
+    return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+  }
+  if (e.type === 'dim-diameter') {
+    const ang = Math.atan2(e.anchor.y - e.c.y, e.anchor.x - e.c.x);
+    const p1 = arcPoint(e.c, e.r, ang), p2 = arcPoint(e.c, e.r, ang + Math.PI);
+    const xs = [p1.x, p2.x, e.anchor.x], ys = [p1.y, p2.y, e.anchor.y];
+    return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+  }
+  if (e.type === 'text') {
+    const w = textWidth(e);
+    return { x0: e.p.x, x1: e.p.x + Math.max(w, 0.05), y0: e.p.y - e.h * 0.2, y1: e.p.y + e.h };
   }
   return {
     x0: Math.min(e.p1.x, e.p2.x), x1: Math.max(e.p1.x, e.p2.x),
@@ -940,6 +1503,9 @@ function drawEntityPath(e) {
   } else if (e.type === 'circle') {
     const c = toScreen(e.c.x, e.c.y);
     ctx.arc(c.x, c.y, e.r * view.scale, 0, Math.PI * 2);
+  } else if (e.type === 'arc') {
+    const c = toScreen(e.c.x, e.c.y);
+    ctx.arc(c.x, c.y, e.r * view.scale, -e.a0, -e.a1, true);
   } else if (e.type === 'polyline') {
     e.pts.forEach((pt, k) => { const s = toScreen(pt.x, pt.y); k === 0 ? ctx.moveTo(s.x, s.y) : ctx.lineTo(s.x, s.y); });
     if (e.closed) ctx.closePath();
@@ -947,9 +1513,9 @@ function drawEntityPath(e) {
 }
 
 /* ════════════════════════════════════════════════
-   OFFSET (desfase paralelo — línea / rectángulo / círculo / polilínea)
+   OFFSET (desfase paralelo — línea / rectángulo / círculo / arco / polilínea)
 ════════════════════════════════════════════════ */
-function isOffsettable(type) { return type === 'line' || type === 'rect' || type === 'circle' || type === 'polyline'; }
+function isOffsettable(type) { return type === 'line' || type === 'rect' || type === 'circle' || type === 'arc' || type === 'polyline'; }
 
 // Intersección de dos rectas infinitas (a1-a2) y (b1-b2). null si son paralelas.
 function lineIntersect(a1, a2, b1, b2) {
@@ -988,6 +1554,10 @@ function computeOffsetInfo(e, m) {
     const d = dist(m, e.c);
     return { sign: d >= e.r ? 1 : -1, dist: Math.abs(d - e.r) };
   }
+  if (e.type === 'arc') {
+    const d = dist(m, e.c);
+    return { sign: d >= e.r ? 1 : -1, dist: Math.abs(d - e.r) };
+  }
   if (e.type === 'polyline') {
     const pts = e.pts;
     const segs = [];
@@ -1020,6 +1590,9 @@ function applyOffset(e, sign, magnitude, info) {
   }
   if (e.type === 'circle') {
     return { type: 'circle', c: { x: e.c.x, y: e.c.y }, r: Math.max(0.02, e.r + sign * magnitude) };
+  }
+  if (e.type === 'arc') {
+    return { type: 'arc', c: { x: e.c.x, y: e.c.y }, r: Math.max(0.02, e.r + sign * magnitude), a0: e.a0, a1: e.a1 };
   }
   if (e.type === 'polyline') {
     const pts = e.pts, n = pts.length;
@@ -1257,23 +1830,37 @@ function applyFilletSide(side, clickPt, ip) {
   entities[side.idx] = pathToEntity({ pts: newPts, closed: path.closed });
 }
 
+function isCircularType(t) { return t === 'circle' || t === 'arc'; }
+
+// t (a lo largo de p1->p2) donde cruza el círculo/arco dado, restringido a la porción visible si es arco.
+function lineCircArcTs(p1, p2, circ) {
+  let ts = lineCircleTs(p1, p2, circ.c, circ.r);
+  if (circ.type === 'arc') {
+    ts = ts.filter(t => {
+      const pt = { x: p1.x + t * (p2.x - p1.x), y: p1.y + t * (p2.y - p1.y) };
+      return angleInArc(normalizeAngle(Math.atan2(pt.y - circ.c.y, pt.x - circ.c.x)), circ.a0, circ.a1);
+    });
+  }
+  return ts;
+}
+
 function doFillet(idx1, click1, idx2, click2) {
   const e1 = entities[idx1], e2 = entities[idx2];
-  if (e1.type === 'circle' && e2.type === 'circle') {
-    document.getElementById('hint').textContent = '⚠ No se pueden empalmar dos círculos (requeriría soporte de arcos)';
+  if (isCircularType(e1.type) && isCircularType(e2.type)) {
+    document.getElementById('hint').textContent = '⚠ No se pueden empalmar dos círculos/arcos entre sí';
     return;
   }
-  if (e1.type === 'circle' || e2.type === 'circle') {
-    const circIdx = e1.type === 'circle' ? idx1 : idx2, circ = e1.type === 'circle' ? e1 : e2;
-    const lineIdx = e1.type === 'circle' ? idx2 : idx1, lineE = e1.type === 'circle' ? e2 : e1;
-    const lineClick = e1.type === 'circle' ? click2 : click1;
+  if (isCircularType(e1.type) || isCircularType(e2.type)) {
+    const circ = isCircularType(e1.type) ? e1 : e2;
+    const lineIdx = isCircularType(e1.type) ? idx2 : idx1, lineE = isCircularType(e1.type) ? e2 : e1;
+    const lineClick = isCircularType(e1.type) ? click2 : click1;
     if (lineE.type !== 'line') {
-      document.getElementById('hint').textContent = '⚠ El empalme con un círculo solo funciona si el otro objeto es una línea';
+      document.getElementById('hint').textContent = '⚠ El empalme con un círculo o arco solo funciona si el otro objeto es una línea';
       return;
     }
-    const ts = lineCircleTs(lineE.p1, lineE.p2, circ.c, circ.r);
+    const ts = lineCircArcTs(lineE.p1, lineE.p2, circ);
     if (ts.length === 0) {
-      document.getElementById('hint').textContent = '⚠ Esa línea no cruza el círculo';
+      document.getElementById('hint').textContent = '⚠ Esa línea no cruza el ' + (circ.type === 'arc' ? 'arco' : 'círculo');
       return;
     }
     const dx = lineE.p2.x - lineE.p1.x, dy = lineE.p2.y - lineE.p1.y, len2 = dx * dx + dy * dy;
@@ -1305,18 +1892,19 @@ function drawFilletPreview() {
   const hit = hitTest(mouseScreen.x, mouseScreen.y);
   if (hit < 0 || hit === filletPick.idx) return;
   const e1 = entities[filletPick.idx], e2 = entities[hit];
-  if (e1.type === 'circle' && e2.type === 'circle') return;
+  if (isCircularType(e1.type) && isCircularType(e2.type)) return;
+  if (isAnnotationType(e1.type) || isAnnotationType(e2.type)) return;
   ctx.save();
   ctx.setLineDash([5, 4]);
   ctx.lineWidth = 1.8;
   ctx.strokeStyle = '#3fb950';
   let ip = null;
-  if (e1.type === 'circle' || e2.type === 'circle') {
-    const circ = e1.type === 'circle' ? e1 : e2;
-    const lineE = e1.type === 'circle' ? e2 : e1;
-    const lineClick = e1.type === 'circle' ? mouseWorld : filletPick.clickPt;
+  if (isCircularType(e1.type) || isCircularType(e2.type)) {
+    const circ = isCircularType(e1.type) ? e1 : e2;
+    const lineE = isCircularType(e1.type) ? e2 : e1;
+    const lineClick = isCircularType(e1.type) ? mouseWorld : filletPick.clickPt;
     if (lineE.type !== 'line') { ctx.restore(); return; }
-    const ts = lineCircleTs(lineE.p1, lineE.p2, circ.c, circ.r);
+    const ts = lineCircArcTs(lineE.p1, lineE.p2, circ);
     if (ts.length === 0) { ctx.restore(); return; }
     const dx = lineE.p2.x - lineE.p1.x, dy = lineE.p2.y - lineE.p1.y, len2 = dx * dx + dy * dy;
     const clickT = len2 < 1e-12 ? 0 : (((lineClick.x - lineE.p1.x) * dx + (lineClick.y - lineE.p1.y) * dy) / len2);
@@ -1341,10 +1929,12 @@ function drawFilletPreview() {
 
 /* ════════════════════════════════════════════════
    RECORTAR / ALARGAR (trim & extend estilo AutoCAD)
-   Se pueden recortar/alargar líneas, rectángulos y polilíneas
-   (por su ruta de segmentos). Los círculos no se pueden recortar/
-   alargar (requeriría soporte de arcos). Los bordes de corte pueden
-   ser línea, rectángulo, círculo o polilínea.
+   Líneas, rectángulos y polilíneas se recortan/alargan por su ruta de
+   segmentos. Los círculos se recortan convirtiéndose en arcos; los
+   arcos se pueden seguir recortando (se acortan o se dividen en dos)
+   y alargando (aumentando su barrido angular). Los círculos completos
+   no se alargan (no tienen extremos). Los bordes de corte pueden ser
+   línea, rectángulo, círculo, arco o polilínea.
 ════════════════════════════════════════════════ */
 // Intersección de la recta a1-a2 con la recta infinita b1-b2.
 // Devuelve t (parámetro sobre a1->a2, puede quedar fuera de [0,1]) y u (sobre b1->b2).
@@ -1372,16 +1962,17 @@ function lineCircleTs(p1, p2, c, r) {
 }
 
 function boundarySegments(e) {
-  if (e.type === 'circle') return [];
+  if (isCircularType(e.type)) return [];
   const path = entityToPath(e);
   return path ? pathSegments(path) : [];
 }
 
 // Todos los t (a lo largo de line.p1->line.p2) donde cruza alguna de las fronteras dadas.
+// (Los círculos/arcos como frontera se tratan como su círculo completo.)
 function boundaryTs(line, boundaries) {
   const ts = [];
   boundaries.forEach(b => {
-    if (b.type === 'circle') {
+    if (isCircularType(b.type)) {
       lineCircleTs(line.p1, line.p2, b.c, b.r).forEach(t => ts.push(t));
     } else {
       boundarySegments(b).forEach(seg => {
@@ -1400,7 +1991,7 @@ function pathBoundaryGs(path, boundaries) {
   const gs = new Set();
   segs.forEach((seg, si) => {
     boundaries.forEach(b => {
-      if (b.type === 'circle') {
+      if (isCircularType(b.type)) {
         lineCircleTs(seg.p1, seg.p2, b.c, b.r).forEach(t => { if (t > 1e-4 && t < 1 - 1e-4) gs.add(+(si + t).toFixed(6)); });
       } else {
         boundarySegments(b).forEach(bs => {
@@ -1411,6 +2002,26 @@ function pathBoundaryGs(path, boundaries) {
     });
   });
   return [...gs].sort((a, b) => a - b);
+}
+
+// Ángulos (0..2π, respecto al centro c) donde el círculo c,r cruza cualquiera de las fronteras dadas.
+function circleBoundaryAngles(c, r, boundaries) {
+  const angles = new Set();
+  boundaries.forEach(b => {
+    if (isCircularType(b.type)) {
+      circleCircleAngles(c, r, b.c, b.r).forEach(a => angles.add(+normalizeAngle(a).toFixed(6)));
+    } else {
+      boundarySegments(b).forEach(seg => {
+        lineCircleTs(seg.p1, seg.p2, c, r).forEach(t => {
+          if (t >= -1e-6 && t <= 1 + 1e-6) {
+            const pt = { x: seg.p1.x + t * (seg.p2.x - seg.p1.x), y: seg.p1.y + t * (seg.p2.y - seg.p1.y) };
+            angles.add(+normalizeAngle(Math.atan2(pt.y - c.y, pt.x - c.x)).toFixed(6));
+          }
+        });
+      });
+    }
+  });
+  return [...angles].sort((a, b) => a - b);
 }
 
 function pathClickG(path, clickWorld) {
@@ -1445,13 +2056,58 @@ function pathPointsBetween(path, gStart, gEnd) {
   return pts;
 }
 
-function doTrim(idx, clickWorld) {
+// Recortar un círculo completo (produce un arco) o un arco existente (lo acorta o lo divide en dos).
+function doTrimCircular(idx, clickWorld) {
   const e = entities[idx];
-  const path = entityToPath(e);
-  if (!path) {
-    document.getElementById('hint').textContent = '⚠ Los círculos no se pueden recortar todavía (requeriría soporte de arcos)';
+  const angles = circleBoundaryAngles(e.c, e.r, trimExtendBoundary);
+  if (angles.length === 0) {
+    document.getElementById('hint').textContent = '⚠ Ese objeto no cruza ningún borde de corte elegido';
     return;
   }
+  const clickA = normalizeAngle(Math.atan2(clickWorld.y - e.c.y, clickWorld.x - e.c.x));
+
+  if (e.type === 'circle') {
+    if (angles.length < 2) {
+      document.getElementById('hint').textContent = '⚠ Se necesitan al menos 2 cruces para recortar un círculo completo';
+      return;
+    }
+    let lo = null, hi = null;
+    angles.forEach(a => { if (a <= clickA && (lo === null || a > lo)) lo = a; if (a >= clickA && (hi === null || a < hi)) hi = a; });
+    if (lo === null) lo = angles[angles.length - 1] - 2 * Math.PI;
+    if (hi === null) hi = angles[0] + 2 * Math.PI;
+    entities[idx] = { type: 'arc', c: { x: e.c.x, y: e.c.y }, r: e.r, a0: hi, a1: lo + 2 * Math.PI };
+    selected = new Set([idx]);
+  } else {
+    const span = e.a1 - e.a0;
+    const local = angles.map(a => { let rel = a - e.a0; return ((rel % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI); })
+      .filter(rel => rel > 1e-4 && rel < span - 1e-4).sort((a, b) => a - b);
+    if (local.length === 0) {
+      document.getElementById('hint').textContent = '⚠ Ese arco no cruza ningún borde de corte elegido';
+      return;
+    }
+    let clickRel = clickA - e.a0; clickRel = ((clickRel % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    let lo = 0, hi = span;
+    local.forEach(g => { if (g <= clickRel && g > lo) lo = g; if (g >= clickRel && g < hi) hi = g; });
+    const results = [];
+    if (lo > 1e-6) results.push({ type: 'arc', c: { x: e.c.x, y: e.c.y }, r: e.r, a0: e.a0, a1: e.a0 + lo });
+    if (hi < span - 1e-6) results.push({ type: 'arc', c: { x: e.c.x, y: e.c.y }, r: e.r, a0: e.a0 + hi, a1: e.a1 });
+    if (results.length === 0) { entities.splice(idx, 1); selected.clear(); }
+    else {
+      entities[idx] = results[0];
+      const newIdx = [idx];
+      for (let i = 1; i < results.length; i++) { entities.push(results[i]); newIdx.push(entities.length - 1); }
+      selected = new Set(newIdx);
+    }
+  }
+  pushHistory();
+  document.getElementById('hint').textContent = TOOL_HINTS.trimAction;
+}
+
+function doTrim(idx, clickWorld) {
+  const e = entities[idx];
+  if (isCircularType(e.type)) { doTrimCircular(idx, clickWorld); return; }
+  const path = entityToPath(e);
+  if (!path) return;
   const segCount = pathSegments(path).length;
   const gs = pathBoundaryGs(path, trimExtendBoundary);
   if (gs.length === 0) {
@@ -1492,12 +2148,45 @@ function doTrim(idx, clickWorld) {
   document.getElementById('hint').textContent = TOOL_HINTS.trimAction;
 }
 
+// Alargar un arco existente aumentando su ángulo de barrido hasta el borde elegido más cercano.
+function doExtendCircular(idx, clickWorld) {
+  const e = entities[idx];
+  const angles = circleBoundaryAngles(e.c, e.r, trimExtendBoundary);
+  if (angles.length === 0) {
+    document.getElementById('hint').textContent = '⚠ No hay ningún borde elegido para alargar el arco';
+    return;
+  }
+  const p0 = arcPoint(e.c, e.r, e.a0), p1 = arcPoint(e.c, e.r, e.a1);
+  const nearEnd = dist(clickWorld, p1) < dist(clickWorld, p0);
+  let best = null;
+  angles.forEach(a => {
+    let rel = nearEnd ? (a - e.a1) : (e.a0 - a);
+    rel = ((rel % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    if (rel > 1e-4 && (best === null || rel < best)) best = rel;
+  });
+  if (best === null) {
+    document.getElementById('hint').textContent = '⚠ No hay ningún borde elegido en esa dirección para alargar';
+    return;
+  }
+  if ((e.a1 - e.a0) + best >= 2 * Math.PI - 1e-4) {
+    document.getElementById('hint').textContent = '⚠ El borde elegido no permite alargar más este arco';
+    return;
+  }
+  entities[idx] = nearEnd
+    ? { type: 'arc', c: { x: e.c.x, y: e.c.y }, r: e.r, a0: e.a0, a1: e.a1 + best }
+    : { type: 'arc', c: { x: e.c.x, y: e.c.y }, r: e.r, a0: e.a0 - best, a1: e.a1 };
+  selected = new Set([idx]);
+  pushHistory();
+  document.getElementById('hint').textContent = TOOL_HINTS.extendAction;
+}
+
 function doExtend(idx, clickWorld) {
   const e = entities[idx];
   if (e.type === 'circle') {
     document.getElementById('hint').textContent = '⚠ Los círculos no se pueden alargar (no tienen extremos)';
     return;
   }
+  if (e.type === 'arc') { doExtendCircular(idx, clickWorld); return; }
   if (e.type === 'rect' || (e.type === 'polyline' && e.closed)) {
     document.getElementById('hint').textContent = '⚠ Las formas cerradas no se pueden alargar (no tienen extremos)';
     return;
@@ -1535,8 +2224,36 @@ function drawTrimExtendPreview() {
   const hit = hitTest(mouseScreen.x, mouseScreen.y);
   if (hit < 0) return;
   const e = entities[hit];
+  if (isAnnotationType(e.type)) return;
   ctx.save();
   if (tool === 'trim') {
+    if (isCircularType(e.type)) {
+      const angles = circleBoundaryAngles(e.c, e.r, trimExtendBoundary);
+      if (angles.length === 0) { ctx.restore(); return; }
+      const clickA = normalizeAngle(Math.atan2(mouseWorld.y - e.c.y, mouseWorld.x - e.c.x));
+      let lo, hi;
+      if (e.type === 'circle') {
+        if (angles.length < 2) { ctx.restore(); return; }
+        lo = null; hi = null;
+        angles.forEach(a => { if (a <= clickA && (lo === null || a > lo)) lo = a; if (a >= clickA && (hi === null || a < hi)) hi = a; });
+        if (lo === null) lo = angles[angles.length - 1] - 2 * Math.PI;
+        if (hi === null) hi = angles[0] + 2 * Math.PI;
+      } else {
+        const span = e.a1 - e.a0;
+        const local = angles.map(a => { let rel = a - e.a0; return ((rel % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI); })
+          .filter(rel => rel > 1e-4 && rel < span - 1e-4);
+        if (local.length === 0) { ctx.restore(); return; }
+        let clickRel = clickA - e.a0; clickRel = ((clickRel % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        let loRel = 0, hiRel = span;
+        local.forEach(g => { if (g <= clickRel && g > loRel) loRel = g; if (g >= clickRel && g < hiRel) hiRel = g; });
+        lo = e.a0 + loRel; hi = e.a0 + hiRel;
+      }
+      const c = toScreen(e.c.x, e.c.y);
+      ctx.setLineDash([3, 3]); ctx.lineWidth = 4; ctx.strokeStyle = '#f85149';
+      ctx.beginPath(); ctx.arc(c.x, c.y, e.r * view.scale, -lo, -hi, true); ctx.stroke();
+      ctx.restore();
+      return;
+    }
     const path = entityToPath(e);
     if (!path) { ctx.restore(); return; }
     const segCount = pathSegments(path).length;
@@ -1559,6 +2276,32 @@ function drawTrimExtendPreview() {
     removed.forEach((p, k) => { const s = toScreen(p.x, p.y); k === 0 ? ctx.moveTo(s.x, s.y) : ctx.lineTo(s.x, s.y); });
     ctx.stroke();
   } else {
+    if (e.type === 'arc') {
+      const angles = circleBoundaryAngles(e.c, e.r, trimExtendBoundary);
+      if (angles.length) {
+        const p0 = arcPoint(e.c, e.r, e.a0), p1 = arcPoint(e.c, e.r, e.a1);
+        const nearEnd = dist(mouseWorld, p1) < dist(mouseWorld, p0);
+        let best = null;
+        angles.forEach(a => {
+          let rel = nearEnd ? (a - e.a1) : (e.a0 - a);
+          rel = ((rel % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+          if (rel > 1e-4 && (best === null || rel < best)) best = rel;
+        });
+        if (best !== null && (e.a1 - e.a0) + best < 2 * Math.PI - 1e-4) {
+          const newA0 = nearEnd ? e.a0 : e.a0 - best;
+          const newA1 = nearEnd ? e.a1 + best : e.a1;
+          const c = toScreen(e.c.x, e.c.y);
+          ctx.setLineDash([5, 4]); ctx.lineWidth = 1.8; ctx.strokeStyle = '#3fb950';
+          ctx.beginPath(); ctx.arc(c.x, c.y, e.r * view.scale, -newA0, -newA1, true); ctx.stroke();
+          ctx.setLineDash([]);
+          const endPt = nearEnd ? arcPoint(e.c, e.r, newA1) : arcPoint(e.c, e.r, newA0);
+          const s = toScreen(endPt.x, endPt.y);
+          ctx.fillStyle = '#3fb950'; ctx.beginPath(); ctx.arc(s.x, s.y, 4, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      ctx.restore();
+      return;
+    }
     if (e.type === 'circle' || e.type === 'rect' || (e.type === 'polyline' && e.closed)) { ctx.restore(); return; }
     const pts = e.type === 'line' ? [e.p1, e.p2] : e.pts;
     const nearEnd = dist(mouseWorld, pts[pts.length - 1]) < dist(mouseWorld, pts[0]);
@@ -1590,6 +2333,8 @@ function draw() {
   drawOffsetFixedPreview();
   drawFilletPreview();
   drawTrimExtendPreview();
+  drawArcDrawPreview();
+  drawDimPreview();
   drawMarquee();
 }
 
@@ -1647,6 +2392,12 @@ function hitTest(sx, sy) {
       const d = dist(p, e.c);
       if (Math.abs(d - e.r) <= threshWorld) return i;
       if (d < e.r) inside.push({ i, area: Math.PI * e.r * e.r });
+    } else if (e.type === 'arc') {
+      const d = dist(p, e.c);
+      if (Math.abs(d - e.r) <= threshWorld) {
+        const theta = normalizeAngle(Math.atan2(p.y - e.c.y, p.x - e.c.x));
+        if (angleInArc(theta, e.a0, e.a1)) return i;
+      }
     } else if (e.type === 'polyline') {
       const pts = e.pts;
       let nearEdge = false;
@@ -1654,6 +2405,33 @@ function hitTest(sx, sy) {
       if (!nearEdge && e.closed && pts.length > 2 && distPointToSeg(p, pts[pts.length - 1], pts[0]) <= threshWorld) nearEdge = true;
       if (nearEdge) return i;
       if (e.closed && pts.length > 2 && pointInPolygon(p, pts)) inside.push({ i, area: polygonArea(pts) });
+    } else if (e.type === 'dim-linear' || e.type === 'dim-aligned') {
+      const g = e.type === 'dim-linear' ? dimLinearGeom(e) : dimAlignedGeom(e);
+      if (distPointToSeg(p, g.d1, g.d2) <= threshWorld) return i;
+    } else if (e.type === 'dim-angular') {
+      const g = dimAngularGeom(e);
+      const d = dist(p, e.vertex);
+      if (Math.abs(d - g.radius) <= threshWorld) {
+        const theta = normalizeAngle(Math.atan2(p.y - e.vertex.y, p.x - e.vertex.x));
+        if (angleInArc(theta, g.a0, g.a1)) return i;
+      }
+    } else if (e.type === 'dim-arclength') {
+      const d = dist(p, e.c);
+      if (Math.abs(d - e.dimR) <= threshWorld) {
+        const theta = normalizeAngle(Math.atan2(p.y - e.c.y, p.x - e.c.x));
+        if (angleInArc(theta, e.a0, e.a1)) return i;
+      }
+    } else if (e.type === 'dim-radius') {
+      const ang = Math.atan2(e.anchor.y - e.c.y, e.anchor.x - e.c.x);
+      const onCirc = arcPoint(e.c, e.r, ang);
+      if (distPointToSeg(p, onCirc, e.anchor) <= threshWorld) return i;
+    } else if (e.type === 'dim-diameter') {
+      const ang = Math.atan2(e.anchor.y - e.c.y, e.anchor.x - e.c.x);
+      const p1 = arcPoint(e.c, e.r, ang), p2 = arcPoint(e.c, e.r, ang + Math.PI);
+      if (distPointToSeg(p, p1, p2) <= threshWorld || distPointToSeg(p, p1, e.anchor) <= threshWorld) return i;
+    } else if (e.type === 'text') {
+      const w = textWidth(e);
+      if (p.x >= e.p.x - threshWorld && p.x <= e.p.x + w + threshWorld && p.y >= e.p.y - threshWorld && p.y <= e.p.y + e.h + threshWorld) return i;
     }
   }
   if (inside.length) { inside.sort((a, b) => a.area - b.area); return inside[0].i; }
@@ -1663,8 +2441,13 @@ function hitTest(sx, sy) {
 function translateEntity(e, dx, dy) {
   const c = JSON.parse(JSON.stringify(e));
   if (c.type === 'line' || c.type === 'rect') { c.p1.x += dx; c.p1.y += dy; c.p2.x += dx; c.p2.y += dy; }
-  else if (c.type === 'circle') { c.c.x += dx; c.c.y += dy; }
+  else if (c.type === 'circle' || c.type === 'arc') { c.c.x += dx; c.c.y += dy; }
   else if (c.type === 'polyline') { c.pts.forEach(pt => { pt.x += dx; pt.y += dy; }); }
+  else if (c.type === 'dim-linear' || c.type === 'dim-aligned') { c.p1.x += dx; c.p1.y += dy; c.p2.x += dx; c.p2.y += dy; c.dimP.x += dx; c.dimP.y += dy; }
+  else if (c.type === 'dim-angular') { c.vertex.x += dx; c.vertex.y += dy; c.p1.x += dx; c.p1.y += dy; c.p2.x += dx; c.p2.y += dy; c.armPt.x += dx; c.armPt.y += dy; }
+  else if (c.type === 'dim-arclength') { c.c.x += dx; c.c.y += dy; }
+  else if (c.type === 'dim-radius' || c.type === 'dim-diameter') { c.c.x += dx; c.c.y += dy; c.anchor.x += dx; c.anchor.y += dy; }
+  else if (c.type === 'text') { c.p.x += dx; c.p.y += dy; }
   return c;
 }
 
@@ -1690,9 +2473,8 @@ function fitView() {
   if (entities.length === 0) { centerView(); view.scale = 50; updateZoomLabel(); draw(); return; }
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
   entities.forEach(e => {
-    const pts = e.type === 'circle' ? [{x:e.c.x-e.r,y:e.c.y-e.r},{x:e.c.x+e.r,y:e.c.y+e.r}]
-      : e.type === 'polyline' ? e.pts : [e.p1, e.p2];
-    pts.forEach(p => { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); });
+    const b = entityBBox(e);
+    x0 = Math.min(x0, b.x0); x1 = Math.max(x1, b.x1); y0 = Math.min(y0, b.y0); y1 = Math.max(y1, b.y1);
   });
   const rect = canvas.parentElement.getBoundingClientRect();
   const w = Math.max(x1 - x0, 0.5), h = Math.max(y1 - y0, 0.5);
@@ -1816,7 +2598,7 @@ function pointerDown(sx, sy, button, shiftKey) {
 
   if (tool === 'fillet') {
     const hit = hitTest(sx, sy);
-    if (hit < 0) {
+    if (hit < 0 || isAnnotationType(entities[hit].type)) {
       document.getElementById('hint').textContent = '⚠ Elige un objeto (línea, rectángulo, polilínea o círculo) para empalmar';
       return;
     }
@@ -1850,12 +2632,188 @@ function pointerDown(sx, sy, button, shiftKey) {
 
   if (isTrimExtendTool() && trimExtendPhase === 'action') {
     const hit = hitTest(sx, sy);
-    if (hit < 0) {
+    if (hit < 0 || isAnnotationType(entities[hit].type)) {
       document.getElementById('hint').textContent = '⚠ Elige un objeto para ' + (tool === 'trim' ? 'recortar' : 'alargar');
       return;
     }
     if (tool === 'trim') doTrim(hit, { x: mouseWorld.x, y: mouseWorld.y });
     else doExtend(hit, { x: mouseWorld.x, y: mouseWorld.y });
+    draw();
+    return;
+  }
+
+  if (isArcDrawTool(tool)) {
+    const p = snapWorld(mouseWorld);
+    if (!arcDraw) {
+      arcDraw = { method: tool, pts: [p], raw: p };
+      typedBuffer = '';
+      draw();
+      return;
+    }
+    if (arcDraw.method === 'arc-ser') {
+      if (arcDraw.pts.length === 1) {
+        arcDraw.pts.push(p);
+        typedBuffer = '';
+        draw();
+        return;
+      }
+      let typedR = null;
+      if (typedBuffer) { const v = parseFloat(typedBuffer); if (!isNaN(v) && v > 0) typedR = v; }
+      commitArcDraw(computeSERArc(arcDraw.pts[0], arcDraw.pts[1], mouseWorld, typedR));
+      draw();
+      return;
+    }
+    if (arcDraw.method === 'arc-sed') {
+      if (arcDraw.pts.length === 1) {
+        arcDraw.pts.push(p);
+        typedBuffer = '';
+        draw();
+        return;
+      }
+      let dirPoint = mouseWorld;
+      if (typedBuffer) { const v = parseFloat(typedBuffer); if (!isNaN(v)) { const rad = v * Math.PI / 180; dirPoint = { x: arcDraw.pts[0].x + Math.cos(rad), y: arcDraw.pts[0].y + Math.sin(rad) }; } }
+      commitArcDraw(computeSEDArc(arcDraw.pts[0], arcDraw.pts[1], dirPoint));
+      draw();
+      return;
+    }
+    if (arcDraw.pts.length < 2) {
+      arcDraw.pts.push(p);
+      draw();
+      return;
+    }
+    const [p1, p2] = arcDraw.pts;
+    commitArcDraw(arcDraw.method === 'arc-3p' ? threePointArc(p1, p2, p) : (() => {
+      const r = dist(p1, p2);
+      if (r < 1e-6) return null;
+      const a0 = normalizeAngle(Math.atan2(p2.y - p1.y, p2.x - p1.x));
+      const aEndRaw = normalizeAngle(Math.atan2(p.y - p1.y, p.x - p1.x));
+      return { type: 'arc', c: { x: p1.x, y: p1.y }, r, a0, a1: a0 + normalizeAngle(aEndRaw - a0) };
+    })());
+    draw();
+    return;
+  }
+
+  if (isDimTool(tool)) {
+    if (tool === 'dim-linear' || tool === 'dim-aligned') {
+      const p = snapWorld(mouseWorld);
+      if (!dimDraw) { dimDraw = { method: tool, pts: [p] }; draw(); return; }
+      if (dimDraw.pts.length === 1) { dimDraw.pts.push(p); draw(); return; }
+      const [p1, p2] = dimDraw.pts;
+      let axis = null;
+      if (tool === 'dim-linear') {
+        const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+        axis = Math.abs(mouseWorld.y - mid.y) >= Math.abs(mouseWorld.x - mid.x) ? 'h' : 'v';
+      }
+      entities.push({ type: tool, p1, p2, dimP: p, axis });
+      selected = new Set([entities.length - 1]);
+      pushHistory();
+      dimDraw = null;
+      draw();
+      return;
+    }
+
+    if (tool === 'dim-angular') {
+      if (!dimDraw) {
+        const hit = hitTest(sx, sy);
+        if (hit < 0 || entities[hit].type !== 'line') {
+          document.getElementById('hint').textContent = '⚠ Elige una línea para el primer lado del ángulo';
+          return;
+        }
+        dimDraw = { method: 'dim-angular', idx1: hit, line1: entities[hit], click1: { x: mouseWorld.x, y: mouseWorld.y } };
+        selected = new Set([hit]);
+        document.getElementById('hint').textContent = 'Clic en la segunda línea para definir el ángulo · Esc cancela';
+        draw();
+        return;
+      }
+      if (!dimDraw.vertex) {
+        const hit = hitTest(sx, sy);
+        if (hit < 0 || entities[hit].type !== 'line') {
+          document.getElementById('hint').textContent = '⚠ Elige una línea para el segundo lado del ángulo';
+          return;
+        }
+        if (hit === dimDraw.idx1) return;
+        const line2 = entities[hit];
+        const vertex = lineIntersect(dimDraw.line1.p1, dimDraw.line1.p2, line2.p1, line2.p2);
+        if (!vertex) {
+          document.getElementById('hint').textContent = '⚠ Esas líneas son paralelas — elige otra línea para el segundo lado';
+          return;
+        }
+        dimDraw.idx2 = hit;
+        dimDraw.click2 = { x: mouseWorld.x, y: mouseWorld.y };
+        dimDraw.vertex = vertex;
+        selected = new Set([dimDraw.idx1, hit]);
+        document.getElementById('hint').textContent = 'Clic para definir el radio del arco de cota · Esc cancela';
+        draw();
+        return;
+      }
+      entities.push({ type: 'dim-angular', vertex: dimDraw.vertex, p1: dimDraw.click1, p2: dimDraw.click2, armPt: { x: mouseWorld.x, y: mouseWorld.y } });
+      selected = new Set([entities.length - 1]);
+      pushHistory();
+      dimDraw = null;
+      draw();
+      return;
+    }
+
+    if (tool === 'dim-arclength') {
+      if (!dimDraw) {
+        const hit = hitTest(sx, sy);
+        if (hit < 0 || entities[hit].type !== 'arc') {
+          document.getElementById('hint').textContent = '⚠ Elige un arco (no un círculo completo) para acotar su longitud';
+          return;
+        }
+        dimDraw = { method: 'dim-arclength', e: entities[hit] };
+        selected = new Set([hit]);
+        document.getElementById('hint').textContent = 'Clic para colocar la línea de cota · Esc cancela';
+        draw();
+        return;
+      }
+      const e = dimDraw.e;
+      const dimR = Math.max(0.05, dist(e.c, mouseWorld));
+      entities.push({ type: 'dim-arclength', c: { x: e.c.x, y: e.c.y }, r: e.r, a0: e.a0, a1: e.a1, dimR });
+      selected = new Set([entities.length - 1]);
+      pushHistory();
+      dimDraw = null;
+      draw();
+      return;
+    }
+
+    if (tool === 'dim-radius' || tool === 'dim-diameter') {
+      if (!dimDraw) {
+        const hit = hitTest(sx, sy);
+        if (hit < 0 || (entities[hit].type !== 'circle' && entities[hit].type !== 'arc')) {
+          document.getElementById('hint').textContent = '⚠ Elige un círculo o un arco';
+          return;
+        }
+        dimDraw = { method: tool, e: entities[hit] };
+        selected = new Set([hit]);
+        document.getElementById('hint').textContent = 'Clic para colocar la línea guía y el texto · Esc cancela';
+        draw();
+        return;
+      }
+      const e = dimDraw.e;
+      let anchor = { x: mouseWorld.x, y: mouseWorld.y };
+      const minGap = 20 / view.scale;
+      if (dist(e.c, anchor) < e.r + minGap) {
+        const ang = Math.atan2(anchor.y - e.c.y, anchor.x - e.c.x);
+        anchor = arcPoint(e.c, e.r + minGap, ang);
+      }
+      entities.push({ type: tool, c: { x: e.c.x, y: e.c.y }, r: e.r, anchor });
+      selected = new Set([entities.length - 1]);
+      pushHistory();
+      dimDraw = null;
+      draw();
+      return;
+    }
+  }
+
+  if (tool === 'text') {
+    const p = snapWorld(mouseWorld);
+    const str = prompt('Texto de la etiqueta:');
+    if (str && str.trim()) {
+      entities.push({ type: 'text', p, str: str.trim(), h: 0.3 });
+      selected = new Set([entities.length - 1]);
+      pushHistory();
+    }
     draw();
     return;
   }
@@ -1969,6 +2927,14 @@ function pointerMove(sx, sy) {
   }
   if (isTrimExtendTool() && trimExtendPhase === 'action') {
     draw();
+    return;
+  }
+  if (isArcDrawTool(tool) && arcDraw) {
+    draw();
+    return;
+  }
+  if (isDimTool(tool) && dimDraw) {
+    draw();
   }
 }
 
@@ -2013,6 +2979,8 @@ canvas.addEventListener('contextmenu', e => {
   if (drawState && drawState.type === 'polyline') { finishPolyline(false); }
   else if (drawState) { drawState = null; typedBuffer = ''; draw(); }
   else if (tool === 'fillet' && filletPick) { filletPick = null; selected.clear(); document.getElementById('hint').textContent = TOOL_HINTS.fillet; draw(); }
+  else if (isArcDrawTool(tool) && arcDraw) { arcDraw = null; typedBuffer = ''; draw(); }
+  else if (isDimTool(tool) && dimDraw) { dimDraw = null; selected.clear(); document.getElementById('hint').textContent = TOOL_HINTS[tool]; draw(); }
   else if (tool === 'copy' || isOffsetTool() || isTrimExtendTool()) { setTool('select'); }
 });
 canvas.addEventListener('wheel', e => {
@@ -2126,6 +3094,36 @@ window.addEventListener('keydown', e => {
     if (/^[0-9.]$/.test(e.key)) { e.preventDefault(); typedBuffer += e.key; draw(); return; }
   }
 
+  // Arco "Inicio, Fin, Radio": mientras se define el radio, los dígitos van al valor tecleado
+  if (tool === 'arc-ser' && arcDraw && arcDraw.pts.length === 2) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      let typedR = null;
+      if (typedBuffer) { const v = parseFloat(typedBuffer); if (!isNaN(v) && v > 0) typedR = v; }
+      if (typedR === null) return; // Enter sin un radio válido: no hace nada (usa clic para confirmar el radio en vivo)
+      commitArcDraw(computeSERArc(arcDraw.pts[0], arcDraw.pts[1], mouseWorld, typedR));
+      return;
+    }
+    if (e.key === 'Backspace') { e.preventDefault(); typedBuffer = typedBuffer.slice(0, -1); draw(); return; }
+    if (/^[0-9.]$/.test(e.key)) { e.preventDefault(); typedBuffer += e.key; draw(); return; }
+  }
+
+  // Arco "Inicio, Fin, Dirección": mientras se define la dirección, los dígitos van al ángulo (en grados) tecleado
+  if (tool === 'arc-sed' && arcDraw && arcDraw.pts.length === 2) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (!typedBuffer) return; // Enter sin ángulo: no hace nada (usa clic para confirmar la dirección en vivo)
+      const v = parseFloat(typedBuffer);
+      if (isNaN(v)) return;
+      const rad = v * Math.PI / 180;
+      const dirPoint = { x: arcDraw.pts[0].x + Math.cos(rad), y: arcDraw.pts[0].y + Math.sin(rad) };
+      commitArcDraw(computeSEDArc(arcDraw.pts[0], arcDraw.pts[1], dirPoint));
+      return;
+    }
+    if (e.key === 'Backspace') { e.preventDefault(); typedBuffer = typedBuffer.slice(0, -1); draw(); return; }
+    if (/^[0-9.-]$/.test(e.key)) { e.preventDefault(); typedBuffer += e.key; draw(); return; }
+  }
+
   // Confirmar con Enter una selección múltiple (Shift+clic) en la fase de "elegir objeto" (Offset dinámico / Copiar / Recortar / Alargar)
   if (((tool === 'copy' && copyPhase === 'pick') || (tool === 'offset' && offsetPhase === 'pick') || (isTrimExtendTool() && trimExtendPhase === 'pick')) && e.key === 'Enter') {
     e.preventDefault();
@@ -2141,6 +3139,8 @@ window.addEventListener('keydown', e => {
     if (copyState) { copyState = null; copySource = null; typedBuffer = ''; setTool('select'); return; }
     if (tool === 'copy' || isOffsetTool() || isTrimExtendTool()) { setTool('select'); return; }
     if (tool === 'fillet' && filletPick) { filletPick = null; selected.clear(); document.getElementById('hint').textContent = TOOL_HINTS.fillet; draw(); return; }
+    if (isArcDrawTool(tool) && arcDraw) { arcDraw = null; typedBuffer = ''; draw(); return; }
+    if (isDimTool(tool) && dimDraw) { dimDraw = null; selected.clear(); document.getElementById('hint').textContent = TOOL_HINTS[tool]; draw(); return; }
     if (drawState && drawState.type === 'polyline') { finishPolyline(false); return; }
     drawState = null; typedBuffer = ''; boxSelect = null; selected.clear(); draw(); return;
   }
@@ -2338,6 +3338,22 @@ function toDXF() {
     pts.forEach(p => { g(0,'VERTEX'); g(8,'0'); g(10,p.x.toFixed(4)); g(20,p.y.toFixed(4)); g(30,0); });
     g(0,'SEQEND');
   }
+  function writeLine(a, b) {
+    g(0,'LINE'); g(8,'0');
+    g(10,a.x.toFixed(4)); g(20,a.y.toFixed(4)); g(30,0);
+    g(11,b.x.toFixed(4)); g(21,b.y.toFixed(4)); g(31,0);
+  }
+  function writeArc(c, r, a0, a1) {
+    g(0,'ARC'); g(8,'0');
+    g(10,c.x.toFixed(4)); g(20,c.y.toFixed(4)); g(30,0);
+    g(40,r.toFixed(4));
+    g(50,(a0*180/Math.PI).toFixed(4)); g(51,(a1*180/Math.PI).toFixed(4));
+  }
+  function writeText(p, str, h) {
+    g(0,'TEXT'); g(8,'0');
+    g(10,p.x.toFixed(4)); g(20,p.y.toFixed(4)); g(30,0);
+    g(40,h.toFixed(4)); g(1,str);
+  }
   entities.forEach(e => {
     if (e.type === 'line') {
       g(0,'LINE'); g(8,'0');
@@ -2347,12 +3363,42 @@ function toDXF() {
       g(0,'CIRCLE'); g(8,'0');
       g(10,e.c.x.toFixed(4)); g(20,e.c.y.toFixed(4)); g(30,0);
       g(40,e.r.toFixed(4));
+    } else if (e.type === 'arc') {
+      g(0,'ARC'); g(8,'0');
+      g(10,e.c.x.toFixed(4)); g(20,e.c.y.toFixed(4)); g(30,0);
+      g(40,e.r.toFixed(4));
+      g(50,(e.a0*180/Math.PI).toFixed(4)); g(51,(e.a1*180/Math.PI).toFixed(4));
     } else if (e.type === 'rect') {
       const x0=Math.min(e.p1.x,e.p2.x), x1=Math.max(e.p1.x,e.p2.x);
       const y0=Math.min(e.p1.y,e.p2.y), y1=Math.max(e.p1.y,e.p2.y);
       writePolyline([{x:x0,y:y0},{x:x1,y:y0},{x:x1,y:y1},{x:x0,y:y1}], true);
     } else if (e.type === 'polyline') {
       writePolyline(e.pts, e.closed);
+    } else if (e.type === 'dim-linear' || e.type === 'dim-aligned') {
+      const gd = e.type === 'dim-linear' ? dimLinearGeom(e) : dimAlignedGeom(e);
+      writeLine(e.p1, gd.d1); writeLine(e.p2, gd.d2); writeLine(gd.d1, gd.d2);
+      writeText({ x: (gd.d1.x + gd.d2.x) / 2, y: (gd.d1.y + gd.d2.y) / 2 }, gd.value.toFixed(2) + ' m', 0.2);
+    } else if (e.type === 'dim-angular') {
+      const gd = dimAngularGeom(e);
+      writeArc(e.vertex, gd.radius, gd.a0, gd.a1);
+      writeLine(e.vertex, arcPoint(e.vertex, gd.radius, gd.a0));
+      writeLine(e.vertex, arcPoint(e.vertex, gd.radius, gd.a1));
+      writeText(arcPoint(e.vertex, gd.radius, gd.a0 + (gd.a1 - gd.a0) / 2), gd.angleDeg.toFixed(1) + 'deg', 0.2);
+    } else if (e.type === 'dim-arclength') {
+      writeArc(e.c, e.dimR, e.a0, e.a1);
+      writeLine(arcPoint(e.c, e.r, e.a0), arcPoint(e.c, e.dimR, e.a0));
+      writeLine(arcPoint(e.c, e.r, e.a1), arcPoint(e.c, e.dimR, e.a1));
+      writeText(arcPoint(e.c, e.dimR, e.a0 + (e.a1 - e.a0) / 2), (e.r * (e.a1 - e.a0)).toFixed(2) + ' m', 0.2);
+    } else if (e.type === 'dim-radius') {
+      const ang = Math.atan2(e.anchor.y - e.c.y, e.anchor.x - e.c.x);
+      writeLine(arcPoint(e.c, e.r, ang), e.anchor);
+      writeText(e.anchor, 'R ' + e.r.toFixed(2) + ' m', 0.2);
+    } else if (e.type === 'dim-diameter') {
+      const ang = Math.atan2(e.anchor.y - e.c.y, e.anchor.x - e.c.x);
+      writeLine(arcPoint(e.c, e.r, ang), arcPoint(e.c, e.r, ang + Math.PI));
+      writeText(e.anchor, '⌀ ' + (e.r * 2).toFixed(2) + ' m', 0.2);
+    } else if (e.type === 'text') {
+      writeText(e.p, e.str, e.h);
     }
   });
   g(0,'ENDSEC');
