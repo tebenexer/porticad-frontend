@@ -186,6 +186,7 @@ body{ display:flex; flex-direction:column; }
 }
 .tb-action:hover{ background:var(--border2); color:var(--text); }
 .tb-action.danger:hover{ background:#f8514922; color:#ff8a80; }
+.tb-action.active{ background:var(--accent-dim); border-color:#1f6feb55; color:var(--accent); }
 .tb-action svg{ width:16px; height:16px; display:block; }
 
 /* ── Canvas ── */
@@ -404,6 +405,25 @@ body{ display:flex; flex-direction:column; }
     </button>
   </div>
 
+  <div class="topbar-sep-v"></div>
+  <div class="topbar-actions">
+    <button class="tb-action" id="tool-m-dist" onclick="setTool('m-dist')" title="Distancia — clic en 2 puntos, se encadena para seguir midiendo">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="4"/><line x1="4" y1="20" x2="8" y2="20"/><line x1="4" y1="20" x2="4" y2="16"/></svg>
+    </button>
+    <button class="tb-action" id="tool-m-radius" onclick="setTool('m-radius')" title="Radio — clic en un círculo o un arco">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="18" y2="6"/></svg>
+    </button>
+    <button class="tb-action" id="tool-m-angle" onclick="setTool('m-angle')" title="Ángulo — clic en 2 líneas">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16"/><path d="M4 20L16 6"/><path d="M9 20a8 8 0 0 1 3.2-11.6"/></svg>
+    </button>
+    <button class="tb-action" id="tool-m-area" onclick="setTool('m-area')" title="Área y Perímetro — clic en una forma cerrada, o traza un polígono a mano">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l8-3 8 3v9l-8 6-8-6z"/></svg>
+    </button>
+    <button class="tb-action" id="tool-m-volume" onclick="setTool('m-volume')" title="Volumen — igual que Área, luego pide la altura/espesor">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+    </button>
+  </div>
+
   <div class="mt-wrap">
     <button class="mt-btn" onclick="toggleMT(event)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -542,37 +562,6 @@ body{ display:flex; flex-direction:column; }
   <button class="tbtn" id="tool-extend" onclick="clickExtendBtn()" title="Alargar — elige el borde límite y luego clic cerca del extremo a alargar">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="12" x2="16" y2="12"/><polyline points="12 6 18 12 12 18"/></svg>
     <span>Alargar</span>
-  </button>
-
-  <div class="tgroup-label">Utilidades</div>
-  <button class="tbtn" id="tool-measure-btn" onclick="toggleMeasureMenu(event)" title="Utilidades de medición — distancia, radio, ángulo, área/perímetro y volumen">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="10" rx="1.5"/><line x1="7" y1="7" x2="7" y2="11"/><line x1="11" y1="7" x2="11" y2="10"/><line x1="15" y1="7" x2="15" y2="11"/><line x1="19" y1="7" x2="19" y2="10"/></svg>
-    <span>Medir ▾</span>
-  </button>
-</div>
-
-<!-- Menú desplegable "Utilidades" (position:fixed, se posiciona junto al botón al abrirse) -->
-<div class="arc-menu-panel" id="measure-menu-panel">
-  <div class="mt-hd" style="border-bottom:1px solid var(--border2);padding-bottom:8px;margin-bottom:6px;">UTILIDADES</div>
-  <button class="file-menu-item" onclick="pickMeasureMethod('m-dist')">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="4"/><line x1="4" y1="20" x2="8" y2="20"/><line x1="4" y1="20" x2="4" y2="16"/></svg>
-    Distancia
-  </button>
-  <button class="file-menu-item" onclick="pickMeasureMethod('m-radius')">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="18" y2="6"/></svg>
-    Radio
-  </button>
-  <button class="file-menu-item" onclick="pickMeasureMethod('m-angle')">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16"/><path d="M4 20L16 6"/><path d="M9 20a8 8 0 0 1 3.2-11.6"/></svg>
-    Ángulo
-  </button>
-  <button class="file-menu-item" onclick="pickMeasureMethod('m-area')">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l8-3 8 3v9l-8 6-8-6z"/></svg>
-    Área y Perímetro
-  </button>
-  <button class="file-menu-item" onclick="pickMeasureMethod('m-volume')">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-    Volumen
   </button>
 </div>
 
@@ -869,13 +858,11 @@ function setTool(t) {
   if (t === 'offset') offsetPhase = 'pick';
   if (t === 'trim' || t === 'extend') trimExtendPhase = 'pick';
   if (t !== 'select' && t !== 'select-box') selected.clear();
-  ['select','select-box','line','polyline','rect','circle','pan','copy','offset','offset-fixed','fillet','trim','extend','text'].forEach(k => document.getElementById('tool-' + k).classList.toggle('active', k === t));
+  ['select','select-box','line','polyline','rect','circle','pan','copy','offset','offset-fixed','fillet','trim','extend','text','m-dist','m-radius','m-angle','m-area','m-volume'].forEach(k => document.getElementById('tool-' + k).classList.toggle('active', k === t));
   const arcBtn = document.getElementById('tool-arc-btn');
   if (arcBtn) arcBtn.classList.toggle('active', isArcDrawTool(t));
   const dimBtn = document.getElementById('tool-dim-btn');
   if (dimBtn) dimBtn.classList.toggle('active', isDimTool(t));
-  const measureBtn = document.getElementById('tool-measure-btn');
-  if (measureBtn) measureBtn.classList.toggle('active', isMeasureTool(t));
   canvas.className = 'tool-' + t + (t === 'copy' ? '-' + copyPhase : t === 'offset' ? '-' + offsetPhase : isTrimExtendTool() ? '-' + trimExtendPhase : '');
   document.getElementById('hint').textContent = TOOL_HINTS[t] || '';
   draw();
@@ -912,20 +899,6 @@ function toggleDimMenu(e) {
 function closeDimMenu() { document.getElementById('dim-menu-panel').style.display = 'none'; }
 document.addEventListener('click', () => closeDimMenu());
 function pickDimMethod(method) { closeDimMenu(); setTool(method); }
-
-// Menú desplegable "Utilidades"
-function toggleMeasureMenu(e) {
-  e.stopPropagation();
-  const panel = document.getElementById('measure-menu-panel');
-  if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
-  const btnRect = e.currentTarget.getBoundingClientRect();
-  panel.style.top = btnRect.top + 'px';
-  panel.style.left = (btnRect.right + 6) + 'px';
-  panel.style.display = 'block';
-}
-function closeMeasureMenu() { document.getElementById('measure-menu-panel').style.display = 'none'; }
-document.addEventListener('click', () => closeMeasureMenu());
-function pickMeasureMethod(method) { closeMeasureMenu(); setTool(method); }
 
 function beginTrimExtendAction() {
   trimExtendBoundary = [...selected].map(i => JSON.parse(JSON.stringify(entities[i])));
