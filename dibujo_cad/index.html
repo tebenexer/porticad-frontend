@@ -103,6 +103,45 @@ body{ display:flex; flex-direction:column; }
 .size-apply-btn:hover{ background:#1f6feb33; }
 .size-apply-btn:disabled{ opacity:.4; cursor:default; }
 
+/* ── Menú "Capas" ── */
+.layers-panel{ min-width:420px; }
+.layers-list{ max-height:260px; overflow-y:auto; padding:0 6px; }
+.layer-row{
+  display:flex; align-items:center; gap:6px; padding:5px 4px; border-radius:6px;
+}
+.layer-row.is-current{ background:var(--accent-dim); }
+.layer-icon-btn{
+  display:flex; align-items:center; justify-content:center; width:22px; height:22px; flex-shrink:0;
+  background:none; border:1px solid transparent; border-radius:5px; color:var(--muted); cursor:pointer; padding:0;
+}
+.layer-icon-btn:hover{ background:var(--border2); color:var(--text); }
+.layer-icon-btn.off{ color:#5c6370; }
+.layer-color-swatch{
+  width:20px; height:20px; flex-shrink:0; padding:0; border:1px solid var(--border); border-radius:5px;
+  background:none; cursor:pointer;
+}
+.layer-name-input{
+  width:64px; flex-shrink:0; background:var(--panel2); border:1px solid var(--border); border-radius:5px;
+  color:var(--text); font-family:var(--mono); font-size:11px; padding:4px 6px;
+}
+.layer-name-input:focus{ outline:none; border-color:var(--accent); }
+.layer-select-sm{
+  flex:1; min-width:0; background:var(--panel2); border:1px solid var(--border); border-radius:5px;
+  color:var(--text); font-size:11px; padding:4px 5px;
+}
+.layer-current-btn{
+  display:flex; align-items:center; justify-content:center; width:20px; height:20px; flex-shrink:0;
+  background:none; border:none; color:var(--muted); cursor:pointer; padding:0;
+}
+.layer-current-btn.active{ color:var(--accent); }
+.layer-delete-btn{
+  display:flex; align-items:center; justify-content:center; width:20px; height:20px; flex-shrink:0;
+  background:none; border:none; color:var(--muted); cursor:pointer; padding:0;
+}
+.layer-delete-btn:hover{ color:#ff8a80; }
+.layer-delete-btn:disabled{ opacity:.25; cursor:default; }
+.layer-delete-btn:disabled:hover{ color:var(--muted); }
+
 /* ── Menú desplegable "Arco" (se posiciona con JS junto al botón, escapa el overflow de la barra) ── */
 .arc-menu-panel{
   display:none; position:fixed; background:var(--panel); border:1px solid var(--border);
@@ -269,6 +308,64 @@ body{ display:flex; flex-direction:column; }
           <input type="number" class="size-input" id="size-dim-all-input" step="0.05" min="0.05">
           <span style="font-size:11px;color:var(--muted);">m</span>
           <button class="size-apply-btn" onclick="applyDimSizeAll()">Aplicar a todas</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="file-menu-wrap" id="layers-menu-wrap" style="margin-left:8px;">
+    <button class="mt-btn" onclick="toggleLayersMenu(event)" title="Capas — color, tipo de línea y grosor por capa">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 8 12 14 22 8 12 2"/><polyline points="2 13 12 19 22 13"/><polyline points="2 18 12 24 22 18"/></svg>
+      Capas
+    </button>
+    <div class="mt-panel layers-panel" id="layers-menu-panel">
+      <div class="mt-hd">CAPAS</div>
+      <div class="layers-list" id="layers-list"></div>
+      <button class="size-apply-btn" style="margin:8px 10px 4px;width:calc(100% - 20px);" onclick="addLayer()">+ Nueva capa</button>
+      <div style="border-top:1px solid var(--border2);margin:8px 0 2px;"></div>
+      <div class="mt-hd" style="border-bottom:none;padding-bottom:2px;">PROPIEDADES DE LA SELECCIÓN</div>
+      <div class="size-row">
+        <label>Capa</label>
+        <div class="size-input-row">
+          <select class="size-input layer-select-sm" id="prop-layer-select" style="flex:1;"></select>
+          <button class="size-apply-btn" id="prop-layer-btn" onclick="applyLayerToSelection()" disabled>Mover</button>
+        </div>
+      </div>
+      <div class="size-row">
+        <label>Color</label>
+        <div class="size-input-row">
+          <select class="size-input layer-select-sm" id="prop-color-mode" style="flex:1;" onchange="onPropColorModeChange()">
+            <option value="bylayer">Por capa</option>
+            <option value="custom">Personalizado</option>
+          </select>
+          <input type="color" class="layer-color-swatch" id="prop-color-custom" value="#e6edf3">
+          <button class="size-apply-btn" id="prop-color-btn" onclick="applyColorToSelection()" disabled>Aplicar</button>
+        </div>
+      </div>
+      <div class="size-row">
+        <label>Tipo de línea</label>
+        <div class="size-input-row">
+          <select class="size-input layer-select-sm" id="prop-ltype-select" style="flex:1;">
+            <option value="bylayer">Por capa</option>
+            <option value="continuous">Continuo</option>
+            <option value="dashed">Discontinuo</option>
+            <option value="dotted">Punteado</option>
+            <option value="dashdot">Guión y punto</option>
+          </select>
+          <button class="size-apply-btn" id="prop-ltype-btn" onclick="applyLtypeToSelection()" disabled>Aplicar</button>
+        </div>
+      </div>
+      <div class="size-row">
+        <label>Grosor de línea</label>
+        <div class="size-input-row">
+          <select class="size-input layer-select-sm" id="prop-lweight-select" style="flex:1;">
+            <option value="bylayer">Por capa</option>
+            <option value="1">Delgado</option>
+            <option value="1.6">Medio</option>
+            <option value="2.4">Grueso</option>
+            <option value="3.4">Extra grueso</option>
+          </select>
+          <button class="size-apply-btn" id="prop-lweight-btn" onclick="applyLweightToSelection()" disabled>Aplicar</button>
         </div>
       </div>
     </div>
@@ -549,6 +646,25 @@ let textHDefault = 0.3;      // alto de texto (m) para las etiquetas nuevas que 
 let dimTextDefault = 0.25;   // alto de texto (m) para las cotas nuevas que se creen
 
 /* ════════════════════════════════════════════════
+   CAPAS (estilo AutoCAD) — cada entidad pertenece a una capa (entity.layer).
+   Color/tipo de línea/grosor son "ByLayer" salvo que la entidad tenga su
+   propio valor explícito (entity.color / entity.ltype / entity.lweight),
+   que actúa como override ("ByObject").
+════════════════════════════════════════════════ */
+let layers = [{ name: '0', color: '#e6edf3', ltype: 'continuous', lweight: 1.6, visible: true, locked: false }];
+let currentLayer = '0';
+const LTYPE_DASH = { continuous: [], dashed: [10, 6], dotted: [1.6, 4], dashdot: [10, 4, 1.6, 4] };
+const LTYPE_LABEL = { continuous: 'Continuo', dashed: 'Discontinuo', dotted: 'Punteado', dashdot: 'Guión y punto' };
+const LWEIGHT_OPTIONS = [{ v: 1, label: 'Delgado' }, { v: 1.6, label: 'Medio' }, { v: 2.4, label: 'Grueso' }, { v: 3.4, label: 'Extra grueso' }];
+
+function getLayer(name) { return layers.find(l => l.name === name) || layers[0]; }
+function isEntityVisible(e) { const l = getLayer(e.layer || '0'); return !l || l.visible !== false; }
+function isEntityLocked(e) { const l = getLayer(e.layer || '0'); return !!(l && l.locked); }
+function entityColor(e) { if (e.color) return e.color; const l = getLayer(e.layer || '0'); return l ? l.color : '#e6edf3'; }
+function entityLweight(e) { if (e.lweight) return e.lweight; const l = getLayer(e.layer || '0'); return l ? l.lweight : 1.6; }
+function entityDash(e) { const lt = e.ltype || (getLayer(e.layer || '0') || {}).ltype || 'continuous'; return LTYPE_DASH[lt] || []; }
+
+/* ════════════════════════════════════════════════
    TRANSFORMACIÓN MUNDO ↔ PANTALLA
 ════════════════════════════════════════════════ */
 function toScreen(wx, wy) { return { x: view.ox + wx * view.scale, y: view.oy - wy * view.scale }; }
@@ -602,7 +718,7 @@ function updateHistoryButtons() {
 }
 
 function saveLocal() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entities, textHDefault, dimTextDefault })); } catch (e) {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entities, textHDefault, dimTextDefault, layers, currentLayer })); } catch (e) {}
 }
 function loadLocal() {
   try {
@@ -614,6 +730,8 @@ function loadLocal() {
       entities = data.entities;
       if (typeof data.textHDefault === 'number') textHDefault = data.textHDefault;
       if (typeof data.dimTextDefault === 'number') dimTextDefault = data.dimTextDefault;
+      if (Array.isArray(data.layers) && data.layers.length > 0) layers = data.layers;
+      if (typeof data.currentLayer === 'string') currentLayer = data.currentLayer;
     }
     history = [JSON.stringify(entities)]; histIndex = 0;
   } catch (e) {}
@@ -838,6 +956,7 @@ function applyOrtho(p1, p2) {
 function objectSnapCandidates() {
   const pts = [];
   entities.forEach(e => {
+    if (!isEntityVisible(e) || isEntityLocked(e)) return;
     if (e.type === 'line') {
       pts.push({ x: e.p1.x, y: e.p1.y, kind: 'Extremo' }, { x: e.p2.x, y: e.p2.y, kind: 'Extremo' });
       pts.push({ x: (e.p1.x + e.p2.x) / 2, y: (e.p1.y + e.p2.y) / 2, kind: 'Medio' });
@@ -1068,6 +1187,7 @@ function computeSEDArc(p1, p2, dirPoint) {
 
 function commitArcDraw(entity) {
   if (!entity) { document.getElementById('hint').textContent = '⚠ Esos puntos no forman un arco válido (¿están alineados?)'; return; }
+  entity.layer = currentLayer;
   entities.push(entity);
   selected = new Set([entities.length - 1]);
   pushHistory();
@@ -1160,7 +1280,7 @@ function drawArcDrawPreview() {
    miden la geometría en el momento de crearlas, luego se comportan como
    cualquier otro objeto (se seleccionan, mueven, copian y borran igual).
 ════════════════════════════════════════════════ */
-function dimColor(sel) { return sel ? '#58a6ff' : DIM_COLOR; }
+function dimColor(e, sel) { return sel ? '#58a6ff' : entityColor(e); }
 
 // Geometría de una cota lineal: línea de cota horizontal o vertical según e.axis.
 function dimLinearGeom(e) {
@@ -1229,10 +1349,13 @@ function dimText(str, posW, angleRad, color, hWorld) {
 }
 
 function drawDimEntity(e, isSel) {
-  const col = dimColor(isSel);
+  if (!isEntityVisible(e)) return;
+  const col = dimColor(e, isSel);
   const arrowSize = 8;
+  const lw = entityLweight(e);
   ctx.save();
-  ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = isSel ? 2.2 : 1.4;
+  ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = isSel ? lw + 0.6 : lw;
+  ctx.setLineDash(entityDash(e));
 
   if (e.type === 'dim-linear' || e.type === 'dim-aligned') {
     const g = e.type === 'dim-linear' ? dimLinearGeom(e) : dimAlignedGeom(e);
@@ -1304,7 +1427,8 @@ function drawDimEntity(e, isSel) {
 }
 
 function drawTextEntity(e, isSel) {
-  const col = dimColor(isSel);
+  if (!isEntityVisible(e)) return;
+  const col = dimColor(e, isSel);
   const s = toScreen(e.p.x, e.p.y);
   ctx.save();
   ctx.font = Math.max(6, e.h * view.scale).toFixed(1) + 'px "Inter", sans-serif';
@@ -1379,11 +1503,11 @@ function commitTextInput() {
   input.style.display = 'none';
   const te = textEdit; textEdit = null;
   if (te.idx !== null) {
-    if (val) { entities[te.idx] = { type: 'text', p: te.p, str: val, h: te.h }; }
+    if (val) { entities[te.idx] = copyStyle({ type: 'text', p: te.p, str: val, h: te.h }, entities[te.idx]); }
     else { entities.splice(te.idx, 1); selected.clear(); }
     pushHistory();
   } else if (val) {
-    entities.push({ type: 'text', p: te.p, str: val, h: te.h });
+    entities.push({ type: 'text', p: te.p, str: val, h: te.h, layer: currentLayer });
     selected = new Set([entities.length - 1]);
     pushHistory();
   }
@@ -1408,10 +1532,13 @@ function cancelTextInput() {
 })();
 
 function strokeEntity(e, selected) {
+  if (!isEntityVisible(e)) return;
   if (e.type === 'text') { drawTextEntity(e, selected); return; }
   if (isAnnotationType(e.type)) { drawDimEntity(e, selected); return; }
-  ctx.lineWidth = selected ? 2.4 : 1.6;
-  ctx.strokeStyle = selected ? '#58a6ff' : '#e6edf3';
+  const lw = entityLweight(e);
+  ctx.lineWidth = selected ? lw + 0.8 : lw;
+  ctx.strokeStyle = selected ? '#58a6ff' : entityColor(e);
+  ctx.setLineDash(entityDash(e));
   ctx.beginPath();
   if (e.type === 'line') {
     const a = toScreen(e.p1.x, e.p1.y), b = toScreen(e.p2.x, e.p2.y);
@@ -1431,6 +1558,7 @@ function strokeEntity(e, selected) {
     if (e.closed) ctx.closePath();
   }
   ctx.stroke();
+  ctx.setLineDash([]);
   if (selected) {
     ctx.fillStyle = '#58a6ff';
     handlesOf(e).forEach(h => { const s = toScreen(h.x, h.y); ctx.beginPath(); ctx.arc(s.x, s.y, 3.5, 0, Math.PI * 2); ctx.fill(); });
@@ -1509,7 +1637,7 @@ function commitTyped() {
 
 function finishPolyline(closed) {
   if (drawState && drawState.type === 'polyline' && drawState.pts.length >= 2) {
-    entities.push({ type: 'polyline', pts: drawState.pts.map(p => ({ x: p.x, y: p.y })), closed: !!closed });
+    entities.push({ type: 'polyline', pts: drawState.pts.map(p => ({ x: p.x, y: p.y })), closed: !!closed, layer: currentLayer });
     pushHistory();
   }
   drawState = null;
@@ -1848,7 +1976,7 @@ function placeOffset() {
     const mag = offsetMagnitude(info);
     usedMag = mag;
     if (mag <= 1e-6) return;
-    entities.push(applyOffset(src, info.sign, mag, info));
+    entities.push(copyStyle(applyOffset(src, info.sign, mag, info), src));
     newIdx.push(entities.length - 1);
   });
   if (newIdx.length) { selected = new Set(newIdx); pushHistory(); }
@@ -1929,7 +2057,7 @@ function placeOffsetFixed(sx, sy) {
   if (!info) return;
   const mag = offsetMagnitude(info);
   if (mag <= 1e-6) return;
-  entities.push(applyOffset(src, info.sign, mag, info));
+  entities.push(copyStyle(applyOffset(src, info.sign, mag, info), src));
   selected = new Set([entities.length - 1]);
   if (typedBuffer) {
     const v = parseFloat(typedBuffer);
@@ -1984,9 +2112,21 @@ function entityToPath(e) {
   if (e.type === 'polyline') return { pts: e.pts, closed: !!e.closed };
   return null; // círculo: no tiene ruta recta
 }
-function pathToEntity(path) {
-  if (path.pts.length === 2 && !path.closed) return { type: 'line', p1: { x: path.pts[0].x, y: path.pts[0].y }, p2: { x: path.pts[1].x, y: path.pts[1].y } };
-  return { type: 'polyline', pts: path.pts.map(p => ({ x: p.x, y: p.y })), closed: !!path.closed };
+// Copia capa/color/tipo de línea/grosor de una entidad "fuente" a otra construida desde cero
+// (usado por Recortar/Alargar/Empalme para que el resultado no pierda su estilo/capa original).
+function copyStyle(dst, src) {
+  if (!dst || !src) return dst;
+  dst.layer = src.layer;
+  if (src.color) dst.color = src.color;
+  if (src.ltype) dst.ltype = src.ltype;
+  if (src.lweight) dst.lweight = src.lweight;
+  return dst;
+}
+function pathToEntity(path, srcE) {
+  const base = path.pts.length === 2 && !path.closed
+    ? { type: 'line', p1: { x: path.pts[0].x, y: path.pts[0].y }, p2: { x: path.pts[1].x, y: path.pts[1].y } }
+    : { type: 'polyline', pts: path.pts.map(p => ({ x: p.x, y: p.y })), closed: !!path.closed };
+  return srcE ? copyStyle(base, srcE) : base;
 }
 function pathSegments(path) {
   const segs = [], n = path.pts.length, count = path.closed ? n : n - 1;
@@ -2031,7 +2171,7 @@ function applyFilletSide(side, clickPt, ip) {
   const a = path.pts[side.si], b = path.pts[(side.si + 1) % n];
   const vIdx = dist(clickPt, a) <= dist(clickPt, b) ? side.si : (side.si + 1) % n;
   const newPts = path.pts.map((p, i) => i === vIdx ? { x: ip.x, y: ip.y } : { x: p.x, y: p.y });
-  entities[side.idx] = pathToEntity({ pts: newPts, closed: path.closed });
+  entities[side.idx] = pathToEntity({ pts: newPts, closed: path.closed }, entities[side.idx]);
 }
 
 function isCircularType(t) { return t === 'circle' || t === 'arc'; }
@@ -2279,7 +2419,7 @@ function doTrimCircular(idx, clickWorld) {
     angles.forEach(a => { if (a <= clickA && (lo === null || a > lo)) lo = a; if (a >= clickA && (hi === null || a < hi)) hi = a; });
     if (lo === null) lo = angles[angles.length - 1] - 2 * Math.PI;
     if (hi === null) hi = angles[0] + 2 * Math.PI;
-    entities[idx] = { type: 'arc', c: { x: e.c.x, y: e.c.y }, r: e.r, a0: hi, a1: lo + 2 * Math.PI };
+    entities[idx] = copyStyle({ type: 'arc', c: { x: e.c.x, y: e.c.y }, r: e.r, a0: hi, a1: lo + 2 * Math.PI }, e);
     selected = new Set([idx]);
   } else {
     const span = e.a1 - e.a0;
@@ -2293,8 +2433,8 @@ function doTrimCircular(idx, clickWorld) {
     let lo = 0, hi = span;
     local.forEach(g => { if (g <= clickRel && g > lo) lo = g; if (g >= clickRel && g < hi) hi = g; });
     const results = [];
-    if (lo > 1e-6) results.push({ type: 'arc', c: { x: e.c.x, y: e.c.y }, r: e.r, a0: e.a0, a1: e.a0 + lo });
-    if (hi < span - 1e-6) results.push({ type: 'arc', c: { x: e.c.x, y: e.c.y }, r: e.r, a0: e.a0 + hi, a1: e.a1 });
+    if (lo > 1e-6) results.push(copyStyle({ type: 'arc', c: { x: e.c.x, y: e.c.y }, r: e.r, a0: e.a0, a1: e.a0 + lo }, e));
+    if (hi < span - 1e-6) results.push(copyStyle({ type: 'arc', c: { x: e.c.x, y: e.c.y }, r: e.r, a0: e.a0 + hi, a1: e.a1 }, e));
     if (results.length === 0) { entities.splice(idx, 1); selected.clear(); }
     else {
       entities[idx] = results[0];
@@ -2333,10 +2473,10 @@ function doTrim(idx, clickWorld) {
 
   const newEntities = [];
   if (!path.closed) {
-    if (lo > 1e-6) newEntities.push(pathToEntity({ pts: pathPointsBetween(path, 0, lo), closed: false }));
-    if (hi < segCount - 1e-6) newEntities.push(pathToEntity({ pts: pathPointsBetween(path, hi, segCount), closed: false }));
+    if (lo > 1e-6) newEntities.push(pathToEntity({ pts: pathPointsBetween(path, 0, lo), closed: false }, e));
+    if (hi < segCount - 1e-6) newEntities.push(pathToEntity({ pts: pathPointsBetween(path, hi, segCount), closed: false }, e));
   } else {
-    newEntities.push(pathToEntity({ pts: pathPointsBetween(path, hi, lo + segCount), closed: false }));
+    newEntities.push(pathToEntity({ pts: pathPointsBetween(path, hi, lo + segCount), closed: false }, e));
   }
 
   if (newEntities.length === 0) {
@@ -2376,9 +2516,9 @@ function doExtendCircular(idx, clickWorld) {
     document.getElementById('hint').textContent = '⚠ El borde elegido no permite alargar más este arco';
     return;
   }
-  entities[idx] = nearEnd
+  entities[idx] = copyStyle(nearEnd
     ? { type: 'arc', c: { x: e.c.x, y: e.c.y }, r: e.r, a0: e.a0, a1: e.a1 + best }
-    : { type: 'arc', c: { x: e.c.x, y: e.c.y }, r: e.r, a0: e.a0 - best, a1: e.a1 };
+    : { type: 'arc', c: { x: e.c.x, y: e.c.y }, r: e.r, a0: e.a0 - best, a1: e.a1 }, e);
   selected = new Set([idx]);
   pushHistory();
   document.getElementById('hint').textContent = TOOL_HINTS.extendAction;
@@ -2416,7 +2556,7 @@ function doExtend(idx, clickWorld) {
   } else {
     const newPts = pts.map(p => ({ x: p.x, y: p.y }));
     if (nearEnd) newPts[newPts.length - 1] = newPt; else newPts[0] = newPt;
-    entities[idx] = { type: 'polyline', pts: newPts, closed: false };
+    entities[idx] = copyStyle({ type: 'polyline', pts: newPts, closed: false }, e);
   }
   selected = new Set([idx]);
   pushHistory();
@@ -2580,6 +2720,7 @@ function hitTest(sx, sy) {
 
   for (let i = entities.length - 1; i >= 0; i--) {
     const e = entities[i];
+    if (!isEntityVisible(e) || isEntityLocked(e)) continue;
     if (e.type === 'line') {
       if (distPointToSeg(p, e.p1, e.p2) <= threshWorld) return i;
     } else if (e.type === 'rect') {
@@ -2674,9 +2815,10 @@ function updateZoomLabel() {
   document.getElementById('zoom-lbl').textContent = Math.round(view.scale / 50 * 100) + '%';
 }
 function fitView() {
-  if (entities.length === 0) { centerView(); view.scale = 50; updateZoomLabel(); draw(); return; }
+  const visibleEntities = entities.filter(isEntityVisible);
+  if (visibleEntities.length === 0) { centerView(); view.scale = 50; updateZoomLabel(); draw(); return; }
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-  entities.forEach(e => {
+  visibleEntities.forEach(e => {
     const b = entityBBox(e);
     x0 = Math.min(x0, b.x0); x1 = Math.max(x1, b.x1); y0 = Math.min(y0, b.y0); y1 = Math.max(y1, b.y1);
   });
@@ -2908,7 +3050,7 @@ function pointerDown(sx, sy, button, shiftKey) {
         const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
         axis = Math.abs(mouseWorld.y - mid.y) >= Math.abs(mouseWorld.x - mid.x) ? 'h' : 'v';
       }
-      entities.push({ type: tool, p1, p2, dimP: p, axis, th: dimTextDefault });
+      entities.push({ type: tool, p1, p2, dimP: p, axis, th: dimTextDefault, layer: currentLayer });
       selected = new Set([entities.length - 1]);
       pushHistory();
       dimDraw = null;
@@ -2951,7 +3093,7 @@ function pointerDown(sx, sy, button, shiftKey) {
         draw();
         return;
       }
-      entities.push({ type: 'dim-angular', vertex: dimDraw.vertex, p1: dimDraw.click1, p2: dimDraw.click2, armPt: { x: mouseWorld.x, y: mouseWorld.y }, th: dimTextDefault });
+      entities.push({ type: 'dim-angular', vertex: dimDraw.vertex, p1: dimDraw.click1, p2: dimDraw.click2, armPt: { x: mouseWorld.x, y: mouseWorld.y }, th: dimTextDefault, layer: currentLayer });
       selected = new Set([entities.length - 1]);
       pushHistory();
       dimDraw = null;
@@ -2974,7 +3116,7 @@ function pointerDown(sx, sy, button, shiftKey) {
       }
       const e = dimDraw.e;
       const dimR = Math.max(0.05, dist(e.c, mouseWorld));
-      entities.push({ type: 'dim-arclength', c: { x: e.c.x, y: e.c.y }, r: e.r, a0: e.a0, a1: e.a1, dimR, th: dimTextDefault });
+      entities.push({ type: 'dim-arclength', c: { x: e.c.x, y: e.c.y }, r: e.r, a0: e.a0, a1: e.a1, dimR, th: dimTextDefault, layer: currentLayer });
       selected = new Set([entities.length - 1]);
       pushHistory();
       dimDraw = null;
@@ -3002,7 +3144,7 @@ function pointerDown(sx, sy, button, shiftKey) {
         const ang = Math.atan2(anchor.y - e.c.y, anchor.x - e.c.x);
         anchor = arcPoint(e.c, e.r + minGap, ang);
       }
-      entities.push({ type: tool, c: { x: e.c.x, y: e.c.y }, r: e.r, anchor, th: dimTextDefault });
+      entities.push({ type: tool, c: { x: e.c.x, y: e.c.y }, r: e.r, anchor, th: dimTextDefault, layer: currentLayer });
       selected = new Set([entities.length - 1]);
       pushHistory();
       dimDraw = null;
@@ -3072,7 +3214,7 @@ function commitDraw(p1, p2) {
     if (r < 1e-6) return;
     e = { type: 'circle', c: p1, r };
   }
-  if (e) { entities.push(e); pushHistory(); }
+  if (e) { e.layer = currentLayer; entities.push(e); pushHistory(); }
 }
 
 function pointerMove(sx, sy) {
@@ -3149,7 +3291,7 @@ function pointerUp() {
     } else {
       const a = toWorld(s.x, s.y), b = toWorld(c.x, c.y);
       const box = { x0: Math.min(a.x, b.x), x1: Math.max(a.x, b.x), y0: Math.min(a.y, b.y), y1: Math.max(a.y, b.y) };
-      entities.forEach((e, i) => { if (bboxIntersects(entityBBox(e), box)) hits.push(i); });
+      entities.forEach((e, i) => { if (isEntityVisible(e) && !isEntityLocked(e) && bboxIntersects(entityBBox(e), box)) hits.push(i); });
     }
     const shiftHeld = boxSelect.shift;
     if (shiftHeld) hits.forEach(i => selected.add(i));
@@ -3473,6 +3615,164 @@ function applyDimSizeAll() {
   draw();
 }
 
+/* ── Menú "Capas" — administrar capas y propiedades (color/tipo de línea/grosor) de la selección ── */
+function escAttr(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function escJs(s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+
+function toggleLayersMenu(e) {
+  e.stopPropagation();
+  const panel = document.getElementById('layers-menu-panel');
+  if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
+  renderLayersList();
+  updateSelectionPropsUI();
+  panel.style.display = 'block';
+}
+function closeLayersMenu() { document.getElementById('layers-menu-panel').style.display = 'none'; }
+document.addEventListener('click', () => closeLayersMenu());
+// Los clics dentro del panel (inputs, selects, botones) no deben cerrar el menú — mismo problema
+// que tuvo el panel "Tamaños" al principio.
+document.getElementById('layers-menu-panel').addEventListener('click', e => e.stopPropagation());
+
+const EYE_OPEN_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_CLOSED_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.6 21.6 0 0 1 5.06-5.94M9.9 4.24A10.5 10.94 0 0 1 12 5c7 0 11 7 11 7a21.6 21.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+const LOCK_CLOSED_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+const LOCK_OPEN_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 7-3.8"/></svg>';
+const DELETE_X_SVG = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
+function layerRowHTML(l) {
+  const isCurrent = l.name === currentLayer;
+  const canDelete = layers.length > 1 && l.name !== currentLayer;
+  const ltypeOpts = Object.keys(LTYPE_LABEL).map(k => '<option value="' + k + '"' + (l.ltype === k ? ' selected' : '') + '>' + LTYPE_LABEL[k] + '</option>').join('');
+  const lwOpts = LWEIGHT_OPTIONS.map(o => '<option value="' + o.v + '"' + (Math.abs(l.lweight - o.v) < 1e-6 ? ' selected' : '') + '>' + o.label + '</option>').join('');
+  const n = escJs(l.name);
+  return '' +
+    '<div class="layer-row' + (isCurrent ? ' is-current' : '') + '">' +
+      '<button class="layer-current-btn' + (isCurrent ? ' active' : '') + '" title="Hacer capa activa" onclick="setCurrentLayer(\'' + n + '\')">' +
+        '<svg width="12" height="12" viewBox="0 0 24 24"><circle cx="12" cy="12" r="' + (isCurrent ? 9 : 7) + '" fill="' + (isCurrent ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>' +
+      '</button>' +
+      '<button class="layer-icon-btn' + (l.visible === false ? ' off' : '') + '" title="Mostrar/ocultar" onclick="toggleLayerVisible(\'' + n + '\')">' + (l.visible === false ? EYE_CLOSED_SVG : EYE_OPEN_SVG) + '</button>' +
+      '<button class="layer-icon-btn' + (l.locked ? ' off' : '') + '" title="Bloquear/desbloquear" onclick="toggleLayerLocked(\'' + n + '\')">' + (l.locked ? LOCK_CLOSED_SVG : LOCK_OPEN_SVG) + '</button>' +
+      '<input type="color" class="layer-color-swatch" value="' + escAttr(l.color) + '" title="Color de la capa" onchange="setLayerColor(\'' + n + '\', this.value)">' +
+      '<input type="text" class="layer-name-input" value="' + escAttr(l.name) + '" onchange="renameLayer(\'' + n + '\', this.value, this)">' +
+      '<select class="layer-select-sm" onchange="setLayerLtype(\'' + n + '\', this.value)">' + ltypeOpts + '</select>' +
+      '<select class="layer-select-sm" style="flex:0 0 82px;" onchange="setLayerLweight(\'' + n + '\', this.value)">' + lwOpts + '</select>' +
+      '<button class="layer-delete-btn" title="Borrar capa" onclick="deleteLayer(\'' + n + '\')"' + (canDelete ? '' : ' disabled') + '>' + DELETE_X_SVG + '</button>' +
+    '</div>';
+}
+
+function updatePropLayerSelect() {
+  const sel = document.getElementById('prop-layer-select');
+  const prevVal = sel.value;
+  sel.innerHTML = layers.map(l => '<option value="' + escAttr(l.name) + '">' + escAttr(l.name) + '</option>').join('');
+  if (layers.some(l => l.name === prevVal)) sel.value = prevVal;
+}
+
+function renderLayersList() {
+  document.getElementById('layers-list').innerHTML = layers.map(layerRowHTML).join('');
+  updatePropLayerSelect();
+}
+
+function setCurrentLayer(name) { currentLayer = name; saveLocal(); renderLayersList(); }
+function toggleLayerVisible(name) { const l = getLayer(name); l.visible = l.visible === false; saveLocal(); renderLayersList(); draw(); }
+function toggleLayerLocked(name) { const l = getLayer(name); l.locked = !l.locked; saveLocal(); renderLayersList(); }
+function setLayerColor(name, hex) { getLayer(name).color = hex; saveLocal(); draw(); }
+function setLayerLtype(name, ltype) { getLayer(name).ltype = ltype; saveLocal(); draw(); }
+function setLayerLweight(name, px) { getLayer(name).lweight = parseFloat(px); saveLocal(); draw(); }
+
+function renameLayer(oldName, newNameRaw, inputEl) {
+  const newName = (newNameRaw || '').trim();
+  if (!newName || newName === oldName) { inputEl.value = oldName; return; }
+  if (layers.some(l => l.name === newName)) { alert('Ya existe una capa con ese nombre.'); inputEl.value = oldName; return; }
+  getLayer(oldName).name = newName;
+  entities.forEach(e => { if ((e.layer || '0') === oldName) e.layer = newName; });
+  if (currentLayer === oldName) currentLayer = newName;
+  saveLocal();
+  renderLayersList();
+  draw();
+}
+
+function addLayer() {
+  let n = layers.length + 1, name;
+  do { name = 'Capa ' + n; n++; } while (layers.some(l => l.name === name));
+  const palette = ['#f85149', '#d29922', '#3fb950', '#22d3ee', '#58a6ff', '#a78bfa', '#f97316', '#10b981'];
+  layers.push({ name, color: palette[layers.length % palette.length], ltype: 'continuous', lweight: 1.6, visible: true, locked: false });
+  saveLocal();
+  renderLayersList();
+}
+
+function deleteLayer(name) {
+  if (layers.length <= 1) { alert('Debe existir al menos una capa.'); return; }
+  if (name === currentLayer) { alert('No puedes borrar la capa activa — cambia primero a otra capa.'); return; }
+  const fallback = layers.find(l => l.name !== name) || layers[0];
+  const count = entities.filter(e => (e.layer || '0') === name).length;
+  if (count > 0 && !confirm('La capa "' + name + '" tiene ' + count + ' objeto(s). Se moverán a la capa "' + fallback.name + '". ¿Continuar?')) return;
+  entities.forEach(e => { if ((e.layer || '0') === name) e.layer = fallback.name; });
+  layers = layers.filter(l => l.name !== name);
+  if (count > 0) pushHistory(); else saveLocal();
+  renderLayersList();
+  draw();
+}
+
+/* ── Propiedades de la selección: capa, color, tipo de línea y grosor (ByLayer u override) ── */
+function updateSelectionPropsUI() {
+  updatePropLayerSelect();
+  const hasSel = selected.size > 0;
+  ['prop-layer-btn', 'prop-color-btn', 'prop-ltype-btn', 'prop-lweight-btn'].forEach(id => { document.getElementById(id).disabled = !hasSel; });
+  if (hasSel) {
+    const first = entities[[...selected][0]];
+    if (first) {
+      document.getElementById('prop-layer-select').value = first.layer || '0';
+      document.getElementById('prop-color-mode').value = first.color ? 'custom' : 'bylayer';
+      document.getElementById('prop-color-custom').value = first.color || getLayer(first.layer || '0').color;
+      document.getElementById('prop-ltype-select').value = first.ltype || 'bylayer';
+      document.getElementById('prop-lweight-select').value = first.lweight || 'bylayer';
+    }
+  }
+  onPropColorModeChange();
+}
+function onPropColorModeChange() {
+  const mode = document.getElementById('prop-color-mode').value;
+  document.getElementById('prop-color-custom').style.visibility = mode === 'custom' ? 'visible' : 'hidden';
+}
+function applyLayerToSelection() {
+  const name = document.getElementById('prop-layer-select').value;
+  if (!name || selected.size === 0) return;
+  selected.forEach(i => { if (entities[i]) entities[i].layer = name; });
+  pushHistory();
+  draw();
+}
+function applyColorToSelection() {
+  if (selected.size === 0) return;
+  const mode = document.getElementById('prop-color-mode').value;
+  const hex = document.getElementById('prop-color-custom').value;
+  selected.forEach(i => {
+    const e = entities[i]; if (!e) return;
+    if (mode === 'bylayer') delete e.color; else e.color = hex;
+  });
+  pushHistory();
+  draw();
+}
+function applyLtypeToSelection() {
+  if (selected.size === 0) return;
+  const v = document.getElementById('prop-ltype-select').value;
+  selected.forEach(i => {
+    const e = entities[i]; if (!e) return;
+    if (v === 'bylayer') delete e.ltype; else e.ltype = v;
+  });
+  pushHistory();
+  draw();
+}
+function applyLweightToSelection() {
+  if (selected.size === 0) return;
+  const v = document.getElementById('prop-lweight-select').value;
+  selected.forEach(i => {
+    const e = entities[i]; if (!e) return;
+    if (v === 'bylayer') delete e.lweight; else e.lweight = parseFloat(v);
+  });
+  pushHistory();
+  draw();
+}
+
 function updateFileTitle() {
   document.getElementById('file-name-label').textContent = currentFileName || 'Sin guardar';
 }
@@ -3485,7 +3785,7 @@ function resetDrawingState() {
 }
 
 function serializeDrawing() {
-  return JSON.stringify({ app: 'porticad-dibujo-cad', version: 1, unit: 'm', entities, textHDefault, dimTextDefault }, null, 2);
+  return JSON.stringify({ app: 'porticad-dibujo-cad', version: 1, unit: 'm', entities, textHDefault, dimTextDefault, layers, currentLayer }, null, 2);
 }
 function deserializeDrawing(text) {
   const data = JSON.parse(text);
@@ -3498,6 +3798,8 @@ function loadDrawingFromText(text, name) {
     entities = data.entities;
     if (typeof data.textHDefault === 'number') textHDefault = data.textHDefault;
     if (typeof data.dimTextDefault === 'number') dimTextDefault = data.dimTextDefault;
+    if (Array.isArray(data.layers) && data.layers.length > 0) layers = data.layers; else layers = [{ name: '0', color: '#e6edf3', ltype: 'continuous', lweight: 1.6, visible: true, locked: false }];
+    currentLayer = typeof data.currentLayer === 'string' ? data.currentLayer : '0';
     resetDrawingState();
     history = [JSON.stringify(entities)]; histIndex = 0;
     currentFileName = name;
@@ -3524,6 +3826,8 @@ function fileNew() {
   entities = [];
   textHDefault = 0.3;
   dimTextDefault = 0.25;
+  layers = [{ name: '0', color: '#e6edf3', ltype: 'continuous', lweight: 1.6, visible: true, locked: false }];
+  currentLayer = '0';
   resetDrawingState();
   history = []; histIndex = -1;
   currentFileName = null;
@@ -3615,38 +3919,41 @@ function toDXF() {
   g(0,'ENDSEC');
 
   g(0,'SECTION'); g(2,'ENTITIES');
+  let curLayerName = '0';
   function writePolyline(pts, closed) {
-    g(0,'POLYLINE'); g(8,'0'); g(66,1); g(70, closed ? 1 : 0);
-    pts.forEach(p => { g(0,'VERTEX'); g(8,'0'); g(10,p.x.toFixed(4)); g(20,p.y.toFixed(4)); g(30,0); });
+    g(0,'POLYLINE'); g(8,curLayerName); g(66,1); g(70, closed ? 1 : 0);
+    pts.forEach(p => { g(0,'VERTEX'); g(8,curLayerName); g(10,p.x.toFixed(4)); g(20,p.y.toFixed(4)); g(30,0); });
     g(0,'SEQEND');
   }
   function writeLine(a, b) {
-    g(0,'LINE'); g(8,'0');
+    g(0,'LINE'); g(8,curLayerName);
     g(10,a.x.toFixed(4)); g(20,a.y.toFixed(4)); g(30,0);
     g(11,b.x.toFixed(4)); g(21,b.y.toFixed(4)); g(31,0);
   }
   function writeArc(c, r, a0, a1) {
-    g(0,'ARC'); g(8,'0');
+    g(0,'ARC'); g(8,curLayerName);
     g(10,c.x.toFixed(4)); g(20,c.y.toFixed(4)); g(30,0);
     g(40,r.toFixed(4));
     g(50,(a0*180/Math.PI).toFixed(4)); g(51,(a1*180/Math.PI).toFixed(4));
   }
   function writeText(p, str, h) {
-    g(0,'TEXT'); g(8,'0');
+    g(0,'TEXT'); g(8,curLayerName);
     g(10,p.x.toFixed(4)); g(20,p.y.toFixed(4)); g(30,0);
     g(40,h.toFixed(4)); g(1,str);
   }
   entities.forEach(e => {
+    if (!isEntityVisible(e)) return;
+    curLayerName = e.layer || '0';
     if (e.type === 'line') {
-      g(0,'LINE'); g(8,'0');
+      g(0,'LINE'); g(8,curLayerName);
       g(10,e.p1.x.toFixed(4)); g(20,e.p1.y.toFixed(4)); g(30,0);
       g(11,e.p2.x.toFixed(4)); g(21,e.p2.y.toFixed(4)); g(31,0);
     } else if (e.type === 'circle') {
-      g(0,'CIRCLE'); g(8,'0');
+      g(0,'CIRCLE'); g(8,curLayerName);
       g(10,e.c.x.toFixed(4)); g(20,e.c.y.toFixed(4)); g(30,0);
       g(40,e.r.toFixed(4));
     } else if (e.type === 'arc') {
-      g(0,'ARC'); g(8,'0');
+      g(0,'ARC'); g(8,curLayerName);
       g(10,e.c.x.toFixed(4)); g(20,e.c.y.toFixed(4)); g(30,0);
       g(40,e.r.toFixed(4));
       g(50,(e.a0*180/Math.PI).toFixed(4)); g(51,(e.a1*180/Math.PI).toFixed(4));
