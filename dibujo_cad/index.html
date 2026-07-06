@@ -3332,6 +3332,9 @@ function toggleSizeMenu(e) {
 }
 function closeSizeMenu() { document.getElementById('size-menu-panel').style.display = 'none'; }
 document.addEventListener('click', () => closeSizeMenu());
+// Los clics dentro del panel (inputs, botones "Aplicar") no deben burbujear al listener
+// de arriba, o cerrarían el menú antes de poder escribir un valor o pulsar "Aplicar".
+document.getElementById('size-menu-panel').addEventListener('click', e => e.stopPropagation());
 
 function updateSizeMenuFields() {
   document.getElementById('size-text-all-input').value = textHDefault;
