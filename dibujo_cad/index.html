@@ -85,6 +85,24 @@ body{ display:flex; flex-direction:column; }
 .file-menu-item.danger{ color:#ff8a80; }
 #file-name-label{ font-size:11px; color:var(--muted); margin-left:2px; }
 
+/* ── Menú "Tamaños" (tamaño de texto de etiquetas y cotas) ── */
+.size-panel{ min-width:250px; }
+.size-row{ padding:6px 10px 10px; }
+.size-row label{ display:block; font-size:10px; color:var(--muted); margin-bottom:5px; }
+.size-input-row{ display:flex; gap:6px; align-items:center; }
+.size-input{
+  width:70px; background:var(--panel2); border:1px solid var(--border); border-radius:6px;
+  color:var(--text); font-family:var(--mono); font-size:12px; padding:5px 7px;
+}
+.size-input:focus{ outline:none; border-color:var(--accent); }
+.size-input:disabled{ opacity:.4; }
+.size-apply-btn{
+  background:var(--accent-dim); border:1px solid #1f6feb55; color:var(--accent); border-radius:6px;
+  padding:5px 10px; font-size:11px; font-weight:600; cursor:pointer; font-family:inherit; white-space:nowrap;
+}
+.size-apply-btn:hover{ background:#1f6feb33; }
+.size-apply-btn:disabled{ opacity:.4; cursor:default; }
+
 /* ── Menú desplegable "Arco" (se posiciona con JS junto al botón, escapa el overflow de la barra) ── */
 .arc-menu-panel{
   display:none; position:fixed; background:var(--panel); border:1px solid var(--border);
@@ -220,6 +238,41 @@ body{ display:flex; flex-direction:column; }
     </div>
   </div>
   <span id="file-name-label">Sin guardar</span>
+
+  <div class="file-menu-wrap" id="size-menu-wrap" style="margin-left:8px;">
+    <button class="mt-btn" onclick="toggleSizeMenu(event)" title="Tamaño de texto de etiquetas y cotas">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="12" y1="4" x2="12" y2="20"/><line x1="9" y1="20" x2="15" y2="20"/></svg>
+      Tamaños
+    </button>
+    <div class="mt-panel size-panel" id="size-menu-panel">
+      <div class="mt-hd">TAMAÑOS DE TEXTO</div>
+      <div class="size-row">
+        <label id="size-selected-label">Selección actual</label>
+        <div class="size-input-row">
+          <input type="number" class="size-input" id="size-selected-input" step="0.05" min="0.05" disabled>
+          <span style="font-size:11px;color:var(--muted);">m</span>
+          <button class="size-apply-btn" id="size-selected-btn" onclick="applySizeToSelection()" disabled>Aplicar</button>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border2);margin:2px 0 6px;"></div>
+      <div class="size-row">
+        <label>Todos los textos del dibujo</label>
+        <div class="size-input-row">
+          <input type="number" class="size-input" id="size-text-all-input" step="0.05" min="0.05">
+          <span style="font-size:11px;color:var(--muted);">m</span>
+          <button class="size-apply-btn" onclick="applyTextSizeAll()">Aplicar a todos</button>
+        </div>
+      </div>
+      <div class="size-row">
+        <label>Todas las cotas del dibujo</label>
+        <div class="size-input-row">
+          <input type="number" class="size-input" id="size-dim-all-input" step="0.05" min="0.05">
+          <span style="font-size:11px;color:var(--muted);">m</span>
+          <button class="size-apply-btn" onclick="applyDimSizeAll()">Aplicar a todas</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div class="topbar-sep-v"></div>
   <div class="topbar-actions">
@@ -492,6 +545,8 @@ let spaceHeld = false;
 let inputIsTouch = false; // último tipo de entrada usado — el umbral de clic es más amplio en táctil
 
 const STORAGE_KEY = 'porticad_dibujo_cad_v1';
+let textHDefault = 0.3;      // alto de texto (m) para las etiquetas nuevas que se creen
+let dimTextDefault = 0.25;   // alto de texto (m) para las cotas nuevas que se creen
 
 /* ════════════════════════════════════════════════
    TRANSFORMACIÓN MUNDO ↔ PANTALLA
@@ -547,12 +602,20 @@ function updateHistoryButtons() {
 }
 
 function saveLocal() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(entities)); } catch (e) {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entities, textHDefault, dimTextDefault })); } catch (e) {}
 }
 function loadLocal() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) { entities = JSON.parse(raw); history = [JSON.stringify(entities)]; histIndex = 0; }
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (Array.isArray(data)) { entities = data; } // formato antiguo (solo un array de entidades)
+    else if (data && Array.isArray(data.entities)) {
+      entities = data.entities;
+      if (typeof data.textHDefault === 'number') textHDefault = data.textHDefault;
+      if (typeof data.dimTextDefault === 'number') dimTextDefault = data.dimTextDefault;
+    }
+    history = [JSON.stringify(entities)]; histIndex = 0;
   } catch (e) {}
 }
 
@@ -1075,7 +1138,7 @@ function drawArrowHead(tipW, fromW, size) {
 }
 
 // Texto de cota: se dibuja en pantalla, rotado según 'angleRad' (ángulo de pantalla) sin quedar cabeza abajo.
-function dimText(str, posW, angleRad, color) {
+function dimText(str, posW, angleRad, color, hWorld) {
   const s = toScreen(posW.x, posW.y);
   ctx.save();
   ctx.translate(s.x, s.y);
@@ -1084,7 +1147,8 @@ function dimText(str, posW, angleRad, color) {
   if (na > Math.PI / 2 && na < 3 * Math.PI / 2) ang += Math.PI;
   ctx.rotate(ang);
   ctx.fillStyle = color;
-  ctx.font = '12px "JetBrains Mono", monospace';
+  const fontPx = Math.max(6, (hWorld || dimTextDefault) * view.scale);
+  ctx.font = fontPx.toFixed(1) + 'px "JetBrains Mono", monospace';
   ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
   ctx.fillText(str, 0, -4);
   ctx.restore();
@@ -1114,7 +1178,7 @@ function drawDimEntity(e, isSel) {
     const nx = -dyL / lenL, ny = dxL / lenL, textGap = 10 / view.scale;
     const textP = { x: mid.x + nx * textGap, y: mid.y + ny * textGap };
     const sAng = Math.atan2(toScreen(g.d2.x, g.d2.y).y - toScreen(g.d1.x, g.d1.y).y, toScreen(g.d2.x, g.d2.y).x - toScreen(g.d1.x, g.d1.y).x);
-    dimText(g.value.toFixed(2) + ' m', textP, sAng, col);
+    dimText(g.value.toFixed(2) + ' m', textP, sAng, col, e.th);
   } else if (e.type === 'dim-angular') {
     const g = dimAngularGeom(e);
     const c = toScreen(e.vertex.x, e.vertex.y);
@@ -1126,7 +1190,7 @@ function drawDimEntity(e, isSel) {
     drawArrowHead(ep1, t1, arrowSize);
     const midA = g.a0 + (g.a1 - g.a0) / 2;
     const textP = arcPoint(e.vertex, g.radius + 14 / view.scale, midA);
-    dimText(g.angleDeg.toFixed(1) + '°', textP, 0, col);
+    dimText(g.angleDeg.toFixed(1) + '°', textP, 0, col, e.th);
   } else if (e.type === 'dim-arclength') {
     const c = toScreen(e.c.x, e.c.y);
     ctx.beginPath(); ctx.arc(c.x, c.y, e.dimR * view.scale, -e.a0, -e.a1, true); ctx.stroke();
@@ -1138,14 +1202,14 @@ function drawDimEntity(e, isSel) {
     drawArrowHead(d1p, t1, arrowSize);
     const midA = e.a0 + (e.a1 - e.a0) / 2;
     const textP = arcPoint(e.c, e.dimR + 14 / view.scale, midA);
-    dimText('⌢ ' + (e.r * (e.a1 - e.a0)).toFixed(2) + ' m', textP, 0, col);
+    dimText('⌢ ' + (e.r * (e.a1 - e.a0)).toFixed(2) + ' m', textP, 0, col, e.th);
   } else if (e.type === 'dim-radius') {
     const ang = Math.atan2(e.anchor.y - e.c.y, e.anchor.x - e.c.x);
     const onCirc = arcPoint(e.c, e.r, ang);
     const a = toScreen(onCirc.x, onCirc.y), b = toScreen(e.anchor.x, e.anchor.y);
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     drawArrowHead(onCirc, e.anchor, arrowSize);
-    dimText('R ' + e.r.toFixed(2) + ' m', e.anchor, 0, col);
+    dimText('R ' + e.r.toFixed(2) + ' m', e.anchor, 0, col, e.th);
   } else if (e.type === 'dim-diameter') {
     const ang = Math.atan2(e.anchor.y - e.c.y, e.anchor.x - e.c.x);
     const p1 = arcPoint(e.c, e.r, ang), p2 = arcPoint(e.c, e.r, ang + Math.PI);
@@ -1160,7 +1224,7 @@ function drawDimEntity(e, isSel) {
     } else {
       textP = arcPoint(e.c, e.r + 14 / view.scale, ang);
     }
-    dimText('⌀ ' + (e.r * 2).toFixed(2) + ' m', textP, 0, col);
+    dimText('⌀ ' + (e.r * 2).toFixed(2) + ' m', textP, 0, col, e.th);
   }
   ctx.restore();
 }
@@ -1216,7 +1280,7 @@ function drawDimPreview() {
 function beginTextInput(p, idx) {
   const input = document.getElementById('text-input-overlay');
   const existing = idx !== null ? entities[idx] : null;
-  const h = existing ? existing.h : 0.3;
+  const h = existing ? existing.h : textHDefault;
   const s = toScreen(p.x, p.y);
   const fontPx = Math.max(11, h * view.scale);
   input.style.left = s.x + 'px';
@@ -2765,7 +2829,7 @@ function pointerDown(sx, sy, button, shiftKey) {
         const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
         axis = Math.abs(mouseWorld.y - mid.y) >= Math.abs(mouseWorld.x - mid.x) ? 'h' : 'v';
       }
-      entities.push({ type: tool, p1, p2, dimP: p, axis });
+      entities.push({ type: tool, p1, p2, dimP: p, axis, th: dimTextDefault });
       selected = new Set([entities.length - 1]);
       pushHistory();
       dimDraw = null;
@@ -2807,7 +2871,7 @@ function pointerDown(sx, sy, button, shiftKey) {
         draw();
         return;
       }
-      entities.push({ type: 'dim-angular', vertex: dimDraw.vertex, p1: dimDraw.click1, p2: dimDraw.click2, armPt: { x: mouseWorld.x, y: mouseWorld.y } });
+      entities.push({ type: 'dim-angular', vertex: dimDraw.vertex, p1: dimDraw.click1, p2: dimDraw.click2, armPt: { x: mouseWorld.x, y: mouseWorld.y }, th: dimTextDefault });
       selected = new Set([entities.length - 1]);
       pushHistory();
       dimDraw = null;
@@ -2830,7 +2894,7 @@ function pointerDown(sx, sy, button, shiftKey) {
       }
       const e = dimDraw.e;
       const dimR = Math.max(0.05, dist(e.c, mouseWorld));
-      entities.push({ type: 'dim-arclength', c: { x: e.c.x, y: e.c.y }, r: e.r, a0: e.a0, a1: e.a1, dimR });
+      entities.push({ type: 'dim-arclength', c: { x: e.c.x, y: e.c.y }, r: e.r, a0: e.a0, a1: e.a1, dimR, th: dimTextDefault });
       selected = new Set([entities.length - 1]);
       pushHistory();
       dimDraw = null;
@@ -2858,7 +2922,7 @@ function pointerDown(sx, sy, button, shiftKey) {
         const ang = Math.atan2(anchor.y - e.c.y, anchor.x - e.c.x);
         anchor = arcPoint(e.c, e.r + minGap, ang);
       }
-      entities.push({ type: tool, c: { x: e.c.x, y: e.c.y }, r: e.r, anchor });
+      entities.push({ type: tool, c: { x: e.c.x, y: e.c.y }, r: e.r, anchor, th: dimTextDefault });
       selected = new Set([entities.length - 1]);
       pushHistory();
       dimDraw = null;
@@ -3258,6 +3322,74 @@ function toggleFileMenu(e) {
 function closeFileMenu() { document.getElementById('file-menu-panel').style.display = 'none'; }
 document.addEventListener('click', () => closeFileMenu());
 
+/* ── Menú "Tamaños" — tamaño de texto de etiquetas y de cotas, por selección o para todo el dibujo ── */
+function toggleSizeMenu(e) {
+  e.stopPropagation();
+  const panel = document.getElementById('size-menu-panel');
+  if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
+  updateSizeMenuFields();
+  panel.style.display = 'block';
+}
+function closeSizeMenu() { document.getElementById('size-menu-panel').style.display = 'none'; }
+document.addEventListener('click', () => closeSizeMenu());
+
+function updateSizeMenuFields() {
+  document.getElementById('size-text-all-input').value = textHDefault;
+  document.getElementById('size-dim-all-input').value = dimTextDefault;
+  const selInput = document.getElementById('size-selected-input');
+  const selBtn = document.getElementById('size-selected-btn');
+  const selLabel = document.getElementById('size-selected-label');
+  const selAnn = [...selected].filter(i => entities[i] && isAnnotationType(entities[i].type));
+  if (selAnn.length > 0) {
+    const first = entities[selAnn[0]];
+    selInput.value = first.type === 'text' ? first.h : (first.th || dimTextDefault);
+    selInput.disabled = false;
+    selBtn.disabled = false;
+    selLabel.textContent = 'Selección actual (' + selAnn.length + (selAnn.length === 1 ? ' objeto)' : ' objetos)');
+  } else {
+    selInput.value = '';
+    selInput.disabled = true;
+    selBtn.disabled = true;
+    selLabel.textContent = 'Selección actual (selecciona un texto o una cota)';
+  }
+}
+
+function applySizeToSelection() {
+  const v = parseFloat(document.getElementById('size-selected-input').value);
+  if (isNaN(v) || v <= 0) return;
+  let changed = false;
+  selected.forEach(i => {
+    const e = entities[i];
+    if (!e) return;
+    if (e.type === 'text') { e.h = v; changed = true; }
+    else if (isAnnotationType(e.type)) { e.th = v; changed = true; }
+  });
+  if (changed) pushHistory();
+  draw();
+}
+
+function applyTextSizeAll() {
+  const v = parseFloat(document.getElementById('size-text-all-input').value);
+  if (isNaN(v) || v <= 0) return;
+  textHDefault = v;
+  let changed = false;
+  entities.forEach(e => { if (e.type === 'text') { e.h = v; changed = true; } });
+  if (changed) pushHistory();
+  saveLocal();
+  draw();
+}
+
+function applyDimSizeAll() {
+  const v = parseFloat(document.getElementById('size-dim-all-input').value);
+  if (isNaN(v) || v <= 0) return;
+  dimTextDefault = v;
+  let changed = false;
+  entities.forEach(e => { if (e.type.indexOf('dim-') === 0) { e.th = v; changed = true; } });
+  if (changed) pushHistory();
+  saveLocal();
+  draw();
+}
+
 function updateFileTitle() {
   document.getElementById('file-name-label').textContent = currentFileName || 'Sin guardar';
 }
@@ -3270,17 +3402,19 @@ function resetDrawingState() {
 }
 
 function serializeDrawing() {
-  return JSON.stringify({ app: 'porticad-dibujo-cad', version: 1, unit: 'm', entities }, null, 2);
+  return JSON.stringify({ app: 'porticad-dibujo-cad', version: 1, unit: 'm', entities, textHDefault, dimTextDefault }, null, 2);
 }
 function deserializeDrawing(text) {
   const data = JSON.parse(text);
   if (!data || !Array.isArray(data.entities)) throw new Error('el archivo no tiene un dibujo válido de PortiCAD');
-  return data.entities;
+  return data;
 }
 function loadDrawingFromText(text, name) {
   try {
-    const newEntities = deserializeDrawing(text);
-    entities = newEntities;
+    const data = deserializeDrawing(text);
+    entities = data.entities;
+    if (typeof data.textHDefault === 'number') textHDefault = data.textHDefault;
+    if (typeof data.dimTextDefault === 'number') dimTextDefault = data.dimTextDefault;
     resetDrawingState();
     history = [JSON.stringify(entities)]; histIndex = 0;
     currentFileName = name;
@@ -3305,6 +3439,8 @@ function fileNew() {
   closeFileMenu();
   if (entities.length > 0 && !confirm('¿Crear un dibujo nuevo? Se perderá lo que no hayas guardado.')) return;
   entities = [];
+  textHDefault = 0.3;
+  dimTextDefault = 0.25;
   resetDrawingState();
   history = []; histIndex = -1;
   currentFileName = null;
@@ -3440,26 +3576,26 @@ function toDXF() {
     } else if (e.type === 'dim-linear' || e.type === 'dim-aligned') {
       const gd = e.type === 'dim-linear' ? dimLinearGeom(e) : dimAlignedGeom(e);
       writeLine(e.p1, gd.d1); writeLine(e.p2, gd.d2); writeLine(gd.d1, gd.d2);
-      writeText({ x: (gd.d1.x + gd.d2.x) / 2, y: (gd.d1.y + gd.d2.y) / 2 }, gd.value.toFixed(2) + ' m', 0.2);
+      writeText({ x: (gd.d1.x + gd.d2.x) / 2, y: (gd.d1.y + gd.d2.y) / 2 }, gd.value.toFixed(2) + ' m', e.th || dimTextDefault);
     } else if (e.type === 'dim-angular') {
       const gd = dimAngularGeom(e);
       writeArc(e.vertex, gd.radius, gd.a0, gd.a1);
       writeLine(e.vertex, arcPoint(e.vertex, gd.radius, gd.a0));
       writeLine(e.vertex, arcPoint(e.vertex, gd.radius, gd.a1));
-      writeText(arcPoint(e.vertex, gd.radius, gd.a0 + (gd.a1 - gd.a0) / 2), gd.angleDeg.toFixed(1) + 'deg', 0.2);
+      writeText(arcPoint(e.vertex, gd.radius, gd.a0 + (gd.a1 - gd.a0) / 2), gd.angleDeg.toFixed(1) + 'deg', e.th || dimTextDefault);
     } else if (e.type === 'dim-arclength') {
       writeArc(e.c, e.dimR, e.a0, e.a1);
       writeLine(arcPoint(e.c, e.r, e.a0), arcPoint(e.c, e.dimR, e.a0));
       writeLine(arcPoint(e.c, e.r, e.a1), arcPoint(e.c, e.dimR, e.a1));
-      writeText(arcPoint(e.c, e.dimR, e.a0 + (e.a1 - e.a0) / 2), (e.r * (e.a1 - e.a0)).toFixed(2) + ' m', 0.2);
+      writeText(arcPoint(e.c, e.dimR, e.a0 + (e.a1 - e.a0) / 2), (e.r * (e.a1 - e.a0)).toFixed(2) + ' m', e.th || dimTextDefault);
     } else if (e.type === 'dim-radius') {
       const ang = Math.atan2(e.anchor.y - e.c.y, e.anchor.x - e.c.x);
       writeLine(arcPoint(e.c, e.r, ang), e.anchor);
-      writeText(e.anchor, 'R ' + e.r.toFixed(2) + ' m', 0.2);
+      writeText(e.anchor, 'R ' + e.r.toFixed(2) + ' m', e.th || dimTextDefault);
     } else if (e.type === 'dim-diameter') {
       const ang = Math.atan2(e.anchor.y - e.c.y, e.anchor.x - e.c.x);
       writeLine(arcPoint(e.c, e.r, ang), arcPoint(e.c, e.r, ang + Math.PI));
-      writeText(e.anchor, '⌀ ' + (e.r * 2).toFixed(2) + ' m', 0.2);
+      writeText(e.anchor, '⌀ ' + (e.r * 2).toFixed(2) + ' m', e.th || dimTextDefault);
     } else if (e.type === 'text') {
       writeText(e.p, e.str, e.h);
     }
