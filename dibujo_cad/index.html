@@ -972,7 +972,12 @@ function objectSnapCandidates() {
     } else if (e.type === 'rect') {
       const x0 = Math.min(e.p1.x, e.p2.x), x1 = Math.max(e.p1.x, e.p2.x);
       const y0 = Math.min(e.p1.y, e.p2.y), y1 = Math.max(e.p1.y, e.p2.y);
-      [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }].forEach(p => pts.push({ ...p, kind: 'Extremo' }));
+      const corners = [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
+      corners.forEach(p => pts.push({ ...p, kind: 'Extremo' }));
+      for (let i = 0; i < 4; i++) {
+        const a = corners[i], b = corners[(i + 1) % 4];
+        pts.push({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, kind: 'Medio' });
+      }
     } else if (e.type === 'circle') {
       pts.push({ x: e.c.x, y: e.c.y, kind: 'Centro' });
       [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2].forEach(a => { const p = arcPoint(e.c, e.r, a); pts.push({ x: p.x, y: p.y, kind: 'Cuadrante' }); });
