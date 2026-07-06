@@ -543,6 +543,37 @@ body{ display:flex; flex-direction:column; }
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="12" x2="16" y2="12"/><polyline points="12 6 18 12 12 18"/></svg>
     <span>Alargar</span>
   </button>
+
+  <div class="tgroup-label">Utilidades</div>
+  <button class="tbtn" id="tool-measure-btn" onclick="toggleMeasureMenu(event)" title="Utilidades de medición — distancia, radio, ángulo, área/perímetro y volumen">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="10" rx="1.5"/><line x1="7" y1="7" x2="7" y2="11"/><line x1="11" y1="7" x2="11" y2="10"/><line x1="15" y1="7" x2="15" y2="11"/><line x1="19" y1="7" x2="19" y2="10"/></svg>
+    <span>Medir ▾</span>
+  </button>
+</div>
+
+<!-- Menú desplegable "Utilidades" (position:fixed, se posiciona junto al botón al abrirse) -->
+<div class="arc-menu-panel" id="measure-menu-panel">
+  <div class="mt-hd" style="border-bottom:1px solid var(--border2);padding-bottom:8px;margin-bottom:6px;">UTILIDADES</div>
+  <button class="file-menu-item" onclick="pickMeasureMethod('m-dist')">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="4"/><line x1="4" y1="20" x2="8" y2="20"/><line x1="4" y1="20" x2="4" y2="16"/></svg>
+    Distancia
+  </button>
+  <button class="file-menu-item" onclick="pickMeasureMethod('m-radius')">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="18" y2="6"/></svg>
+    Radio
+  </button>
+  <button class="file-menu-item" onclick="pickMeasureMethod('m-angle')">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16"/><path d="M4 20L16 6"/><path d="M9 20a8 8 0 0 1 3.2-11.6"/></svg>
+    Ángulo
+  </button>
+  <button class="file-menu-item" onclick="pickMeasureMethod('m-area')">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l8-3 8 3v9l-8 6-8-6z"/></svg>
+    Área y Perímetro
+  </button>
+  <button class="file-menu-item" onclick="pickMeasureMethod('m-volume')">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+    Volumen
+  </button>
 </div>
 
 <!-- Menú desplegable "Acotar" (position:fixed, se posiciona junto al botón al abrirse) -->
@@ -774,6 +805,11 @@ const TOOL_HINTS = {
   'dim-radius':    'Clic en un círculo o un arco · mueve el mouse y clic para colocar la línea guía y el texto "R" · Esc cancela',
   'dim-diameter':  'Clic en un círculo o un arco · mueve el mouse y clic para colocar la línea guía y el texto "⌀" · Esc cancela',
   text: 'Clic en el punto de inserción y escribe el texto de la etiqueta · doble clic sobre un texto existente para editarlo',
+  'm-dist':   'Clic en el primer punto, clic en el segundo — muestra la distancia (encadena para seguir midiendo) · Esc cancela',
+  'm-radius': 'Clic en un círculo o un arco para ver su radio, diámetro y circunferencia',
+  'm-angle':  'Clic en la primera línea, clic en la segunda — muestra el ángulo entre ellas · Esc cancela',
+  'm-area':   'Clic en un círculo, rectángulo o polilínea cerrada para ver su área y perímetro · o clic en puntos vacíos para trazar un polígono (Enter cierra, Retroceso deshace) · Esc cancela',
+  'm-volume': 'Igual que Área — al terminar, pide la altura/espesor y calcula el volumen · Esc cancela',
 };
 
 let copyPhase = 'pick';   // 'pick' (eligiendo el objeto) → 'place' (colocando copias)
@@ -785,6 +821,8 @@ let trimExtendBoundary = null;  // clones de las entidades usadas como borde de 
 let arcDraw = null;        // { method: 'arc-3p'|'arc-cse'|'arc-ser', pts:[...], raw } mientras se dibuja un arco
 let dimDraw = null;        // estado (variable según el método) mientras se coloca una cota
 let textEdit = null;       // { p, idx, h } mientras el cuadro de texto flotante está abierto (nuevo texto o edición)
+let measureDraw = null;    // estado (variable según el método) mientras se acumulan puntos de una medición
+let measureResult = null;  // { point, lines:[...], arc? } — último resultado de Utilidades a mostrar en el lienzo
 const DIM_COLOR = '#22d3ee';
 
 // "¿estamos en algún modo de offset?" — para Esc/clic-derecho, que salen igual en ambos modos
@@ -793,6 +831,7 @@ function isTrimExtendTool() { return tool === 'trim' || tool === 'extend'; }
 function isDimTool(t) { return t === 'dim-linear' || t === 'dim-aligned' || t === 'dim-angular' || t === 'dim-arclength' || t === 'dim-radius' || t === 'dim-diameter'; }
 function isAnnotationType(t) { return t === 'text' || (typeof t === 'string' && t.indexOf('dim-') === 0); }
 function isArcDrawTool(t) { return t === 'arc-3p' || t === 'arc-cse' || t === 'arc-ser' || t === 'arc-sed'; }
+function isMeasureTool(t) { return t === 'm-dist' || t === 'm-radius' || t === 'm-angle' || t === 'm-area' || t === 'm-volume'; }
 
 function isBusy() {
   return !!drawState || !!copyState
@@ -803,6 +842,7 @@ function isBusy() {
     || (isTrimExtendTool() && trimExtendPhase === 'action')
     || (isArcDrawTool(tool) && !!arcDraw)
     || (isDimTool(tool) && !!dimDraw)
+    || (isMeasureTool(tool) && !!measureDraw)
     || !!textEdit;
 }
 
@@ -823,6 +863,8 @@ function setTool(t) {
   trimExtendBoundary = null;
   arcDraw = null;
   dimDraw = null;
+  measureDraw = null;
+  measureResult = null;
   if (t === 'copy') copyPhase = 'pick';
   if (t === 'offset') offsetPhase = 'pick';
   if (t === 'trim' || t === 'extend') trimExtendPhase = 'pick';
@@ -832,6 +874,8 @@ function setTool(t) {
   if (arcBtn) arcBtn.classList.toggle('active', isArcDrawTool(t));
   const dimBtn = document.getElementById('tool-dim-btn');
   if (dimBtn) dimBtn.classList.toggle('active', isDimTool(t));
+  const measureBtn = document.getElementById('tool-measure-btn');
+  if (measureBtn) measureBtn.classList.toggle('active', isMeasureTool(t));
   canvas.className = 'tool-' + t + (t === 'copy' ? '-' + copyPhase : t === 'offset' ? '-' + offsetPhase : isTrimExtendTool() ? '-' + trimExtendPhase : '');
   document.getElementById('hint').textContent = TOOL_HINTS[t] || '';
   draw();
@@ -868,6 +912,20 @@ function toggleDimMenu(e) {
 function closeDimMenu() { document.getElementById('dim-menu-panel').style.display = 'none'; }
 document.addEventListener('click', () => closeDimMenu());
 function pickDimMethod(method) { closeDimMenu(); setTool(method); }
+
+// Menú desplegable "Utilidades"
+function toggleMeasureMenu(e) {
+  e.stopPropagation();
+  const panel = document.getElementById('measure-menu-panel');
+  if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
+  const btnRect = e.currentTarget.getBoundingClientRect();
+  panel.style.top = btnRect.top + 'px';
+  panel.style.left = (btnRect.right + 6) + 'px';
+  panel.style.display = 'block';
+}
+function closeMeasureMenu() { document.getElementById('measure-menu-panel').style.display = 'none'; }
+document.addEventListener('click', () => closeMeasureMenu());
+function pickMeasureMethod(method) { closeMeasureMenu(); setTool(method); }
 
 function beginTrimExtendAction() {
   trimExtendBoundary = [...selected].map(i => JSON.parse(JSON.stringify(entities[i])));
@@ -2708,6 +2766,8 @@ function draw() {
   drawArcDrawPreview();
   drawDimPreview();
   drawGeneralSnapMarker();
+  drawMeasurePreview();
+  drawMeasureResult();
   drawMarquee();
 }
 
@@ -2737,6 +2797,114 @@ function polygonArea(pts) {
   let a = 0;
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) a += (pts[j].x + pts[i].x) * (pts[j].y - pts[i].y);
   return Math.abs(a / 2);
+}
+function polygonPerimeter(pts, closed) {
+  let per = 0, n = pts.length, count = closed ? n : n - 1;
+  for (let i = 0; i < count; i++) per += dist(pts[i], pts[(i + 1) % n]);
+  return per;
+}
+
+/* ════════════════════════════════════════════════
+   UTILIDADES — mediciones rápidas (distancia, radio, ángulo, área/
+   perímetro, volumen). Son consultas de solo lectura: no crean
+   entidades ni se guardan con el dibujo.
+════════════════════════════════════════════════ */
+// Área y perímetro de una entidad cerrada existente (círculo, rectángulo o polilínea cerrada). null si no aplica.
+function entityAreaPerimeter(e) {
+  if (e.type === 'circle') return { area: Math.PI * e.r * e.r, perimeter: 2 * Math.PI * e.r, kind: 'Círculo' };
+  if (e.type === 'rect') {
+    const w = Math.abs(e.p2.x - e.p1.x), h = Math.abs(e.p2.y - e.p1.y);
+    return { area: w * h, perimeter: 2 * (w + h), kind: 'Rectángulo' };
+  }
+  if (e.type === 'polyline' && e.closed && e.pts.length > 2) {
+    return { area: polygonArea(e.pts), perimeter: polygonPerimeter(e.pts, true), kind: 'Polilínea cerrada' };
+  }
+  return null;
+}
+// Ángulo (0-180°) entre dos rayos que parten de 'vertex', más el barrido corto (a0,a1) para dibujarlo.
+function twoRayAngle(vertex, p1, p2) {
+  const ang1 = normalizeAngle(Math.atan2(p1.y - vertex.y, p1.x - vertex.x));
+  const ang2 = normalizeAngle(Math.atan2(p2.y - vertex.y, p2.x - vertex.x));
+  const diff = normalizeAngle(ang2 - ang1);
+  if (diff > Math.PI) return { a0: ang2, a1: ang2 + (2 * Math.PI - diff), deg: (2 * Math.PI - diff) * 180 / Math.PI };
+  return { a0: ang1, a1: ang1 + diff, deg: diff * 180 / Math.PI };
+}
+// Cuadro flotante con el resultado de una medición (varias líneas de texto), anclado a un punto del mundo.
+function drawResultBox(worldPt, lines) {
+  const s = toScreen(worldPt.x, worldPt.y);
+  ctx.save();
+  ctx.font = '12px "JetBrains Mono", monospace';
+  const padX = 10, padY = 8, lineH = 16;
+  const w = Math.max(...lines.map(l => ctx.measureText(l).width)) + padX * 2;
+  const h = lines.length * lineH + padY * 2 - 4;
+  const x = s.x + 14, y = s.y - h - 14;
+  roundRectPath(x, y, w, h, 6);
+  ctx.fillStyle = '#1f6feb'; ctx.fill();
+  ctx.strokeStyle = '#79c0ff'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+  lines.forEach((l, i) => ctx.fillText(l, x + padX, y + padY + i * lineH));
+  ctx.restore();
+}
+function drawMeasurePreview() {
+  if (!isMeasureTool(tool)) return;
+  if (tool === 'm-dist' && measureDraw) {
+    ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#e3b341'; ctx.lineWidth = 1.4;
+    const a = toScreen(measureDraw.pts[0].x, measureDraw.pts[0].y), b = toScreen(mouseWorld.x, mouseWorld.y);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.setLineDash([]); ctx.fillStyle = '#e3b341';
+    ctx.beginPath(); ctx.arc(a.x, a.y, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  } else if ((tool === 'm-area' || tool === 'm-volume') && measureDraw) {
+    ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#e3b341'; ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    measureDraw.pts.forEach((p, i) => { const s = toScreen(p.x, p.y); i === 0 ? ctx.moveTo(s.x, s.y) : ctx.lineTo(s.x, s.y); });
+    const mp = toScreen(mouseWorld.x, mouseWorld.y);
+    ctx.lineTo(mp.x, mp.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#e3b341';
+    measureDraw.pts.forEach(p => { const s = toScreen(p.x, p.y); ctx.beginPath(); ctx.arc(s.x, s.y, 3, 0, Math.PI * 2); ctx.fill(); });
+    if (measureDraw.pts.length >= 2) {
+      const s0 = toScreen(measureDraw.pts[0].x, measureDraw.pts[0].y);
+      ctx.strokeStyle = '#3fb950'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(s0.x, s0.y, 6, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+function drawMeasureResult() {
+  if (!measureResult) return;
+  if (measureResult.arc) {
+    ctx.save(); ctx.setLineDash([4, 3]); ctx.strokeStyle = '#e3b341'; ctx.lineWidth = 1.6;
+    const c = toScreen(measureResult.arc.c.x, measureResult.arc.c.y);
+    ctx.beginPath(); ctx.arc(c.x, c.y, measureResult.arc.r * view.scale, -measureResult.arc.a0, -measureResult.arc.a1, true); ctx.stroke();
+    ctx.restore();
+  }
+  drawResultBox(measureResult.point, measureResult.lines);
+}
+function finishAreaMeasurement(area, perimeter, kind, point, needsHeight) {
+  if (needsHeight) {
+    const hStr = prompt('Altura / espesor (m) para calcular el volumen:');
+    if (hStr === null) { measureResult = null; draw(); return; }
+    const h = parseFloat(hStr);
+    if (isNaN(h) || h <= 0) {
+      measureResult = { point, lines: ['⚠ Altura inválida', (kind ? kind + ' — ' : '') + 'Área: ' + area.toFixed(3) + ' m²', 'Perímetro: ' + perimeter.toFixed(3) + ' m'] };
+      draw();
+      return;
+    }
+    measureResult = { point, lines: [
+      (kind ? kind + ' — ' : '') + 'Área: ' + area.toFixed(3) + ' m²',
+      'Perímetro: ' + perimeter.toFixed(3) + ' m',
+      'Altura: ' + h.toFixed(3) + ' m',
+      'Volumen: ' + (area * h).toFixed(3) + ' m³'
+    ] };
+  } else {
+    measureResult = { point, lines: [
+      (kind ? kind + ' — ' : '') + 'Área: ' + area.toFixed(3) + ' m²',
+      'Perímetro: ' + perimeter.toFixed(3) + ' m'
+    ] };
+  }
+  draw();
 }
 
 // Umbral de clic: más generoso en pantallas táctiles (dedo) que con mouse (cursor preciso)
@@ -3182,6 +3350,114 @@ function pointerDown(sx, sy, button, shiftKey) {
     }
   }
 
+  if (isMeasureTool(tool)) {
+    if (tool === 'm-dist') {
+      const p = smartSnap(mouseWorld);
+      if (!measureDraw) { measureDraw = { method: 'm-dist', pts: [p] }; measureResult = null; draw(); return; }
+      const p1 = measureDraw.pts[0];
+      const d = dist(p1, p);
+      const dx = Math.abs(p.x - p1.x), dy = Math.abs(p.y - p1.y);
+      const ang = normalizeAngle(Math.atan2(p.y - p1.y, p.x - p1.x)) * 180 / Math.PI;
+      measureResult = { point: p, lines: [
+        'Distancia: ' + d.toFixed(3) + ' m',
+        'Δx: ' + dx.toFixed(3) + ' m   Δy: ' + dy.toFixed(3) + ' m',
+        'Ángulo: ' + ang.toFixed(1) + '°'
+      ] };
+      measureDraw = { method: 'm-dist', pts: [p] }; // encadena: el punto final es el nuevo inicio
+      draw();
+      return;
+    }
+
+    if (tool === 'm-radius') {
+      const hit = hitTest(sx, sy);
+      if (hit < 0 || (entities[hit].type !== 'circle' && entities[hit].type !== 'arc')) {
+        document.getElementById('hint').textContent = '⚠ Elige un círculo o un arco';
+        return;
+      }
+      const e = entities[hit];
+      selected = new Set([hit]);
+      measureResult = { point: { x: mouseWorld.x, y: mouseWorld.y }, lines: [
+        'Radio: ' + e.r.toFixed(3) + ' m',
+        'Diámetro: ' + (e.r * 2).toFixed(3) + ' m',
+        'Circunferencia: ' + (2 * Math.PI * e.r).toFixed(3) + ' m'
+      ] };
+      draw();
+      return;
+    }
+
+    if (tool === 'm-angle') {
+      if (!measureDraw) {
+        const hit = hitTest(sx, sy);
+        if (hit < 0 || entities[hit].type !== 'line') {
+          document.getElementById('hint').textContent = '⚠ Elige una línea para el primer lado del ángulo';
+          return;
+        }
+        measureDraw = { method: 'm-angle', idx1: hit, line1: entities[hit], click1: { x: mouseWorld.x, y: mouseWorld.y } };
+        selected = new Set([hit]);
+        document.getElementById('hint').textContent = 'Clic en la segunda línea · Esc cancela';
+        draw();
+        return;
+      }
+      const hit = hitTest(sx, sy);
+      if (hit < 0 || entities[hit].type !== 'line') {
+        document.getElementById('hint').textContent = '⚠ Elige una línea para el segundo lado del ángulo';
+        return;
+      }
+      if (hit === measureDraw.idx1) return;
+      const line2 = entities[hit];
+      const vertex = lineIntersect(measureDraw.line1.p1, measureDraw.line1.p2, line2.p1, line2.p2);
+      if (!vertex) {
+        document.getElementById('hint').textContent = '⚠ Esas líneas son paralelas — elige otra línea';
+        return;
+      }
+      const c1 = rayPointForAngular(measureDraw.line1, vertex, measureDraw.click1);
+      const c2 = rayPointForAngular(line2, vertex, { x: mouseWorld.x, y: mouseWorld.y });
+      const g = twoRayAngle(vertex, c1, c2);
+      selected = new Set([measureDraw.idx1, hit]);
+      measureDraw = null;
+      measureResult = { point: vertex, lines: ['Ángulo: ' + g.deg.toFixed(2) + '°'], arc: { c: vertex, r: 40 / view.scale, a0: g.a0, a1: g.a1 } };
+      draw();
+      return;
+    }
+
+    if (tool === 'm-area' || tool === 'm-volume') {
+      const needsHeight = tool === 'm-volume';
+      if (!measureDraw) {
+        const hit = hitTest(sx, sy);
+        if (hit >= 0) {
+          const ap = entityAreaPerimeter(entities[hit]);
+          if (ap) {
+            selected = new Set([hit]);
+            finishAreaMeasurement(ap.area, ap.perimeter, ap.kind, { x: mouseWorld.x, y: mouseWorld.y }, needsHeight);
+            return;
+          }
+          document.getElementById('hint').textContent = '⚠ Esa forma no tiene área (línea o arco abierto) — o haz clic en un punto vacío para trazar un polígono';
+          return;
+        }
+        const p = smartSnap(mouseWorld);
+        measureDraw = { method: tool, pts: [p] };
+        measureResult = null;
+        document.getElementById('hint').textContent = 'Clic para cada vértice del polígono · Enter o clic cerca del inicio para cerrarlo · Retroceso deshace · Esc cancela';
+        draw();
+        return;
+      }
+      const p = smartSnap(mouseWorld);
+      const first = measureDraw.pts[0];
+      const sClick = toScreen(p.x, p.y), sFirst = toScreen(first.x, first.y);
+      if (measureDraw.pts.length >= 2 && dist(sClick, sFirst) <= 10) {
+        const area = polygonArea(measureDraw.pts);
+        const per = polygonPerimeter(measureDraw.pts, true);
+        const centroid = { x: measureDraw.pts.reduce((s, q) => s + q.x, 0) / measureDraw.pts.length, y: measureDraw.pts.reduce((s, q) => s + q.y, 0) / measureDraw.pts.length };
+        measureDraw = null;
+        finishAreaMeasurement(area, per, 'Polígono', centroid, needsHeight);
+        return;
+      }
+      measureDraw.pts.push(p);
+      draw();
+      return;
+    }
+  }
+
   if (tool === 'text') {
     if (textEdit) return;
     beginTextInput(snapWorld(mouseWorld), null);
@@ -3303,7 +3579,7 @@ function pointerMove(sx, sy) {
     draw();
     return;
   }
-  if (isDimTool(tool) || isSnapDrawTool(tool)) {
+  if (isDimTool(tool) || isSnapDrawTool(tool) || isMeasureTool(tool)) {
     draw();
   }
 }
@@ -3351,6 +3627,7 @@ canvas.addEventListener('contextmenu', e => {
   else if (tool === 'fillet' && filletPick) { filletPick = null; selected.clear(); document.getElementById('hint').textContent = TOOL_HINTS.fillet; draw(); }
   else if (isArcDrawTool(tool) && arcDraw) { arcDraw = null; typedBuffer = ''; draw(); }
   else if (isDimTool(tool) && dimDraw) { dimDraw = null; selected.clear(); document.getElementById('hint').textContent = TOOL_HINTS[tool]; draw(); }
+  else if (isMeasureTool(tool) && (measureDraw || measureResult)) { measureDraw = null; measureResult = null; selected.clear(); document.getElementById('hint').textContent = TOOL_HINTS[tool]; draw(); }
   else if (tool === 'copy' || isOffsetTool() || isTrimExtendTool()) { setTool('select'); }
 });
 canvas.addEventListener('dblclick', e => {
@@ -3502,6 +3779,31 @@ window.addEventListener('keydown', e => {
     if (/^[0-9.-]$/.test(e.key)) { e.preventDefault(); typedBuffer += e.key; draw(); return; }
   }
 
+  // Área/Volumen: Enter cierra el polígono trazado a mano, Retroceso deshace el último vértice
+  if ((tool === 'm-area' || tool === 'm-volume') && measureDraw) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (measureDraw.pts.length >= 3) {
+        const area = polygonArea(measureDraw.pts);
+        const per = polygonPerimeter(measureDraw.pts, true);
+        const centroid = { x: measureDraw.pts.reduce((s, q) => s + q.x, 0) / measureDraw.pts.length, y: measureDraw.pts.reduce((s, q) => s + q.y, 0) / measureDraw.pts.length };
+        const needsHeight = tool === 'm-volume';
+        measureDraw = null;
+        finishAreaMeasurement(area, per, 'Polígono', centroid, needsHeight);
+      } else {
+        measureDraw = null;
+        draw();
+      }
+      return;
+    }
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      if (measureDraw.pts.length > 1) measureDraw.pts.pop(); else measureDraw = null;
+      draw();
+      return;
+    }
+  }
+
   // Confirmar con Enter una selección múltiple (Shift+clic) en la fase de "elegir objeto" (Offset dinámico / Copiar / Recortar / Alargar)
   if (((tool === 'copy' && copyPhase === 'pick') || (tool === 'offset' && offsetPhase === 'pick') || (isTrimExtendTool() && trimExtendPhase === 'pick')) && e.key === 'Enter') {
     e.preventDefault();
@@ -3519,6 +3821,7 @@ window.addEventListener('keydown', e => {
     if (tool === 'fillet' && filletPick) { filletPick = null; selected.clear(); document.getElementById('hint').textContent = TOOL_HINTS.fillet; draw(); return; }
     if (isArcDrawTool(tool) && arcDraw) { arcDraw = null; typedBuffer = ''; draw(); return; }
     if (isDimTool(tool) && dimDraw) { dimDraw = null; selected.clear(); document.getElementById('hint').textContent = TOOL_HINTS[tool]; draw(); return; }
+    if (isMeasureTool(tool) && (measureDraw || measureResult)) { measureDraw = null; measureResult = null; selected.clear(); document.getElementById('hint').textContent = TOOL_HINTS[tool]; draw(); return; }
     if (drawState && drawState.type === 'polyline') { finishPolyline(false); return; }
     drawState = null; typedBuffer = ''; boxSelect = null; selected.clear(); draw(); return;
   }
