@@ -1049,10 +1049,17 @@ function smartSnap(worldPt) {
 }
 // ¿La herramienta activa dibuja geometría punto-a-punto (línea/polilínea/rect/círculo/arco)?
 function isSnapDrawTool(t) { return t === 'line' || t === 'rect' || t === 'circle' || t === 'polyline' || isArcDrawTool(t); }
+// Utilidades que miden puntos libres (con snap a objeto) en vez de elegir una entidad completa con hitTest.
+function isSnapMeasureTool(t) { return t === 'm-dist' || t === 'm-area' || t === 'm-volume'; }
 function drawGeneralSnapMarker() {
-  if (!objectSnapOn || !isSnapDrawTool(tool)) return;
+  if (!objectSnapOn || !(isSnapDrawTool(tool) || isSnapMeasureTool(tool))) return;
   // en Inicio-Fin-Radio / Inicio-Fin-Dirección, el último clic define el radio/dirección (no se ajusta a un punto de la grilla/objeto)
   if ((tool === 'arc-ser' || tool === 'arc-sed') && arcDraw && arcDraw.pts.length >= 2) return;
+  // en Área/Volumen, si el cursor está sobre una forma cerrada existente el clic la toma entera (sin snap a punto)
+  if (isSnapMeasureTool(tool) && (tool === 'm-area' || tool === 'm-volume') && !measureDraw) {
+    const hoverHit = hitTest(mouseScreen.x, mouseScreen.y);
+    if (hoverHit >= 0 && entityAreaPerimeter(entities[hoverHit])) return;
+  }
   const os = objectSnap(mouseWorld);
   if (os) drawObjectSnapMarker(os);
 }
