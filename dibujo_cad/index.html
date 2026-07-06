@@ -830,6 +830,80 @@ function applyOrtho(p1, p2) {
 }
 
 /* ════════════════════════════════════════════════
+   SNAP A OBJETO (estilo AutoCAD OSNAP) — usado por las herramientas de
+   Acotar para que los puntos medidos coincidan exactamente con los
+   extremos/centros/puntos medios reales de la geometría, en vez de
+   depender de la precisión del clic o de la grilla.
+════════════════════════════════════════════════ */
+function objectSnapCandidates() {
+  const pts = [];
+  entities.forEach(e => {
+    if (e.type === 'line') {
+      pts.push({ x: e.p1.x, y: e.p1.y, kind: 'Extremo' }, { x: e.p2.x, y: e.p2.y, kind: 'Extremo' });
+      pts.push({ x: (e.p1.x + e.p2.x) / 2, y: (e.p1.y + e.p2.y) / 2, kind: 'Medio' });
+    } else if (e.type === 'rect') {
+      const x0 = Math.min(e.p1.x, e.p2.x), x1 = Math.max(e.p1.x, e.p2.x);
+      const y0 = Math.min(e.p1.y, e.p2.y), y1 = Math.max(e.p1.y, e.p2.y);
+      [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }].forEach(p => pts.push({ ...p, kind: 'Extremo' }));
+    } else if (e.type === 'circle') {
+      pts.push({ x: e.c.x, y: e.c.y, kind: 'Centro' });
+      [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2].forEach(a => { const p = arcPoint(e.c, e.r, a); pts.push({ x: p.x, y: p.y, kind: 'Cuadrante' }); });
+    } else if (e.type === 'arc') {
+      pts.push({ x: e.c.x, y: e.c.y, kind: 'Centro' });
+      [e.a0, e.a1].forEach(a => { const p = arcPoint(e.c, e.r, a); pts.push({ x: p.x, y: p.y, kind: 'Extremo' }); });
+      [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2].forEach(a => { if (angleInArc(a, e.a0, e.a1)) { const p = arcPoint(e.c, e.r, a); pts.push({ x: p.x, y: p.y, kind: 'Cuadrante' }); } });
+    } else if (e.type === 'polyline') {
+      e.pts.forEach((p, i) => {
+        pts.push({ x: p.x, y: p.y, kind: 'Extremo' });
+        const n = e.pts[(i + 1) % e.pts.length];
+        if (i < e.pts.length - 1 || e.closed) pts.push({ x: (p.x + n.x) / 2, y: (p.y + n.y) / 2, kind: 'Medio' });
+      });
+    }
+  });
+  return pts;
+}
+// Punto de snap a objeto más cercano dentro del umbral (en píxeles de pantalla), o null si no hay ninguno cerca.
+function objectSnap(worldPt, threshPx) {
+  const threshWorld = (threshPx || 14) / view.scale;
+  let best = null, bestD = threshWorld;
+  objectSnapCandidates().forEach(p => {
+    const d = dist(worldPt, p);
+    if (d <= bestD) { bestD = d; best = p; }
+  });
+  return best;
+}
+// Punto de mundo a usar para un clic de Acotar: prioriza el snap a objeto (coherente con la
+// geometría real); si no hay nada cerca, cae a la grilla (comportamiento previo).
+function dimSnapPoint(worldPt) {
+  const os = objectSnap(worldPt);
+  return os ? { x: os.x, y: os.y } : snapWorld(worldPt);
+}
+function drawObjectSnapMarker(p) {
+  const s = toScreen(p.x, p.y);
+  ctx.save();
+  ctx.strokeStyle = '#e3b341'; ctx.lineWidth = 1.8;
+  ctx.strokeRect(s.x - 5, s.y - 5, 10, 10);
+  ctx.fillStyle = '#e3b341';
+  ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillText(p.kind, s.x + 9, s.y + 7);
+  ctx.restore();
+}
+// Punto exacto sobre la recta infinita de 'lineE', en el lado del vértice más cercano a clickPt
+// (para que el rayo de una cota angular quede perfectamente alineado con la línea real, sin
+// arrastrar el error de precisión del clic).
+function rayPointForAngular(lineE, vertex, clickPt) {
+  const dx = lineE.p2.x - lineE.p1.x, dy = lineE.p2.y - lineE.p1.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 < 1e-12) return { x: clickPt.x, y: clickPt.y };
+  const t = ((clickPt.x - lineE.p1.x) * dx + (clickPt.y - lineE.p1.y) * dy) / len2;
+  const proj = { x: lineE.p1.x + t * dx, y: lineE.p1.y + t * dy };
+  const ddx = proj.x - vertex.x, ddy = proj.y - vertex.y;
+  if (Math.hypot(ddx, ddy) < 1e-9) return { x: lineE.p2.x, y: lineE.p2.y };
+  return { x: vertex.x + ddx, y: vertex.y + ddy };
+}
+
+/* ════════════════════════════════════════════════
    GRILLA ADAPTATIVA (secuencia 1-2-5)
 ════════════════════════════════════════════════ */
 function computeGridStep() {
@@ -1246,7 +1320,12 @@ function drawTextEntity(e, isSel) {
 }
 
 function drawDimPreview() {
-  if (!isDimTool(tool) || !dimDraw) return;
+  if (!isDimTool(tool)) return;
+  if ((tool === 'dim-linear' || tool === 'dim-aligned') && (!dimDraw || dimDraw.pts.length < 2)) {
+    const os = objectSnap(mouseWorld);
+    if (os) drawObjectSnapMarker(os);
+  }
+  if (!dimDraw) return;
   if (dimDraw.method === 'dim-linear' || dimDraw.method === 'dim-aligned') {
     const pts = dimDraw.pts;
     if (pts.length === 1) {
@@ -2820,7 +2899,7 @@ function pointerDown(sx, sy, button, shiftKey) {
 
   if (isDimTool(tool)) {
     if (tool === 'dim-linear' || tool === 'dim-aligned') {
-      const p = snapWorld(mouseWorld);
+      const p = dimSnapPoint(mouseWorld);
       if (!dimDraw) { dimDraw = { method: tool, pts: [p] }; draw(); return; }
       if (dimDraw.pts.length === 1) { dimDraw.pts.push(p); draw(); return; }
       const [p1, p2] = dimDraw.pts;
@@ -2864,8 +2943,9 @@ function pointerDown(sx, sy, button, shiftKey) {
           return;
         }
         dimDraw.idx2 = hit;
-        dimDraw.click2 = { x: mouseWorld.x, y: mouseWorld.y };
         dimDraw.vertex = vertex;
+        dimDraw.click1 = rayPointForAngular(dimDraw.line1, vertex, dimDraw.click1);
+        dimDraw.click2 = rayPointForAngular(line2, vertex, { x: mouseWorld.x, y: mouseWorld.y });
         selected = new Set([dimDraw.idx1, hit]);
         document.getElementById('hint').textContent = 'Clic para definir el radio del arco de cota · Esc cancela';
         draw();
@@ -3052,7 +3132,7 @@ function pointerMove(sx, sy) {
     draw();
     return;
   }
-  if (isDimTool(tool) && dimDraw) {
+  if (isDimTool(tool)) {
     draw();
   }
 }
