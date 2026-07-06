@@ -503,6 +503,10 @@ body{ display:flex; flex-direction:column; }
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V4h16"/></svg>
     <span>Ortog.</span>
   </button>
+  <button class="tbtn active" id="tool-osnap" onclick="toggleObjectSnap()" title="Snap a objeto — al dibujar, ajusta el clic a extremos/medios/centros/cuadrantes de otras entidades (línea, polilínea, rectángulo, círculo y arco)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><circle cx="17.5" cy="6.5" r="3.5"/><path d="M6.5 10v7a3.5 3.5 0 0 0 3.5 3.5h4"/></svg>
+    <span>Snap Obj</span>
+  </button>
 
   <div class="tgroup-label">Anotar</div>
   <button class="tbtn" id="tool-dim-btn" onclick="toggleDimMenu(event)" title="Acotar — elige el tipo de cota (lineal, alineada, angular, longitud de arco, radio, diámetro)">
@@ -624,7 +628,7 @@ let tool = 'select';
 let view = { ox: 0, oy: 0, scale: 50 }; // px de pantalla por unidad (metro)
 const MIN_SCALE = 4, MAX_SCALE = 1200;
 
-let gridOn = true, snapOn = true, orthoOn = false;
+let gridOn = true, snapOn = true, orthoOn = false, objectSnapOn = true;
 const SNAP_STEP = 0.5; // metros
 
 let drawState = null;   // { type, p1, raw } mientras se traza una forma ('raw' = punto derivado del mouse)
@@ -936,6 +940,11 @@ function toggleOrtho() {
   orthoOn = !orthoOn;
   document.getElementById('tool-ortho').classList.toggle('active', orthoOn);
 }
+function toggleObjectSnap() {
+  objectSnapOn = !objectSnapOn;
+  document.getElementById('tool-osnap').classList.toggle('active', objectSnapOn);
+  draw();
+}
 
 function snapWorld(p) {
   if (!snapOn) return p;
@@ -993,9 +1002,23 @@ function objectSnap(worldPt, threshPx) {
 }
 // Punto de mundo a usar para un clic de Acotar: prioriza el snap a objeto (coherente con la
 // geometría real); si no hay nada cerca, cae a la grilla (comportamiento previo).
-function dimSnapPoint(worldPt) {
-  const os = objectSnap(worldPt);
-  return os ? { x: os.x, y: os.y } : snapWorld(worldPt);
+// Punto de mundo a usar para un clic de dibujo/acotado: prioriza el snap a objeto (si está activo
+// y hay algo cerca) para que la geometría quede coherente; si no, cae a la grilla de siempre.
+function smartSnap(worldPt) {
+  if (objectSnapOn) {
+    const os = objectSnap(worldPt);
+    if (os) return { x: os.x, y: os.y };
+  }
+  return snapWorld(worldPt);
+}
+// ¿La herramienta activa dibuja geometría punto-a-punto (línea/polilínea/rect/círculo/arco)?
+function isSnapDrawTool(t) { return t === 'line' || t === 'rect' || t === 'circle' || t === 'polyline' || isArcDrawTool(t); }
+function drawGeneralSnapMarker() {
+  if (!objectSnapOn || !isSnapDrawTool(tool)) return;
+  // en Inicio-Fin-Radio / Inicio-Fin-Dirección, el último clic define el radio/dirección (no se ajusta a un punto de la grilla/objeto)
+  if ((tool === 'arc-ser' || tool === 'arc-sed') && arcDraw && arcDraw.pts.length >= 2) return;
+  const os = objectSnap(mouseWorld);
+  if (os) drawObjectSnapMarker(os);
 }
 function drawObjectSnapMarker(p) {
   const s = toScreen(p.x, p.y);
@@ -1445,7 +1468,7 @@ function drawTextEntity(e, isSel) {
 
 function drawDimPreview() {
   if (!isDimTool(tool)) return;
-  if ((tool === 'dim-linear' || tool === 'dim-aligned') && (!dimDraw || dimDraw.pts.length < 2)) {
+  if (objectSnapOn && (tool === 'dim-linear' || tool === 'dim-aligned') && (!dimDraw || dimDraw.pts.length < 2)) {
     const os = objectSnap(mouseWorld);
     if (os) drawObjectSnapMarker(os);
   }
@@ -2679,6 +2702,7 @@ function draw() {
   drawTrimExtendPreview();
   drawArcDrawPreview();
   drawDimPreview();
+  drawGeneralSnapMarker();
   drawMarquee();
 }
 
@@ -2989,7 +3013,7 @@ function pointerDown(sx, sy, button, shiftKey) {
   }
 
   if (isArcDrawTool(tool)) {
-    const p = snapWorld(mouseWorld);
+    const p = smartSnap(mouseWorld);
     if (!arcDraw) {
       arcDraw = { method: tool, pts: [p], raw: p };
       typedBuffer = '';
@@ -3041,7 +3065,7 @@ function pointerDown(sx, sy, button, shiftKey) {
 
   if (isDimTool(tool)) {
     if (tool === 'dim-linear' || tool === 'dim-aligned') {
-      const p = dimSnapPoint(mouseWorld);
+      const p = smartSnap(mouseWorld);
       if (!dimDraw) { dimDraw = { method: tool, pts: [p] }; draw(); return; }
       if (dimDraw.pts.length === 1) { dimDraw.pts.push(p); draw(); return; }
       const [p1, p2] = dimDraw.pts;
@@ -3160,7 +3184,7 @@ function pointerDown(sx, sy, button, shiftKey) {
   }
 
   if (tool === 'polyline') {
-    const p = snapWorld(mouseWorld);
+    const p = smartSnap(mouseWorld);
     if (!drawState) {
       drawState = { type: 'polyline', pts: [p], raw: p };
       typedBuffer = '';
@@ -3182,7 +3206,7 @@ function pointerDown(sx, sy, button, shiftKey) {
   }
 
   if (tool === 'line' || tool === 'rect' || tool === 'circle') {
-    const p = snapWorld(mouseWorld);
+    const p = smartSnap(mouseWorld);
     if (!drawState) {
       drawState = { type: tool, p1: p, raw: p };
       typedBuffer = '';
@@ -3248,7 +3272,7 @@ function pointerMove(sx, sy) {
     return;
   }
   if (drawState) {
-    let p = snapWorld(mouseWorld);
+    let p = smartSnap(mouseWorld);
     p = applyOrtho(drawStateP1(), p);
     drawState.raw = p;
     draw();
@@ -3274,7 +3298,7 @@ function pointerMove(sx, sy) {
     draw();
     return;
   }
-  if (isDimTool(tool)) {
+  if (isDimTool(tool) || isSnapDrawTool(tool)) {
     draw();
   }
 }
