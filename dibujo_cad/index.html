@@ -91,6 +91,12 @@ body{ display:flex; flex-direction:column; }
 .icon-lg-panel .file-menu-item{ gap:12px; padding:9px 10px; }
 .icon-lg-panel .file-menu-item svg{ width:21px; height:21px; }
 
+/* ── Menú "Tema" (color de fondo del lienzo + color de línea por defecto) ── */
+#theme-menu-panel{ min-width:250px; }
+#theme-menu-panel .file-menu-item{ gap:12px; padding:9px 10px; }
+.theme-swatch{ width:21px; height:21px; border-radius:5px; border:2px solid; flex-shrink:0; display:inline-block; }
+#theme-menu-panel .file-menu-item.active-theme{ background:var(--accent-dim); }
+
 /* ── Menú "Tamaños" (tamaño de texto de etiquetas y cotas) ── */
 .size-panel{ min-width:250px; }
 .size-row{ padding:6px 10px 10px; }
@@ -373,6 +379,40 @@ body{ display:flex; flex-direction:column; }
           </select>
           <button class="size-apply-btn" id="prop-lweight-btn" onclick="applyLweightToSelection()" disabled>Aplicar</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="file-menu-wrap" id="theme-menu-wrap" style="margin-left:8px;">
+    <button class="mt-btn" onclick="toggleThemeMenu(event)" title="Tema del lienzo — color de fondo y color de línea por defecto">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18 3.5 3.5 0 0 0 0-7 2 2 0 0 1 0-4 3.5 3.5 0 0 0 0-7z"/></svg>
+      Tema
+    </button>
+    <div class="mt-panel" id="theme-menu-panel">
+      <div class="mt-hd">TEMA DEL LIENZO</div>
+      <button class="file-menu-item" data-theme="dark" onclick="pickCanvasTheme('dark')">
+        <span class="theme-swatch" style="background:#0d1117;border-color:#e6edf3;"></span>
+        Oscuro (Predeterminado)
+      </button>
+      <button class="file-menu-item" data-theme="light" onclick="pickCanvasTheme('light')">
+        <span class="theme-swatch" style="background:#f6f8fa;border-color:#1b1f24;"></span>
+        Claro
+      </button>
+      <button class="file-menu-item" data-theme="blueprint" onclick="pickCanvasTheme('blueprint')">
+        <span class="theme-swatch" style="background:#1b3a63;border-color:#ffffff;"></span>
+        Pizarra Azul (Plano)
+      </button>
+      <button class="file-menu-item" data-theme="vellum" onclick="pickCanvasTheme('vellum')">
+        <span class="theme-swatch" style="background:#f2ecda;border-color:#2b2620;"></span>
+        Papel Vegetal
+      </button>
+      <button class="file-menu-item" data-theme="phosphor" onclick="pickCanvasTheme('phosphor')">
+        <span class="theme-swatch" style="background:#031807;border-color:#3ef17a;"></span>
+        Fósforo Verde (Retro)
+      </button>
+      <div style="border-top:1px solid var(--border2);margin:6px 0 4px;"></div>
+      <div style="padding:2px 10px 4px;font-size:10px;color:var(--muted);line-height:1.4;">
+        Cambia el fondo y el color por defecto de la capa "0". Las capas con color propio no se ven afectadas.
       </div>
     </div>
   </div>
@@ -714,6 +754,42 @@ function entityLweight(e) { if (e.lweight) return e.lweight; const l = getLayer(
 function entityDash(e) { const lt = e.ltype || (getLayer(e.layer || '0') || {}).ltype || 'continuous'; return LTYPE_DASH[lt] || []; }
 
 /* ════════════════════════════════════════════════
+   TEMA DEL LIENZO — color de fondo + color por defecto de las líneas
+   (capa "0"), para tener contraste entre el lienzo y el dibujo. El color
+   de una capa concreta (ej. una capa roja "Muros") no se toca — solo se
+   actualiza la capa "0", que es donde empieza cualquier dibujo nuevo.
+════════════════════════════════════════════════ */
+const CANVAS_THEMES = {
+  dark:      { label: 'Oscuro (Predeterminado)', bg: '#0d1117', gridMinor: '#171c23', gridMajor: '#21262d', lineColor: '#e6edf3' },
+  light:     { label: 'Claro',                   bg: '#f6f8fa', gridMinor: '#e8ebef', gridMajor: '#d7dce2', lineColor: '#1b1f24' },
+  blueprint: { label: 'Pizarra Azul (Plano)',     bg: '#1b3a63', gridMinor: '#254a7a', gridMajor: '#31588c', lineColor: '#ffffff' },
+  vellum:    { label: 'Papel Vegetal',            bg: '#f2ecda', gridMinor: '#e3dbc2', gridMajor: '#d3c8a6', lineColor: '#2b2620' },
+  phosphor:  { label: 'Fósforo Verde (Retro)',    bg: '#031807', gridMinor: '#0a2c10', gridMajor: '#123f18', lineColor: '#3ef17a' },
+};
+let canvasTheme = 'dark';
+
+// Aplica solo el fondo/grilla de un tema (sin tocar el color de ninguna capa) — para cargar/
+// restaurar un dibujo, donde las capas guardadas ya traen el color correcto que les corresponde.
+function applyCanvasThemeVisuals(key) {
+  const th = CANVAS_THEMES[key] ? key : 'dark';
+  canvasTheme = th;
+  const wrap = document.querySelector('.canvas-wrap');
+  if (wrap) wrap.style.backgroundColor = CANVAS_THEMES[th].bg;
+}
+// Elegir un tema a propósito desde el menú: además del fondo/grilla, recolorea la capa "0"
+// (donde empieza cualquier dibujo nuevo) para que contraste con el nuevo fondo. Las demás
+// capas (con su propio color ya definido a propósito) no se tocan.
+function pickCanvasTheme(key) {
+  closeThemeMenu();
+  if (!CANVAS_THEMES[key]) return;
+  applyCanvasThemeVisuals(key);
+  getLayer('0').color = CANVAS_THEMES[key].lineColor;
+  updateThemeMenuHighlight();
+  saveLocal();
+  draw();
+}
+
+/* ════════════════════════════════════════════════
    TRANSFORMACIÓN MUNDO ↔ PANTALLA
 ════════════════════════════════════════════════ */
 function toScreen(wx, wy) { return { x: view.ox + wx * view.scale, y: view.oy - wy * view.scale }; }
@@ -767,7 +843,7 @@ function updateHistoryButtons() {
 }
 
 function saveLocal() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entities, textHDefault, dimTextDefault, layers, currentLayer })); } catch (e) {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entities, textHDefault, dimTextDefault, layers, currentLayer, canvasTheme })); } catch (e) {}
 }
 function loadLocal() {
   try {
@@ -781,6 +857,7 @@ function loadLocal() {
       if (typeof data.dimTextDefault === 'number') dimTextDefault = data.dimTextDefault;
       if (Array.isArray(data.layers) && data.layers.length > 0) layers = data.layers;
       if (typeof data.currentLayer === 'string') currentLayer = data.currentLayer;
+      if (typeof data.canvasTheme === 'string' && CANVAS_THEMES[data.canvasTheme]) canvasTheme = data.canvasTheme;
     }
     history = [JSON.stringify(entities)]; histIndex = 0;
   } catch (e) {}
@@ -1145,19 +1222,20 @@ function drawGrid() {
   const x0 = Math.floor(wTL.x / step) * step, x1 = wBR.x;
   const y0 = Math.floor(wBR.y / step) * step, y1 = wTL.y;
 
+  const th = CANVAS_THEMES[canvasTheme] || CANVAS_THEMES.dark;
   ctx.lineWidth = 1;
   let i = 0;
   for (let x = x0; x <= x1 + step; x += step, i++) {
     const sx = toScreen(x, 0).x;
     const isMajor = Math.round(x / step) % majorEvery === 0;
-    ctx.strokeStyle = isMajor ? '#21262d' : '#171c23';
+    ctx.strokeStyle = isMajor ? th.gridMajor : th.gridMinor;
     ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, H); ctx.stroke();
   }
   i = 0;
   for (let y = y0; y <= y1 + step; y += step, i++) {
     const sy = toScreen(0, y).y;
     const isMajor = Math.round(y / step) % majorEvery === 0;
-    ctx.strokeStyle = isMajor ? '#21262d' : '#171c23';
+    ctx.strokeStyle = isMajor ? th.gridMajor : th.gridMinor;
     ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
   }
 
@@ -3972,6 +4050,23 @@ function applyDimSizeAll() {
   draw();
 }
 
+/* ── Menú "Tema" — color de fondo del lienzo y color por defecto de la capa "0" ── */
+function toggleThemeMenu(e) {
+  e.stopPropagation();
+  const p = document.getElementById('theme-menu-panel');
+  if (p.style.display === 'block') { p.style.display = 'none'; return; }
+  updateThemeMenuHighlight();
+  p.style.display = 'block';
+}
+function closeThemeMenu() { document.getElementById('theme-menu-panel').style.display = 'none'; }
+document.addEventListener('click', () => closeThemeMenu());
+document.getElementById('theme-menu-panel').addEventListener('click', e => e.stopPropagation());
+function updateThemeMenuHighlight() {
+  document.querySelectorAll('#theme-menu-panel .file-menu-item').forEach(btn => {
+    btn.classList.toggle('active-theme', btn.dataset.theme === canvasTheme);
+  });
+}
+
 /* ── Menú "Capas" — administrar capas y propiedades (color/tipo de línea/grosor) de la selección ── */
 function escAttr(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function escJs(s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
@@ -4142,7 +4237,7 @@ function resetDrawingState() {
 }
 
 function serializeDrawing() {
-  return JSON.stringify({ app: 'porticad-dibujo-cad', version: 1, unit: 'm', entities, textHDefault, dimTextDefault, layers, currentLayer }, null, 2);
+  return JSON.stringify({ app: 'porticad-dibujo-cad', version: 1, unit: 'm', entities, textHDefault, dimTextDefault, layers, currentLayer, canvasTheme }, null, 2);
 }
 function deserializeDrawing(text) {
   const data = JSON.parse(text);
@@ -4157,6 +4252,7 @@ function loadDrawingFromText(text, name) {
     if (typeof data.dimTextDefault === 'number') dimTextDefault = data.dimTextDefault;
     if (Array.isArray(data.layers) && data.layers.length > 0) layers = data.layers; else layers = [{ name: '0', color: '#e6edf3', ltype: 'continuous', lweight: 1.6, visible: true, locked: false }];
     currentLayer = typeof data.currentLayer === 'string' ? data.currentLayer : '0';
+    applyCanvasThemeVisuals(typeof data.canvasTheme === 'string' ? data.canvasTheme : 'dark');
     resetDrawingState();
     history = [JSON.stringify(entities)]; histIndex = 0;
     currentFileName = name;
@@ -4164,6 +4260,7 @@ function loadDrawingFromText(text, name) {
     saveLocal();
     fitView();
     updateFileTitle();
+    updateThemeMenuHighlight();
   } catch (err) {
     alert('No se pudo abrir el archivo: ' + err.message);
   }
@@ -4185,6 +4282,8 @@ function fileNew() {
   dimTextDefault = 0.25;
   layers = [{ name: '0', color: '#e6edf3', ltype: 'continuous', lweight: 1.6, visible: true, locked: false }];
   currentLayer = '0';
+  applyCanvasThemeVisuals('dark');
+  updateThemeMenuHighlight();
   resetDrawingState();
   history = []; histIndex = -1;
   currentFileName = null;
@@ -4364,6 +4463,8 @@ function exportDXF() {
 ════════════════════════════════════════════════ */
 window.addEventListener('resize', () => { resizeCanvas(); });
 loadLocal();
+applyCanvasThemeVisuals(canvasTheme);
+updateThemeMenuHighlight();
 centerView();
 resizeCanvas();
 updateZoomLabel();
