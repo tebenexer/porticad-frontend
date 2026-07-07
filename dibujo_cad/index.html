@@ -867,23 +867,23 @@ function loadLocal() {
    HERRAMIENTAS
 ════════════════════════════════════════════════ */
 const TOOL_HINTS = {
-  select:     'Clic para seleccionar · arrastra para mover · Shift+clic suma · Supr para borrar',
-  'select-box': 'Arrastra para seleccionar por área (previsualizada) · mantén Shift para sumar',
+  select:     'Clic para seleccionar · arrastra para mover · Shift+clic o Ctrl+clic suma · Supr para borrar',
+  'select-box': 'Arrastra para seleccionar por área (previsualizada) · mantén Shift o Ctrl para sumar',
   line:       'Clic, clic para el segundo punto · escribe un valor (m) y Enter para longitud exacta · Esc cancela',
   polyline:   'Clic para cada vértice · escribe una longitud (m) y Enter por tramo · clic cerca del inicio cierra · Enter (sin escribir) termina · Supr deshace el último vértice',
   rect:       'Clic en una esquina y la opuesta · escribe ancho,alto (o un valor = cuadrado) y Enter · Esc cancela',
   circle:     'Clic en el centro y el radio · escribe r,valor o d,valor (o un número = radio) y Enter · Esc cancela',
   pan:        'Arrastra para desplazar la vista',
-  copy:       'Selecciona el objeto a copiar — clic, o arrastra un área · Shift+clic para elegir varios + Enter · Esc cancela',
+  copy:       'Selecciona el objeto a copiar — clic, o arrastra un área · Shift+clic o Ctrl+clic para elegir varios + Enter · Esc cancela',
   copyPlace:  'Clic: punto base · clic: coloca una copia (puedes seguir colocando más) · escribe una distancia y Enter · Esc/Enter vacío termina',
-  offset:     'Selecciona línea/rectángulo/círculo/polilínea a desfasar — clic, o arrastra un área · Shift+clic para elegir varios + Enter · Esc cancela',
+  offset:     'Selecciona línea/rectángulo/círculo/polilínea a desfasar — clic, o arrastra un área · Shift+clic o Ctrl+clic para elegir varios + Enter · Esc cancela',
   offsetPlace:'Mueve el mouse hacia el lado deseado y clic para crear el offset (puedes seguir) · escribe una distancia y Enter · Esc/Enter vacío termina',
   'offset-fixed': 'Escribe una distancia y Enter para fijarla · luego clic sobre cualquier objeto para desfasarlo (repite en otros objetos) · Esc/Enter vacío termina',
   fillet:     'Clic en la primera línea, luego clic en la segunda para unirlas en su intersección · Esc cancela',
   filletStep2:'Elige la segunda línea para unirla con la primera · Esc cancela',
-  trim:       'Elige el/los borde(s) de corte — clic, o arrastra un área · Shift+clic para elegir varios + Enter · Esc cancela',
+  trim:       'Elige el/los borde(s) de corte — clic, o arrastra un área · Shift+clic o Ctrl+clic para elegir varios (ej. dos líneas paralelas) + Enter · Esc cancela',
   trimAction: 'Clic sobre el tramo de línea que quieres recortar (se elimina esa parte) · puedes seguir recortando otras líneas · Esc termina',
-  extend:     'Elige el/los borde(s) hasta donde alargar — clic, o arrastra un área · Shift+clic para elegir varios + Enter · Esc cancela',
+  extend:     'Elige el/los borde(s) hasta donde alargar — clic, o arrastra un área · Shift+clic o Ctrl+clic para elegir varios + Enter · Esc cancela',
   extendAction:'Clic cerca del extremo de la línea que quieres alargar hasta el borde elegido · puedes seguir alargando otras líneas · Esc termina',
   'arc-3p':   'Clic en el punto de inicio, clic en un punto por donde pasa el arco, clic en el punto final · Esc cancela',
   'arc-cse':  'Clic en el centro, clic en el punto de inicio (define el radio), clic en el punto final (define el barrido) · Esc cancela',
@@ -3147,7 +3147,7 @@ function updateCoordLabels(w) {
   document.getElementById('coord-y').textContent = w.y.toFixed(2);
 }
 
-function pointerDown(sx, sy, button, shiftKey) {
+function pointerDown(sx, sy, button, shiftKey) { // shiftKey: Shift, Ctrl o Cmd (cualquiera "suma a la selección")
   mouseScreen = { x: sx, y: sy };
   mouseWorld = toWorld(sx, sy);
 
@@ -3710,7 +3710,7 @@ function pointerUp() {
 }
 
 /* ── Mouse ── */
-canvas.addEventListener('mousedown', e => { inputIsTouch = false; e.preventDefault(); pointerDown(e.offsetX, e.offsetY, e.button, e.shiftKey); });
+canvas.addEventListener('mousedown', e => { inputIsTouch = false; e.preventDefault(); pointerDown(e.offsetX, e.offsetY, e.button, e.shiftKey || e.ctrlKey || e.metaKey); });
 canvas.addEventListener('mousemove', e => { inputIsTouch = false; pointerMove(e.offsetX, e.offsetY); });
 window.addEventListener('mouseup', pointerUp);
 canvas.addEventListener('contextmenu', e => {
