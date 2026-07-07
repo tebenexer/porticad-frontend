@@ -86,6 +86,10 @@ body{ display:flex; flex-direction:column; }
 .file-menu-item svg{ flex-shrink:0; }
 .file-menu-item.danger{ color:#ff8a80; }
 #file-name-label{ font-size:11px; color:var(--muted); margin-left:2px; }
+/* Paneles con íconos grandes (Anotar/Editar/Utilidades) — mismo tamaño que la barra izquierda */
+.icon-lg-panel{ min-width:240px; }
+.icon-lg-panel .file-menu-item{ gap:12px; padding:9px 10px; }
+.icon-lg-panel .file-menu-item svg{ width:21px; height:21px; }
 
 /* ── Menú "Tamaños" (tamaño de texto de etiquetas y cotas) ── */
 .size-panel{ min-width:250px; }
@@ -407,12 +411,85 @@ body{ display:flex; flex-direction:column; }
   </div>
 
   <div class="topbar-sep-v"></div>
+  <div class="file-menu-wrap" id="anotar-menu-wrap">
+    <button class="mt-btn" id="tool-anotar-btn" onclick="toggleAnotarMenu(event)" title="Anotar — cotas (lineal, alineada, angular, longitud de arco, radio, diámetro) y texto">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="18" x2="20" y2="18"/><line x1="4" y1="14" x2="4" y2="21"/><line x1="20" y1="14" x2="20" y2="21"/><path d="M4 18l3-1.6M20 18l-3-1.6"/></svg>
+      Anotar ▾
+    </button>
+    <div class="mt-panel icon-lg-panel" id="anotar-menu-panel">
+      <div class="mt-hd">ANOTAR</div>
+      <button class="file-menu-item" onclick="pickAnotarMethod('dim-linear')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="18" x2="20" y2="18"/><line x1="4" y1="12" x2="4" y2="21"/><line x1="20" y1="12" x2="20" y2="21"/></svg>
+        Lineal
+      </button>
+      <button class="file-menu-item" onclick="pickAnotarMethod('dim-aligned')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="19" x2="19" y2="5"/><line x1="8" y1="22" x2="2" y2="16"/><line x1="22" y1="8" x2="16" y2="2"/></svg>
+        Alineada
+      </button>
+      <button class="file-menu-item" onclick="pickAnotarMethod('dim-angular')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16"/><path d="M4 20L16 6"/><path d="M9 20a8 8 0 0 1 3.2-11.6"/></svg>
+        Angular
+      </button>
+      <button class="file-menu-item" onclick="pickAnotarMethod('dim-arclength')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16a10 10 0 0 1 16 0"/><path d="M4 20a12 12 0 0 1 16 0"/></svg>
+        Longitud de Arco
+      </button>
+      <button class="file-menu-item" onclick="pickAnotarMethod('dim-radius')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="18" y2="6"/></svg>
+        Radio
+      </button>
+      <button class="file-menu-item" onclick="pickAnotarMethod('dim-diameter')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><line x1="4" y1="18" x2="20" y2="6"/></svg>
+        Diámetro
+      </button>
+      <div style="border-top:1px solid var(--border2);margin:4px 0;"></div>
+      <button class="file-menu-item" onclick="pickAnotarMethod('text')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="12" y1="4" x2="12" y2="20"/><line x1="9" y1="20" x2="15" y2="20"/></svg>
+        Texto
+      </button>
+    </div>
+  </div>
+
+  <div class="file-menu-wrap" id="editar-menu-wrap">
+    <button class="mt-btn" id="tool-editar-btn" onclick="toggleEditarMenu(event)" title="Editar — copiar, offset, empalme, recortar, alargar">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Editar ▾
+    </button>
+    <div class="mt-panel icon-lg-panel" id="editar-menu-panel">
+      <div class="mt-hd">EDITAR</div>
+      <button class="file-menu-item" onclick="closeEditarMenu(); clickCopyBtn();">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copiar
+      </button>
+      <button class="file-menu-item" onclick="closeEditarMenu(); clickOffsetBtn('offset');">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="7" width="10" height="10" rx="1"/><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"/></svg>
+        Offset
+      </button>
+      <button class="file-menu-item" onclick="closeEditarMenu(); clickOffsetBtn('offset-fixed');">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        Offset Fijo
+      </button>
+      <button class="file-menu-item" onclick="closeEditarMenu(); setTool('fillet');">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v9a7 7 0 0 0 7 7h9"/></svg>
+        Empalme
+      </button>
+      <button class="file-menu-item" onclick="closeEditarMenu(); clickTrimBtn();">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+        Recortar
+      </button>
+      <button class="file-menu-item" onclick="closeEditarMenu(); clickExtendBtn();">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="12" x2="16" y2="12"/><polyline points="12 6 18 12 12 18"/></svg>
+        Alargar
+      </button>
+    </div>
+  </div>
+
   <div class="file-menu-wrap" id="util-menu-wrap">
     <button class="mt-btn" id="tool-util-btn" onclick="toggleUtilMenu(event)" title="Utilidades de medición — distancia, radio, ángulo, área/perímetro y volumen">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="10" rx="1.5"/><line x1="7" y1="7" x2="7" y2="11"/><line x1="11" y1="7" x2="11" y2="10"/><line x1="15" y1="7" x2="15" y2="11"/><line x1="19" y1="7" x2="19" y2="10"/></svg>
       Utilidades ▾
     </button>
-    <div class="mt-panel" id="util-menu-panel">
+    <div class="mt-panel icon-lg-panel" id="util-menu-panel">
       <button class="file-menu-item" onclick="pickUtilMethod('m-dist')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="4"/><line x1="4" y1="20" x2="8" y2="20"/><line x1="4" y1="20" x2="4" y2="16"/></svg>
         Distancia
@@ -540,70 +617,6 @@ body{ display:flex; flex-direction:column; }
     <span>Snap Obj</span>
   </button>
 
-  <div class="tgroup-label">Anotar</div>
-  <button class="tbtn" id="tool-dim-btn" onclick="toggleDimMenu(event)" title="Acotar — elige el tipo de cota (lineal, alineada, angular, longitud de arco, radio, diámetro)">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="18" x2="20" y2="18"/><line x1="4" y1="14" x2="4" y2="21"/><line x1="20" y1="14" x2="20" y2="21"/><path d="M4 18l3-1.6M20 18l-3-1.6"/></svg>
-    <span>Acotar ▾</span>
-  </button>
-  <button class="tbtn" id="tool-text" onclick="setTool('text')" title="Texto — clic para colocar una etiqueta">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="12" y1="4" x2="12" y2="20"/><line x1="9" y1="20" x2="15" y2="20"/></svg>
-    <span>Texto</span>
-  </button>
-
-  <div class="tgroup-label">Editar</div>
-  <button class="tbtn" id="tool-copy" onclick="clickCopyBtn()" title="Copiar — elige el objeto y luego el punto base/destino">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-    <span>Copiar</span>
-  </button>
-  <button class="tbtn" id="tool-offset" onclick="clickOffsetBtn('offset')" title="Offset — la distancia sigue al mouse en cada clic (O)">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="7" width="10" height="10" rx="1"/><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"/></svg>
-    <span>Offset</span>
-  </button>
-  <button class="tbtn" id="tool-offset-fixed" onclick="clickOffsetBtn('offset-fixed')" title="Offset Fijo — escribe la distancia y Enter, luego clic en cualquier objeto para desfasarlo">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-    <span>Offset Fijo</span>
-  </button>
-  <button class="tbtn" id="tool-fillet" onclick="setTool('fillet')" title="Empalme — une dos líneas en su punto de intersección">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v9a7 7 0 0 0 7 7h9"/></svg>
-    <span>Empalme</span>
-  </button>
-  <button class="tbtn" id="tool-trim" onclick="clickTrimBtn()" title="Recortar — elige el borde de corte y luego clic en el tramo a eliminar">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
-    <span>Recortar</span>
-  </button>
-  <button class="tbtn" id="tool-extend" onclick="clickExtendBtn()" title="Alargar — elige el borde límite y luego clic cerca del extremo a alargar">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="12" x2="16" y2="12"/><polyline points="12 6 18 12 12 18"/></svg>
-    <span>Alargar</span>
-  </button>
-</div>
-
-<!-- Menú desplegable "Acotar" (position:fixed, se posiciona junto al botón al abrirse) -->
-<div class="arc-menu-panel" id="dim-menu-panel">
-  <div class="mt-hd" style="border-bottom:1px solid var(--border2);padding-bottom:8px;margin-bottom:6px;">ACOTAR</div>
-  <button class="file-menu-item" onclick="pickDimMethod('dim-linear')">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="18" x2="20" y2="18"/><line x1="4" y1="12" x2="4" y2="21"/><line x1="20" y1="12" x2="20" y2="21"/></svg>
-    Lineal
-  </button>
-  <button class="file-menu-item" onclick="pickDimMethod('dim-aligned')">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="19" x2="19" y2="5"/><line x1="8" y1="22" x2="2" y2="16"/><line x1="22" y1="8" x2="16" y2="2"/></svg>
-    Alineada
-  </button>
-  <button class="file-menu-item" onclick="pickDimMethod('dim-angular')">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16"/><path d="M4 20L16 6"/><path d="M9 20a8 8 0 0 1 3.2-11.6"/></svg>
-    Angular
-  </button>
-  <button class="file-menu-item" onclick="pickDimMethod('dim-arclength')">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16a10 10 0 0 1 16 0"/><path d="M4 20a12 12 0 0 1 16 0"/></svg>
-    Longitud de Arco
-  </button>
-  <button class="file-menu-item" onclick="pickDimMethod('dim-radius')">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="18" y2="6"/></svg>
-    Radio
-  </button>
-  <button class="file-menu-item" onclick="pickDimMethod('dim-diameter')">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><line x1="4" y1="18" x2="20" y2="6"/></svg>
-    Diámetro
-  </button>
 </div>
 
 <!-- Menú desplegable "Arco" (position:fixed, se posiciona junto al botón al abrirse) -->
@@ -833,6 +846,7 @@ function isDimTool(t) { return t === 'dim-linear' || t === 'dim-aligned' || t ==
 function isAnnotationType(t) { return t === 'text' || (typeof t === 'string' && t.indexOf('dim-') === 0); }
 function isArcDrawTool(t) { return t === 'arc-3p' || t === 'arc-cse' || t === 'arc-ser' || t === 'arc-sed'; }
 function isMeasureTool(t) { return t === 'm-dist' || t === 'm-radius' || t === 'm-angle' || t === 'm-area' || t === 'm-volume'; }
+function isEditTool(t) { return t === 'copy' || t === 'offset' || t === 'offset-fixed' || t === 'fillet' || t === 'trim' || t === 'extend'; }
 
 function isBusy() {
   return !!drawState || !!copyState
@@ -870,11 +884,13 @@ function setTool(t) {
   if (t === 'offset') offsetPhase = 'pick';
   if (t === 'trim' || t === 'extend') trimExtendPhase = 'pick';
   if (t !== 'select' && t !== 'select-box') selected.clear();
-  ['select','select-box','line','polyline','rect','circle','pan','copy','offset','offset-fixed','fillet','trim','extend','text'].forEach(k => document.getElementById('tool-' + k).classList.toggle('active', k === t));
+  ['select','select-box','line','polyline','rect','circle','pan'].forEach(k => document.getElementById('tool-' + k).classList.toggle('active', k === t));
   const arcBtn = document.getElementById('tool-arc-btn');
   if (arcBtn) arcBtn.classList.toggle('active', isArcDrawTool(t));
-  const dimBtn = document.getElementById('tool-dim-btn');
-  if (dimBtn) dimBtn.classList.toggle('active', isDimTool(t));
+  const anotarBtn = document.getElementById('tool-anotar-btn');
+  if (anotarBtn) anotarBtn.classList.toggle('active', isDimTool(t) || t === 'text');
+  const editarBtn = document.getElementById('tool-editar-btn');
+  if (editarBtn) editarBtn.classList.toggle('active', isEditTool(t));
   const utilBtn = document.getElementById('tool-util-btn');
   if (utilBtn) utilBtn.classList.toggle('active', isMeasureTool(t));
   canvas.className = 'tool-' + t + (t === 'copy' ? '-' + copyPhase : t === 'offset' ? '-' + offsetPhase : isTrimExtendTool() ? '-' + trimExtendPhase : '');
@@ -900,19 +916,24 @@ function closeArcMenu() { document.getElementById('arc-menu-panel').style.displa
 document.addEventListener('click', () => closeArcMenu());
 function pickArcMethod(method) { closeArcMenu(); setTool(method); }
 
-// Menú desplegable "Acotar"
-function toggleDimMenu(e) {
+// Menú desplegable "Anotar" (topbar) — cotas + texto
+function toggleAnotarMenu(e) {
   e.stopPropagation();
-  const panel = document.getElementById('dim-menu-panel');
-  if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
-  const btnRect = e.currentTarget.getBoundingClientRect();
-  panel.style.top = btnRect.top + 'px';
-  panel.style.left = (btnRect.right + 6) + 'px';
-  panel.style.display = 'block';
+  const p = document.getElementById('anotar-menu-panel');
+  p.style.display = p.style.display === 'block' ? 'none' : 'block';
 }
-function closeDimMenu() { document.getElementById('dim-menu-panel').style.display = 'none'; }
-document.addEventListener('click', () => closeDimMenu());
-function pickDimMethod(method) { closeDimMenu(); setTool(method); }
+function closeAnotarMenu() { document.getElementById('anotar-menu-panel').style.display = 'none'; }
+document.addEventListener('click', () => closeAnotarMenu());
+function pickAnotarMethod(method) { closeAnotarMenu(); setTool(method); }
+
+// Menú desplegable "Editar" (topbar) — copiar, offset, empalme, recortar, alargar
+function toggleEditarMenu(e) {
+  e.stopPropagation();
+  const p = document.getElementById('editar-menu-panel');
+  p.style.display = p.style.display === 'block' ? 'none' : 'block';
+}
+function closeEditarMenu() { document.getElementById('editar-menu-panel').style.display = 'none'; }
+document.addEventListener('click', () => closeEditarMenu());
 
 function beginTrimExtendAction() {
   trimExtendBoundary = [...selected].map(i => JSON.parse(JSON.stringify(entities[i])));
