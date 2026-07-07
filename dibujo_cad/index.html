@@ -38,7 +38,7 @@ body{ display:flex; flex-direction:column; }
 /* ── Topbar ── */
 .topbar{
   background:var(--panel); border-bottom:1px solid var(--border);
-  height:44px; display:flex; align-items:center; padding:0 16px; gap:8px;
+  height:56px; display:flex; align-items:center; padding:0 16px; gap:8px;
   flex-shrink:0; z-index:200; position:relative;
 }
 .topbar a{ color:var(--accent); font-size:14px; font-weight:700; text-decoration:none; }
@@ -51,12 +51,13 @@ body{ display:flex; flex-direction:column; }
 /* ── Multi-Tools dropdown ── */
 .mt-wrap{ position:relative; margin-left:auto; }
 .mt-btn{
-  display:flex; align-items:center; gap:6px; background:none; border:1px solid var(--border);
-  border-radius:7px; padding:6px 11px; color:var(--accent); font-size:11px; font-weight:700;
+  display:flex; align-items:center; gap:7px; background:none; border:1px solid var(--border);
+  border-radius:7px; padding:8px 13px; color:var(--accent); font-size:11.5px; font-weight:700;
   cursor:pointer; font-family:inherit; transition:.15s;
 }
 .mt-btn:hover{ background:var(--border2); }
 .mt-btn.active{ background:var(--accent-dim); border-color:#1f6feb55; }
+.mt-btn svg{ width:16px; height:16px; flex-shrink:0; }
 .mt-panel{
   display:none; position:absolute; top:calc(100% + 8px); right:0; background:var(--panel);
   border:1px solid var(--border); border-radius:10px; padding:10px 8px; min-width:230px;
@@ -178,16 +179,16 @@ body{ display:flex; flex-direction:column; }
 .tsep{ width:auto; height:1px; background:var(--border); margin:4px 2px; flex-shrink:0; }
 
 /* ── Botones de acción en la topbar (Deshacer/Rehacer, Zoom, Borrar/Limpiar) ── */
-.topbar-sep-v{ width:1px; height:22px; background:var(--border); flex-shrink:0; }
+.topbar-sep-v{ width:1px; height:26px; background:var(--border); flex-shrink:0; }
 .topbar-actions{ display:flex; align-items:center; gap:2px; flex-shrink:0; }
 .tb-action{
   display:flex; align-items:center; justify-content:center;
-  width:30px; height:30px; border-radius:7px; border:1px solid transparent;
+  width:36px; height:36px; border-radius:8px; border:1px solid transparent;
   background:none; color:var(--muted); cursor:pointer; transition:.12s; flex-shrink:0;
 }
 .tb-action:hover{ background:var(--border2); color:var(--text); }
 .tb-action.danger:hover{ background:#f8514922; color:#ff8a80; }
-.tb-action svg{ width:16px; height:16px; display:block; }
+.tb-action svg{ width:19px; height:19px; display:block; }
 
 /* ── Canvas ── */
 .canvas-wrap{ flex:1; position:relative; overflow:hidden; background:var(--panel2); min-height:0; }
