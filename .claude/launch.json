@@ -4,8 +4,9 @@
     {
       "name": "porticad-frontend",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "5500"],
-      "port": 5500
+      "runtimeArgs": ["-c", "import os,http.server,socketserver; PORT=int(os.environ.get('PORT','5500')); httpd=socketserver.TCPServer(('',PORT),http.server.SimpleHTTPRequestHandler); print('Serving on port', PORT); httpd.serve_forever()"],
+      "port": 5500,
+      "autoPort": true
     }
   ]
 }
