@@ -678,6 +678,10 @@ body{ display:flex; flex-direction:column; }
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16a10 10 0 0 1 12 3"/><line x1="4" y1="16" x2="4" y2="9"/><polyline points="1 12 4 9 7 12"/></svg>
     Inicio, Fin, Dirección
   </button>
+  <button class="file-menu-item" onclick="pickArcMethod('arc-sedo')">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16a10 10 0 0 1 12 3"/><line x1="4" y1="16" x2="4" y2="9"/><polyline points="1 12 4 9 7 12"/><path d="M2 21h4M2 21v-4" stroke-width="1.5"/></svg>
+    Inicio, Fin, Dirección Ortogonal
+  </button>
 </div>
 
 <!-- ── Canvas ── -->
@@ -889,6 +893,7 @@ const TOOL_HINTS = {
   'arc-cse':  'Clic en el centro, clic en el punto de inicio (define el radio), clic en el punto final (define el barrido) · Esc cancela',
   'arc-ser':  'Clic en el inicio, clic en el final · mueve el mouse para definir el radio (o escribe un valor) y clic/Enter para confirmar · Esc cancela',
   'arc-sed':  'Clic en el inicio, clic en el final · mueve el mouse para definir la dirección tangente en el inicio (o escribe un ángulo en grados) y clic/Enter para confirmar · Esc cancela',
+  'arc-sedo': 'Clic en el inicio, clic en el final · la dirección tangente en el inicio se ajusta siempre a horizontal o vertical según el lado del mouse (o escribe un ángulo en grados) y clic/Enter para confirmar · Esc cancela',
   'dim-linear':    'Clic en el primer punto, clic en el segundo · mueve el mouse y clic para colocar la línea de cota (horizontal o vertical, según hacia dónde muevas el mouse) · Esc cancela',
   'dim-aligned':   'Clic en el primer punto, clic en el segundo · mueve el mouse y clic para colocar la línea de cota (paralela a los dos puntos) · Esc cancela',
   'dim-angular':   'Clic en la primera línea, clic en la segunda línea · mueve el mouse y clic para definir el radio del arco de cota · Esc cancela',
@@ -921,7 +926,7 @@ function isOffsetTool() { return tool === 'offset' || tool === 'offset-fixed'; }
 function isTrimExtendTool() { return tool === 'trim' || tool === 'extend'; }
 function isDimTool(t) { return t === 'dim-linear' || t === 'dim-aligned' || t === 'dim-angular' || t === 'dim-arclength' || t === 'dim-radius' || t === 'dim-diameter'; }
 function isAnnotationType(t) { return t === 'text' || (typeof t === 'string' && t.indexOf('dim-') === 0); }
-function isArcDrawTool(t) { return t === 'arc-3p' || t === 'arc-cse' || t === 'arc-ser' || t === 'arc-sed'; }
+function isArcDrawTool(t) { return t === 'arc-3p' || t === 'arc-cse' || t === 'arc-ser' || t === 'arc-sed' || t === 'arc-sedo'; }
 function isMeasureTool(t) { return t === 'm-dist' || t === 'm-radius' || t === 'm-angle' || t === 'm-area' || t === 'm-volume'; }
 function isEditTool(t) { return t === 'copy' || t === 'offset' || t === 'offset-fixed' || t === 'fillet' || t === 'trim' || t === 'extend'; }
 
@@ -1166,7 +1171,7 @@ function isSnapMeasureTool(t) { return t === 'm-dist' || t === 'm-area' || t ===
 function drawGeneralSnapMarker() {
   if (!objectSnapOn || !(isSnapDrawTool(tool) || isSnapMeasureTool(tool))) return;
   // en Inicio-Fin-Radio / Inicio-Fin-Dirección, el último clic define el radio/dirección (no se ajusta a un punto de la grilla/objeto)
-  if ((tool === 'arc-ser' || tool === 'arc-sed') && arcDraw && arcDraw.pts.length >= 2) return;
+  if ((tool === 'arc-ser' || tool === 'arc-sed' || tool === 'arc-sedo') && arcDraw && arcDraw.pts.length >= 2) return;
   // en Área/Volumen, si el cursor está sobre una forma cerrada existente el clic la toma entera (sin snap a punto)
   if (isSnapMeasureTool(tool) && (tool === 'm-area' || tool === 'm-volume') && !measureDraw) {
     const hoverHit = hitTest(mouseScreen.x, mouseScreen.y);
@@ -1364,6 +1369,15 @@ function computeSEDArc(p1, p2, dirPoint) {
   return { type: 'arc', c, r, a0, a1 };
 }
 
+// Punto de dirección (a distancia 1 de p1) ajustado al eje dominante (horizontal o vertical),
+// para "Inicio, Fin, Dirección Ortogonal" — mismo criterio que applyOrtho, pero da un punto de
+// dirección en vez de ajustar un punto de destino.
+function orthoDirPoint(p1, mouseP) {
+  const dx = mouseP.x - p1.x, dy = mouseP.y - p1.y;
+  if (Math.abs(dx) >= Math.abs(dy)) return { x: p1.x + (dx >= 0 ? 1 : -1), y: p1.y };
+  return { x: p1.x, y: p1.y + (dy >= 0 ? 1 : -1) };
+}
+
 function commitArcDraw(entity) {
   if (!entity) { document.getElementById('hint').textContent = '⚠ Esos puntos no forman un arco válido (¿están alineados?)'; return; }
   entity.layer = currentLayer;
@@ -1398,8 +1412,8 @@ function drawArcDrawPreview() {
       if (typedBuffer) drawTypedTooltip(mp, typedBuffer + ' ↵');
       else { ctx.font = '11px "JetBrains Mono", monospace'; ctx.textBaseline = 'bottom'; ctx.textAlign = 'left'; ctx.fillText(label, mp.x + 10, mp.y - 8); }
     }
-  } else if (arcDraw.method === 'arc-sed' && pts.length === 2) {
-    let dirPoint = mouseWorld;
+  } else if ((arcDraw.method === 'arc-sed' || arcDraw.method === 'arc-sedo') && pts.length === 2) {
+    let dirPoint = arcDraw.method === 'arc-sedo' ? orthoDirPoint(pts[0], mouseWorld) : mouseWorld;
     if (typedBuffer) {
       const v = parseFloat(typedBuffer);
       if (!isNaN(v)) { const rad = v * Math.PI / 180; dirPoint = { x: pts[0].x + Math.cos(rad), y: pts[0].y + Math.sin(rad) }; }
@@ -3301,14 +3315,14 @@ function pointerDown(sx, sy, button, shiftKey) { // shiftKey: Shift, Ctrl o Cmd 
       draw();
       return;
     }
-    if (arcDraw.method === 'arc-sed') {
+    if (arcDraw.method === 'arc-sed' || arcDraw.method === 'arc-sedo') {
       if (arcDraw.pts.length === 1) {
         arcDraw.pts.push(p);
         typedBuffer = '';
         draw();
         return;
       }
-      let dirPoint = mouseWorld;
+      let dirPoint = arcDraw.method === 'arc-sedo' ? orthoDirPoint(arcDraw.pts[0], mouseWorld) : mouseWorld;
       if (typedBuffer) { const v = parseFloat(typedBuffer); if (!isNaN(v)) { const rad = v * Math.PI / 180; dirPoint = { x: arcDraw.pts[0].x + Math.cos(rad), y: arcDraw.pts[0].y + Math.sin(rad) }; } }
       commitArcDraw(computeSEDArc(arcDraw.pts[0], arcDraw.pts[1], dirPoint));
       draw();
@@ -3858,8 +3872,8 @@ window.addEventListener('keydown', e => {
     if (/^[0-9.]$/.test(e.key)) { e.preventDefault(); typedBuffer += e.key; draw(); return; }
   }
 
-  // Arco "Inicio, Fin, Dirección": mientras se define la dirección, los dígitos van al ángulo (en grados) tecleado
-  if (tool === 'arc-sed' && arcDraw && arcDraw.pts.length === 2) {
+  // Arco "Inicio, Fin, Dirección" (normal u ortogonal): mientras se define la dirección, los dígitos van al ángulo (en grados) tecleado
+  if ((tool === 'arc-sed' || tool === 'arc-sedo') && arcDraw && arcDraw.pts.length === 2) {
     if (e.key === 'Enter') {
       e.preventDefault();
       if (!typedBuffer) return; // Enter sin ángulo: no hace nada (usa clic para confirmar la dirección en vivo)
