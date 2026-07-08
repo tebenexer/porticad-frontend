@@ -1869,11 +1869,13 @@ function drawPreview() {
     ctx.beginPath();
     const a = toScreen(p1.x, p1.y), b = toScreen(p2.x, p2.y);
     ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+    ctx.stroke(); // pintar el tramo punteado ya mismo — el beginPath() de abajo (círculo de inicio) reemplazaría esta ruta antes de llegar al ctx.stroke() compartido del final
     label = dist(p1, p2).toFixed(2) + ' m';
     // resaltar el punto de inicio (clic cerca cierra la polilínea)
     const s0 = toScreen(drawState.pts[0].x, drawState.pts[0].y);
     ctx.save(); ctx.setLineDash([]); ctx.strokeStyle = '#3fb950'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(s0.x, s0.y, 6, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    ctx.beginPath(); // limpiar la ruta para que el ctx.stroke() compartido de más abajo no repinte el círculo
   } else if (drawState.type === 'line') {
     const a = toScreen(p1.x, p1.y), b = toScreen(p2.x, p2.y);
     ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
