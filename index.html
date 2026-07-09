@@ -1504,6 +1504,17 @@ _fbAuth.onAuthStateChanged(user => {
       box-shadow:0 4px 16px rgba(0,0,0,0.5);
       line-height:1.7; white-space:nowrap; z-index:100;
     "></div>
+
+    <!-- Tooltips fijados (comparación) — uno por cada nudo clickeado -->
+    <div id="nudo-tooltips-fijados" style="position:absolute; top:0; left:0; pointer-events:none;"></div>
+    <button id="btn-limpiar-fijados" onclick="limpiarNudosFijados()" data-tip="Quitar todos los tooltips fijados"
+      style="display:none; position:absolute; bottom:12px; left:12px;
+      background:rgba(220,38,38,0.9); border:1px solid rgba(255,255,255,0.3); color:white;
+      font-size:12px; font-weight:600; padding:7px 14px; border-radius:20px; cursor:pointer;
+      box-shadow:0 2px 10px rgba(0,0,0,0.35); z-index:95;">
+      ✕ Limpiar comparación
+    </button>
+
     <!-- Overlay de distancia (aparece al escribir un número) -->
     <div id="dist-overlay">
       <div id="dist-bubble">
@@ -3088,43 +3099,15 @@ cv.addEventListener('mousemove', e => {
     infoBar.style.display = 'block';
 
     // Tooltip con desplazamientos si hay resultados
-    if (resultados?.desplazamientos) {
-      const d   = resultados.desplazamientos[hNhov];
-      const ux  = d.Ux_m * 100, uy = d.Uy_m * 100, rot = d.theta;
-      const mag = Math.sqrt(ux*ux + uy*uy);
-
-      // Sección Default
-      let html = `<span style="color:#facc15;font-weight:700">Nudo ${hNhov+1}</span>`;
-      html += `<div style="margin-top:4px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.15)">`;
-      html += `<span style="color:#aaa;font-size:10px;font-weight:600">DEFAULT</span><br>`;
-      html += `<span style="color:#60a5fa">Ux</span>=<b>${ux.toFixed(4)}</b> cm  `;
-      html += `<span style="color:#f87171">Uy</span>=<b>${uy.toFixed(4)}</b> cm  `;
-      html += `<span style="color:#c4b5fd">θ</span>=<b>${rot.toFixed(6)}</b> rad`;
-      html += `</div>`;
-
-      // Sección por cada combo activo
-      const combosActivos = Object.entries(resultadosPorCombo)
-        .filter(([nom]) => combosVisibles[nom]);
-      combosActivos.forEach(([nom, data], ci) => {
-        const col = COMBO_COLORS_ACT[Object.keys(resultadosPorCombo).indexOf(nom) % COMBO_COLORS_ACT.length];
-        const dc = data.desplazamientos?.[hNhov];
-        if (!dc) return;
-        const uxc = dc.Ux_m * 100, uyc = dc.Uy_m * 100, rotc = dc.theta;
-        html += `<div style="margin-top:4px;padding:3px 0;${ci<combosActivos.length-1?'border-bottom:1px solid rgba(255,255,255,0.1)':''}">`;
-        html += `<span style="color:${col};font-size:10px;font-weight:700">${nom}</span><br>`;
-        html += `<span style="color:#60a5fa">Ux</span>=<b>${uxc.toFixed(4)}</b> cm  `;
-        html += `<span style="color:#f87171">Uy</span>=<b>${uyc.toFixed(4)}</b> cm  `;
-        html += `<span style="color:#c4b5fd">θ</span>=<b>${rotc.toFixed(6)}</b> rad`;
-        html += `</div>`;
-      });
-
-      nudoTip.innerHTML = html;
+    const tipInfo = _tooltipNudoHTML(hNhov);
+    if (tipInfo) {
+      nudoTip.innerHTML = tipInfo.html;
       // Posicionar junto al cursor, evitando salirse del canvas
       const wrap  = cv.parentElement.getBoundingClientRect();
       const cvr   = cv.getBoundingClientRect();
       const ox    = cvr.left - wrap.left;
       const oy    = cvr.top  - wrap.top;
-      const tipW  = 220, tipH = 80 + combosActivos.length * 48;
+      const tipW  = 220, tipH = 80 + tipInfo.combosCount * 48;
       let tx = ox + cx + 16, ty = oy + cy - tipH/2;
       if (tx + tipW > wrap.width)  tx = ox + cx - tipW - 12;
       if (ty < 4) ty = 4;
@@ -3552,6 +3535,15 @@ cv.addEventListener('click', e => {
 
   } else if (mode === 'pegar') {
     _confirmarPegado(cursorMundo.x, cursorMundo.y);
+
+  } else if (mode === 'select' && resultados?.desplazamientos) {
+    const h = hitNudo(cx, cy);
+    if (h !== -1) {
+      toggleNudoFijado(h);
+    } else if (nudosFijados.size > 0) {
+      limpiarNudosFijados();
+    }
+    draw();
   }
 });
 
@@ -3640,6 +3632,8 @@ function draw() {
     ctx.strokeStyle = '#fef08a'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(wx(n.x), wy(n.y), 16, 0, Math.PI*2); ctx.stroke();
   }
+
+  renderNudosFijados();
 }
 
 function drawGrid() {
@@ -3852,6 +3846,93 @@ function drawNudos() {
       ctx.fillText(i+1, x+ox, y-oy+4);
       ctx.textAlign   = 'left';
     }
+  });
+}
+
+// ── Tooltip de nudo (desplazamientos) — compartido entre hover y fijados ──
+function _tooltipNudoHTML(idx) {
+  if (!resultados?.desplazamientos) return null;
+  const d = resultados.desplazamientos[idx];
+  if (!d) return null;
+  const ux = d.Ux_m * 100, uy = d.Uy_m * 100, rot = d.theta;
+
+  // Sección Default
+  let html = `<span style="color:#facc15;font-weight:700">Nudo ${idx+1}</span>`;
+  html += `<div style="margin-top:4px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.15)">`;
+  html += `<span style="color:#aaa;font-size:10px;font-weight:600">DEFAULT</span><br>`;
+  html += `<span style="color:#60a5fa">Ux</span>=<b>${ux.toFixed(4)}</b> cm  `;
+  html += `<span style="color:#f87171">Uy</span>=<b>${uy.toFixed(4)}</b> cm  `;
+  html += `<span style="color:#c4b5fd">θ</span>=<b>${rot.toFixed(6)}</b> rad`;
+  html += `</div>`;
+
+  // Sección por cada combo activo
+  const combosActivos = Object.entries(resultadosPorCombo)
+    .filter(([nom]) => combosVisibles[nom]);
+  combosActivos.forEach(([nom, data], ci) => {
+    const col = COMBO_COLORS_ACT[Object.keys(resultadosPorCombo).indexOf(nom) % COMBO_COLORS_ACT.length];
+    const dc = data.desplazamientos?.[idx];
+    if (!dc) return;
+    const uxc = dc.Ux_m * 100, uyc = dc.Uy_m * 100, rotc = dc.theta;
+    html += `<div style="margin-top:4px;padding:3px 0;${ci<combosActivos.length-1?'border-bottom:1px solid rgba(255,255,255,0.1)':''}">`;
+    html += `<span style="color:${col};font-size:10px;font-weight:700">${nom}</span><br>`;
+    html += `<span style="color:#60a5fa">Ux</span>=<b>${uxc.toFixed(4)}</b> cm  `;
+    html += `<span style="color:#f87171">Uy</span>=<b>${uyc.toFixed(4)}</b> cm  `;
+    html += `<span style="color:#c4b5fd">θ</span>=<b>${rotc.toFixed(6)}</b> rad`;
+    html += `</div>`;
+  });
+
+  return { html, combosCount: combosActivos.length };
+}
+
+// ── Tooltips fijados (comparación) — clic en un nudo (modo select) lo fija ──
+let nudosFijados = new Set();
+
+function toggleNudoFijado(idx) {
+  if (nudosFijados.has(idx)) nudosFijados.delete(idx);
+  else nudosFijados.add(idx);
+  renderNudosFijados();
+}
+
+function limpiarNudosFijados() {
+  nudosFijados.clear();
+  renderNudosFijados();
+}
+
+function renderNudosFijados() {
+  const cont = document.getElementById('nudo-tooltips-fijados');
+  const btn  = document.getElementById('btn-limpiar-fijados');
+  if (!cont || !btn) return;
+  btn.style.display = nudosFijados.size > 0 ? '' : 'none';
+  cont.innerHTML = '';
+  if (nudosFijados.size === 0) return;
+
+  const wrap = cv.parentElement.getBoundingClientRect();
+  const cvr  = cv.getBoundingClientRect();
+  const ox   = cvr.left - wrap.left, oy = cvr.top - wrap.top;
+
+  nudosFijados.forEach(idx => {
+    if (idx >= nudos.length) return;
+    const info = _tooltipNudoHTML(idx);
+    if (!info) return;
+    const n  = nudos[idx];
+    const sx = wx(n.x), sy = wy(n.y);
+    const tipW = 220, tipH = 80 + info.combosCount * 48;
+    let tx = ox + sx + 18, ty = oy + sy - tipH / 2;
+    if (tx + tipW > wrap.width)  tx = ox + sx - tipW - 14;
+    if (ty < 4) ty = 4;
+    if (ty + tipH > wrap.height) ty = wrap.height - tipH - 4;
+
+    const div = document.createElement('div');
+    div.style.cssText = `position:absolute; left:${tx}px; top:${ty}px;
+      background:rgba(8,18,38,0.97); border:1px solid #38bdf8;
+      border-radius:6px; padding:7px 12px; font-family:var(--mono);
+      font-size:12px; color:white; box-shadow:0 4px 16px rgba(0,0,0,0.5);
+      line-height:1.7; white-space:nowrap; z-index:90; pointer-events:auto;`;
+    div.innerHTML = info.html +
+      `<div style="text-align:right;margin-top:2px;">
+         <span onclick="toggleNudoFijado(${idx})" style="cursor:pointer;color:#f87171;font-size:11px;">✕ quitar</span>
+       </div>`;
+    cont.appendChild(div);
   });
 }
 
@@ -9647,6 +9728,7 @@ function limpiar(confirmar = true) {
   nudosSelCarga.clear();
   nudosSelResorte.clear();
   barrasSelArticulacion.clear();
+  nudosFijados.clear();
   selBoxClear();
   moverDrag = false;
   nudosPosOrig = {};
