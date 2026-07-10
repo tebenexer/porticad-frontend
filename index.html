@@ -10271,16 +10271,28 @@ function setApoyoPreset(tipo, manual = false) {
   syncApoyoPanel();
 }
 
-function apoyoChkChange() {
-  apoyoRestricciones.ux = document.getElementById('ap-chk-ux').checked;
-  apoyoRestricciones.uy = document.getElementById('ap-chk-uy').checked;
-  apoyoRestricciones.th = document.getElementById('ap-chk-th').checked;
+function _actualizarTipoDesdeRestricciones() {
   const { ux, uy, th } = apoyoRestricciones;
   if      (ux && uy && th)   apoyoTipoActual = 'empotrado';
   else if (ux && uy && !th)  apoyoTipoActual = 'fijo';
   else if (!ux && uy && !th) apoyoTipoActual = 'movil';
   else                       apoyoTipoActual = 'custom';
+}
+
+// Ux/Uy ahora son "medidores" (gauge) en vez de checkbox nativo, para poder
+// mostrar el nivel de porcentaje además del on/off — ver syncApoyoPanel().
+function apoyoChkToggle(dof) {
+  apoyoRestricciones[dof] = !apoyoRestricciones[dof];
+  _actualizarTipoDesdeRestricciones();
   apoyoPanelSeleccionado = true; // user manually changed restrictions
+  syncApoyoPanel();
+}
+
+// θ sigue siendo un checkbox nativo normal (no varía con el ángulo)
+function apoyoChkChangeTheta() {
+  apoyoRestricciones.th = document.getElementById('ap-chk-th').checked;
+  _actualizarTipoDesdeRestricciones();
+  apoyoPanelSeleccionado = true;
   syncApoyoPanel();
 }
 
@@ -10322,12 +10334,8 @@ function apoyoDialMove(e) {
 function apoyoDialUp() { _apoyoDialDragging = false; }
 
 function syncApoyoPanel() {
-  // Sync checkboxes
-  const cux = document.getElementById('ap-chk-ux');
-  const cuy = document.getElementById('ap-chk-uy');
+  // θ sigue siendo un checkbox nativo (Ux/Uy ahora son gauges, ver abajo)
   const cth = document.getElementById('ap-chk-th');
-  if (cux) cux.checked = apoyoRestricciones.ux;
-  if (cuy) cuy.checked = apoyoRestricciones.uy;
   if (cth) cth.checked = apoyoRestricciones.th;
 
   // Highlight active preset button
@@ -10375,6 +10383,16 @@ function syncApoyoPanel() {
     }
     pctUx.textContent = '(' + pux + '%)';
     pctUy.textContent = '(' + puy + '%)';
+
+    // Gauges: la barra sube al nivel del porcentaje; el tilde solo aparece al 100%
+    const fillUx = document.getElementById('ap-gauge-ux-fill');
+    const fillUy = document.getElementById('ap-gauge-uy-fill');
+    const checkUx = document.getElementById('ap-gauge-ux-check');
+    const checkUy = document.getElementById('ap-gauge-uy-check');
+    if (fillUx)  fillUx.style.height  = pux + '%';
+    if (fillUy)  fillUy.style.height  = puy + '%';
+    if (checkUx) checkUx.style.opacity = pux >= 100 ? '1' : '0';
+    if (checkUy) checkUy.style.opacity = puy >= 100 ? '1' : '0';
   }
 
   // Dial: posicionar el handle según apoyoAnguloActual (0° = abajo, sentido horario)
@@ -11010,18 +11028,30 @@ document.addEventListener('DOMContentLoaded', function() {
     <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;
                 letter-spacing:0.5px;margin-bottom:8px;">Restricciones</div>
     <div style="display:flex;flex-direction:column;gap:7px;">
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;">
-        <input type="checkbox" id="ap-chk-ux" onchange="apoyoChkChange()"
-               style="accent-color:#60a5fa;width:16px;height:16px;cursor:pointer;"/>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;" onclick="apoyoChkToggle('ux')">
+        <span style="width:18px;height:18px;border-radius:4px;border:2px solid #60a5fa;
+              position:relative;flex-shrink:0;background:var(--surface2);overflow:hidden;box-sizing:border-box;display:inline-block;">
+          <span id="ap-gauge-ux-fill" style="position:absolute;left:0;bottom:0;width:100%;height:0%;background:#60a5fa;display:block;transition:height .15s ease;"></span>
+          <svg viewBox="0 0 16 16" width="13" height="13" style="position:absolute;top:1px;left:1px;pointer-events:none;">
+            <path id="ap-gauge-ux-check" d="M2 8.5l3.5 3.5L14 3" stroke="white" stroke-width="2.3" fill="none"
+                  stroke-linecap="round" stroke-linejoin="round" style="opacity:0;transition:opacity .1s;"/>
+          </svg>
+        </span>
         <span style="font-size:13px;">
           <b style="color:#60a5fa;font-family:var(--mono)">Ux</b>
           <span style="color:var(--muted);font-size:11px;margin-left:4px;">despl. horizontal</span>
           <span id="ap-pct-ux" style="color:#60a5fa;font-size:11px;font-family:var(--mono);font-weight:700;margin-left:6px;"></span>
         </span>
       </label>
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;">
-        <input type="checkbox" id="ap-chk-uy" onchange="apoyoChkChange()"
-               style="accent-color:#f87171;width:16px;height:16px;cursor:pointer;"/>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;" onclick="apoyoChkToggle('uy')">
+        <span style="width:18px;height:18px;border-radius:4px;border:2px solid #f87171;
+              position:relative;flex-shrink:0;background:var(--surface2);overflow:hidden;box-sizing:border-box;display:inline-block;">
+          <span id="ap-gauge-uy-fill" style="position:absolute;left:0;bottom:0;width:100%;height:0%;background:#f87171;display:block;transition:height .15s ease;"></span>
+          <svg viewBox="0 0 16 16" width="13" height="13" style="position:absolute;top:1px;left:1px;pointer-events:none;">
+            <path id="ap-gauge-uy-check" d="M2 8.5l3.5 3.5L14 3" stroke="white" stroke-width="2.3" fill="none"
+                  stroke-linecap="round" stroke-linejoin="round" style="opacity:0;transition:opacity .1s;"/>
+          </svg>
+        </span>
         <span style="font-size:13px;">
           <b style="color:#f87171;font-family:var(--mono)">Uy</b>
           <span style="color:var(--muted);font-size:11px;margin-left:4px;">despl. vertical</span>
@@ -11029,7 +11059,7 @@ document.addEventListener('DOMContentLoaded', function() {
         </span>
       </label>
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;">
-        <input type="checkbox" id="ap-chk-th" onchange="apoyoChkChange()"
+        <input type="checkbox" id="ap-chk-th" onchange="apoyoChkChangeTheta()"
                style="accent-color:#c4b5fd;width:16px;height:16px;cursor:pointer;"/>
         <span style="font-size:13px;">
           <b style="color:#c4b5fd;font-family:var(--mono)">θ</b>
