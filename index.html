@@ -9834,9 +9834,17 @@ function limpiar(confirmar = true) {
     if (form)   form.style.display   = 'none';
   });
 
-  // ── Resultados en panel derecho ──────────────────────────
-  const tabRes = document.getElementById('tab-resultados');
-  if (tabRes) tabRes.innerHTML = '<div style="color:var(--muted);padding:12px;font-size:13px;">Sin resultados — ejecuta el cálculo primero.</div>';
+  // ── Resultados en panel derecho — resetear solo el contenido dinámico,
+  //    SIN reemplazar todo #tab-resultados: ese contenedor tiene estructura
+  //    estática (selects de unidades, botones "ampliar", canvases de mini-
+  //    diagramas, paneles de inspección) que renderResultados()/
+  //    inspeccionarBarra() buscan por id la próxima vez que se calcule.
+  //    Machacar el innerHTML entero los destruía para siempre y dejaba los
+  //    resultados sin dónde renderizarse en el próximo cálculo. ──────────
+  const elDespl = document.getElementById('res-despl');
+  if (elDespl) elDespl.innerHTML = '<p style="font-size:14px;color:var(--muted)">Corre el análisis primero.</p>';
+  const elReac = document.getElementById('res-reac');
+  if (elReac) elReac.innerHTML = '';
 
   // ── Log API ──────────────────────────────────────────────
   const apiLog = document.getElementById('api-log');
