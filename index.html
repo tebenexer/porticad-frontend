@@ -10334,6 +10334,31 @@ function syncApoyoPanel() {
     lbl.style.color = rest.length ? 'var(--text)' : '#ef4444';
   }
 
+  // Porcentaje de restricción por dirección — junto a los checkboxes Ux/Uy.
+  // Empotrado/Fijo restringen ambas direcciones al 100% sin importar el
+  // ángulo (matemáticamente invariante ante rotación). Móvil restringe una
+  // sola dirección que SÍ rota con el ángulo: a 0° es 100% Uy/0% Ux (como
+  // el checkbox y el ícono), y en ángulos oblicuos queda repartida entre
+  // ambas — sin²θ en Ux y cos²θ en Uy, exactamente lo que el backend
+  // restringe (ver resolver_sistema_ecuaciones en analysis.py).
+  const pctUx = document.getElementById('ap-pct-ux');
+  const pctUy = document.getElementById('ap-pct-uy');
+  if (pctUx && pctUy) {
+    const radPct = apoyoAnguloActual * Math.PI / 180;
+    let pux, puy;
+    if (apoyoTipoActual === 'empotrado' || apoyoTipoActual === 'fijo') {
+      pux = 100; puy = 100;
+    } else if (apoyoTipoActual === 'movil') {
+      pux = Math.round(Math.sin(radPct) ** 2 * 100);
+      puy = Math.round(Math.cos(radPct) ** 2 * 100);
+    } else {
+      pux = apoyoRestricciones.ux ? 100 : 0;
+      puy = apoyoRestricciones.uy ? 100 : 0;
+    }
+    pctUx.textContent = '(' + pux + '%)';
+    pctUy.textContent = '(' + puy + '%)';
+  }
+
   // Dial: posicionar el handle según apoyoAnguloActual (0° = abajo, sentido horario)
   const rad = apoyoAnguloActual * Math.PI / 180, R = 22;
   const hx = 32 - R * Math.sin(rad), hy = 32 + R * Math.cos(rad);
@@ -10973,6 +10998,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <span style="font-size:13px;">
           <b style="color:#60a5fa;font-family:var(--mono)">Ux</b>
           <span style="color:var(--muted);font-size:11px;margin-left:4px;">despl. horizontal</span>
+          <span id="ap-pct-ux" style="color:#60a5fa;font-size:11px;font-family:var(--mono);font-weight:700;margin-left:6px;"></span>
         </span>
       </label>
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;">
@@ -10981,6 +11007,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <span style="font-size:13px;">
           <b style="color:#f87171;font-family:var(--mono)">Uy</b>
           <span style="color:var(--muted);font-size:11px;margin-left:4px;">despl. vertical</span>
+          <span id="ap-pct-uy" style="color:#f87171;font-size:11px;font-family:var(--mono);font-weight:700;margin-left:6px;"></span>
         </span>
       </label>
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;">
