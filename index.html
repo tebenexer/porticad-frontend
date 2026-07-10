@@ -3949,6 +3949,23 @@ function renderNudosFijados() {
   });
 }
 
+// ── Color del apoyo Móvil según el ángulo ────────────────────────────────
+// A 0° (100% Uy, como el ícono clásico) queda el cian original; a medida que
+// gira hacia Ux (90° = 100% Ux) se degrada hacia un azul más saturado. El
+// mismo sin²θ que se usa para el porcentaje del panel es el factor de mezcla,
+// así el color es literalmente una lectura visual de esa misma proporción.
+const _COLOR_MOVIL_UY = [68, 221, 255];  // #44ddff — 100% Uy (por defecto)
+const _COLOR_MOVIL_UX = [34, 85, 204];   // #2255cc — 100% Ux
+function _colorMovilPorAngulo(anguloGrados) {
+  const rad = (anguloGrados || 0) * Math.PI / 180;
+  const t = Math.sin(rad) ** 2; // fracción Ux (0..1)
+  const c1 = _COLOR_MOVIL_UY, c2 = _COLOR_MOVIL_UX;
+  const r = Math.round(c1[0] + t * (c2[0] - c1[0]));
+  const g = Math.round(c1[1] + t * (c2[1] - c1[1]));
+  const b = Math.round(c1[2] + t * (c2[2] - c1[2]));
+  return { css: `rgb(${r},${g},${b})`, hex: (r << 16) | (g << 8) | b };
+}
+
 function drawApoyos() {
   apoyos.forEach(a => {
     if (a.nudo >= nudos.length) return;
@@ -4007,18 +4024,19 @@ function drawApoyos() {
         ctx.stroke();
       }
 
-    } else { // móvil — triángulo cian con borde blanco + ruedas
-      ctx.fillStyle   = '#44ddff';
+    } else { // móvil — triángulo cian/azul (según ángulo) con borde blanco + ruedas
+      const colMovil = _colorMovilPorAngulo(a.angulo).css;
+      ctx.fillStyle   = colMovil;
       ctx.strokeStyle = 'white';
       ctx.lineWidth   = 1.5;
       ctx.beginPath();
       ctx.moveTo(0, 0); ctx.lineTo(-12, 18); ctx.lineTo(12, 18);
       ctx.closePath(); ctx.fill(); ctx.stroke();
-      // Línea base cian
-      ctx.strokeStyle = '#44ddff'; ctx.lineWidth = 1.5;
+      // Línea base
+      ctx.strokeStyle = colMovil; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.moveTo(-16, 18); ctx.lineTo(16, 18); ctx.stroke();
       // Ruedas con borde blanco
-      ctx.fillStyle   = '#44ddff';
+      ctx.fillStyle   = colMovil;
       ctx.strokeStyle = 'white'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(-6, 23, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
       ctx.beginPath(); ctx.arc(6, 23, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
@@ -8627,7 +8645,7 @@ function build3DScene() {
     const n  = nudos[a.nudo]; // 0-based
     if (!n) return;
     const nx = n.x-cx, ny = n.y-cy;
-    const apColor = a.tipo==='empotrado' ? 0xff3333 : a.tipo==='fijo' ? 0xffcc00 : 0x44aaff;
+    const apColor = a.tipo==='empotrado' ? 0xff3333 : a.tipo==='fijo' ? 0xffcc00 : _colorMovilPorAngulo(a.angulo).hex;
 
     // Grupo posicionado en el nudo y rotado según a.angulo — las piezas se
     // agregan en coordenadas locales (relativas al nudo) como si angulo=0.
