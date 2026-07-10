@@ -2561,6 +2561,11 @@ let barras  = [];
 let apoyos  = [];   // {nudo, tipo}
 let cargas  = [];   // {nudo, Fx, Fy, M}
 let resultados = null;
+// Se incrementa cada vez que el modelo se reemplaza por completo (Nuevo/Limpiar/Abrir).
+// Las respuestas async de /analizar capturan este valor al iniciar y lo comparan al
+// terminar: si ya no coincide, el modelo cambió mientras se esperaba y se descarta la
+// respuesta en vez de sobreescribir el estado ya limpio con resultados obsoletos.
+let _modeloGen = 0;
     const _pi = document.getElementById('menu-item-pdf');
     if (_pi) { _pi.style.opacity='0.4'; _pi.style.cursor='not-allowed'; _pi.onclick=null; }
 let vis = { def:false, mom:false, cor:false, axi:false, rea:false, eloc:false, eglo:false };
@@ -5086,6 +5091,11 @@ async function toggleComboActPanel(nom) {
   if (nudos.length < 2 || barras.length === 0 || apoyos.length === 0)
     return setMsg('⚠ Modelo incompleto');
 
+  // Solo lectura (ver comentario equivalente en calcular()) — no invalida
+  // otros cálculos en paralelo sobre el mismo modelo, solo detecta si el
+  // modelo fue reemplazado (Nuevo/Limpiar/Abrir) mientras se esperaba.
+  const myGen = _modeloGen;
+
   _comboLoading = nom; renderActCombosToggles();
   setMsg('⏳ Calculando combo "' + nom + '"…');
 
@@ -5100,12 +5110,17 @@ async function toggleComboActPanel(nom) {
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    resultadosPorCombo[nom] = data;
-    combosVisibles[nom] = true; comboDestacado = nom;
-    vis.env = true;
-    setMsg('✔ Combo "' + nom + '" calculado');
+    if (myGen === _modeloGen) {
+      resultadosPorCombo[nom] = data;
+      combosVisibles[nom] = true; comboDestacado = nom;
+      vis.env = true;
+      setMsg('✔ Combo "' + nom + '" calculado');
+    } else {
+      console.log('[combo] Respuesta descartada: el modelo cambió mientras se calculaba.');
+    }
   } catch(e) {
-    setMsg('⚠ Error en combo "' + nom + '": ' + e.message);
+    if (myGen === _modeloGen) setMsg('⚠ Error en combo "' + nom + '": ' + e.message);
+    else console.log('[combo] Error descartado (modelo cambió mientras se calculaba):', e);
   }
   _comboLoading = null;
   renderActCombosToggles(); renderCombos(); draw();
@@ -5418,6 +5433,12 @@ async function calcular() {
   if (barras.length === 0) return setMsg('⚠ Agrega al menos 1 barra');
   if (apoyos.length === 0) return setMsg('⚠ Agrega al menos 1 apoyo');
 
+  // Recuerda la generación actual del modelo (solo lectura: no la incrementa,
+  // para no invalidar un cálculo de combo corriendo en paralelo sobre el
+  // mismo modelo). Si al volver el servidor _modeloGen ya cambió — porque se
+  // hizo Nuevo/Limpiar/Abrir mientras se esperaba — la respuesta se descarta.
+  const myGen = _modeloGen;
+
   const E_def = parseFloat(document.getElementById('E').value) || 21000000;
   const A_def = parseFloat(document.getElementById('A').value) || 0.01;
   const I_def = parseFloat(document.getElementById('I').value) || 0.0001;
@@ -5534,7 +5555,16 @@ async function calcular() {
       throw new Error(errDetail);
     }
 
-    resultados = await res.json();
+    const data = await res.json();
+
+    if (myGen !== _modeloGen) {
+      // El modelo cambió (Nuevo/Limpiar/Abrir) mientras se esperaba esta
+      // respuesta — se descarta en vez de pisar el estado ya limpio.
+      console.log('[calcular] Respuesta descartada: el modelo cambió mientras se calculaba.');
+      document.getElementById('btn-calc').disabled = false;
+      return;
+    }
+    resultados = data;
 
     // Log de respuesta
     logApi('<span style="color:#22c55e;font-weight:700">✓ CONEXIÓN ESTABLECIDA</span>\n' +
@@ -5563,6 +5593,13 @@ async function calcular() {
     draw();
 
   } catch (err) {
+    if (myGen !== _modeloGen) {
+      // El modelo ya cambió mientras se esperaba — no mostrar un error
+      // que ya no corresponde al modelo actual.
+      console.log('[calcular] Error descartado (modelo cambió mientras se calculaba):', err);
+      document.getElementById('btn-calc').disabled = false;
+      return;
+    }
     const esRedError = err instanceof TypeError && (err.message.includes('fetch') || err.message.includes('Failed') || err.message.includes('NetworkError'));
     const msg = esRedError ? '✗ SIN CONEXIÓN AL SERVIDOR\n\n' + err.message : '✗ Error al procesar resultados\n\n' + err.message;
     logApi('<span class="err">' + msg + '</span>');
@@ -9599,6 +9636,10 @@ function _modeloActual() {
 }
 
 function _cargarModelo(data) {
+  // Reemplaza el modelo por completo — invalida cualquier respuesta de
+  // /analizar todavía en vuelo (ver _modeloGen en limpiar()).
+  _modeloGen++;
+
   nudos              = data.nudos              || [];
   barras             = data.barras             || [];
   apoyos             = data.apoyos             || [];
@@ -9618,9 +9659,16 @@ function _cargarModelo(data) {
   resultadosPorCombo = {};
   combosVisibles = {};
   comboDestacado = null;
+  nudosFijados.clear();
 
   const _pi = document.getElementById('menu-item-pdf');
   if (_pi) { _pi.style.opacity='0.4'; _pi.style.cursor='not-allowed'; _pi.onclick=null; }
+
+  // Cerrar modales/paneles de inspección que puedan referenciar el modelo anterior
+  cerrarInspeccion();
+  cerrarInspeccionNudo();
+  cerrarModal();
+  cerrarModalTabla();
 
   selBoxClear(); undoStack = []; redoStack = [];
   setTimeout(() => {
@@ -9701,6 +9749,11 @@ function limpiar(confirmar = true) {
     if (!confirm('¿Limpiar todo el modelo? Esta acción no se puede deshacer.')) return;
   }
 
+  // Invalida cualquier respuesta de /analizar todavía en vuelo (calcular() o
+  // toggleComboActPanel()): al volver, compararán su copia contra _modeloGen y,
+  // si ya no coincide, descartarán el resultado en vez de pisar el estado limpio.
+  _modeloGen++;
+
   // ── Geometría ────────────────────────────────────────────
   nudos = []; barras = []; apoyos = []; cargas = [];
   propiedadesBarras = {};
@@ -9732,6 +9785,19 @@ function limpiar(confirmar = true) {
   selBoxClear();
   moverDrag = false;
   nudosPosOrig = {};
+
+  // ── Modales/paneles de inspección abiertos — cerrar para no dejar datos
+  //    obsoletos visibles referenciando barras/nudos que ya no existen ───
+  cerrarInspeccion();
+  cerrarInspeccionNudo();
+  cerrarModal();
+  cerrarModalTabla();
+
+  // ── Estado "lápiz" de Apoyo — volver al preset por defecto ───────────
+  apoyoTipoActual        = 'empotrado';
+  apoyoRestricciones      = { ux: true, uy: true, th: true };
+  apoyoPanelSeleccionado  = false;
+  apoyoAnguloActual       = 0;
 
   // ── Historial ────────────────────────────────────────────
   undoStack = []; redoStack = [];
