@@ -897,7 +897,9 @@ function _actualizarEstadoCalc() {
     if (btnLogout)  btnLogout.style.display = '';
     const user = _fbAuth.currentUser;
     if (userLabel && user) {
-      userLabel.textContent = user.displayName || user.email.split('@')[0];
+      const nombre = user.displayName || user.email.split('@')[0];
+      userLabel.textContent = nombre;
+      userLabel.title = nombre; // completo al pasar el mouse si queda truncado con "…"
       userLabel.style.display = '';
     }
   } else {
@@ -1030,11 +1032,6 @@ _fbAuth.onAuthStateChanged(user => {
              max-width:130px;">
       <option value="__default__">Default (todas)</option>
     </select>
-    <button id="btn-login-topbar" onclick="abrirModalLogin()"
-      style="font-size:12px; padding:4px 10px; border-radius:5px; border:1px solid #60a5fa;
-             background:rgba(96,165,250,0.12); color:#60a5fa; cursor:pointer; white-space:nowrap;">
-      🔐 Iniciar sesión
-    </button>
     <!-- Separador -->
     <div style="width:1px; height:22px; background:var(--border); margin:0 4px; flex-shrink:0;"></div>
 
@@ -1202,10 +1199,16 @@ _fbAuth.onAuthStateChanged(user => {
     </div>
 
   </div>
-  <div class="ml-auto" style="display:flex; align-items:center; gap:10px;">
-    <span id="user-label-topbar" style="display:none; font-size:12px; color:#22c55e; white-space:nowrap;"></span>
+  <div class="ml-auto" style="display:flex; align-items:center; gap:6px;">
+    <button id="btn-login-topbar" onclick="abrirModalLogin()"
+      style="font-size:11px; padding:4px 8px; border-radius:5px; border:1px solid #60a5fa;
+             background:rgba(96,165,250,0.12); color:#60a5fa; cursor:pointer; white-space:nowrap;">
+      🔐 Iniciar sesión
+    </button>
+    <span id="user-label-topbar" style="display:none; font-size:11px; color:#22c55e; white-space:nowrap;
+      max-width:70px; overflow:hidden; text-overflow:ellipsis;" title=""></span>
     <button id="btn-logout-topbar" onclick="cerrarSesion()"
-      style="display:none; font-size:11px; padding:3px 8px; border-radius:5px; border:1px solid #6e7681;
+      style="display:none; font-size:10.5px; padding:3px 6px; border-radius:5px; border:1px solid #6e7681;
              background:transparent; color:#6e7681; cursor:pointer; white-space:nowrap;">
       Cerrar sesión
     </button>
