@@ -289,6 +289,10 @@ body{ display:flex; flex-direction:column; }
         Guardar como…
       </button>
       <div style="border-top:1px solid var(--border2);margin:4px 0;"></div>
+      <button class="file-menu-item" onclick="fileImportDXF()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Importar DXF / DWG…
+      </button>
       <button class="file-menu-item" onclick="exportDXF()">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Exportar a DXF…
@@ -4642,6 +4646,156 @@ function exportDXF() {
   if (entities.length === 0) { alert('No hay nada para exportar todavía.'); return; }
   const base = (currentFileName || 'dibujo').replace(/\.[^.]+$/, '');
   downloadTextFile(base + '.dxf', toDXF(), 'application/dxf');
+}
+
+/* ── Importar DXF (lee LINE, CIRCLE, ARC, LWPOLYLINE/POLYLINE, TEXT/MTEXT y capas) ──
+   DWG es un formato binario propietario de Autodesk: no se puede interpretar aquí,
+   así que si el usuario elige un .dwg se le indica que lo convierta a .dxf primero. */
+function ensureLayer(name, colorHex) {
+  const n = name || '0';
+  if (!layers.some(l => l.name === n)) layers.push({ name: n, color: colorHex || '#9aa4b2', ltype: 'continuous', lweight: 1.4, visible: true, locked: false });
+  else if (colorHex) getLayer(n).color = colorHex;
+}
+const DXF_ACI_HEX = { 1: '#ff5555', 2: '#f4d03f', 3: '#3fb950', 4: '#39c5cf', 5: '#58a6ff', 6: '#e066cc', 7: '#e6edf3', 8: '#5c6370', 9: '#9aa4b2' };
+function dxfAciToHex(aci) { if (!aci || aci === 256) return null; return DXF_ACI_HEX[aci] || '#9aa4b2'; }
+function dxfTokenize(text) {
+  const lines = text.split(/\r\n|\r|\n/);
+  const pairs = [];
+  for (let i = 0; i + 1 < lines.length; i += 2) {
+    const code = parseInt(lines[i].trim(), 10);
+    if (isNaN(code)) continue;
+    pairs.push({ code, value: lines[i + 1].trim() });
+  }
+  return pairs;
+}
+function dxfGroupRecords(pairs) {
+  const records = [];
+  let cur = null;
+  for (const { code, value } of pairs) {
+    if (code === 0) { cur = { type: value, fields: {} }; records.push(cur); }
+    else if (cur) { (cur.fields[code] || (cur.fields[code] = [])).push(value); }
+  }
+  return records;
+}
+function dxfF1(rec, code, def) { return rec.fields[code] ? rec.fields[code][0] : def; }
+function dxfNum(rec, code, idx, def) {
+  const arr = rec.fields[code];
+  if (!arr || arr[idx] === undefined) return def;
+  const v = parseFloat(arr[idx]);
+  return isNaN(v) ? def : v;
+}
+function parseDXF(text) {
+  const pairs = dxfTokenize(text);
+  if (pairs.length === 0) throw new Error('el archivo está vacío o no tiene el formato DXF esperado');
+  let scale = 1;
+  for (let i = 0; i < pairs.length - 1; i++) {
+    if (pairs[i].code === 9 && pairs[i].value === '$INSUNITS') {
+      const u = parseInt(pairs[i + 1].value, 10);
+      const m = { 1: 0.0254, 2: 0.3048, 3: 1609.34, 4: 0.001, 5: 0.01, 6: 1, 9: 0.0000254 };
+      scale = m[u] !== undefined ? m[u] : 1;
+      break;
+    }
+  }
+  const P = (x, y) => ({ x: x * scale, y: y * scale });
+  const records = dxfGroupRecords(pairs);
+  const newEntities = [];
+  const newLayers = [];
+  const unsupported = {};
+  let section = null;
+  for (let i = 0; i < records.length; i++) {
+    const rec = records[i];
+    if (rec.type === 'SECTION') { section = dxfF1(rec, 2, null); continue; }
+    if (rec.type === 'ENDSEC') { section = null; continue; }
+    if (rec.type === 'LAYER' && section === 'TABLES') {
+      const name = dxfF1(rec, 2, null);
+      if (name) newLayers.push({ name, color: dxfAciToHex(parseInt(dxfF1(rec, 62, '7'), 10)) });
+      continue;
+    }
+    if (section !== 'ENTITIES') continue;
+    const layer = dxfF1(rec, 8, '0');
+    const color = dxfAciToHex(rec.fields[62] ? parseInt(rec.fields[62][0], 10) : undefined);
+    if (rec.type === 'LINE') {
+      const p1 = P(dxfNum(rec, 10, 0, 0), dxfNum(rec, 20, 0, 0));
+      const p2 = P(dxfNum(rec, 11, 0, 0), dxfNum(rec, 21, 0, 0));
+      const e = { type: 'line', p1, p2, layer }; if (color) e.color = color;
+      newEntities.push(e);
+    } else if (rec.type === 'CIRCLE') {
+      const c = P(dxfNum(rec, 10, 0, 0), dxfNum(rec, 20, 0, 0));
+      const r = dxfNum(rec, 40, 0, 1) * scale;
+      const e = { type: 'circle', c, r, layer }; if (color) e.color = color;
+      newEntities.push(e);
+    } else if (rec.type === 'ARC') {
+      const c = P(dxfNum(rec, 10, 0, 0), dxfNum(rec, 20, 0, 0));
+      const r = dxfNum(rec, 40, 0, 1) * scale;
+      let a0 = normalizeAngle(dxfNum(rec, 50, 0, 0) * Math.PI / 180);
+      let a1 = normalizeAngle(dxfNum(rec, 51, 0, 0) * Math.PI / 180);
+      if (a1 <= a0) a1 += 2 * Math.PI;
+      const e = { type: 'arc', c, r, a0, a1, layer }; if (color) e.color = color;
+      newEntities.push(e);
+    } else if (rec.type === 'LWPOLYLINE') {
+      const xs = rec.fields[10] || [], ys = rec.fields[20] || [];
+      const pts = xs.map((x, idx) => P(parseFloat(x), parseFloat(ys[idx] || 0)));
+      const closed = (parseInt(dxfF1(rec, 70, '0'), 10) & 1) === 1;
+      if (pts.length >= 2) { const e = { type: 'polyline', pts, closed, layer }; if (color) e.color = color; newEntities.push(e); }
+    } else if (rec.type === 'POLYLINE') {
+      const closed = (parseInt(dxfF1(rec, 70, '0'), 10) & 1) === 1;
+      const pts = [];
+      let j = i + 1;
+      while (j < records.length && records[j].type === 'VERTEX') { pts.push(P(dxfNum(records[j], 10, 0, 0), dxfNum(records[j], 20, 0, 0))); j++; }
+      if (j < records.length && records[j].type === 'SEQEND') j++;
+      i = j - 1;
+      if (pts.length >= 2) { const e = { type: 'polyline', pts, closed, layer }; if (color) e.color = color; newEntities.push(e); }
+    } else if (rec.type === 'TEXT') {
+      const p = P(dxfNum(rec, 10, 0, 0), dxfNum(rec, 20, 0, 0));
+      const h = Math.max(0.01, dxfNum(rec, 40, 0, 0.25) * scale);
+      const str = dxfF1(rec, 1, '');
+      if (str) { const e = { type: 'text', p, str, h, layer }; if (color) e.color = color; newEntities.push(e); }
+    } else if (rec.type === 'MTEXT') {
+      const p = P(dxfNum(rec, 10, 0, 0), dxfNum(rec, 20, 0, 0));
+      const h = Math.max(0.01, dxfNum(rec, 40, 0, 0.25) * scale);
+      let str = (rec.fields[3] || []).join('') + (dxfF1(rec, 1, '') || '');
+      str = str.replace(/\\P/gi, '\n').replace(/\\p[^;]*;/gi, '').replace(/\\[A-Za-z][^;\\]*;/g, '').replace(/[{}]/g, '');
+      if (str) { const e = { type: 'text', p, str, h, layer }; if (color) e.color = color; newEntities.push(e); }
+    } else if (rec.type !== 'VERTEX' && rec.type !== 'SEQEND' && rec.type !== 'ENDTAB' && rec.type !== 'TABLE' && rec.type !== 'EOF') {
+      unsupported[rec.type] = (unsupported[rec.type] || 0) + 1;
+    }
+  }
+  return { entities: newEntities, layers: newLayers, unsupported };
+}
+function importDXFText(text, name) {
+  let result;
+  try { result = parseDXF(text); }
+  catch (err) { alert('No se pudo interpretar "' + name + '": ' + err.message); return; }
+  if (result.entities.length === 0) { alert('No se encontraron entidades compatibles en "' + name + '".'); return; }
+  result.layers.forEach(l => ensureLayer(l.name, l.color));
+  result.entities.forEach(e => ensureLayer(e.layer, null));
+  entities.push(...result.entities);
+  pushHistory();
+  fitView();
+  draw();
+  const unsupportedList = Object.entries(result.unsupported);
+  let msg = 'Se importaron ' + result.entities.length + ' entidades desde "' + name + '".';
+  if (unsupportedList.length) msg += '\nSe omitieron tipos no compatibles: ' + unsupportedList.map(([t, n]) => t + ' (' + n + ')').join(', ') + '.';
+  alert(msg);
+}
+function fileImportDXF() {
+  closeFileMenu();
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.dxf,.dwg';
+  input.onchange = () => {
+    const f = input.files[0];
+    if (!f) return;
+    if (/\.dwg$/i.test(f.name)) {
+      alert('Los archivos .DWG usan un formato binario propietario de Autodesk que no se puede leer directamente aquí.\n\nConviértelo primero a .DXF (en AutoCAD/LibreCAD/QCAD usa "Guardar como… DXF", o usa el conversor gratuito ODA File Converter) y luego importa ese .dxf.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => importDXFText(reader.result, f.name);
+    reader.onerror = () => alert('No se pudo leer el archivo.');
+    reader.readAsText(f);
+  };
+  input.click();
 }
 
 /* ════════════════════════════════════════════════
