@@ -97,6 +97,13 @@ body{ display:flex; flex-direction:column; }
 .theme-swatch{ width:21px; height:21px; border-radius:5px; border:2px solid; flex-shrink:0; display:inline-block; }
 #theme-menu-panel .file-menu-item.active-theme{ background:var(--accent-dim); }
 
+/* ── Menú "Propiedades" (coordenadas/dimensiones del objeto seleccionado) ── */
+.file-menu-wrap .props-panel{ min-width:260px; max-width:300px; }
+.props-panel .size-row{ padding:5px 10px; }
+.props-panel .size-input{ width:78px; }
+.props-panel .prop-readonly{ padding:4px 10px 6px; font-size:11px; color:var(--muted); line-height:1.5; }
+.props-panel .prop-empty{ padding:8px 10px; font-size:12px; color:var(--muted); line-height:1.5; }
+
 /* ── Menú "Tamaños" (tamaño de texto de etiquetas y cotas) ── */
 .size-panel{ min-width:250px; }
 .size-row{ padding:6px 10px 10px; }
@@ -414,6 +421,17 @@ body{ display:flex; flex-direction:column; }
       <div style="padding:2px 10px 4px;font-size:10px;color:var(--muted);line-height:1.4;">
         Cambia el fondo y el color por defecto de la capa "0". Las capas con color propio no se ven afectadas.
       </div>
+    </div>
+  </div>
+
+  <div class="file-menu-wrap" id="props-menu-wrap" style="margin-left:8px;">
+    <button class="mt-btn" onclick="togglePropertiesMenu(event)" title="Propiedades del objeto seleccionado — coordenadas, radio, ángulos, etc.">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+      Propiedades
+    </button>
+    <div class="mt-panel props-panel" id="props-menu-panel">
+      <div class="mt-hd">PROPIEDADES</div>
+      <div id="props-panel-body"></div>
     </div>
   </div>
 
@@ -2878,6 +2896,16 @@ function draw() {
   drawMeasurePreview();
   drawMeasureResult();
   drawMarquee();
+  refreshPropertiesPanelIfOpen();
+}
+let lastPropsSig = null;
+function refreshPropertiesPanelIfOpen() {
+  const panel = document.getElementById('props-menu-panel');
+  if (!panel || panel.style.display !== 'block') return;
+  const sig = [...selected].sort((a, b) => a - b).join(',');
+  if (sig === lastPropsSig) return;
+  lastPropsSig = sig;
+  updatePropertiesPanel();
 }
 
 /* ════════════════════════════════════════════════
@@ -4086,6 +4114,148 @@ function updateThemeMenuHighlight() {
 /* ── Menú "Capas" — administrar capas y propiedades (color/tipo de línea/grosor) de la selección ── */
 function escAttr(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function escJs(s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+
+/* ── Menú "Propiedades" — coordenadas/dimensiones del objeto seleccionado (línea, rectángulo, círculo, arco, texto…) ── */
+const PROP_TYPE_LABEL = {
+  line: 'Línea', rect: 'Rectángulo', circle: 'Círculo', arc: 'Arco', polyline: 'Polilínea', text: 'Texto',
+  'dim-linear': 'Cota lineal', 'dim-aligned': 'Cota alineada', 'dim-angular': 'Cota angular',
+  'dim-arclength': 'Cota longitud de arco', 'dim-radius': 'Cota de radio', 'dim-diameter': 'Cota de diámetro',
+};
+function togglePropertiesMenu(e) {
+  e.stopPropagation();
+  const p = document.getElementById('props-menu-panel');
+  if (p.style.display === 'block') { p.style.display = 'none'; return; }
+  updatePropertiesPanel();
+  lastPropsSig = [...selected].sort((a, b) => a - b).join(',');
+  p.style.display = 'block';
+}
+function closePropertiesMenu() { document.getElementById('props-menu-panel').style.display = 'none'; }
+document.addEventListener('click', () => closePropertiesMenu());
+document.getElementById('props-menu-panel').addEventListener('click', e => e.stopPropagation());
+
+function propNum(v) { return (Math.round(v * 1000) / 1000).toString(); }
+function propFieldsHTML(e) {
+  if (e.type === 'line' || e.type === 'rect') {
+    const lenInfo = e.type === 'line'
+      ? 'Longitud: ' + propNum(dist(e.p1, e.p2)) + ' m &nbsp;·&nbsp; Ángulo: ' + propNum(normalizeAngle(Math.atan2(e.p2.y - e.p1.y, e.p2.x - e.p1.x)) * 180 / Math.PI) + '°'
+      : 'Ancho: ' + propNum(Math.abs(e.p2.x - e.p1.x)) + ' m &nbsp;·&nbsp; Alto: ' + propNum(Math.abs(e.p2.y - e.p1.y)) + ' m &nbsp;·&nbsp; Área: ' + propNum(Math.abs((e.p2.x - e.p1.x) * (e.p2.y - e.p1.y))) + ' m²';
+    return '' +
+      '<div class="size-row"><label>Punto ' + (e.type === 'line' ? 'inicial' : '1') + ' (X, Y)</label><div class="size-input-row">' +
+        '<input type="number" class="size-input" id="pf-x1" step="0.01" value="' + propNum(e.p1.x) + '">' +
+        '<input type="number" class="size-input" id="pf-y1" step="0.01" value="' + propNum(e.p1.y) + '">' +
+      '</div></div>' +
+      '<div class="size-row"><label>Punto ' + (e.type === 'line' ? 'final' : '2') + ' (X, Y)</label><div class="size-input-row">' +
+        '<input type="number" class="size-input" id="pf-x2" step="0.01" value="' + propNum(e.p2.x) + '">' +
+        '<input type="number" class="size-input" id="pf-y2" step="0.01" value="' + propNum(e.p2.y) + '">' +
+      '</div></div>' +
+      '<div class="prop-readonly">' + lenInfo + '</div>' +
+      '<button class="size-apply-btn" style="margin:2px 10px 8px;width:calc(100% - 20px);" onclick="applyEntityProperties()">Aplicar</button>';
+  }
+  if (e.type === 'circle') {
+    return '' +
+      '<div class="size-row"><label>Centro (X, Y)</label><div class="size-input-row">' +
+        '<input type="number" class="size-input" id="pf-cx" step="0.01" value="' + propNum(e.c.x) + '">' +
+        '<input type="number" class="size-input" id="pf-cy" step="0.01" value="' + propNum(e.c.y) + '">' +
+      '</div></div>' +
+      '<div class="size-row"><label>Radio</label><div class="size-input-row">' +
+        '<input type="number" class="size-input" id="pf-r" step="0.01" min="0.001" value="' + propNum(e.r) + '">' +
+        '<span style="font-size:11px;color:var(--muted);">m</span>' +
+      '</div></div>' +
+      '<div class="prop-readonly">Diámetro: ' + propNum(e.r * 2) + ' m &nbsp;·&nbsp; Área: ' + propNum(Math.PI * e.r * e.r) + ' m² &nbsp;·&nbsp; Circunferencia: ' + propNum(2 * Math.PI * e.r) + ' m</div>' +
+      '<button class="size-apply-btn" style="margin:2px 10px 8px;width:calc(100% - 20px);" onclick="applyEntityProperties()">Aplicar</button>';
+  }
+  if (e.type === 'arc') {
+    return '' +
+      '<div class="size-row"><label>Centro (X, Y)</label><div class="size-input-row">' +
+        '<input type="number" class="size-input" id="pf-cx" step="0.01" value="' + propNum(e.c.x) + '">' +
+        '<input type="number" class="size-input" id="pf-cy" step="0.01" value="' + propNum(e.c.y) + '">' +
+      '</div></div>' +
+      '<div class="size-row"><label>Radio</label><div class="size-input-row">' +
+        '<input type="number" class="size-input" id="pf-r" step="0.01" min="0.001" value="' + propNum(e.r) + '">' +
+        '<span style="font-size:11px;color:var(--muted);">m</span>' +
+      '</div></div>' +
+      '<div class="size-row"><label>Ángulo inicial / final (°)</label><div class="size-input-row">' +
+        '<input type="number" class="size-input" id="pf-a0" step="1" value="' + propNum(e.a0 * 180 / Math.PI) + '">' +
+        '<input type="number" class="size-input" id="pf-a1" step="1" value="' + propNum(e.a1 * 180 / Math.PI) + '">' +
+      '</div></div>' +
+      '<div class="prop-readonly">Longitud de arco: ' + propNum(e.r * (e.a1 - e.a0)) + ' m</div>' +
+      '<button class="size-apply-btn" style="margin:2px 10px 8px;width:calc(100% - 20px);" onclick="applyEntityProperties()">Aplicar</button>';
+  }
+  if (e.type === 'text') {
+    return '' +
+      '<div class="size-row"><label>Contenido</label>' +
+        '<input type="text" class="size-input" id="pf-str" style="width:100%;" value="' + escAttr(e.str) + '">' +
+      '</div>' +
+      '<div class="size-row"><label>Posición (X, Y)</label><div class="size-input-row">' +
+        '<input type="number" class="size-input" id="pf-x" step="0.01" value="' + propNum(e.p.x) + '">' +
+        '<input type="number" class="size-input" id="pf-y" step="0.01" value="' + propNum(e.p.y) + '">' +
+      '</div></div>' +
+      '<div class="size-row"><label>Altura de texto</label><div class="size-input-row">' +
+        '<input type="number" class="size-input" id="pf-h" step="0.01" min="0.01" value="' + propNum(e.h) + '">' +
+        '<span style="font-size:11px;color:var(--muted);">m</span>' +
+      '</div></div>' +
+      '<button class="size-apply-btn" style="margin:2px 10px 8px;width:calc(100% - 20px);" onclick="applyEntityProperties()">Aplicar</button>';
+  }
+  if (e.type === 'polyline') {
+    return '<div class="prop-readonly">Vértices: ' + e.pts.length + ' &nbsp;·&nbsp; ' + (e.closed ? 'Cerrada' : 'Abierta') +
+      (e.closed ? ' &nbsp;·&nbsp; Perímetro: ' + propNum(polygonPerimeter(e.pts, true)) + ' m &nbsp;·&nbsp; Área: ' + propNum(polygonArea(e.pts)) + ' m²' : ' &nbsp;·&nbsp; Longitud: ' + propNum(polygonPerimeter(e.pts, false)) + ' m') +
+      '<br><span style="opacity:.7;">Edita sus vértices arrastrándolos o usando las herramientas de dibujo.</span></div>';
+  }
+  const ap = entityAreaPerimeter(e);
+  return '<div class="prop-readonly">Esta es una anotación — sus valores se calculan de la geometría que mide.' + (ap ? '' : '') + '<br><span style="opacity:.7;">Selecciónala y bórrala/vuelve a crearla para cambiarla.</span></div>';
+}
+function updatePropertiesPanel() {
+  const body = document.getElementById('props-panel-body');
+  if (selected.size === 0) {
+    body.innerHTML = '<div class="prop-empty">Selecciona un objeto para ver y editar sus propiedades.</div>';
+    return;
+  }
+  if (selected.size > 1) {
+    const counts = {};
+    selected.forEach(i => { const e = entities[i]; if (!e) return; const label = PROP_TYPE_LABEL[e.type] || e.type; counts[label] = (counts[label] || 0) + 1; });
+    const summary = Object.entries(counts).map(([label, n]) => label + ' × ' + n).join(', ');
+    body.innerHTML = '<div class="prop-empty">' + selected.size + ' objetos seleccionados<br>' + summary + '<br><br>Selecciona un solo objeto para editar sus propiedades.</div>';
+    return;
+  }
+  const idx = [...selected][0];
+  const e = entities[idx];
+  if (!e) { body.innerHTML = ''; return; }
+  body.innerHTML = '<div class="prop-readonly" style="padding-top:6px;font-weight:600;color:var(--text);">' + (PROP_TYPE_LABEL[e.type] || e.type) + '</div>' + propFieldsHTML(e);
+}
+function applyEntityProperties() {
+  if (selected.size !== 1) return;
+  const idx = [...selected][0];
+  const e = entities[idx];
+  if (!e) return;
+  const num = (id) => { const el = document.getElementById(id); return el ? parseFloat(el.value) : NaN; };
+  if (e.type === 'line' || e.type === 'rect') {
+    const x1 = num('pf-x1'), y1 = num('pf-y1'), x2 = num('pf-x2'), y2 = num('pf-y2');
+    if ([x1, y1, x2, y2].some(isNaN)) return;
+    e.p1 = { x: x1, y: y1 }; e.p2 = { x: x2, y: y2 };
+  } else if (e.type === 'circle') {
+    const cx = num('pf-cx'), cy = num('pf-cy'), rr = num('pf-r');
+    if ([cx, cy, rr].some(isNaN) || rr <= 0) return;
+    e.c = { x: cx, y: cy }; e.r = rr;
+  } else if (e.type === 'arc') {
+    const cx = num('pf-cx'), cy = num('pf-cy'), rr = num('pf-r');
+    let a0 = num('pf-a0'), a1 = num('pf-a1');
+    if ([cx, cy, rr, a0, a1].some(isNaN) || rr <= 0) return;
+    a0 = (a0 * Math.PI / 180); a1 = (a1 * Math.PI / 180);
+    a0 = normalizeAngle(a0);
+    if (a1 <= a0) a1 += 2 * Math.PI;
+    e.c = { x: cx, y: cy }; e.r = rr; e.a0 = a0; e.a1 = a1;
+  } else if (e.type === 'text') {
+    const x = num('pf-x'), y = num('pf-y'), h = num('pf-h');
+    const strEl = document.getElementById('pf-str');
+    if ([x, y, h].some(isNaN) || h <= 0 || !strEl) return;
+    e.p = { x, y }; e.h = h; e.str = strEl.value;
+  } else {
+    return;
+  }
+  pushHistory();
+  updatePropertiesPanel();
+  draw();
+}
 
 function toggleLayersMenu(e) {
   e.stopPropagation();
