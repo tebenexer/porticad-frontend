@@ -108,6 +108,8 @@
     .btn-primary:hover { background: var(--primary-dark); }
     .btn-ghost { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
     .btn-ghost:hover { background: #e2e8f0; }
+    .btn-danger { background: var(--danger-light); color: var(--danger); }
+    .btn-danger:hover { background: var(--danger); color: #fff; }
     .btn-sm { padding: 5px 10px; font-size: 0.76rem; }
 
     /* CALC BAR */
@@ -185,6 +187,7 @@
 <div class="tabs-nav">
   <button class="tab-btn active" onclick="openTab(event,'tab-calc')">🧱 Calculadora</button>
   <button class="tab-btn" onclick="openTab(event,'tab-precios')">⚙ Precios de Insumos</button>
+  <button class="tab-btn" onclick="openTab(event,'tab-historial')">📈 Historial de Precios</button>
 </div>
 
 <div class="container">
@@ -239,6 +242,23 @@
     </div>
   </div>
 
+  <!-- ═══════════════ TAB: HISTORIAL DE PRECIOS ═══════════════ -->
+  <div id="tab-historial" class="tab-content">
+    <div class="card">
+      <div class="card-header">📈 Historial de Cambios de Precios</div>
+      <div class="card-body">
+        <p style="font-size:0.83rem;color:var(--muted);margin-bottom:16px;">
+          Cada vez que modificas un precio en la pestaña "Precios de Insumos" (o lo restableces), se guarda un registro con la fecha, el insumo, el precio anterior y el nuevo. Este historial se guarda en tu navegador (localStorage).
+        </p>
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+          <button class="btn btn-ghost btn-sm" onclick="exportHistorialCSV()">⬇ Exportar CSV</button>
+          <button class="btn btn-danger btn-sm" onclick="limpiarHistorial()">✕ Borrar historial</button>
+        </div>
+        <div id="historialWrap"></div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <div class="toast" id="toast"></div>
@@ -286,6 +306,7 @@ const DEFAULT_PRICES = {
 };
 
 const LS_KEY = 'porticad_materiales_muros_prices';
+const HISTORY_LS_KEY = 'porticad_materiales_muros_price_history';
 
 // ── Precios: almacenamiento ───────────────────────────────────────────────────
 
@@ -325,20 +346,120 @@ function buildPricesGrid() {
 function onPriceChange(inp) {
   const key = inp.dataset.key;
   const prices = getPrices();
-  prices[key] = parseFloat(inp.value) || 0;
+  const oldValue = prices[key];
+  const newValue = parseFloat(inp.value) || 0;
+  if (newValue !== oldValue) registrarCambioPrecio(key, oldValue, newValue, 'Edición manual');
+  prices[key] = newValue;
   savePrices(prices);
   const item = document.getElementById(`price-item-${key}`);
   if (item) item.classList.toggle('price-changed', prices[key] !== DEFAULT_PRICES[key].value);
   toast('Precio guardado.');
+  buildHistorialTable();
   calcular();
 }
 
 function resetPrecios() {
   if (!confirm('¿Restablecer todos los precios por defecto?')) return;
+  const current = getPrices();
+  for (const key in DEFAULT_PRICES) {
+    const def = DEFAULT_PRICES[key].value;
+    if (current[key] !== def) registrarCambioPrecio(key, current[key], def, 'Restablecido a valor por defecto');
+  }
   localStorage.removeItem(LS_KEY);
   buildPricesGrid();
+  buildHistorialTable();
   toast('Precios restablecidos.');
   calcular();
+}
+
+// ── Historial de precios ──────────────────────────────────────────────────────
+
+function getHistorial() {
+  return JSON.parse(localStorage.getItem(HISTORY_LS_KEY) || '[]');
+}
+
+function saveHistorial(hist) {
+  localStorage.setItem(HISTORY_LS_KEY, JSON.stringify(hist));
+}
+
+function registrarCambioPrecio(key, oldValue, newValue, motivo) {
+  const hist = getHistorial();
+  hist.push({
+    fecha: new Date().toISOString(),
+    key,
+    label: DEFAULT_PRICES[key] ? DEFAULT_PRICES[key].label : key,
+    unit: DEFAULT_PRICES[key] ? DEFAULT_PRICES[key].unit : '',
+    anterior: oldValue,
+    nuevo: newValue,
+    motivo
+  });
+  saveHistorial(hist);
+}
+
+function buildHistorialTable() {
+  const wrap = document.getElementById('historialWrap');
+  if (!wrap) return;
+  const hist = getHistorial().slice().sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  if (hist.length === 0) {
+    wrap.innerHTML = '<p class="empty-state">Todavía no se ha registrado ningún cambio de precio.</p>';
+    return;
+  }
+  const money = (n) => 'RD$' + n.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  let html = `<table class="result-table"><thead><tr>
+    <th>Fecha</th><th>Insumo</th><th>Precio anterior</th><th>Precio nuevo</th><th>Variación</th><th>Motivo</th>
+  </tr></thead><tbody>`;
+  hist.forEach(h => {
+    const fecha = new Date(h.fecha).toLocaleString('es-DO', { dateStyle: 'medium', timeStyle: 'short' });
+    const diff = h.nuevo - h.anterior;
+    const pct = h.anterior !== 0 ? (diff / h.anterior * 100) : 0;
+    const sign = diff >= 0 ? '+' : '';
+    const color = diff > 0 ? 'var(--danger)' : (diff < 0 ? 'var(--accent-dark)' : 'var(--muted)');
+    html += `<tr>
+      <td>${fecha}</td>
+      <td>${h.label}</td>
+      <td>${money(h.anterior)}</td>
+      <td>${money(h.nuevo)}</td>
+      <td style="color:${color};font-weight:700;">${sign}${money(diff)} (${sign}${pct.toFixed(1)}%)</td>
+      <td>${h.motivo || ''}</td>
+    </tr>`;
+  });
+  html += `</tbody></table>`;
+  wrap.innerHTML = html;
+}
+
+function limpiarHistorial() {
+  if (!confirm('¿Borrar todo el historial de cambios de precios? Esta acción no se puede deshacer.')) return;
+  localStorage.removeItem(HISTORY_LS_KEY);
+  buildHistorialTable();
+  toast('Historial borrado.');
+}
+
+function exportHistorialCSV() {
+  const hist = getHistorial().slice().sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  if (hist.length === 0) { toast('No hay historial para exportar.'); return; }
+  let csv = 'Fecha,Insumo,Unidad,Precio anterior,Precio nuevo,Variacion (%),Motivo\n';
+  hist.forEach(h => {
+    const pct = h.anterior !== 0 ? ((h.nuevo - h.anterior) / h.anterior * 100) : 0;
+    const row = [
+      new Date(h.fecha).toLocaleString('es-DO'),
+      `"${h.label}"`,
+      h.unit || '',
+      h.anterior.toFixed(2),
+      h.nuevo.toFixed(2),
+      pct.toFixed(1),
+      `"${h.motivo || ''}"`
+    ].join(',');
+    csv += row + '\n';
+  });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `historial_precios_materiales_muros_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // ── Sincronización área ⇄ bloques ─────────────────────────────────────────────
@@ -548,6 +669,7 @@ function toast(msg) {
 
 window.addEventListener('DOMContentLoaded', () => {
   buildPricesGrid();
+  buildHistorialTable();
 });
 </script>
 </body>
