@@ -355,6 +355,24 @@
   }
   .statusbar span b { color: var(--text); font-weight: 600; }
 
+  /* ── Tooltip flotante junto al cursor (data-tip) ────────── */
+  #hover-tooltip {
+    position: fixed;
+    z-index: 10000;
+    display: none;
+    pointer-events: none;
+    max-width: 260px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: #1c1e22;
+    color: #f0f1f3;
+    font-size: 12px;
+    line-height: 1.4;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.28);
+    border: 1px solid #3a3f47;
+  }
+
   /* ── Result toggles ───────────────────────────────────── */
   .rtoggle {
     display: flex; align-items: center; gap: 8px;
@@ -2569,6 +2587,8 @@ _fbAuth.onAuthStateChanged(user => {
     <span id="st-msg">Listo</span>
   </span>
 </div>
+
+<div id="hover-tooltip"></div>
 
 <script>
 // ═══════════════════════════════════════════════════════
@@ -10207,17 +10227,40 @@ function aplicarComboACargas(cargasOrig, cargasDistOrig) {
 // ═══════════════════════════════════════════════════════
 (function() {
   let prevMsg = '', showing = false;
+  const tipEl = document.getElementById('hover-tooltip');
+
+  function positionTip(x, y) {
+    if (!tipEl) return;
+    const pad = 16;
+    const rect = tipEl.getBoundingClientRect();
+    let left = x + pad;
+    let top  = y + pad;
+    if (left + rect.width  > window.innerWidth  - 4) left = x - rect.width  - pad;
+    if (top  + rect.height > window.innerHeight - 4) top  = y - rect.height - pad;
+    tipEl.style.left = left + 'px';
+    tipEl.style.top  = top  + 'px';
+  }
+
   document.addEventListener('mouseover', e => {
     const el = e.target.closest('[data-tip]');
     if (!el) return;
     const txt = el.getAttribute('data-tip');
     if (!txt) return;
     const msgEl = document.getElementById('st-msg');
-    if (!msgEl) return;
-    if (!showing) prevMsg = msgEl.textContent;
-    msgEl.textContent = '💡 ' + txt;
-    msgEl.style.color = '#60a5fa';
+    if (msgEl) {
+      if (!showing) prevMsg = msgEl.textContent;
+      msgEl.textContent = '💡 ' + txt;
+      msgEl.style.color = '#60a5fa';
+    }
     showing = true;
+    if (tipEl) {
+      tipEl.textContent = txt;
+      tipEl.style.display = 'block';
+      positionTip(e.clientX, e.clientY);
+    }
+  });
+  document.addEventListener('mousemove', e => {
+    if (showing) positionTip(e.clientX, e.clientY);
   });
   document.addEventListener('mouseout', e => {
     if (!showing) return;
@@ -10225,10 +10268,12 @@ function aplicarComboACargas(cargasOrig, cargasDistOrig) {
     if (!el) return;
     if (e.relatedTarget && el.contains(e.relatedTarget)) return;
     const msgEl = document.getElementById('st-msg');
-    if (!msgEl) return;
-    msgEl.textContent = prevMsg;
-    msgEl.style.color = '';
+    if (msgEl) {
+      msgEl.textContent = prevMsg;
+      msgEl.style.color = '';
+    }
     showing = false;
+    if (tipEl) tipEl.style.display = 'none';
   });
 })();
 
