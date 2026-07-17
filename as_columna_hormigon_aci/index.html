@@ -12,7 +12,7 @@
       background: #0d1117;
       color: #e6edf3;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 13px;
+      font-size: 15px;
       min-height: 100vh;
       overflow: hidden;
     }
@@ -21,25 +21,29 @@
     .topbar {
       background: #161b22;
       border-bottom: 1px solid #30363d;
-      height: 44px;
+      height: 50px;
       display: flex;
       align-items: center;
       padding: 0 16px;
       gap: 8px;
       position: sticky; top: 0; z-index: 100;
     }
-    .topbar-logo { font-size: 14px; font-weight: 700; color: #58a6ff; text-decoration: none; }
-    .topbar-sep  { color: #30363d; font-size: 16px; }
-    .topbar-crumb { font-size: 12px; color: #8b949e; display: flex; align-items: center; gap: 6px; }
-    .topbar-title { font-size: 13px; font-weight: 600; color: #e6edf3; }
+    .topbar-logo { font-size: 16px; font-weight: 700; color: #58a6ff; text-decoration: none; }
+    .topbar-sep  { color: #30363d; font-size: 18px; }
+    .topbar-crumb { font-size: 14px; color: #8b949e; display: flex; align-items: center; gap: 6px; }
+    .topbar-title { font-size: 15px; font-weight: 600; color: #e6edf3; }
     .badge { background: #1f6feb22; border: 1px solid #1f6feb55; color: #58a6ff;
-             font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; }
+             font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
 
     /* ── Layout ── */
     .main {
       display: grid;
-      grid-template-columns: 400px 1fr;
-      height: calc(100vh - 44px);
+      grid-template-columns: 430px 1fr;
+      height: calc(100vh - 50px);
+      transition: grid-template-columns .22s ease;
+    }
+    .main.inputs-collapsed {
+      grid-template-columns: 0px 1fr;
     }
 
     /* ── Inputs ── */
@@ -47,11 +51,42 @@
       background: #161b22;
       border-right: 1px solid #21262d;
       overflow-y: auto;
+      overflow-x: hidden;
+      min-width: 0;
       padding: 16px;
       display: flex;
       flex-direction: column;
       gap: 14px;
     }
+    .main.inputs-collapsed .panel-inputs {
+      padding: 16px 0;
+      border-right: none;
+    }
+
+    /* Pestaña para ocultar/mostrar el panel de datos (desktop) */
+    #inputs-toggle-tab {
+      position: fixed;
+      top: 50%;
+      left: 430px;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 60px;
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-left: none;
+      border-radius: 0 8px 8px 0;
+      color: #8b949e;
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 60;
+      transition: left .22s ease, background .15s, color .15s, border-color .15s;
+    }
+    #inputs-toggle-tab:hover { background: #1c2128; color: #58a6ff; border-color: #58a6ff55; }
+    .main.inputs-collapsed #inputs-toggle-tab { left: 0px; }
 
     /* Grupos de inputs con card leve */
     .input-group {
@@ -65,22 +100,34 @@
     }
 
     .sec-title {
-      font-size: 11px; font-weight: 700; color: #58a6ff;
+      font-size: 13px; font-weight: 700; color: #58a6ff;
       letter-spacing: .6px; text-transform: uppercase;
       padding-bottom: 8px; border-bottom: 1px solid #21262d;
       display: flex; align-items: center; gap: 6px;
     }
     .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .field { display: flex; flex-direction: column; gap: 5px; }
-    .field label { font-size: 13px; color: #8b949e; font-weight: 500; }
-    .field label em { font-style: normal; color: #6e7681; font-size: 11px; }
+    .field label { font-size: 15px; color: #8b949e; font-weight: 500; }
+    .field label em { font-style: normal; color: #6e7681; font-size: 13px; }
     .field input, .field select {
       background: #161b22; border: 1px solid #30363d; border-radius: 7px;
-      color: #e6edf3; font-size: 14px; padding: 8px 11px; width: 100%;
+      color: #e6edf3; font-size: 16px; padding: 9px 11px; width: 100%;
       outline: none; transition: border-color .15s;
     }
     .field input:focus, .field select:focus { border-color: #58a6ff; box-shadow: 0 0 0 3px #1f6feb22; }
     .field select option { background: #161b22; }
+
+    /* Fila de campo: etiqueta a la izquierda, entry a la derecha (misma columna) */
+    .field-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .field-row label { font-size: 15px; color: #8b949e; font-weight: 500; }
+    .field-row label em { font-style: normal; color: #6e7681; font-size: 13px; }
+    .field-row input, .field-row select {
+      background: #161b22; border: 1px solid #30363d; border-radius: 7px;
+      color: #e6edf3; font-size: 16px; padding: 9px 11px;
+      width: 175px; flex-shrink: 0; outline: none; transition: border-color .15s;
+    }
+    .field-row input:focus, .field-row select:focus { border-color: #58a6ff; box-shadow: 0 0 0 3px #1f6feb22; }
+    .field-row select option { background: #161b22; }
 
     /* Wrapper del cuerpo de inputs — flex column con gap en desktop */
     #as-inputs-body {
@@ -91,14 +138,14 @@
 
     .toggle-group { display: flex; gap: 4px; background: #0d1117;
                     border: 1px solid #21262d; border-radius: 7px; padding: 4px; width: fit-content; }
-    .tgbtn { background: none; border: none; color: #8b949e; font-size: 12px;
-              font-weight: 600; padding: 5px 12px; border-radius: 5px; cursor: pointer; transition: all .15s; }
+    .tgbtn { background: none; border: none; color: #8b949e; font-size: 14px;
+              font-weight: 600; padding: 6px 13px; border-radius: 5px; cursor: pointer; transition: all .15s; }
     .tgbtn.active { background: #21262d; color: #e6edf3; }
 
     /* Indicador de cálculo */
     .calc-status {
       display: flex; align-items: center; gap: 6px;
-      font-size: 11px; color: #6e7681;
+      font-size: 13px; color: #6e7681;
     }
     .calc-dot { width: 7px; height: 7px; border-radius: 50%; background: #6e7681; transition: all .3s; }
     .calc-dot.ok   { background: #3fb950; }
@@ -109,52 +156,55 @@
     /* ── Panel results ── */
     .panel-results {
       display: grid;
-      grid-template-rows: auto 1fr;
+      grid-template-rows: 1fr;
       overflow: hidden;
     }
 
-    /* Summary strip */
-    .summary-strip {
-      background: #161b22;
-      border-bottom: 1px solid #21262d;
-      padding: 10px 16px;
+    /* Columna de métricas (As, ρ, φPn, φMn, φ, εt) — entre el gráfico y las combinaciones */
+    .metrics-col {
+      overflow-y: auto;
+      padding: 14px;
       display: flex;
+      flex-direction: column;
       gap: 10px;
-      flex-wrap: wrap;
-      align-items: center;
+      border-right: 1px solid #21262d;
     }
-    .scard {
+    .mcard {
+      background: #1f6feb14;
+      border: 1px solid #1f6feb40;
+      border-left: 3px solid #58a6ff;
+      border-radius: 10px;
+      padding: 10px 12px 10px 11px;
       display: flex; flex-direction: column; gap: 1px;
-      min-width: 96px;
     }
-    .scard-lbl { font-size: 9px; font-weight: 700; color: #8b949e; letter-spacing: .5px; text-transform: uppercase; }
-    .scard-val { font-size: 18px; font-weight: 700; color: #e6edf3; line-height: 1; }
+    .scard-lbl { font-size: 11px; font-weight: 700; color: #8b949e; letter-spacing: .5px; text-transform: uppercase; }
+    .scard-val { font-size: 21px; font-weight: 700; color: #e6edf3; line-height: 1.2; }
     .scard-val.ok   { color: #3fb950; }
     .scard-val.warn { color: #d29922; }
     .scard-val.err  { color: #f85149; }
-    .scard-unit { font-size: 10px; color: #6e7681; }
-    .strip-sep { width: 1px; height: 52px; background: #21262d; margin: 0 4px; }
+    .scard-unit { font-size: 12px; color: #6e7681; }
 
-    /* Fila del combo seleccionado en cada scard */
+    /* Fila del combo seleccionado en cada mcard */
     .scard-prov {
-      font-size: 12px; font-weight: 700; color: #30363d;
-      line-height: 1; margin-top: 1px;
+      font-size: 14px; font-weight: 700; color: #30363d;
+      line-height: 1.2; margin-top: 1px;
       display: flex; align-items: center; gap: 3px;
     }
     .scard-prov.ok   { color: #3fb950; }
     .scard-prov.err  { color: #f85149; }
     .scard-prov.warn { color: #d29922; }
 
-    /* Content area — viz primero (izq), combos al fondo (der) */
+    /* Content area — viz, métricas, combos */
     .content-area {
       display: grid;
-      grid-template-columns: 460px 1fr;
-      overflow: hidden;
+      grid-template-columns: 410px 220px minmax(380px, 1fr);
+      overflow: auto;
     }
 
     /* Combinations table — ahora a la derecha */
     .combos-panel {
       overflow-y: auto;
+      overflow-x: auto;
       border-left: 1px solid #21262d;
     }
     .combos-header {
@@ -168,27 +218,27 @@
       flex-wrap: wrap;
     }
     .combos-header-title {
-      font-size: 11px; font-weight: 700; color: #8b949e;
+      font-size: 13px; font-weight: 700; color: #8b949e;
       letter-spacing: .5px; text-transform: uppercase;
       flex: 1;
     }
 
-    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
     th {
       position: sticky; top: 0;
       background: #0d1117;
-      color: #8b949e; font-weight: 600; font-size: 11px;
-      padding: 7px 12px; text-align: left;
+      color: #8b949e; font-weight: 600; font-size: 13px;
+      padding: 8px 12px; text-align: left;
       border-bottom: 1px solid #21262d;
       white-space: nowrap;
     }
-    td { padding: 7px 12px; border-bottom: 1px solid #161b22; color: #e6edf3; white-space: nowrap; }
+    td { padding: 8px 12px; border-bottom: 1px solid #161b22; color: #e6edf3; white-space: nowrap; }
     tr.combo-row { cursor: pointer; transition: background .1s; }
     tr.combo-row:hover td { background: #1c2128; }
     tr.combo-row.selected td { background: #1f6feb15; }
     tr.combo-row.selected td:first-child { border-left: 2px solid #58a6ff; padding-left: 10px; }
     tr.combo-row.req-min td { background: #23863608; }
-    .tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+    .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 4px; }
     .tag-blue { background: #1f6feb22; color: #58a6ff; }
     .tag-green{ background: #23863622; color: #3fb950; }
     .tag-gold { background: #9e6a0322; color: #d29922; }
@@ -204,12 +254,13 @@
       gap: 14px;
       border-right: 1px solid #21262d;
     }
-    .viz-panel-title { font-size: 10px; font-weight: 700; color: #8b949e; letter-spacing: .5px; text-transform: uppercase; }
+    .viz-panel-title { font-size: 12px; font-weight: 700; color: #8b949e; letter-spacing: .5px; text-transform: uppercase; }
 
-    canvas#cviz { display: block; margin: 0 auto; border-radius: 8px; }
+    canvas#cviz { display: block; margin: 0 auto; border-radius: 8px; max-width: 100%; height: auto; }
     .cviz-wrap {
       background: #0d1117;
       border: 1px solid #21262d;
+      max-width: 100%;
       border-radius: 10px;
       padding: 12px;
       display: flex;
@@ -225,13 +276,13 @@
       overflow: hidden;
     }
     .combo-info-hdr {
-      padding: 8px 12px;
+      padding: 9px 12px;
       background: #1f6feb15;
       border-bottom: 1px solid #1f6feb30;
-      font-size: 11px; font-weight: 700; color: #58a6ff;
+      font-size: 13px; font-weight: 700; color: #58a6ff;
     }
-    .combo-info-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; }
-    .ci-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+    .combo-info-body { padding: 11px 12px; display: flex; flex-direction: column; gap: 8px; }
+    .ci-row { display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
     .ci-lbl { color: #8b949e; }
     .ci-val { font-weight: 600; color: #e6edf3; }
     .ci-val.ok  { color: #3fb950; }
@@ -241,22 +292,25 @@
     .verif-item {
       display: flex; align-items: center; gap: 7px;
       background: #161b22; border: 1px solid #21262d;
-      border-radius: 7px; padding: 7px 10px; font-size: 11px;
+      border-radius: 7px; padding: 8px 10px; font-size: 13px;
     }
     .verif-item.ok  { border-color: #23863630; }
     .verif-item.err { border-color: #da363330; }
     .vdot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
     .ok  .vdot { background: #3fb950; }
     .err .vdot { background: #f85149; }
-    .vref { margin-left: auto; color: #6e7681; font-size: 10px; }
+    .vref { margin-left: auto; color: #6e7681; font-size: 12px; }
 
     /* Error / empty */
     .err-box { background: #da363314; border: 1px solid #da363340;
-               border-radius: 8px; padding: 12px 14px; color: #f85149; font-size: 13px; }
-    .empty-hint { color: #6e7681; font-size: 12px; text-align: center; padding: 30px; }
+               border-radius: 8px; padding: 12px 14px; color: #f85149; font-size: 15px; }
+    .empty-hint { color: #6e7681; font-size: 14px; text-align: center; padding: 30px; }
 
     /* ── Mobile ── */
     @media (max-width: 768px) {
+      /* En móvil el colapso lo maneja #as-inputs-toggle-bar, no la pestaña lateral */
+      #inputs-toggle-tab { display: none !important; }
+
       body {
         overflow: auto;
         height: auto;
@@ -280,12 +334,18 @@
         overflow: visible;
       }
 
-      /* Summary strip: horizontal scroll, no wrap */
-      .summary-strip {
+      /* Métricas: fila con scroll horizontal en vez de columna */
+      .metrics-col {
+        border-right: none;
+        border-bottom: 1px solid #21262d;
+        flex-direction: row;
         overflow-x: auto;
-        flex-wrap: nowrap;
         -webkit-overflow-scrolling: touch;
       }
+      .mcard { min-width: 135px; flex-shrink: 0; }
+
+      /* Campos: entry un poco más angosto para dejar espacio a la etiqueta */
+      .field-row input, .field-row select { width: 150px; }
 
       /* Content area: single column */
       .content-area {
@@ -296,6 +356,7 @@
       /* Combos panel: limited height with scroll */
       .combos-panel {
         border-right: none;
+        border-left: none;
         border-bottom: 1px solid #21262d;
         max-height: 380px;
         overflow-y: auto;
@@ -303,6 +364,7 @@
 
       /* Viz panel: full width */
       .viz-panel {
+        border-right: none;
         overflow-y: visible;
       }
 
@@ -338,11 +400,11 @@
       #as-inputs-body.collapsed { display: none; }
 
       /* Botón diagrama en sidebar: hacerlo más compacto */
-      .panel-inputs button[onclick="abrirDiagrama()"] { font-size: 11px; padding: 8px 10px; }
+      .panel-inputs button[onclick="abrirDiagrama()"] { font-size: 13px; padding: 9px 10px; }
 
-      /* Summary strip: fuente más pequeña en móvil */
-      .scard-val { font-size: 15px; }
-      .scard-lbl { font-size: 8px; }
+      /* Métricas: fuente algo más pequeña en móvil */
+      .scard-val { font-size: 18px; }
+      .scard-lbl { font-size: 10px; }
 
       /* Topbar buttons: ocultar texto en pantallas muy pequeñas */
       @media (max-width: 480px) {
@@ -367,11 +429,11 @@
     <!-- Botón Diagrama de Interacción -->
     <button onclick="abrirDiagrama()" title="Ver Diagrama de Interacción P-M"
       style="background:#1f6feb22;border:1px solid #1f6feb55;border-radius:7px;color:#58a6ff;
-             font-size:12px;font-weight:600;padding:5px 11px;cursor:pointer;
+             font-size:14px;font-weight:600;padding:6px 13px;cursor:pointer;
              display:flex;align-items:center;gap:6px;transition:all .15s;"
       onmouseover="this.style.background='#1f6feb33';this.style.borderColor='#58a6ff'"
       onmouseout="this.style.background='#1f6feb22';this.style.borderColor='#1f6feb55'">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
       </svg>
       Diagrama P-M
@@ -380,11 +442,11 @@
     <!-- Botón Fórmulas ACI -->
     <button onclick="toggleFormulas()" title="Fórmulas y referencias ACI"
       style="background:#21262d;border:1px solid #30363d;border-radius:7px;color:#8b949e;
-             font-size:12px;font-weight:600;padding:5px 11px;cursor:pointer;
+             font-size:14px;font-weight:600;padding:6px 13px;cursor:pointer;
              display:flex;align-items:center;gap:6px;transition:all .15s;"
       onmouseover="this.style.borderColor='#58a6ff';this.style.color='#58a6ff'"
       onmouseout="this.style.borderColor='#30363d';this.style.color='#8b949e'">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/>
         <line x1="12" y1="8" x2="12" y2="12"/>
         <line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -399,7 +461,10 @@
   </div>
 </div>
 
-<div class="main">
+<div class="main" id="main-grid">
+
+  <!-- Pestaña para ocultar/mostrar el panel de datos -->
+  <button id="inputs-toggle-tab" onclick="toggleInputsPanel()" title="Ocultar panel de datos">‹</button>
 
   <!-- ═══ PANEL INPUTS ═══ -->
   <div class="panel-inputs">
@@ -408,8 +473,8 @@
     <div id="as-inputs-toggle-bar" style="display:none;align-items:center;justify-content:space-between;
          padding:10px 14px;border-bottom:1px solid #21262d;cursor:pointer;background:#161b22;"
          onclick="toggleAsInputs()">
-      <span style="font-size:12px;font-weight:700;color:#e6edf3;">⚙ Parámetros de diseño</span>
-      <span id="as-inputs-arrow" style="color:#8b949e;font-size:14px;transition:transform .2s;">▲</span>
+      <span style="font-size:14px;font-weight:700;color:#e6edf3;">⚙ Parámetros de diseño</span>
+      <span id="as-inputs-arrow" style="color:#8b949e;font-size:16px;transition:transform .2s;">▲</span>
     </div>
 
     <div id="as-inputs-body">
@@ -426,28 +491,34 @@
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
         Sección
       </div>
-      <div class="row2">
-        <div class="field">
-          <label>Ancho b <em>(cm)</em></label>
-          <input type="number" id="i-b" value="30" min="5" step="1" oninput="recalc()">
-        </div>
-        <div class="field">
-          <label>Alto h <em>(cm)</em></label>
-          <input type="number" id="i-h" value="30" min="5" step="1" oninput="recalc()">
-        </div>
+
+      <div class="toggle-group" id="shape-toggle" style="align-self:flex-start;">
+        <button class="tgbtn active" id="shape-rect" onclick="setShape('rect')">Rectangular</button>
+        <button class="tgbtn"        id="shape-circ" onclick="setShape('circ')">Circular</button>
       </div>
-      <div class="row2">
-        <div class="field">
-          <label>Recubrimiento <em>(cm)</em></label>
-          <input type="number" id="i-r" value="4" min="1" step="0.5" oninput="recalc()">
-        </div>
-        <div class="field">
-          <label>Tipo de confinamiento</label>
-          <select id="i-tipo" onchange="recalc()">
-            <option value="estribos">Estribos  (φ=0.65)</option>
-            <option value="espiral">Espiral   (φ=0.75)</option>
-          </select>
-        </div>
+
+      <div class="field-row" id="field-b">
+        <label>Ancho b <em>(cm)</em></label>
+        <input type="number" id="i-b" value="30" min="5" step="1" oninput="recalc()">
+      </div>
+      <div class="field-row" id="field-h">
+        <label>Alto h <em>(cm)</em></label>
+        <input type="number" id="i-h" value="30" min="5" step="1" oninput="recalc()">
+      </div>
+      <div class="field-row" id="field-D" style="display:none;">
+        <label>Diámetro D <em>(cm)</em></label>
+        <input type="number" id="i-D" value="40" min="10" step="1" oninput="recalc()">
+      </div>
+      <div class="field-row">
+        <label>Recubrimiento <em>(cm)</em></label>
+        <input type="number" id="i-r" value="4" min="1" step="0.5" oninput="recalc()">
+      </div>
+      <div class="field-row">
+        <label>Tipo de confinamiento</label>
+        <select id="i-tipo" onchange="recalc()">
+          <option value="estribos">Estribos  (φ=0.65)</option>
+          <option value="espiral">Espiral   (φ=0.75)</option>
+        </select>
       </div>
     </div>
 
@@ -456,34 +527,32 @@
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
         Materiales
       </div>
-      <div class="row2">
-        <div class="field">
-          <label>f'c <em id="u-fc">(MPa)</em></label>
-          <select id="i-fc" onchange="onMatChange()">
-            <option value="21">21 — f'c 210</option>
-            <option value="24">24 — f'c 240</option>
-            <option value="28" selected>28 — f'c 280</option>
-            <option value="35">35 — f'c 350</option>
-            <option value="42">42 — f'c 420</option>
-            <option value="custom">Personalizado</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>fy <em id="u-fy">(MPa)</em></label>
-          <select id="i-fy" onchange="onMatChange()">
-            <option value="420" selected>420 — Gr. 60</option>
-            <option value="280">280 — Gr. 40</option>
-            <option value="500">500 — Gr. 72</option>
-            <option value="custom">Personalizado</option>
-          </select>
-        </div>
+      <div class="field-row">
+        <label>f'c <em id="u-fc">(MPa)</em></label>
+        <select id="i-fc" onchange="onMatChange()">
+          <option value="21">21 — f'c 210</option>
+          <option value="24">24 — f'c 240</option>
+          <option value="28" selected>28 — f'c 280</option>
+          <option value="35">35 — f'c 350</option>
+          <option value="42">42 — f'c 420</option>
+          <option value="custom">Personalizado</option>
+        </select>
       </div>
-      <div class="row2" id="row-custom" style="display:none;">
-        <div class="field">
+      <div class="field-row">
+        <label>fy <em id="u-fy">(MPa)</em></label>
+        <select id="i-fy" onchange="onMatChange()">
+          <option value="420" selected>420 — Gr. 60</option>
+          <option value="280">280 — Gr. 40</option>
+          <option value="500">500 — Gr. 72</option>
+          <option value="custom">Personalizado</option>
+        </select>
+      </div>
+      <div id="row-custom" style="display:none;">
+        <div class="field-row">
           <label>f'c personalizado</label>
           <input type="number" id="i-fc-c" value="28" min="1" step="1" oninput="recalc()">
         </div>
-        <div class="field">
+        <div class="field-row" style="margin-top:10px;">
           <label>fy personalizado</label>
           <input type="number" id="i-fy-c" value="420" min="1" step="1" oninput="recalc()">
         </div>
@@ -495,35 +564,33 @@
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
         Cargas Factorizadas
       </div>
-      <div class="row2">
-        <div class="field">
-          <label>Pu <em id="u-pu">(kN)</em></label>
-          <input type="number" id="i-Pu" value="800" min="0" step="10" oninput="recalc()">
-        </div>
-        <div class="field">
-          <label>Mu <em id="u-mu">(kN·m)</em></label>
-          <input type="number" id="i-Mu" value="60" min="0" step="5" oninput="recalc()">
-        </div>
+      <div class="field-row">
+        <label>Pu <em id="u-pu">(kN)</em></label>
+        <input type="number" id="i-Pu" value="800" min="0" step="10" oninput="recalc()">
+      </div>
+      <div class="field-row">
+        <label>Mu <em id="u-mu">(kN·m)</em></label>
+        <input type="number" id="i-Mu" value="60" min="0" step="5" oninput="recalc()">
       </div>
     </div>
 
     <!-- Botón diagrama de interacción -->
     <button onclick="abrirDiagrama()" style="
-        width:100%; padding:10px 12px; border-radius:8px; cursor:pointer;
+        width:100%; padding:11px 12px; border-radius:8px; cursor:pointer;
         background:#0d1117; border:1px solid #30363d; color:#e6edf3;
-        font-size:12px; font-weight:600; font-family:inherit;
+        font-size:14px; font-weight:600; font-family:inherit;
         display:flex; align-items:center; gap:8px; justify-content:center;
         transition:all .15s;"
       onmouseover="this.style.borderColor='#58a6ff';this.style.color='#58a6ff'"
       onmouseout="this.style.borderColor='#30363d';this.style.color='#e6edf3'">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
       </svg>
       Ver Diagrama de Interacción P-M
     </button>
 
     <div style="margin-top:auto; background:#1f6feb0d; border:1px solid #1f6feb22;
-                border-radius:8px; padding:10px 12px; font-size:11px; color:#8b949e; line-height:1.6;">
+                border-radius:8px; padding:10px 12px; font-size:13px; color:#8b949e; line-height:1.6;">
       <strong style="color:#58a6ff;">ACI 318-25</strong> · Refuerzo simétrico ·
       ρ<sub>mín</sub>=1% · ρ<sub>máx</sub>=8%
     </div>
@@ -534,52 +601,7 @@
   <!-- ═══ PANEL RESULTS ═══ -->
   <div class="panel-results">
 
-    <!-- Summary strip -->
-    <div class="summary-strip" id="summary-strip">
-      <div class="scard">
-        <div class="scard-lbl">As requerido</div>
-        <div class="scard-val ok" id="s-Ast">—</div>
-        <div class="scard-prov" id="s-Ast-prov"></div>
-        <div class="scard-unit">cm²</div>
-      </div>
-      <div class="strip-sep"></div>
-      <div class="scard">
-        <div class="scard-lbl">ρ requerido</div>
-        <div class="scard-val ok" id="s-rho">—</div>
-        <div class="scard-prov" id="s-rho-prov"></div>
-        <div class="scard-unit">%</div>
-      </div>
-      <div class="strip-sep"></div>
-      <div class="scard">
-        <div class="scard-lbl">φPn</div>
-        <div class="scard-val" id="s-Pn">—</div>
-        <div class="scard-prov" id="s-Pn-prov"></div>
-        <div class="scard-unit" id="s-Pn-u">kN</div>
-      </div>
-      <div class="strip-sep"></div>
-      <div class="scard">
-        <div class="scard-lbl">φMn</div>
-        <div class="scard-val" id="s-Mn">—</div>
-        <div class="scard-prov" id="s-Mn-prov"></div>
-        <div class="scard-unit" id="s-Mn-u">kN·m</div>
-      </div>
-      <div class="strip-sep"></div>
-      <div class="scard">
-        <div class="scard-lbl">Factor φ</div>
-        <div class="scard-val" id="s-phi">—</div>
-        <div class="scard-prov" id="s-phi-prov"></div>
-        <div class="scard-unit" id="s-zona">—</div>
-      </div>
-      <div class="strip-sep"></div>
-      <div class="scard">
-        <div class="scard-lbl">εt acero</div>
-        <div class="scard-val" id="s-et">—</div>
-        <div class="scard-prov" id="s-et-prov"></div>
-        <div class="scard-unit">‰</div>
-      </div>
-    </div>
-
-    <!-- Content grid: viz primero (izq), combos a la derecha -->
+    <!-- Content grid: viz | métricas | combos -->
     <div class="content-area">
 
       <!-- Panel viz + verif — columna izquierda -->
@@ -642,6 +664,46 @@
         <!-- Verificaciones -->
         <div id="verif-list" style="display:flex;flex-direction:column;gap:5px;"></div>
 
+      </div>
+
+      <!-- Columna de métricas — entre el gráfico y las combinaciones -->
+      <div class="metrics-col" id="metrics-col">
+        <div class="mcard">
+          <div class="scard-lbl">As requerido</div>
+          <div class="scard-val ok" id="s-Ast">—</div>
+          <div class="scard-prov" id="s-Ast-prov"></div>
+          <div class="scard-unit">cm²</div>
+        </div>
+        <div class="mcard">
+          <div class="scard-lbl">ρ requerido</div>
+          <div class="scard-val ok" id="s-rho">—</div>
+          <div class="scard-prov" id="s-rho-prov"></div>
+          <div class="scard-unit">%</div>
+        </div>
+        <div class="mcard">
+          <div class="scard-lbl">φPn</div>
+          <div class="scard-val" id="s-Pn">—</div>
+          <div class="scard-prov" id="s-Pn-prov"></div>
+          <div class="scard-unit" id="s-Pn-u">kN</div>
+        </div>
+        <div class="mcard">
+          <div class="scard-lbl">φMn</div>
+          <div class="scard-val" id="s-Mn">—</div>
+          <div class="scard-prov" id="s-Mn-prov"></div>
+          <div class="scard-unit" id="s-Mn-u">kN·m</div>
+        </div>
+        <div class="mcard">
+          <div class="scard-lbl">Factor φ</div>
+          <div class="scard-val" id="s-phi">—</div>
+          <div class="scard-prov" id="s-phi-prov"></div>
+          <div class="scard-unit" id="s-zona">—</div>
+        </div>
+        <div class="mcard">
+          <div class="scard-lbl">εt acero</div>
+          <div class="scard-val" id="s-et">—</div>
+          <div class="scard-prov" id="s-et-prov"></div>
+          <div class="scard-unit">‰</div>
+        </div>
       </div>
 
       <!-- Tabla de combinaciones — columna derecha (ancho restante) -->
@@ -709,6 +771,7 @@ let barFilter   = 'in';
 let lastResult  = null;
 let selectedIdx = 0;
 let debTimer    = null;
+let shape       = 'rect'; // 'rect' | 'circ'
 
 // ═══════════════════════════════════════════════════════
 // TOGGLES
@@ -742,6 +805,17 @@ function setUnits(u) {
   recalc();
 }
 
+function setShape(s) {
+  if (s === shape) return;
+  shape = s;
+  document.getElementById('shape-rect').classList.toggle('active', s==='rect');
+  document.getElementById('shape-circ').classList.toggle('active', s==='circ');
+  document.getElementById('field-b').style.display = s==='rect' ? 'flex' : 'none';
+  document.getElementById('field-h').style.display = s==='rect' ? 'flex' : 'none';
+  document.getElementById('field-D').style.display = s==='circ' ? 'flex' : 'none';
+  recalc();
+}
+
 function setBarFilter(f) {
   barFilter = f;
   ['mm','in','all'].forEach(x => document.getElementById('f-'+x).classList.toggle('active', x===f));
@@ -751,7 +825,7 @@ function setBarFilter(f) {
 function onMatChange() {
   const showC = document.getElementById('i-fc').value==='custom'
              || document.getElementById('i-fy').value==='custom';
-  document.getElementById('row-custom').style.display = showC ? 'grid' : 'none';
+  document.getElementById('row-custom').style.display = showC ? 'block' : 'none';
   recalc();
 }
 
@@ -787,13 +861,40 @@ function getMu() {
 }
 
 // ═══════════════════════════════════════════════════════
-// MOTOR ACI 318-25
+// Segmento circular: área y centroide (integración numérica)
+// R: radio de la sección (cm) · a: profundidad del bloque desde la fibra
+// extrema comprimida (0..2R). Devuelve área (cm²) y distancia del centroide
+// del segmento a esa misma fibra extrema (cm).
 // ═══════════════════════════════════════════════════════
-function calcularACI(b, h, r, fc, fy, Pu_kN, Mu_kNm, tipo) {
+function circleSegmentAreaCentroid(R, a) {
+  const aClip = Math.max(0, Math.min(2*R, a));
+  if (aClip <= 0) return { area: 0, yBar: 0 };
+  const N = 90;
+  const dy = aClip / N;
+  let area = 0, moment = 0;
+  for (let i = 0; i < N; i++) {
+    const y = (i + 0.5) * dy;
+    const w = 2 * Math.sqrt(Math.max(0, 2*R*y - y*y));
+    area   += w*dy;
+    moment += w*dy*y;
+  }
+  return { area, yBar: area > 0 ? moment/area : 0 };
+}
+
+// ═══════════════════════════════════════════════════════
+// MOTOR ACI 318-25 — sección rectangular o circular
+// Modelo de 2 capas de acero (comprimida/traccionada) con refuerzo simétrico.
+// ═══════════════════════════════════════════════════════
+function calcularACI(shape, b, h, D, r, fc, fy, Pu_kN, Mu_kNm, tipo) {
+  const isCirc = shape === 'circ';
   const fc_ = fc / 10, fy_ = fy / 10, Es_ = 20000;
   const ecu = 0.003, ey = fy_ / Es_;
-  const Ag  = b * h, dp = r, d = h - r;
-  const Mu_ = Mu_kNm * 100;
+  const Ag   = isCirc ? Math.PI*D*D/4 : b*h;
+  const dp   = r;
+  const d    = isCirc ? (D - r) : (h - r);
+  const R    = D/2;
+  const Hb   = isCirc ? D : h; // dimensión de referencia para acotar la bisección en c
+  const Mu_  = Mu_kNm * 100;
 
   let beta1 = 0.85;
   if (fc > 28) beta1 = Math.max(0.65, 0.85 - 0.05*(fc-28)/7);
@@ -807,11 +908,24 @@ function calcularACI(b, h, r, fc, fy, Pu_kN, Mu_kNm, tipo) {
     const et  = c>0 ? ecu*(d-c)/c  : ey;
     const fsc = Math.max(-fy_, Math.min(fy_, ec_*Es_));
     const fst = Math.max(-fy_, Math.min(fy_, et*Es_));
-    const Cc  = 0.85*fc_*a*b;
+
+    let Cc, brazoCc, brazoS;
+    if (isCirc) {
+      const seg = circleSegmentAreaCentroid(R, a);
+      Cc      = 0.85*fc_*seg.area;
+      brazoCc = R - seg.yBar;
+      brazoS  = R;
+    } else {
+      const aClip = Math.max(0, Math.min(h, a));
+      Cc      = 0.85*fc_*aClip*b;
+      brazoCc = h/2 - aClip/2;
+      brazoS  = h/2;
+    }
+
     const Cs  = As*(fsc - 0.85*fc_);
     const Ts  = As*fst;
     const Pn  = Cc + Cs - Ts;
-    const Mn  = Cc*(h/2-a/2) + Cs*(h/2-dp) + Ts*(d-h/2);
+    const Mn  = Cc*brazoCc + Cs*(brazoS-dp) + Ts*(d-brazoS);
     let phi;
     if (et <= ey)        phi = phi_c;
     else if (et >= 0.005) phi = 0.90;
@@ -829,7 +943,7 @@ function calcularACI(b, h, r, fc, fy, Pu_kN, Mu_kNm, tipo) {
       const p = phi_c*Pn_max(Ast);
       return { ok: p>=Pu_kN, phi_Pn:p, phi_Mn:1e9, phi:phi_c, et:0, c:1e9 };
     }
-    let clo=1e-3, chi=5*h;
+    let clo=1e-3, chi=5*Hb;
     const f = c => { const s=section(c,Ast); return s.Mn - s.Pn*e; };
     let flo = f(clo);
     for (let i=0;i<80;i++) {
@@ -846,11 +960,15 @@ function calcularACI(b, h, r, fc, fy, Pu_kN, Mu_kNm, tipo) {
     };
   }
 
+  const p = {shape,b,h,D,r,fc,fy,Ag,d,dp,beta1,phi_c,kfac,Pu_kN,Mu_kNm,tipo,ey};
+
   // Búsqueda binaria de ρ mínimo
   const chkMin = checkAst(0.01*Ag);
-  if (chkMin.ok) return build(0.01*Ag, chkMin, {b,h,r,fc,fy,Ag,d,dp,beta1,phi_c,kfac,Pu_kN,Mu_kNm,tipo,ey});
+  if (chkMin.ok) return build(0.01*Ag, chkMin, p);
   const chkMax = checkAst(0.08*Ag);
-  if (!chkMax.ok) return { error:'Sección insuficiente. Aumenta b×h o f\'c.' };
+  if (!chkMax.ok) return { error: isCirc
+    ? 'Sección insuficiente. Aumenta el diámetro D o f\'c.'
+    : 'Sección insuficiente. Aumenta b×h o f\'c.' };
 
   let rlo=0.01, rhi=0.08;
   for (let i=0;i<60;i++) {
@@ -859,27 +977,37 @@ function calcularACI(b, h, r, fc, fy, Pu_kN, Mu_kNm, tipo) {
     if (rhi-rlo<1e-5) break;
   }
   const Ast_req = rhi*Ag;
-  return build(Ast_req, checkAst(Ast_req), {b,h,r,fc,fy,Ag,d,dp,beta1,phi_c,kfac,Pu_kN,Mu_kNm,tipo,ey});
+  return build(Ast_req, checkAst(Ast_req), p);
 }
 
 function build(Ast_req, chk, p) {
   // Generar todas las combinaciones válidas
-  const { b, h, r, Ag, ey } = p;
+  const { shape, b, h, D, r, Ag, ey } = p;
+  const isCirc = shape === 'circ';
   const combos = [];
   const barras = [...BARRAS_MM, ...BARRAS_IN];
+  const nMin = isCirc ? 6 : 4;
 
   for (const bar of barras) {
-    for (let n=4; n<=24; n+=2) {
+    for (let n=nMin; n<=24; n+=2) {
       const Ast_prov = n * bar.A;
       if (Ast_prov < Ast_req * 0.995) continue;
 
       // Verificar espaciamiento mínimo (ACI 25.2.1 — sep mín = max(d_b, 4/3 ag, 25mm=2.5cm))
       const sep_min = Math.max(bar.d, 2.5); // cm
-      const por_cara_long = Math.ceil(n/4); // aprox barras cara larga
-      const cara_util = (Math.max(b,h) - 2*r);
-      const sep_libre = (cara_util - por_cara_long*bar.d) / (por_cara_long - 1 + 1e-9);
-
-      if (n > 4 && sep_libre < sep_min) continue;
+      let sep_libre;
+      if (isCirc) {
+        // Barras distribuidas uniformemente en un anillo de radio Rs
+        const Rs = D/2 - r;
+        const circunf = 2*Math.PI*Rs;
+        sep_libre = (circunf - n*bar.d) / n;
+        if (sep_libre < sep_min) continue;
+      } else {
+        const por_cara_long = Math.ceil(n/4); // aprox barras cara larga
+        const cara_util = (Math.max(b,h) - 2*r);
+        sep_libre = (cara_util - por_cara_long*bar.d) / (por_cara_long - 1 + 1e-9);
+        if (n > 4 && sep_libre < sep_min) continue;
+      }
 
       combos.push({
         n, bar,
@@ -917,19 +1045,25 @@ function recalc() {
 }
 
 function _doCalc() {
-  const b  = parseFloat(document.getElementById('i-b').value);
-  const h  = parseFloat(document.getElementById('i-h').value);
+  const isCirc = shape === 'circ';
+  const b  = isCirc ? NaN : parseFloat(document.getElementById('i-b').value);
+  const h  = isCirc ? NaN : parseFloat(document.getElementById('i-h').value);
+  const D  = isCirc ? parseFloat(document.getElementById('i-D').value) : NaN;
   const r  = parseFloat(document.getElementById('i-r').value);
   const fc = getfc(), fy = getfy(), Pu = getPu(), Mu = getMu();
   const tipo = document.getElementById('i-tipo').value;
 
-  if ([b,h,r,fc,fy,Pu,Mu].some(v=>isNaN(v)||v<=0) || r>=h/2 || r>=b/2) {
+  const dimsInvalid = isCirc
+    ? (isNaN(D) || D<=0 || r>=D/2)
+    : (isNaN(b) || isNaN(h) || b<=0 || h<=0 || r>=h/2 || r>=b/2);
+
+  if ([r,fc,fy,Pu,Mu].some(v=>isNaN(v)||v<=0) || dimsInvalid) {
     setDot('err','Datos inválidos');
     clearSummary(); clearCombos('Datos inválidos'); clearViz(); return;
   }
 
   try {
-    const res = calcularACI(b, h, r, fc, fy, Pu, Mu, tipo);
+    const res = calcularACI(shape, b, h, D, r, fc, fy, Pu, Mu, tipo);
     lastResult = res;
 
     if (res.error) {
@@ -1002,9 +1136,9 @@ function renderCombos(res) {
 
     // Nombre principal + fracción comercial + equivalencia
     const fracLabel  = c.bar.frac && c.bar.frac !== '—'
-      ? `<div style="font-size:10px;color:#58a6ff;margin-top:1px;">${c.bar.frac}</div>` : '';
+      ? `<div style="font-size:12px;color:#58a6ff;margin-top:1px;">${c.bar.frac}</div>` : '';
     const equivLabel = c.bar.equiv && c.bar.equiv !== '—'
-      ? `<div style="font-size:10px;color:#8b949e;margin-top:1px;">≡ ${c.bar.equiv}</div>` : '';
+      ? `<div style="font-size:12px;color:#8b949e;margin-top:1px;">≡ ${c.bar.equiv}</div>` : '';
 
     return `<tr class="combo-row${i===0?' selected':''}" onclick="selectCombo(${i})" data-idx="${i}">
       <td>
@@ -1045,10 +1179,15 @@ function renderCombos(res) {
 // Reutiliza los parámetros actuales del diseño
 // ═══════════════════════════════════════════════════════
 function calcCapacidadAst(Ast_cm2, p) {
-  const { b, h, rec: r, fc, fy, Pu: Pu_kN, Mu: Mu_kNm, type: tipo } = p;
+  const { shape, b, h, D, r, fc, fy, Pu_kN, Mu_kNm, tipo } = p;
+  const isCirc = shape === 'circ';
   const fc_  = fc / 10, fy_  = fy / 10, Es_ = 20000;
   const ecu  = 0.003,   ey   = fy_ / Es_;
-  const dp   = r,       d    = h - r,   Ag  = b * h;
+  const dp   = r;
+  const d    = isCirc ? (D - r) : (h - r);
+  const Ag   = isCirc ? Math.PI*D*D/4 : b*h;
+  const R    = D/2;
+  const Hb   = isCirc ? D : h;
   const Mu_  = Mu_kNm * 100; // kN·cm
 
   let beta1 = 0.85;
@@ -1063,11 +1202,24 @@ function calcCapacidadAst(Ast_cm2, p) {
     const et  = c > 0 ? ecu*(d-c)/c  : ey;
     const fsc = Math.max(-fy_, Math.min(fy_, ec_*Es_));
     const fst = Math.max(-fy_, Math.min(fy_, et*Es_));
-    const Cc  = 0.85*fc_*a*b;
+
+    let Cc, brazoCc, brazoS;
+    if (isCirc) {
+      const seg = circleSegmentAreaCentroid(R, a);
+      Cc      = 0.85*fc_*seg.area;
+      brazoCc = R - seg.yBar;
+      brazoS  = R;
+    } else {
+      const aClip = Math.max(0, Math.min(h, a));
+      Cc      = 0.85*fc_*aClip*b;
+      brazoCc = h/2 - aClip/2;
+      brazoS  = h/2;
+    }
+
     const Cs  = As*(fsc - 0.85*fc_);
     const Ts  = As*fst;
     const Pn  = Cc + Cs - Ts;
-    const Mn  = Cc*(h/2-a/2) + Cs*(h/2-dp) + Ts*(d-h/2);
+    const Mn  = Cc*brazoCc + Cs*(brazoS-dp) + Ts*(d-brazoS);
     let phi;
     if (et <= ey)          phi = phi_c;
     else if (et >= 0.005)  phi = 0.90;
@@ -1084,7 +1236,7 @@ function calcCapacidadAst(Ast_cm2, p) {
   }
 
   // Bisección en c
-  let clo = 1e-3, chi = 5*h;
+  let clo = 1e-3, chi = 5*Hb;
   const f = c => { const s = sec(c); return s.Mn - s.Pn * e; };
   let flo = f(clo);
   for (let i = 0; i < 80; i++) {
@@ -1118,7 +1270,7 @@ function selectCombo(idx) {
   });
 
   const c = combos[idx];
-  const b = lastResult.p.b, h = lastResult.p.h, r_c = lastResult.p.r;
+  const { shape: shp, b, h, D, r: r_c } = lastResult.p;
 
   // Info panel
   document.getElementById('combo-info').style.display = 'block';
@@ -1130,8 +1282,8 @@ function selectCombo(idx) {
   const fP  = unidades === 'met' ? 1/9.80665 : 1;
   const uP  = unidades === 'met' ? 'tf' : 'kN';
   const uM  = unidades === 'met' ? 'tf·m' : 'kN·m';
-  const Pu_dis = lastResult.p.Pu;
-  const Mu_dis = lastResult.p.Mu;
+  const Pu_dis = lastResult.p.Pu_kN;
+  const Mu_dis = lastResult.p.Mu_kNm;
   const cumplePn = cap.phi_Pn >= Pu_dis;
   const cumpleMn = isFinite(cap.phi_Mn) ? cap.phi_Mn >= Mu_dis : true;
   const cumpleTodo = cumplePn && cumpleMn;
@@ -1147,8 +1299,12 @@ function selectCombo(idx) {
   excEl.textContent = '+' + c.exceso.toFixed(1)+'%';
   excEl.className   = 'ci-val ' + (c.exceso<15?'ok':'warn');
 
-  const bpc = Math.ceil(c.n/4);
-  document.getElementById('ci-bpc').textContent = `≈${bpc} por cara`;
+  if (shp === 'circ') {
+    document.getElementById('ci-bpc').textContent = `${c.n} en anillo`;
+  } else {
+    const bpc = Math.ceil(c.n/4);
+    document.getElementById('ci-bpc').textContent = `≈${bpc} por cara`;
+  }
 
   const sepEl = document.getElementById('ci-sep');
   if (isFinite(c.sep_libre)) {
@@ -1234,7 +1390,7 @@ function selectCombo(idx) {
     `Sección — ${c.n}×${c.bar.nom}  (As = ${c.Ast_prov.toFixed(2)} cm²)`;
 
   // Dibujar sección
-  dibujarSeccion(b, h, r_c, c.n, c.bar.d, lastResult.Ast_req);
+  dibujarSeccion(shp, b, h, D, r_c, c.n, c.bar.d, lastResult.Ast_req);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1293,41 +1449,50 @@ function seededRng(seed) {
 // ═══════════════════════════════════════════════════════
 // CANVAS — DIBUJAR SECCIÓN
 // ═══════════════════════════════════════════════════════
-function dibujarSeccion(b, h, r, n_barras, d_barra, Ast_req) {
+function dibujarSeccion(shape, b, h, D, r, n_barras, d_barra, Ast_req) {
   const canvas = document.getElementById('cviz');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
 
+  const isCirc = shape === 'circ';
+  const dimX = isCirc ? D : b, dimY = isCirc ? D : h;
+
   const margin = 32;
-  const esc = Math.min((W-2*margin)/b, (H-2*margin)/h);
-  const offX = (W - b*esc)/2, offY = (H - h*esc)/2;
+  const esc = Math.min((W-2*margin)/dimX, (H-2*margin)/dimY);
+  const offX = (W - dimX*esc)/2, offY = (H - dimY*esc)/2;
+  const cx = offX + dimX*esc/2, cy = offY + dimY*esc/2, Rpx = dimX*esc/2;
+
+  function outlinePath() {
+    ctx.beginPath();
+    if (isCirc) ctx.arc(cx, cy, Rpx, 0, Math.PI*2);
+    else        ctx.rect(offX, offY, dimX*esc, dimY*esc);
+  }
 
   // ── Sección con textura hormigón ──────────────────────────
   ctx.save();
-  ctx.beginPath();
-  ctx.rect(offX, offY, b*esc, h*esc);
+  outlinePath();
   ctx.clip();
 
   // Base: color hormigón gris cálido
   ctx.fillStyle = '#b0afa6';
-  ctx.fillRect(offX, offY, b*esc, h*esc);
+  ctx.fillRect(offX, offY, dimX*esc, dimY*esc);
 
   // Variación base (gradiente sutil de iluminación)
-  const grd = ctx.createLinearGradient(offX, offY, offX + b*esc, offY + h*esc);
+  const grd = ctx.createLinearGradient(offX, offY, offX + dimX*esc, offY + dimY*esc);
   grd.addColorStop(0,    'rgba(255,255,245,0.18)');
   grd.addColorStop(0.45, 'rgba(255,255,245,0.04)');
   grd.addColorStop(1,    'rgba(0,0,0,0.12)');
   ctx.fillStyle = grd;
-  ctx.fillRect(offX, offY, b*esc, h*esc);
+  ctx.fillRect(offX, offY, dimX*esc, dimY*esc);
 
   // Áridos gruesos: elipses irregulares (grava)
-  const rng = seededRng(b * 1000 + h);
-  const nGrava = Math.floor((b * h * esc * esc) / 120);
+  const rng = seededRng(Math.round(dimX * 1000 + dimY));
+  const nGrava = Math.floor((dimX * dimY * esc * esc) / 120);
   for (let i = 0; i < nGrava; i++) {
-    const px  = offX + rng() * b * esc;
-    const py  = offY + rng() * h * esc;
+    const px  = offX + rng() * dimX * esc;
+    const py  = offY + rng() * dimY * esc;
     const sz  = 2.5 + rng() * 5;
     const rot = rng() * Math.PI;
     const g   = 115 + Math.floor(rng() * 60);
@@ -1339,23 +1504,23 @@ function dibujarSeccion(b, h, r, n_barras, d_barra, Ast_req) {
   }
 
   // Arena fina: puntos pequeños
-  const nArena = Math.floor((b * h * esc * esc) / 18);
+  const nArena = Math.floor((dimX * dimY * esc * esc) / 18);
   for (let i = 0; i < nArena; i++) {
-    const px = offX + rng() * b * esc;
-    const py = offY + rng() * h * esc;
+    const px = offX + rng() * dimX * esc;
+    const py = offY + rng() * dimY * esc;
     const g  = 100 + Math.floor(rng() * 90);
     ctx.fillStyle = `rgba(${g},${g},${g-4},0.18)`;
     ctx.fillRect(px, py, 1, 1);
   }
 
   // Poros/fisuras superficiales muy leves
-  const nPoros = Math.floor((b * h * esc * esc) / 600);
+  const nPoros = Math.floor((dimX * dimY * esc * esc) / 600);
   for (let i = 0; i < nPoros; i++) {
-    const px = offX + rng() * b * esc;
-    const py = offY + rng() * h * esc;
-    const r  = 0.8 + rng() * 1.5;
+    const px = offX + rng() * dimX * esc;
+    const py = offY + rng() * dimY * esc;
+    const rr = 0.8 + rng() * 1.5;
     ctx.fillStyle = `rgba(60,55,50,${0.15 + rng()*0.2})`;
-    ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(px, py, rr, 0, Math.PI*2); ctx.fill();
   }
 
   ctx.restore();
@@ -1363,16 +1528,21 @@ function dibujarSeccion(b, h, r, n_barras, d_barra, Ast_req) {
   // Borde de sección
   ctx.shadowColor='rgba(88,166,255,0.2)'; ctx.shadowBlur=14;
   ctx.strokeStyle='#58a6ff'; ctx.lineWidth=1.5;
-  ctx.beginPath(); ctx.rect(offX, offY, b*esc, h*esc); ctx.stroke();
+  outlinePath(); ctx.stroke();
   ctx.shadowBlur=0;
 
   // Línea de recubrimiento
   ctx.strokeStyle='#30363d'; ctx.lineWidth=0.7; ctx.setLineDash([3,3]);
-  ctx.strokeRect(offX+r*esc, offY+r*esc, (b-2*r)*esc, (h-2*r)*esc);
+  if (isCirc) {
+    ctx.beginPath(); ctx.arc(cx, cy, Rpx - r*esc, 0, Math.PI*2); ctx.stroke();
+  } else {
+    ctx.strokeRect(offX+r*esc, offY+r*esc, (b-2*r)*esc, (h-2*r)*esc);
+  }
   ctx.setLineDash([]);
 
   // Distribuir y dibujar barras
-  const pos = distribuirBarras(b, h, r, n_barras);
+  const pos = isCirc ? distribuirBarrasCirculares(D, r, n_barras)
+                      : distribuirBarras(b, h, r, n_barras);
   const rb  = Math.max(3, Math.min(12, d_barra*esc/2));
 
   pos.forEach(([bx,by]) => {
@@ -1401,15 +1571,19 @@ function dibujarSeccion(b, h, r, n_barras, d_barra, Ast_req) {
 
   // Cotas
   ctx.fillStyle='#8b949e'; ctx.font='10px sans-serif'; ctx.textAlign='center';
-  ctx.fillText(`b = ${b} cm`, W/2, offY+h*esc+18);
-  ctx.save(); ctx.translate(offX-18, H/2);
-  ctx.rotate(-Math.PI/2); ctx.fillText(`h = ${h} cm`, 0, 0); ctx.restore();
+  if (isCirc) {
+    ctx.fillText(`D = ${D} cm`, W/2, offY+dimY*esc+18);
+  } else {
+    ctx.fillText(`b = ${b} cm`, W/2, offY+h*esc+18);
+    ctx.save(); ctx.translate(offX-18, H/2);
+    ctx.rotate(-Math.PI/2); ctx.fillText(`h = ${h} cm`, 0, 0); ctx.restore();
+  }
 
   // Indicador de As requerido vs provisto
   const Ast_prov = n_barras * (Math.PI * (d_barra/2)**2);
   const ratio = Math.min(1, Ast_req / (Ast_prov+0.001));
-  const barW = b*esc * 0.8, barH = 5;
-  const barX = offX + b*esc*0.1, barY = offY + h*esc + 24;
+  const barW = dimX*esc * 0.8, barH = 5;
+  const barX = offX + dimX*esc*0.1, barY = offY + dimY*esc + 24;
   ctx.fillStyle='#21262d';
   ctx.beginPath(); ctx.roundRect(barX, barY, barW, barH, 3); ctx.fill();
   ctx.fillStyle='#3fb950';
@@ -1433,6 +1607,15 @@ function distribuirBarras(b, h, r, n) {
   for(let i=extra+1;i>=0;i--) pos.push([x0+i*(x1-x0)/(extra+1), y1]);
   // Cara izquierda
   for(let i=extra;i>=1;i--)   pos.push([x0, y0+i*(y1-y0)/(extra+1)]);
+  return pos;
+}
+
+function distribuirBarrasCirculares(D, r, n) {
+  const pos = [], Rs = D/2 - r, cx = D/2, cy = D/2;
+  for (let i = 0; i < n; i++) {
+    const ang = -Math.PI/2 + i*(2*Math.PI/n); // primera barra arriba (fibra extrema)
+    pos.push([cx + Rs*Math.cos(ang), cy + Rs*Math.sin(ang)]);
+  }
   return pos;
 }
 
@@ -1472,17 +1655,33 @@ function toggleAsInputs() {
   if (arrow) arrow.textContent = collapsed ? '▼' : '▲';
 }
 
+// ── Ocultar/mostrar el panel de datos de entrada (desktop) ──────
+function toggleInputsPanel() {
+  const main = document.getElementById('main-grid');
+  const tab  = document.getElementById('inputs-toggle-tab');
+  if (!main || !tab) return;
+  const collapsed = main.classList.toggle('inputs-collapsed');
+  tab.textContent = collapsed ? '›' : '‹';
+  tab.title = collapsed ? 'Mostrar panel de datos' : 'Ocultar panel de datos';
+}
+
 // ── Abrir Diagrama de Interacción pasando los parámetros actuales ──
 function abrirDiagrama() {
-  const b   = document.getElementById('i-b').value;
-  const h   = document.getElementById('i-h').value;
   const r   = document.getElementById('i-r').value;
   const fc  = getfc();   // siempre en MPa
   const fy  = getfy();   // siempre en MPa
   const Pu  = getPu();   // kN
   const Mu  = getMu();   // kN·m
-  // b, h, r están en cm — el diagrama los espera en cm también (convierte a m internamente)
-  const url = `/diagrama_interaccion?b=${b}&h=${h}&rec=${r}&fc=${fc.toFixed(1)}&fy=${fy.toFixed(0)}&Pu=${Pu.toFixed(1)}&Mu=${Mu.toFixed(2)}`;
+  // b, h, D, r están en cm — el diagrama los espera en cm también (convierte a m internamente)
+  let url;
+  if (shape === 'circ') {
+    const D = document.getElementById('i-D').value;
+    url = `/diagrama_interaccion?type=circular&D=${D}&rec=${r}&fc=${fc.toFixed(1)}&fy=${fy.toFixed(0)}&Pu=${Pu.toFixed(1)}&Mu=${Mu.toFixed(2)}`;
+  } else {
+    const b = document.getElementById('i-b').value;
+    const h = document.getElementById('i-h').value;
+    url = `/diagrama_interaccion?type=rectangular&b=${b}&h=${h}&rec=${r}&fc=${fc.toFixed(1)}&fy=${fy.toFixed(0)}&Pu=${Pu.toFixed(1)}&Mu=${Mu.toFixed(2)}`;
+  }
   window.open(url, '_blank');
 }
 </script>
@@ -1718,7 +1917,7 @@ function abrirDiagrama() {
       <div class="fm-header-text">
         <div class="fm-header-title">Fórmulas y Referencias — ACI 318-25</div>
         <div class="fm-header-sub">
-          <span class="fm-badge">Columna Rectangular</span>
+          <span class="fm-badge">Columna Rectangular o Circular</span>
           <span class="fm-badge">Refuerzo Simétrico</span>
           <span class="fm-badge">Flexión Uniaxial</span>
           <span style="color:#57606a;">&middot; Diseño por resistencia (LRFD)</span>
@@ -1805,7 +2004,11 @@ function abrirDiagrama() {
       <div class="fm-sec" style="border-bottom:none;padding-bottom:4px;">
         <div class="fm-scope">
           <strong>&#x26A0; Alcance y limitaciones:</strong> Esta herramienta calcula el refuerzo longitudinal bajo
-          <strong>carga axial + flexión uniaxial</strong> con refuerzo simétrico.
+          <strong>carga axial + flexión uniaxial</strong> con refuerzo simétrico, para secciones
+          <strong>rectangulares o circulares</strong>. En sección circular, A<sub>g</sub> = &#x3C0;&middot;D&sup2;/4 y el bloque
+          de compresión C<sub>c</sub> se integra sobre el segmento circular real (en vez de a&middot;b); el acero se
+          idealiza igual que en la sección rectangular, en dos capas (comprimida a d'=recubrimiento y
+          traccionada a d=D&minus;recubrimiento).
           <strong>No incluye:</strong> diseño de estribos o espiral (ACI §25.7),
           efectos de esbeltez (ACI §6.2.5), flexión biaxial (ACI §22.4.2.2),
           ni verificaciones sísmicas especiales.

@@ -1162,9 +1162,15 @@ function exportPDF(){
 ════════════════════════════════════════════════ */
 function readURLParams(){
   const sp=new URLSearchParams(window.location.search);
-  // b, h en cm → convertir a m
+  // Tipo de sección (viene de As Columna H.A.)
+  if(sp.get('type')==='circular'){
+    const radio=document.querySelector('input[name="sectionType"][value="circular"]');
+    if(radio) radio.checked=true;
+  }
+  // b, h, D en cm → convertir a m
   if(sp.has('b'))  document.getElementById('b').value=(parseFloat(sp.get('b'))/100).toFixed(3);
   if(sp.has('h'))  document.getElementById('h').value=(parseFloat(sp.get('h'))/100).toFixed(3);
+  if(sp.has('D'))  document.getElementById('diameter-circ').value=(parseFloat(sp.get('D'))/100).toFixed(3);
   if(sp.has('rec'))document.getElementById('rec').value=(parseFloat(sp.get('rec'))/100).toFixed(4);
   if(sp.has('fc')) document.getElementById('fc').value=sp.get('fc');
   if(sp.has('fy')) document.getElementById('fy').value=sp.get('fy');
