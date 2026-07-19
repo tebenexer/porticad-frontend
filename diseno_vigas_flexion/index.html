@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Diseño de Vigas a Flexión — PortiCAD Multi-Tools</title>
+<link rel="icon" href="/favicon.png" type="image/png" />
+<link rel="shortcut icon" href="/favicon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --sans:'Inter',system-ui,sans-serif;
+  --mono:'JetBrains Mono','Courier New',monospace;
+  --bg:#f3f4f6;--surface:#fff;--sidebar:#f9fafb;
+  --border:#e5e7eb;--border2:#d1d5db;
+  --text:#111827;--muted:#6b7280;
+  --accent:#1d4ed8;--accent2:#3b82f6;
+  --green:#16a34a;--red:#dc2626;--amber:#d97706;
+}
+body{font-family:var(--sans);background:#0d1117;color:#e6edf3;
+     font-size:15px;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+/* ── Topbar ── */
+.topbar{background:#161b22;border-bottom:1px solid #30363d;height:44px;
+        display:flex;align-items:center;padding:0 16px;gap:8px;flex-shrink:0;z-index:100}
+.topbar a{color:#58a6ff;font-size:14px;font-weight:700;text-decoration:none}
+.topbar-sep{color:#30363d;font-size:16px}
+.topbar-crumb{font-size:12px;color:#8b949e;display:flex;align-items:center;gap:6px}
+.topbar-title{font-size:13px;font-weight:600;color:#e6edf3}
+.badge{background:#1f6feb22;border:1px solid #1f6feb55;color:#58a6ff;
+       font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px}
+.badge.beta{background:#d2992222;border-color:#d2992255;color:#d29922}
+.calc-dot{width:7px;height:7px;border-radius:50%;background:#3fb950;transition:all .3s}
+.calc-dot.busy{background:#d29922;animation:blink .6s infinite}
+.calc-dot.err{background:#f85149}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.calc-msg{font-size:11px;color:#8b949e}
+
+/* ── Main layout ── */
+.main{display:grid;grid-template-columns:340px 1fr;flex:1;overflow:hidden}
+
+/* ── Inputs panel ── */
+.panel-inputs{background:#161b22;border-right:1px solid #21262d;
+              overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+.input-group{background:#0d1117;border:1px solid #21262d;border-radius:10px;
+             padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.sec-title{font-size:12.5px;font-weight:700;color:#58a6ff;letter-spacing:.6px;
+           text-transform:uppercase;padding-bottom:8px;border-bottom:1px solid #21262d;
+           display:flex;align-items:center;gap:6px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:13px;color:#8b949e;font-weight:500}
+.field label em{font-style:normal;color:#6e7681;font-size:12px}
+.field input,.field select{background:#161b22;border:1px solid #30363d;border-radius:7px;
+  color:#e6edf3;font-size:14px;padding:7px 10px;width:100%;outline:none;transition:border-color .15s}
+.field input:disabled{opacity:.4;cursor:not-allowed}
+.field input:focus,.field select:focus{border-color:#58a6ff;box-shadow:0 0 0 3px #1f6feb22}
+.field select option{background:#161b22}
+.chk-row{display:flex;align-items:center;gap:7px;font-size:13px;color:#c9d1d9;cursor:pointer}
+.chk-row input{accent-color:#58a6ff;width:14px;height:14px}
+.aci-note{background:#1f6feb0d;border:1px solid #1f6feb22;border-radius:8px;
+          padding:10px 12px;font-size:12px;color:#8b949e;line-height:1.6}
+.aci-note.warn{background:#9e6a0310;border-color:#9e6a0330;color:#d29922}
+.hidden{display:none!important}
+
+/* ── Results panel ── */
+.panel-results{overflow:hidden;display:flex;flex-direction:column}
+
+.summary-strip{background:#161b22;border-bottom:1px solid #21262d;padding:12px 16px;
+               display:flex;gap:10px;align-items:center;overflow-x:auto;flex-shrink:0}
+.scard{display:flex;flex-direction:column;gap:2px;min-width:90px;flex-shrink:0}
+.scard-lbl{font-size:11px;font-weight:700;color:#8b949e;letter-spacing:.5px;text-transform:uppercase}
+.scard-val{font-size:20px;font-weight:700;color:#e6edf3;line-height:1.15}
+.scard-val.ok{color:#3fb950}.scard-val.warn{color:#d29922}.scard-val.err{color:#f85149}
+.scard-unit{font-size:12px;color:#6e7681}
+.strip-sep{width:1px;height:44px;background:#21262d;margin:0 4px;flex-shrink:0}
+
+.results-body{flex:1;display:grid;grid-template-columns:1fr 460px;overflow:hidden}
+
+.res-card{border-right:1px solid #21262d;overflow-y:auto;padding:16px;
+          display:flex;flex-direction:column;gap:14px}
+.res-card:last-child{border-right:none}
+.res-title{font-size:12px;font-weight:700;color:#8b949e;letter-spacing:.5px;
+           text-transform:uppercase;padding-bottom:9px;border-bottom:1px solid #21262d}
+
+.verif-item{display:flex;align-items:flex-start;gap:8px;background:#161b22;
+            border:1px solid #21262d;border-radius:7px;padding:9px 12px;font-size:14px}
+.verif-item.ok{border-color:#23863630}.verif-item.err{border-color:#da363330}
+.verif-item.warn{border-color:#9e6a0330}.verif-item.info{border-color:#1f6feb30}
+.vdot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.ok .vdot{background:#3fb950}.err .vdot{background:#f85149}
+.warn .vdot{background:#d29922}.info .vdot{background:#58a6ff}
+.vtext{flex:1;color:#c9d1d9;line-height:1.5}
+
+.formula-box{background:#0d1117;border:1px solid #21262d;border-radius:8px;
+             padding:12px 14px;font-family:var(--mono);font-size:13.5px;color:#e6edf3;line-height:2}
+.formula-box span.key{color:#58a6ff}
+.formula-box span.val{color:#3fb950}
+.formula-box span.lbl{color:#8b949e;font-size:13px}
+.formula-box span.warn{color:#d29922}
+
+.msg-box{border-radius:8px;padding:12px 14px;font-size:15px;font-weight:600;margin:2px 0;line-height:1.5}
+.msg-box.ok{background:#23863614;border:1px solid #23863640;color:#3fb950}
+.msg-box.err{background:#da363314;border:1px solid #da363340;color:#f85149}
+.msg-box.warn{background:#9e6a0314;border:1px solid #9e6a0340;color:#d29922}
+
+.viz-section{display:flex;flex-direction:column;gap:10px;align-items:center}
+canvas{display:block;border-radius:8px;background:#0d1117;max-width:100%}
+.legend{display:flex;flex-wrap:wrap;gap:10px 16px;font-size:12.5px;color:#8b949e;padding:0 4px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:11px;height:11px;border-radius:2px;display:inline-block}
+
+/* ── Modal ACI ── */
+.aci-h{font-size:13px;font-weight:700;color:#58a6ff;letter-spacing:.3px;text-transform:uppercase;
+       padding-bottom:6px;border-bottom:1px solid #21262d;margin-bottom:2px}
+.aci-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.aci-table th{background:#0d1117;color:#8b949e;font-size:10.5px;font-weight:700;padding:7px 9px;
+              text-align:left;border-bottom:1px solid #21262d;text-transform:uppercase;letter-spacing:.3px}
+.aci-table td{padding:7px 9px;border-bottom:1px solid #21262d;color:#e6edf3;font-family:var(--mono);font-size:12px}
+.aci-table td.aci-ref{font-family:var(--sans);color:#58a6ff;font-weight:600;white-space:nowrap;font-size:11.5px}
+.aci-table tr:last-child td{border-bottom:none}
+.aci-explain{background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:12px 14px}
+.aci-explain.ok{border-color:#23863640}
+.aci-explain.warn{border-color:#9e6a0340}
+.aci-explain b.tag{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;margin-bottom:6px}
+.aci-explain.ok b.tag{background:#23863622;color:#3fb950}
+.aci-explain.warn b.tag{background:#9e6a0322;color:#d29922}
+
+@media(max-width:900px){
+  body{overflow:auto;height:auto}
+  .main{grid-template-columns:1fr;height:auto}
+  .results-body{grid-template-columns:1fr;height:auto;overflow:visible}
+  .res-card{border-right:none;border-bottom:1px solid #21262d}
+}
+</style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="topbar">
+  <a href="/">PortiCAD</a>
+  <span class="topbar-sep">›</span>
+  <div class="topbar-crumb">
+    <span class="topbar-title">Diseño de Vigas a Flexión</span>
+  </div>
+  <span class="badge beta" style="margin-left:8px">BETA v0.1</span>
+  <button id="btn-aci-info" onclick="openAciModal()"
+    style="margin-left:12px;background:#1f6feb18;border:1px solid #1f6feb55;color:#58a6ff;
+           font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:7px;cursor:pointer;
+           display:flex;align-items:center;gap:6px;">
+    📖 Fórmulas y ACI 318-25
+  </button>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+    <div class="calc-dot" id="calc-dot"></div>
+    <span class="calc-msg" id="calc-msg">Listo</span>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL: FÓRMULAS Y REFERENCIAS ACI 318-25 ══════════════ -->
+<div id="aci-modal" style="display:none;position:fixed;inset:0;background:rgba(1,4,9,0.72);
+     z-index:1000;align-items:center;justify-content:center;padding:24px;" onclick="if(event.target===this)closeAciModal()">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;max-width:760px;width:100%;
+       max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+    <div style="position:sticky;top:0;background:#161b22;border-bottom:1px solid #21262d;padding:14px 20px;
+         display:flex;align-items:center;gap:10px;z-index:1;">
+      <span style="font-size:15px;font-weight:700;color:#e6edf3;">📖 Fórmulas y Referencias — ACI 318-25</span>
+      <button onclick="closeAciModal()" style="margin-left:auto;background:none;border:none;color:#8b949e;
+              font-size:20px;cursor:pointer;line-height:1;padding:2px 6px;">×</button>
+    </div>
+    <div id="aci-modal-body" style="padding:18px 20px;display:flex;flex-direction:column;gap:16px;font-size:13.5px;line-height:1.65;color:#c9d1d9;">
+    </div>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ══════════════ INPUTS ══════════════ -->
+<div class="panel-inputs">
+
+  <!-- Sección -->
+  <div class="input-group">
+    <div class="sec-title">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+      Sección de la Viga
+    </div>
+    <div class="row2">
+      <div class="field"><label>Base b <em>(cm)</em></label>
+        <input id="i-b" type="number" value="30" min="10" step="1" oninput="recalc()"></div>
+      <div class="field"><label>Altura h <em>(cm)</em></label>
+        <input id="i-h" type="number" value="50" min="15" step="1" oninput="recalc()"></div>
+    </div>
+    <div class="field"><label>Recubrimiento al acero de tracción, r <em>(cm)</em></label>
+      <input id="i-r" type="number" value="5" min="1.5" step="0.5" oninput="recalc()"></div>
+    <div class="aci-note" style="font-size:10.5px">Peralte efectivo <strong>d = h − r</strong>, medido desde la fibra extrema en compresión hasta el centroide del acero en tracción.</div>
+  </div>
+
+  <!-- Materiales -->
+  <div class="input-group">
+    <div class="sec-title">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      Materiales
+    </div>
+    <div class="row2">
+      <div class="field"><label>f'c <em>(MPa)</em></label>
+        <select id="i-fc" onchange="recalc()">
+          <option value="20">20 — f'c 200</option>
+          <option value="21">21 — f'c 210</option>
+          <option value="24">24 — f'c 240</option>
+          <option value="28" selected>28 — f'c 280</option>
+          <option value="35">35 — f'c 350</option>
+          <option value="42">42 — f'c 420</option>
+        </select></div>
+      <div class="field"><label>fy <em>(MPa)</em></label>
+        <select id="i-fy" onchange="recalc()">
+          <option value="280">280 — Gr.40</option>
+          <option value="350">350 — Gr.50</option>
+          <option value="420" selected>420 — Gr.60</option>
+        </select></div>
+    </div>
+  </div>
+
+  <!-- Cargas -->
+  <div class="input-group">
+    <div class="sec-title">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+      Momento de Diseño
+    </div>
+    <div class="field"><label>Mu <em>(kN·m)</em></label>
+      <input id="i-Mu" type="number" value="100" min="0" step="1" oninput="recalc()"></div>
+  </div>
+
+  <!-- Acero de compresión -->
+  <div class="input-group">
+    <div class="sec-title">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+      Acero en Compresión
+    </div>
+    <div class="field"><label>Recubrimiento al acero de compresión, d' <em>(cm)</em></label>
+      <input id="i-dp" type="number" value="6" min="1.5" step="0.5" oninput="recalc()"></div>
+    <div class="aci-note" style="font-size:11px">
+      Si Mu supera φMn de la sección simplemente reforzada, el diseño doblemente reforzado (ACI 318-25) se calcula automáticamente usando este d'.
+    </div>
+
+    <div id="manual-comp-row">
+      <label class="chk-row">
+        <input type="checkbox" id="i-hascomp" onchange="recalc()">
+        Forzar visualización de A's manual (la sección no lo requiere)
+      </label>
+      <div class="field" style="margin-top:8px">
+        <label>A's manual <em>(cm²)</em></label>
+        <input id="i-Asp" type="number" value="5.10" min="0" step="0.1" oninput="recalc()" disabled></div>
+    </div>
+  </div>
+
+  <div class="aci-note">
+    <strong style="color:#58a6ff">Método</strong> · Bloque rectangular equivalente (Whitney) ·
+    γ = 0.85 · εu = 0.003 · φ = 0.9<br>
+    Herramienta en <strong style="color:#d29922">beta</strong>: se irá ajustando con el uso.
+  </div>
+
+</div><!-- /panel-inputs -->
+
+<!-- ══════════════ RESULTS ══════════════ -->
+<div class="panel-results">
+
+  <div class="summary-strip" id="summary-strip">
+    <div class="scard">
+      <div class="scard-lbl">As requerido</div>
+      <div class="scard-val" id="s-As">—</div>
+      <div class="scard-unit">cm²</div>
+    </div>
+    <div class="strip-sep" id="sep-Asp" style="display:none"></div>
+    <div class="scard" id="card-Asp" style="display:none">
+      <div class="scard-lbl">A's requerido</div>
+      <div class="scard-val" id="s-Asp">—</div>
+      <div class="scard-unit">cm²</div>
+    </div>
+    <div class="strip-sep"></div>
+    <div class="scard">
+      <div class="scard-lbl">a</div>
+      <div class="scard-val" id="s-a">—</div>
+      <div class="scard-unit">cm</div>
+    </div>
+    <div class="strip-sep"></div>
+    <div class="scard">
+      <div class="scard-lbl">c (E.N.)</div>
+      <div class="scard-val" id="s-c">—</div>
+      <div class="scard-unit">cm</div>
+    </div>
+    <div class="strip-sep"></div>
+    <div class="scard">
+      <div class="scard-lbl">φMn</div>
+      <div class="scard-val" id="s-phiMn">—</div>
+      <div class="scard-unit">kN·m</div>
+    </div>
+    <div class="strip-sep"></div>
+    <div class="scard">
+      <div class="scard-lbl">As mín.</div>
+      <div class="scard-val" id="s-Asmin">—</div>
+      <div class="scard-unit">cm²</div>
+    </div>
+    <div class="strip-sep"></div>
+    <div class="scard">
+      <div class="scard-lbl">As máx.</div>
+      <div class="scard-val" id="s-Asmax">—</div>
+      <div class="scard-unit">cm²</div>
+    </div>
+  </div>
+
+  <div class="results-body">
+
+    <div class="res-card" style="align-items:center">
+      <div class="res-title" style="align-self:stretch">Detalle de Refuerzo</div>
+      <div class="viz-section">
+        <canvas id="cviz" width="420" height="560"></canvas>
+        <div class="legend">
+          <span><i style="background:#1f6feb40"></i>Zona compresión (a)</span>
+          <span><i style="background:#3fb950"></i>Eje neutro (c)</span>
+          <span><i style="background:#c9822e"></i>As tracción</span>
+          <span><i style="background:#5a7a9e"></i>A's compresión</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="res-card">
+      <div id="msg-content"></div>
+
+      <div class="res-title">Verificaciones</div>
+      <div id="verif-content" style="display:flex;flex-direction:column;gap:5px">
+        <div class="empty-hint">Calculando…</div>
+      </div>
+
+      <div class="res-title" style="margin-top:4px">Fórmulas Aplicadas</div>
+      <div id="formula-detail"></div>
+    </div>
+
+  </div>
+</div><!-- /panel-results -->
+</div><!-- /main -->
+
+<script>
+/* ════════════════════════════════════════════════════════
+   MOTOR DE CÁLCULO — Flexión simple y doblemente reforzada
+   ACI 318-25 — bloque rectangular equivalente (Whitney)
+   Simple: portado desde vigaflexionv0.0.9.py
+   Doble: método clásico de compatibilidad de deformaciones,
+          fijando c en el límite controlado por tracción (εt=0.005)
+════════════════════════════════════════════════════════ */
+const GAMMA = 0.85;      // 0.85·f'c — intensidad del bloque equivalente (§22.2.2.4.1)
+const EPS_U = 0.003;     // deformación última del hormigón (§22.2.2.1)
+const EPS_TL = 0.005;    // límite inferior de εt para sección controlada por tracción (Tabla 21.2.2)
+const ES = 200000;       // módulo de elasticidad del acero, MPa (§20.2.2.2)
+
+function beta1(fc) {
+  if (fc <= 28) return 0.85;
+  if (fc >= 55) return 0.65;
+  return 0.85 - (0.05 * (fc - 28) / 7);
+}
+function rhoMax(beta_1, fc, fy) {
+  return ((GAMMA * beta_1 * fc) / fy) * (EPS_U / (EPS_U + EPS_TL));
+}
+
+function calcViga(p) {
+  const { b_cm, h_cm, r_cm, fc, fy, Mu, dp_cm } = p;
+  const b = b_cm / 100, h = h_cm / 100, d_ = r_cm / 100;   // metros
+  const d = h - d_;
+  if (d <= 0) return { err: 'El recubrimiento r debe ser menor que h.' };
+
+  const beta_1 = beta1(fc);
+  const rho_max = rhoMax(beta_1, fc, fy);
+
+  const As_max = rho_max * b * d * 10000;   // cm² — As máx. sección simplemente reforzada (εt=0.005)
+  const phi_Mmax = 0.9 * As_max * fy * (d * 100 - (As_max * fy) / (2 * GAMMA * fc * b * 100)) / 1000; // kN·m
+
+  const Asmin1 = (Math.sqrt(fc) * b * d / (4 * fy)) * 10000;
+  const Asmin2 = (1.4 * b * d / fy) * 10000;
+  const As_min = Math.max(Asmin1, Asmin2);
+
+  let As = 0, a = 0, c = 0, needsComp = false;
+  let detail = null, doubly = null;
+
+  if (Mu < phi_Mmax) {
+    const dcm = d * 100, bcm = b * 100, MuMN = Mu * 1000;
+    const A = 0.9 * dcm;
+    const B = 0.81 * dcm ** 2;
+    const C = 1.8 * MuMN / (GAMMA * fc * bcm);
+    const D = 0.9 * fy / (GAMMA * fc * bcm);
+    if (B >= C) {
+      const RAIZ = Math.sqrt(B - C);
+      As = (A - RAIZ) / D;
+      a = As * fy / (0.85 * fc * bcm);
+      c = a / beta_1;
+      detail = { A, B, C, D, RAIZ, dcm, bcm, MuMN };
+    }
+  } else {
+    needsComp = true;
+    doubly = calcDoublyReinforced(d * 100, b * 100, dp_cm, fc, fy, beta_1, As_max, phi_Mmax, Mu);
+    As = doubly.As_total;
+    a = doubly.a1;
+    c = doubly.c1;
+  }
+
+  return {
+    ok: true,
+    b_cm, h_cm, r_cm, d_cm: d * 100,
+    fc, fy, Mu,
+    beta_1, rho_max, As_max, phi_Mmax, As_min, Asmin1, Asmin2,
+    As, a, c, needsComp, detail, doubly,
+  };
+}
+
+/* ── Diseño doblemente reforzado — ACI 318-25 ──
+   Se fija c = c1 (el máximo permitido para sección controlada por
+   tracción, εt=0.005 → φ=0.9, Tabla 21.2.2) y se añade el par
+   As2/A's para cubrir el momento adicional sobre M n1 sin mover
+   el eje neutro (así φ=0.9 se mantiene exacto). */
+function calcDoublyReinforced(dcm, bcm, dp_cm, fc, fy, beta_1, As1, phi_Mn1, Mu) {
+  const c1 = dcm * EPS_U / (EPS_U + EPS_TL);   // cm — c máx. controlado por tracción
+  const a1 = beta_1 * c1;
+
+  const Mn1 = phi_Mn1 / 0.9;      // kN·m nominal (sección simplemente reforzada, As1)
+  const Mn_req = Mu / 0.9;        // kN·m nominal total requerido
+  const dMn = Mn_req - Mn1;       // kN·m — momento adicional a cubrir con el par As2 / A's
+
+  const z = dcm - dp_cm;          // brazo de palanca del par As2 / A's
+  const eps_y = fy / ES;
+
+  let err = null, As2 = 0, Asp = 0, eps_sp = 0, fsp = 0, yields = false;
+
+  if (dp_cm >= c1) {
+    err = `d' (${dp_cm.toFixed(1)} cm) ≥ c (${c1.toFixed(2)} cm): el acero de compresión quedaría fuera de la zona de compresión. Reduce d' o aumenta la sección.`;
+  } else if (z <= 0) {
+    err = `d' (${dp_cm.toFixed(1)} cm) debe ser menor que d (${dcm.toFixed(1)} cm).`;
+  } else {
+    As2 = (dMn * 1000) / (fy * z);                 // cm²
+    eps_sp = EPS_U * (c1 - dp_cm) / c1;             // deformación en el acero de compresión
+    yields = eps_sp >= eps_y;
+    fsp = yields ? fy : ES * eps_sp;                // MPa
+    const denom = fsp - GAMMA * fc;
+    if (denom <= 0) {
+      err = `f's' (${fsp.toFixed(0)} MPa) ≤ 0.85·f'c (${(GAMMA * fc).toFixed(0)} MPa): el acero de compresión no aporta capacidad neta útil con este d'. Reduce d' o usa mayor f'c.`;
+    } else {
+      Asp = As2 * fy / denom;                       // cm²
+    }
+  }
+
+  const As_total = As1 + (err ? 0 : As2);
+
+  return { c1, a1, Mn1, Mn_req, dMn, z, eps_y, As1, As2, Asp, eps_sp, fsp, yields, err, As_total };
+}
+
+/* ════════════════════════════════════════════════════════
+   RECÁLCULO / RENDER
+════════════════════════════════════════════════════════ */
+let _deb = null;
+function recalc() {
+  onCompChange();
+  clearTimeout(_deb);
+  setDot('busy', 'Calculando…');
+  _deb = setTimeout(_doCalc, 60);
+}
+
+function readParams() {
+  return {
+    b_cm: parseFloat(document.getElementById('i-b').value) || 30,
+    h_cm: parseFloat(document.getElementById('i-h').value) || 50,
+    r_cm: parseFloat(document.getElementById('i-r').value) || 5,
+    fc:   parseFloat(document.getElementById('i-fc').value) || 28,
+    fy:   parseFloat(document.getElementById('i-fy').value) || 420,
+    Mu:   parseFloat(document.getElementById('i-Mu').value) || 0,
+    hasComp: document.getElementById('i-hascomp').checked,
+    dp_cm: parseFloat(document.getElementById('i-dp').value) || 6,
+    Asp_cm2: parseFloat(document.getElementById('i-Asp').value) || 0,
+  };
+}
+
+let _lastR = null, _lastP = null;
+
+function _doCalc() {
+  const p = readParams();
+  const r = calcViga(p);
+  _lastR = r.err ? null : r;
+  _lastP = p;
+  if (r.err) {
+    setDot('err', 'Error');
+    document.getElementById('msg-content').innerHTML = `<div class="msg-box err">${r.err}</div>`;
+    document.getElementById('verif-content').innerHTML = '';
+    document.getElementById('formula-detail').innerHTML = '';
+    return;
+  }
+  setDot('ok', 'Listo');
+  document.getElementById('manual-comp-row').style.display = r.needsComp ? 'none' : '';
+  renderSummary(r, p);
+  renderMsg(r);
+  renderVerif(r, p);
+  renderFormulas(r);
+  drawSection(r, p);
+  if (document.getElementById('aci-modal').style.display === 'flex') renderAciModalBody(r, p);
+}
+
+function setDot(s, m) {
+  document.getElementById('calc-dot').className = 'calc-dot ' + s;
+  document.getElementById('calc-msg').textContent = m;
+}
+
+function f1(v) { return typeof v === 'number' && isFinite(v) ? v.toFixed(1) : '—'; }
+function f2(v) { return typeof v === 'number' && isFinite(v) ? v.toFixed(2) : '—'; }
+function f4(v) { return typeof v === 'number' && isFinite(v) ? v.toFixed(4) : '—'; }
+
+function renderSummary(r, p) {
+  document.getElementById('s-As').textContent = f2(r.As);
+  document.getElementById('s-a').textContent  = f2(r.a);
+  document.getElementById('s-c').textContent  = f2(r.c);
+
+  const phiEl = document.getElementById('s-phiMn');
+  phiEl.textContent = f1(r.phi_Mmax);
+  phiEl.className   = 'scard-val ' + (r.needsComp ? 'warn' : 'ok');
+
+  document.getElementById('s-Asmin').textContent = f2(r.As_min);
+
+  const maxEl = document.getElementById('s-Asmax');
+  maxEl.textContent = f2(r.As_max);
+  maxEl.className   = 'scard-val';
+
+  const showAsp = (r.needsComp && r.doubly && !r.doubly.err) || (!r.needsComp && p.hasComp);
+  document.getElementById('sep-Asp').style.display  = showAsp ? '' : 'none';
+  document.getElementById('card-Asp').style.display = showAsp ? '' : 'none';
+  if (showAsp) {
+    document.getElementById('s-Asp').textContent = f2(r.needsComp ? r.doubly.Asp : p.Asp_cm2);
+  }
+}
+
+function renderMsg(r) {
+  let html;
+  if (r.needsComp) {
+    if (r.doubly.err) {
+      html = `<div class="msg-box err">⚠ Se requiere acero de compresión pero el diseño no es válido con el d' actual:<br>${r.doubly.err}</div>`;
+    } else {
+      html = `<div class="msg-box warn">⚠ Sección doblemente reforzada (ACI 318-25) — φMn simple (${f1(r.phi_Mmax)} kN·m) &lt; Mu (${f1(r.Mu)} kN·m).<br>
+        As total = ${f2(r.As)} cm² (As₁=${f2(r.doubly.As1)} + As₂=${f2(r.doubly.As2)}) · A's = ${f2(r.doubly.Asp)} cm²</div>`;
+    }
+  } else {
+    html = `<div class="msg-box ok">✓ No necesita acero a compresión — φMn (${f1(r.phi_Mmax)} kN·m) ≥ Mu (${f1(r.Mu)} kN·m).</div>`;
+  }
+  document.getElementById('msg-content').innerHTML = html;
+}
+
+function renderVerif(r, p) {
+  const vOk   = t => `<div class="verif-item ok"><div class="vdot"></div><span class="vtext">✓ ${t}</span></div>`;
+  const vErr  = t => `<div class="verif-item err"><div class="vdot"></div><span class="vtext">✗ ${t}</span></div>`;
+  const vWarn = t => `<div class="verif-item warn"><div class="vdot"></div><span class="vtext">⚠ ${t}</span></div>`;
+  const vInfo = t => `<div class="verif-item info"><div class="vdot"></div><span class="vtext">ℹ ${t}</span></div>`;
+
+  let items = [];
+  items.push(vInfo(`d = h − r = ${f2(r.d_cm)} cm`));
+  items.push(vInfo(`β₁ = ${f2(r.beta_1)}   ·   ρmáx = ${f4(r.rho_max)}`));
+
+  if (r.needsComp) {
+    const d = r.doubly;
+    items.push(vWarn(`Mu/φ = ${f1(d.Mn_req)} kN·m &gt; Mn₁ = ${f1(d.Mn1)} kN·m — se añade el par As₂/A's (§22.2, diseño doblemente reforzado)`));
+    items.push(vInfo(`c fijado en el límite controlado por tracción: c = c₁ = ${f2(d.c1)} cm (εt = 0.005 → φ = 0.9, Tabla 21.2.2)`));
+
+    if (d.err) {
+      items.push(vErr(d.err));
+    } else {
+      items.push(vInfo(`εs' = ${f4(d.eps_sp)}   ·   εy = ${f4(d.eps_y)}`));
+      items.push(d.yields
+        ? vOk(`El acero de compresión fluye (εs' ≥ εy) → f's' = fy = ${f1(r.fy)} MPa`)
+        : vWarn(`El acero de compresión NO fluye (εs' &lt; εy) → f's' = Es·εs' = ${f1(d.fsp)} MPa`));
+
+      items.push(vInfo(`As₁ (bloque simple) = ${f2(d.As1)} cm²   ·   As₂ (par con A's) = ${f2(d.As2)} cm²`));
+      items.push(vOk(`As total = As₁+As₂ = ${f2(r.As)} cm²   ·   A's = ${f2(d.Asp)} cm²`));
+
+      const cumpleMin = r.As >= r.As_min;
+      items.push(cumpleMin
+        ? vOk(`As total = ${f2(r.As)} cm² ≥ As mín = ${f2(r.As_min)} cm²`)
+        : vWarn(`As total = ${f2(r.As)} cm² &lt; As mín = ${f2(r.As_min)} cm² — usar As mín`));
+    }
+  } else {
+    const cumpleMin = r.As >= r.As_min;
+    items.push(cumpleMin
+      ? vOk(`As = ${f2(r.As)} cm² ≥ As mín = ${f2(r.As_min)} cm²`)
+      : vWarn(`As = ${f2(r.As)} cm² &lt; As mín = ${f2(r.As_min)} cm² — usar As mín`));
+
+    const cumpleMax = r.As <= r.As_max;
+    items.push(cumpleMax
+      ? vOk(`As = ${f2(r.As)} cm² ≤ As máx = ${f2(r.As_max)} cm²`)
+      : vErr(`As = ${f2(r.As)} cm² &gt; As máx = ${f2(r.As_max)} cm²`));
+
+    items.push(vInfo(`a = ${f2(r.a)} cm   ·   c = a/β₁ = ${f2(r.c)} cm`));
+
+    if (p.hasComp) items.push(vInfo(`A's manual = ${f2(p.Asp_cm2)} cm² — solo para visualización, no requerida por el diseño`));
+  }
+
+  document.getElementById('verif-content').innerHTML = items.join('');
+}
+
+function renderFormulas(r) {
+  let html = `<div class="formula-box">
+    <span class="lbl">β₁ =</span> <span class="val">${f2(r.beta_1)}</span><br>
+    <span class="lbl">ρmáx = (γ·β₁·f'c/fy)·(εu/(εu+0.005)) =</span> <span class="val">${f4(r.rho_max)}</span><br>
+    <span class="lbl">As máx = ρmáx·b·d =</span> <span class="val">${f2(r.As_max)} cm²</span><br>
+    <span class="lbl">φMn (As máx) =</span> <span class="val">${f1(r.phi_Mmax)} kN·m</span><br><br>
+    <span class="lbl">As mín = max(√f'c·b·d/4fy , 1.4·b·d/fy)</span><br>
+    <span class="lbl">&nbsp;&nbsp;= max(${f2(r.Asmin1)}, ${f2(r.Asmin2)}) =</span> <span class="val">${f2(r.As_min)} cm²</span>
+  </div>`;
+
+  if (r.detail) {
+    const d = r.detail;
+    html += `<div class="formula-box" style="margin-top:6px">
+      <span class="lbl">Ecuación cuadrática de equilibrio (bloque Whitney):</span><br>
+      A = 0.9·d = <span class="val">${f2(d.A)}</span>
+      <span class="lbl">&nbsp;&nbsp;B = 0.81·d² =</span> <span class="val">${f1(d.B)}</span><br>
+      C = 1.8·Mu/(γ·f'c·b) = <span class="val">${f2(d.C)}</span>
+      <span class="lbl">&nbsp;&nbsp;D = 0.9·fy/(γ·f'c·b) =</span> <span class="val">${f4(d.D)}</span><br>
+      RAIZ = √(B−C) = <span class="val">${f2(d.RAIZ)}</span><br>
+      <span class="lbl">As = (A−RAIZ)/D =</span> <span class="val">${f2(r.As)} cm²</span><br>
+      <span class="lbl">a = As·fy/(0.85·f'c·b) =</span> <span class="val">${f2(r.a)} cm</span>
+      <span class="lbl">&nbsp;&nbsp;c = a/β₁ =</span> <span class="val">${f2(r.c)} cm</span>
+    </div>`;
+  } else if (!r.needsComp) {
+    html += `<div class="formula-box warn" style="margin-top:6px">
+      <span class="warn">Mu = 0 — sin demanda de acero a tracción.</span>
+    </div>`;
+  }
+
+  if (r.needsComp) {
+    const d = r.doubly;
+    html += `<div class="formula-box" style="margin-top:6px">
+      <span class="lbl">Diseño doblemente reforzado — c fijo en el límite controlado por tracción:</span><br>
+      c₁ = d·εu/(εu+0.005) = <span class="val">${f2(d.c1)} cm</span>
+      <span class="lbl">&nbsp;&nbsp;a₁ = β₁·c₁ =</span> <span class="val">${f2(d.a1)} cm</span><br>
+      As₁ = As máx = <span class="val">${f2(d.As1)} cm²</span>
+      <span class="lbl">&nbsp;&nbsp;Mn₁ = φMn(As máx)/0.9 =</span> <span class="val">${f1(d.Mn1)} kN·m</span><br><br>
+      <span class="lbl">Mn requerido = Mu/φ =</span> <span class="val">${f1(d.Mn_req)} kN·m</span><br>
+      <span class="lbl">ΔMn = Mn req − Mn₁ =</span> <span class="val">${f1(d.dMn)} kN·m</span><br>
+      <span class="lbl">As₂ = ΔMn/(fy·(d−d')) =</span> <span class="val">${f2(d.As2)} cm²</span><br><br>
+      <span class="lbl">εs' = εu·(c₁−d')/c₁ =</span> <span class="val">${f4(d.eps_sp)}</span>
+      <span class="lbl">&nbsp;&nbsp;εy = fy/Es =</span> <span class="val">${f4(d.eps_y)}</span><br>
+      <span class="lbl">f's' =</span> <span class="val">${f1(d.fsp)} MPa</span> ${d.yields ? '<span class="val">(fluye)</span>' : '<span class="warn">(no fluye)</span>'}<br>
+      <span class="lbl">A's = As₂·fy/(f's'−γ·f'c) =</span> <span class="val">${d.err ? '—' : f2(d.Asp) + ' cm²'}</span><br><br>
+      <span class="lbl">As total = As₁+As₂ =</span> <span class="val">${f2(r.As)} cm²</span>
+    </div>`;
+  }
+
+  document.getElementById('formula-detail').innerHTML = html;
+}
+
+/* ════════════════════════════════════════════════════════
+   MODAL — FÓRMULAS Y REFERENCIAS ACI 318-25
+════════════════════════════════════════════════════════ */
+function openAciModal() {
+  document.getElementById('aci-modal').style.display = 'flex';
+  if (_lastR) renderAciModalBody(_lastR, _lastP);
+  else document.getElementById('aci-modal-body').innerHTML = '<div class="empty-hint">Ingresa datos válidos para ver el detalle.</div>';
+}
+function closeAciModal() {
+  document.getElementById('aci-modal').style.display = 'none';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAciModal(); });
+
+function renderAciModalBody(r, p) {
+  const eps_y = r.fy / ES;
+
+  // ── Deformación y fluencia del acero de TRACCIÓN ──
+  let eps_t, cUsed;
+  if (r.needsComp) {
+    cUsed = r.doubly.c1;
+    eps_t = EPS_TL; // fijado por construcción en el límite controlado por tracción
+  } else if (r.detail) {
+    cUsed = r.c;
+    eps_t = EPS_U * (r.d_cm - r.c) / r.c;
+  } else {
+    cUsed = null; eps_t = null;
+  }
+
+  let tensHtml = '';
+  if (eps_t != null) {
+    const tensYields = eps_t >= eps_y;
+    tensHtml = `
+      <div class="aci-explain ${tensYields ? 'ok' : 'warn'}">
+        <b class="tag">${tensYields ? '✓ EL ACERO DE TRACCIÓN FLUYE' : '⚠ EL ACERO DE TRACCIÓN NO FLUYE'}</b>
+        <div>εt = εu·(d−c)/c = 0.003·(${f2(r.d_cm)}−${f2(cUsed)})/${f2(cUsed)} = <b>${f4(eps_t)}</b><br>
+        εy = fy/Es = ${r.fy}/${ES} = <b>${f4(eps_y)}</b></div>
+        <div style="margin-top:8px">
+        ${tensYields
+          ? `Como εt (${f4(eps_t)}) ≥ εy (${f4(eps_y)}), el acero de tracción fluye antes de que el hormigón alcance su deformación última εu=0.003 — esto valida usar fs=fy en la ecuación de equilibrio. Además εt ≥ 0.005, el límite inferior de las secciones <b>controladas por tracción</b> (Tabla 21.2.2), por lo que φ=0.9 exacto.
+             Esta condición es <b>intencional</b>: la herramienta restringe el diseño a As ≤ As máx precisamente para garantizarla — así la falla es dúctil (grandes deflexiones y fisuración visibles antes del colapso) en vez de frágil por aplastamiento súbito del hormigón.`
+          : `Esto no debería ocurrir en un diseño válido de esta herramienta (As siempre se limita a As máx). Si lo ves, revisa los datos de entrada.`}
+        </div>
+      </div>`;
+  }
+
+  // ── Deformación y fluencia del acero de COMPRESIÓN ──
+  let compHtml = '';
+  if (r.needsComp && r.doubly && !r.doubly.err) {
+    const d = r.doubly;
+    compHtml = `
+      <div class="aci-explain ${d.yields ? 'ok' : 'warn'}">
+        <b class="tag">${d.yields ? '✓ EL ACERO DE COMPRESIÓN FLUYE' : '⚠ EL ACERO DE COMPRESIÓN NO FLUYE'}</b>
+        <div>εs' = εu·(c−d')/c = 0.003·(${f2(d.c1)}−${f1(p.dp_cm)})/${f2(d.c1)} = <b>${f4(d.eps_sp)}</b><br>
+        εy = fy/Es = <b>${f4(d.eps_y)}</b>   →   f's' = <b>${f1(d.fsp)} MPa</b> ${d.yields ? '(= fy)' : '(&lt; fy, acero elástico)'}</div>
+        <div style="margin-top:8px">
+        ${d.yields
+          ? `El acero de compresión alcanza la fluencia porque está lo bastante cerca de la fibra extrema en compresión (d' pequeño frente a c): εs' (${f4(d.eps_sp)}) ≥ εy (${f4(d.eps_y)}). <b>Esta es la condición más eficiente</b>: el acero trabaja a su esfuerzo nominal fy completo, por lo que se necesita <b>menos área de A's</b> para aportar la fuerza de compresión requerida (menor costo, menos congestión de barras).`
+          : `El acero de compresión NO alcanza la fluencia porque d' es relativamente grande frente a c (queda más cerca del eje neutro que de la fibra extrema en compresión): εs' (${f4(d.eps_sp)}) &lt; εy (${f4(d.eps_y)}). El diseño sigue siendo <b>válido y seguro</b> — se usa el esfuerzo real f's'=Es·εs' (menor que fy) en el equilibrio de fuerzas, no un valor supuesto — pero es <b>menos eficiente</b>: cada cm² de A's aporta menos fuerza, por lo que se necesita <b>más área de acero</b> que si hubiera fluido.`}
+        <br><br><b>¿Es mejor que fluya o que no?</b> En términos de eficiencia de material, <b>siempre es preferible que el acero de compresión fluya</b>: se aprovecha su capacidad completa y el diseño resulta más económico. El ACI 318 no exige que fluya — solo exige equilibrio de fuerzas y compatibilidad de deformaciones (§22.2.1) — por lo que no fluir no es un error ni una condición insegura, solo menos óptima. Para favorecer la fluencia se puede reducir d' (acercar el acero de compresión a la cara comprimida), dentro de los límites de recubrimiento mínimo por durabilidad.
+        </div>
+      </div>`;
+  }
+
+  const html = `
+    <div>
+      <div class="aci-h">Fórmulas usadas y su referencia en ACI 318-25</div>
+      <div style="overflow-x:auto">
+      <table class="aci-table">
+        <thead><tr><th>Concepto</th><th>Fórmula</th><th>ACI 318-25</th></tr></thead>
+        <tbody>
+          <tr><td>Hipótesis de diseño (secciones planas, compatibilidad de deformaciones)</td><td>—</td><td class="aci-ref">§22.2.1</td></tr>
+          <tr><td>Deformación última del hormigón</td><td>εu = 0.003</td><td class="aci-ref">§22.2.2.1</td></tr>
+          <tr><td>Resistencia a tracción del hormigón despreciada</td><td>—</td><td class="aci-ref">§22.2.2.2</td></tr>
+          <tr><td>Relación esfuerzo-deformación del acero (elástico hasta fy, luego constante)</td><td>fs=Es·εs ≤ fy</td><td class="aci-ref">§22.2.2.3</td></tr>
+          <tr><td>Bloque rectangular equivalente (Whitney)</td><td>C = 0.85·f'c·a·b</td><td class="aci-ref">§22.2.2.4.1</td></tr>
+          <tr><td>Factor β₁ según f'c</td><td>a = β₁·c</td><td class="aci-ref">§22.2.2.4.3</td></tr>
+          <tr><td>Módulo de elasticidad del acero</td><td>Es = 200 000 MPa</td><td class="aci-ref">§20.2.2.2</td></tr>
+          <tr><td>Secciones controladas por tracción → φ=0.9</td><td>εt ≥ 0.005</td><td class="aci-ref">Tabla 21.2.2 / §21.2.2</td></tr>
+          <tr><td>Deformación de fluencia del acero</td><td>εy = fy/Es</td><td class="aci-ref">§21.2.2</td></tr>
+          <tr><td>Acero mínimo a flexión</td><td>As,mín = max(0.25√f'c/fy, 1.4/fy)·b·d</td><td class="aci-ref">§9.6.1.2</td></tr>
+          <tr><td>Equilibrio de fuerzas, sección simplemente reforzada</td><td>As·fy = 0.85·f'c·a·b</td><td class="aci-ref">§22.2 (aplicación de §22.2.1–22.2.2)</td></tr>
+          <tr><td>Par adicional As₂ / A's (doblemente reforzada)</td><td>As₂·fy = A's·(f's'−0.85f'c)</td><td class="aci-ref">§22.2.1 (compatibilidad de deformaciones)</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <div style="font-size:11px;color:#6e7681;margin-top:6px">
+        Numeración de acápites según la organización de ACI 318-19/318-25, Capítulos 9, 20, 21 y 22 (requisitos generales de resistencia a flexión). El diseño doblemente reforzado es una aplicación directa del principio general de compatibilidad de deformaciones (§22.2.1); el ACI no entrega una fórmula cerrada única para el par As₂/A's.
+      </div>
+    </div>
+
+    <div>
+      <div class="aci-h">¿Fluye el acero?</div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+        ${tensHtml || '<div class="empty-hint">Sin solución de tracción calculada.</div>'}
+        ${compHtml}
+      </div>
+    </div>`;
+
+  document.getElementById('aci-modal-body').innerHTML = html;
+}
+
+/* ════════════════════════════════════════════════════════
+   CANVAS — SECCIÓN Y REFUERZO (estilo fusiónVigaFlexiónDibujo)
+════════════════════════════════════════════════════════ */
+function seededRng(seed) {
+  let s = seed | 0;
+  return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; };
+}
+
+function drawArrow(ctx, x1, y1, x2, y2, color, w) {
+  ctx.strokeStyle = color; ctx.lineWidth = w || 1.2;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  const ang = Math.atan2(y2 - y1, x2 - x1), s = 5;
+  [[x1, y1, ang], [x2, y2, ang + Math.PI]].forEach(([x, y, a]) => {
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - s * Math.cos(a - 0.4), y - s * Math.sin(a - 0.4));
+    ctx.lineTo(x - s * Math.cos(a + 0.4), y - s * Math.sin(a + 0.4));
+    ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+  });
+}
+
+function drawBar(ctx, px, py, rb, tone) {
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath(); ctx.arc(px + 0.8, py + 0.8, rb + 1, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#1e293b';
+  ctx.beginPath(); ctx.arc(px, py, rb + 1.4, 0, Math.PI * 2); ctx.fill();
+  const g = ctx.createRadialGradient(px - rb * 0.3, py - rb * 0.3, 0, px, py, rb);
+  if (tone === 'comp') { g.addColorStop(0, '#8fb3d9'); g.addColorStop(0.55, '#5a7a9e'); g.addColorStop(1, '#2f4257'); }
+  else { g.addColorStop(0, '#eca326'); g.addColorStop(0.55, '#b87333'); g.addColorStop(1, '#6b3a10'); }
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, rb, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.beginPath(); ctx.arc(px - rb * 0.28, py - rb * 0.28, rb * 0.3, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawSection(r, p) {
+  const cv = document.getElementById('cviz');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const b = r.b_cm, h = r.h_cm, d = r.d_cm, rCover = r.r_cm;
+  const autoComp = r.needsComp && r.doubly && !r.doubly.err;
+  const hasComp = autoComp || (!r.needsComp && p.hasComp);
+  const dp = p.dp_cm, Asp = autoComp ? r.doubly.Asp : p.Asp_cm2;
+
+  const ml = 78, mr = hasComp ? 138 : 112, mt = 36, mb = 56;
+  const cw = W - ml - mr, ch = H - mt - mb;
+  const esc = Math.min(cw / b, ch / h);
+  const ox = ml + (cw - b * esc) / 2;
+  const oy = mt + (ch - h * esc) / 2;
+
+  // ── Concreto con textura ──
+  ctx.save();
+  ctx.beginPath(); ctx.rect(ox, oy, b * esc, h * esc); ctx.clip();
+  ctx.fillStyle = '#b0afa6'; ctx.fillRect(ox, oy, b * esc, h * esc);
+  const grd = ctx.createLinearGradient(ox, oy, ox + b * esc, oy + h * esc);
+  grd.addColorStop(0, 'rgba(255,255,245,0.16)'); grd.addColorStop(1, 'rgba(0,0,0,0.12)');
+  ctx.fillStyle = grd; ctx.fillRect(ox, oy, b * esc, h * esc);
+  const rng = seededRng(Math.round(b * 1000 + h));
+  for (let i = 0; i < Math.floor(b * h * esc * esc / 130); i++) {
+    const px = ox + rng() * b * esc, py = oy + rng() * h * esc, sz = 2 + rng() * 4, g = 112 + Math.floor(rng() * 60);
+    ctx.fillStyle = `rgba(${g},${g - 3},${g - 8},${0.2 + rng() * 0.3})`;
+    ctx.beginPath(); ctx.ellipse(px, py, sz, sz * (0.5 + rng() * 0.6), rng() * Math.PI, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+
+  // Borde sección
+  ctx.strokeStyle = '#374151'; ctx.lineWidth = 1.6;
+  ctx.strokeRect(ox, oy, b * esc, h * esc);
+
+  // ── Zona de compresión (bloque Whitney "a") ──
+  if (r.a > 0) {
+    ctx.fillStyle = 'rgba(88,166,255,0.22)';
+    ctx.fillRect(ox, oy, b * esc, r.a * esc);
+    ctx.strokeStyle = 'rgba(88,166,255,0.55)'; ctx.lineWidth = 1;
+    ctx.strokeRect(ox, oy, b * esc, r.a * esc);
+  }
+
+  // ── Eje neutro (c) — línea discontinua ──
+  if (r.c > 0) {
+    const yC = oy + r.c * esc, ext = b * esc * 0.12;
+    ctx.strokeStyle = '#3fb950'; ctx.lineWidth = 1.4; ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.moveTo(ox - ext, yC); ctx.lineTo(ox + b * esc + ext, yC); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#3fb950'; ctx.font = 'bold 13px Inter,sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(`E.N. c=${f2(r.c)}cm`, ox + b * esc + ext + 4, yC + 4);
+  }
+
+  // ── Acero en tracción (As) ──
+  const yAs = oy + d * esc;
+  const rb = Math.max(4, Math.min(9, b * esc / 16));
+  const nBarsAs = Math.max(2, Math.min(6, Math.round(b / 10)));
+  const marginX = Math.max(rCover, 3) * esc;
+  const xs = [];
+  for (let i = 0; i < nBarsAs; i++) {
+    xs.push(ox + marginX + (nBarsAs === 1 ? (b * esc - 2 * marginX) / 2 : i * (b * esc - 2 * marginX) / (nBarsAs - 1)));
+  }
+  xs.forEach(px => drawBar(ctx, px, yAs, rb, 'tens'));
+
+  // Leader + etiqueta As
+  const lastX = xs[xs.length - 1];
+  drawArrow(ctx, lastX + rb + 2, yAs + 4, ox + b * esc + 26, yAs + 30, '#c9822e', 1);
+  ctx.fillStyle = '#e8b06a'; ctx.font = 'bold 14px Inter,sans-serif'; ctx.textAlign = 'left';
+  const asLabel = r.needsComp && r.doubly.err ? `As₁ (incompleto) = ${f2(r.As)} cm²` : `As = ${f2(r.As)} cm²`;
+  ctx.fillText(asLabel, ox + b * esc + 28, yAs + 35);
+
+  // ── Acero en compresión (A's) — automático (doblemente reforzada) o manual ──
+  if (hasComp) {
+    const yAsp = oy + dp * esc;
+    const nBarsAsp = Math.max(2, Math.min(4, Math.round(b / 15)));
+    const xsp = [];
+    for (let i = 0; i < nBarsAsp; i++) {
+      xsp.push(ox + marginX + (nBarsAsp === 1 ? (b * esc - 2 * marginX) / 2 : i * (b * esc - 2 * marginX) / (nBarsAsp - 1)));
+    }
+    xsp.forEach(px => drawBar(ctx, px, yAsp, Math.max(3.5, rb * 0.85), 'comp'));
+
+    const lastXp = xsp[xsp.length - 1];
+    drawArrow(ctx, lastXp + rb + 2, yAsp - 4, ox + b * esc + 26, yAsp - 26, '#5a7a9e', 1);
+    ctx.fillStyle = '#8fb3d9'; ctx.font = 'bold 14px Inter,sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(`A's = ${f2(Asp)} cm²`, ox + b * esc + 28, yAsp - 31);
+
+    // Cota d' (dentro, a la izquierda, con fondo para legibilidad)
+    const xdp = ox + Math.max(12, b * esc * 0.1);
+    drawArrow(ctx, xdp, oy, xdp, yAsp, '#8fb3d9', 1);
+    const dpLabel = `d'=${f1(dp)}`, dpLy = yAsp + 15;
+    ctx.font = '12px Inter,sans-serif';
+    const tw = ctx.measureText(dpLabel).width;
+    ctx.fillStyle = 'rgba(13,17,23,0.75)';
+    ctx.fillRect(xdp - 3, dpLy - 11, tw + 8, 16);
+    ctx.fillStyle = '#8fb3d9'; ctx.textAlign = 'left';
+    ctx.fillText(dpLabel, xdp + 1, dpLy);
+  }
+
+  // ── Cotas exteriores ──
+  ctx.font = '13px Inter,sans-serif'; ctx.fillStyle = '#8b949e';
+
+  // b (abajo)
+  const yb = oy + h * esc + 30;
+  drawArrow(ctx, ox, yb, ox + b * esc, yb, '#6e7681', 1);
+  ctx.textAlign = 'center'; ctx.fillText(`b = ${f1(b)} cm`, ox + b * esc / 2, yb + 19);
+
+  // h (izquierda)
+  const xh = ox - 52;
+  drawArrow(ctx, xh, oy, xh, oy + h * esc, '#6e7681', 1);
+  ctx.save(); ctx.translate(xh - 16, oy + h * esc / 2); ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center'; ctx.fillText(`h = ${f1(h)} cm`, 0, 0); ctx.restore();
+
+  // d (derecha, desde arriba hasta el acero de tracción)
+  const xd = ox + b * esc + (hasComp ? 82 : 54);
+  drawArrow(ctx, xd, oy, xd, yAs, '#9aa4b2', 1);
+  ctx.save(); ctx.translate(xd + 16, oy + (yAs - oy) / 2); ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center'; ctx.fillText(`d = ${f1(d)} cm`, 0, 0); ctx.restore();
+
+  // Título
+  ctx.fillStyle = '#8b949e'; ctx.font = '12px Inter,sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('Sección — Detalle de Refuerzo a Flexión', W / 2, 18);
+}
+
+/* ════════════════════════════════════════════════════════
+   UI HELPERS
+════════════════════════════════════════════════════════ */
+function onCompChange() {
+  const on = document.getElementById('i-hascomp').checked;
+  document.getElementById('i-Asp').disabled = !on;
+}
+
+window.addEventListener('resize', recalc);
+onCompChange();
+recalc();
+</script>
+</body>
+</html>
