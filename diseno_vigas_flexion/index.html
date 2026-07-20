@@ -136,6 +136,38 @@ canvas{display:block;border-radius:8px;background:#0d1117;max-width:100%}
 .aci-explain.ok b.tag{background:#16a34a1f;color:#15803d}
 .aci-explain.warn b.tag{background:#d977061f;color:#b45309}
 
+/* ── Reporte acumulado ── */
+.report-item{border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;display:flex;gap:16px;background:#f8fafc}
+.report-item.err{border-color:#fca5a5;background:#fef2f2}
+.report-thumb{width:110px;height:auto;border-radius:6px;border:1px solid #d1d5db;flex-shrink:0;background:#fff}
+.report-info{flex:1;min-width:0}
+.report-name{font-size:15.5px;font-weight:700;color:#111827;margin-bottom:4px}
+.report-meta{font-size:13px;color:#4b5563;line-height:1.6}
+.report-status{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:20px;margin-left:8px}
+.report-status.ok{background:#16a34a1f;color:#15803d}
+.report-status.err{background:#dc26261f;color:#b91c1c}
+.report-del{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;font-size:12px;font-weight:600;
+            padding:5px 10px;border-radius:6px;cursor:pointer;align-self:flex-start;white-space:nowrap}
+
+/* ── Combinación de barras ── */
+.bars-table{width:100%;border-collapse:collapse;font-size:13.5px}
+.bars-table th{background:#f1f5f9;color:#334155;font-size:11.5px;font-weight:700;padding:9px 10px;
+               text-align:left;border-bottom:1px solid #e2e8f0;text-transform:uppercase;letter-spacing:.3px}
+.bars-table td{padding:8px 10px;border-bottom:1px solid #e5e7eb;color:#111827}
+.bars-table tr.best td{background:#f0fdf4}
+.bars-table tr.infeasible td{color:#9ca3af}
+.bars-status{font-size:12px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap}
+.bars-status.ok{background:#16a34a1f;color:#15803d}
+.bars-status.err{background:#dc26261f;color:#b91c1c}
+.bars-star{background:#16a34a;color:#fff;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:20px;margin-left:6px}
+.bars-select{background:#1d4ed8;border:none;color:#fff;font-size:12px;font-weight:600;padding:5px 11px;
+             border-radius:6px;cursor:pointer;white-space:nowrap}
+.bars-select:disabled{background:#d1d5db;cursor:not-allowed}
+.bars-select.used{background:#16a34a}
+.bars-current{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;font-size:14px;color:#1e3a8a;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.bars-current button{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;font-size:12px;font-weight:600;
+                      padding:4px 10px;border-radius:6px;cursor:pointer;margin-left:auto}
+
 @media(max-width:900px){
   body{overflow:auto;height:auto}
   .main{grid-template-columns:1fr;height:auto}
@@ -160,9 +192,72 @@ canvas{display:block;border-radius:8px;background:#0d1117;max-width:100%}
            display:flex;align-items:center;gap:6px;">
     📖 Fórmulas y ACI 318-25
   </button>
+  <button id="btn-add-report" onclick="addToReport()"
+    style="margin-left:8px;background:#23863618;border:1px solid #23863655;color:#3fb950;
+           font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:7px;cursor:pointer;
+           display:flex;align-items:center;gap:6px;">
+    ➕ Agregar al Reporte
+  </button>
+  <button id="btn-open-report" onclick="openReportModal()"
+    style="margin-left:8px;background:#9e6a0318;border:1px solid #9e6a0355;color:#d29922;
+           font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:7px;cursor:pointer;
+           display:flex;align-items:center;gap:6px;">
+    📄 Reporte (<span id="report-count">0</span>)
+  </button>
+  <button id="btn-open-bars" onclick="openBarsModal()"
+    style="margin-left:8px;background:#8b5cf618;border:1px solid #8b5cf655;color:#a78bfa;
+           font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:7px;cursor:pointer;
+           display:flex;align-items:center;gap:6px;">
+    📐 Combinación de Barras
+  </button>
   <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
     <div class="calc-dot" id="calc-dot"></div>
     <span class="calc-msg" id="calc-msg">Listo</span>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+     background:#161b22;border:1px solid #30363d;color:#e6edf3;padding:10px 18px;border-radius:8px;
+     font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,0.5);z-index:2000;"></div>
+
+<!-- ══════════════ MODAL: REPORTE ACUMULADO DE VIGAS ══════════════ -->
+<div id="report-modal" style="display:none;position:fixed;inset:0;background:rgba(1,4,9,0.72);
+     z-index:1000;align-items:center;justify-content:center;padding:24px;" onclick="if(event.target===this)closeReportModal()">
+  <div style="background:#ffffff;border:1px solid #d1d5db;border-radius:12px;max-width:1100px;width:100%;
+       max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+    <div style="position:sticky;top:0;background:#ffffff;border-bottom:1px solid #e5e7eb;padding:16px 22px;
+         display:flex;align-items:center;gap:10px;z-index:1;">
+      <span style="font-size:18px;font-weight:700;color:#111827;">📄 Reporte de Vigas Diseñadas</span>
+      <button onclick="exportReportPDF()" style="margin-left:auto;background:#1d4ed8;border:none;color:#fff;
+              font-size:13px;font-weight:600;padding:7px 14px;border-radius:7px;cursor:pointer;">
+        🖨️ Exportar PDF
+      </button>
+      <button onclick="clearReport()" style="background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;
+              font-size:13px;font-weight:600;padding:7px 12px;border-radius:7px;cursor:pointer;">
+        Vaciar todo
+      </button>
+      <button onclick="closeReportModal()" style="background:none;border:none;color:#6b7280;
+              font-size:24px;cursor:pointer;line-height:1;padding:2px 6px;">×</button>
+    </div>
+    <div id="report-modal-body" style="padding:20px 22px;display:flex;flex-direction:column;gap:14px;font-size:14px;color:#1f2937;">
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL: COMBINACIÓN DE BARRAS ══════════════ -->
+<div id="bars-modal" style="display:none;position:fixed;inset:0;background:rgba(1,4,9,0.72);
+     z-index:1000;align-items:center;justify-content:center;padding:24px;" onclick="if(event.target===this)closeBarsModal()">
+  <div style="background:#ffffff;border:1px solid #d1d5db;border-radius:12px;max-width:1150px;width:100%;
+       max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+    <div style="position:sticky;top:0;background:#ffffff;border-bottom:1px solid #e5e7eb;padding:16px 22px;
+         display:flex;align-items:center;gap:10px;z-index:1;">
+      <span style="font-size:18px;font-weight:700;color:#111827;">📐 Combinación de Barras — ACI 318-25 §25.2</span>
+      <button onclick="closeBarsModal()" style="margin-left:auto;background:none;border:none;color:#6b7280;
+              font-size:24px;cursor:pointer;line-height:1;padding:2px 6px;">×</button>
+    </div>
+    <div id="bars-modal-body" style="padding:20px 22px;display:flex;flex-direction:column;gap:20px;font-size:14.5px;color:#1f2937;">
+    </div>
   </div>
 </div>
 
@@ -193,6 +288,8 @@ canvas{display:block;border-radius:8px;background:#0d1117;max-width:100%}
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
       Sección de la Viga
     </div>
+    <div class="field"><label>Nombre de la sección</label>
+      <input id="i-nombre" type="text" placeholder="V-1, Viga Techo N2…"></div>
     <div class="row2">
       <div class="field"><label>Base b <em>(cm)</em></label>
         <input id="i-b" type="number" value="30" min="10" step="1" oninput="recalc()"></div>
@@ -213,18 +310,29 @@ canvas{display:block;border-radius:8px;background:#0d1117;max-width:100%}
     <div class="row2">
       <div class="field"><label>f'c <em>(MPa)</em></label>
         <select id="i-fc" onchange="recalc()">
+          <option value="17">17 — f'c 170</option>
           <option value="20">20 — f'c 200</option>
           <option value="21">21 — f'c 210</option>
           <option value="24">24 — f'c 240</option>
+          <option value="25">25 — f'c 250</option>
           <option value="28" selected>28 — f'c 280</option>
+          <option value="30">30 — f'c 300</option>
           <option value="35">35 — f'c 350</option>
+          <option value="40">40 — f'c 400</option>
           <option value="42">42 — f'c 420</option>
+          <option value="45">45 — f'c 450</option>
+          <option value="50">50 — f'c 500</option>
+          <option value="55">55 — f'c 550</option>
+          <option value="60">60 — f'c 600</option>
         </select></div>
       <div class="field"><label>fy <em>(MPa)</em></label>
         <select id="i-fy" onchange="recalc()">
           <option value="280">280 — Gr.40</option>
           <option value="350">350 — Gr.50</option>
           <option value="420" selected>420 — Gr.60</option>
+          <option value="500">500 — B500</option>
+          <option value="520">520 — Gr.75</option>
+          <option value="550">550 — Gr.80</option>
         </select></div>
     </div>
   </div>
@@ -461,6 +569,47 @@ function calcDoublyReinforced(dcm, bcm, dp_cm, fc, fy, beta_1, As1, phi_Mn1, Mu)
 }
 
 /* ════════════════════════════════════════════════════════
+   COMBINACIÓN DE BARRAS — catálogo y verificación de
+   espaciamiento mínimo libre, ACI 318-25 §25.2.1
+════════════════════════════════════════════════════════ */
+const BAR_CATALOG = [
+  { no: '3',  mm: 9.525,  inch: '3/8"'   },
+  { no: '4',  mm: 12.7,   inch: '1/2"'   },
+  { no: '5',  mm: 15.875, inch: '5/8"'   },
+  { no: '6',  mm: 19.05,  inch: '3/4"'   },
+  { no: '7',  mm: 22.225, inch: '7/8"'   },
+  { no: '8',  mm: 25.4,   inch: '1"'     },
+  { no: '9',  mm: 28.575, inch: '1-1/8"' },
+  { no: '10', mm: 32.258, inch: '1-1/4"' },
+  { no: '11', mm: 35.814, inch: '1-3/8"' },
+];
+function barAreaCm2(mm) { const r_cm = mm / 20; return Math.PI * r_cm * r_cm; }
+
+// Para cada diámetro, encuentra el n mínimo que cumple As_req y evalúa si cabe
+// en el ancho disponible con el espaciamiento libre mínimo del ACI 318-25 §25.2.1:
+// s ≥ max(db, 25 mm) — asumiendo agregado no controlante (sin dato de TMN).
+function findBarCombos(As_req_cm2, b_cm, cover_cm) {
+  const avail_mm = (b_cm - 2 * cover_cm) * 10;
+  return BAR_CATALOG.map(bar => {
+    const area = barAreaCm2(bar.mm);
+    const sMin = Math.max(bar.mm, 25);
+    let n = Math.max(2, Math.ceil(As_req_cm2 / area));
+    const widthReq = n * bar.mm + (n - 1) * sMin;
+    const sReal = n > 1 ? (avail_mm - n * bar.mm) / (n - 1) : null;
+    const As_prov = n * area;
+    const excess = (As_prov / As_req_cm2 - 1) * 100;
+    const practico = n <= 10;
+    const cabe = widthReq <= avail_mm;
+    return { ...bar, area, n, As_prov, excess, sMin, sReal, avail_mm, feasible: cabe && practico };
+  });
+}
+function bestBarCombo(combos) {
+  const ok = combos.filter(c => c.feasible);
+  if (!ok.length) return null;
+  return ok.reduce((a, b) => (b.excess < a.excess ? b : a));
+}
+
+/* ════════════════════════════════════════════════════════
    RECÁLCULO / RENDER
 ════════════════════════════════════════════════════════ */
 let _deb = null;
@@ -486,12 +635,15 @@ function readParams() {
 }
 
 let _lastR = null, _lastP = null;
+let selectedTensionBar = null, selectedCompBar = null;
 
 function _doCalc() {
   const p = readParams();
   const r = calcViga(p);
   _lastR = r.err ? null : r;
   _lastP = p;
+  selectedTensionBar = null;
+  selectedCompBar = null;
   if (r.err) {
     setDot('err', 'Error');
     document.getElementById('msg-content').innerHTML = `<div class="msg-box err">${r.err}</div>`;
@@ -693,7 +845,7 @@ function openAciModal() {
 function closeAciModal() {
   document.getElementById('aci-modal').style.display = 'none';
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAciModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAciModal(); closeReportModal(); closeBarsModal(); } });
 
 function renderAciModalBody(r, p) {
   const eps_y = r.fy / ES;
@@ -784,6 +936,268 @@ function renderAciModalBody(r, p) {
 }
 
 /* ════════════════════════════════════════════════════════
+   REPORTE ACUMULADO — varias secciones de viga, exportable a PDF
+════════════════════════════════════════════════════════ */
+const REPORT_KEY = 'pcad_vigas_flexion_report_v1';
+let reportList = loadReport();
+
+function loadReport() {
+  try { return JSON.parse(localStorage.getItem(REPORT_KEY)) || []; }
+  catch (e) { return []; }
+}
+function saveReportList() {
+  localStorage.setItem(REPORT_KEY, JSON.stringify(reportList));
+  document.getElementById('report-count').textContent = reportList.length;
+}
+
+let _toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.style.display = 'none'; }, 2600);
+}
+
+function addToReport() {
+  if (!_lastR) { showToast('⚠ Ingresa datos válidos antes de agregar.'); return; }
+  const r = _lastR, p = _lastP;
+  const nameInput = document.getElementById('i-nombre');
+  const name = nameInput.value.trim() || `Viga ${reportList.length + 1}`;
+  const cumple = r.needsComp ? !(r.doubly && r.doubly.err) : true;
+
+  const entry = {
+    id: Date.now() + '-' + Math.random().toString(36).slice(2),
+    name,
+    timestamp: new Date().toLocaleString('es'),
+    b_cm: r.b_cm, h_cm: r.h_cm, r_cm: r.r_cm, fc: r.fc, fy: r.fy, Mu: r.Mu, dp_cm: p.dp_cm,
+    needsComp: r.needsComp,
+    As: r.As, a: r.a, c: r.c, phi_Mmax: r.phi_Mmax, As_min: r.As_min, As_max: r.As_max,
+    doubly: r.doubly,
+    cumple,
+    img: document.getElementById('cviz').toDataURL('image/png'),
+  };
+  reportList.push(entry);
+  saveReportList();
+  showToast(`✓ "${name}" agregada al reporte (${reportList.length} en total)`);
+  nameInput.value = '';
+  if (document.getElementById('report-modal').style.display === 'flex') renderReportModal();
+}
+
+function deleteReportEntry(id) {
+  reportList = reportList.filter(e => e.id !== id);
+  saveReportList();
+  renderReportModal();
+}
+
+function clearReport() {
+  if (!reportList.length) return;
+  if (!confirm('¿Vaciar todo el reporte acumulado? Esta acción no se puede deshacer.')) return;
+  reportList = [];
+  saveReportList();
+  renderReportModal();
+}
+
+function openReportModal() {
+  document.getElementById('report-modal').style.display = 'flex';
+  renderReportModal();
+}
+function closeReportModal() {
+  document.getElementById('report-modal').style.display = 'none';
+}
+
+function reportEntrySummary(e) {
+  let s = `b=${f1(e.b_cm)}cm · h=${f1(e.h_cm)}cm · f'c=${e.fc}MPa · fy=${e.fy}MPa · Mu=${f1(e.Mu)}kN·m<br>`;
+  if (e.needsComp) {
+    s += e.cumple
+      ? `As total=${f2(e.As)}cm² (doblemente reforzada) · A's=${f2(e.doubly.Asp)}cm² · ${e.doubly.yields ? 'A\'s fluye' : 'A\'s no fluye'}`
+      : `⚠ ${e.doubly.err}`;
+  } else {
+    s += `As=${f2(e.As)}cm² · φMn=${f1(e.phi_Mmax)}kN·m ≥ Mu (no necesita compresión)`;
+  }
+  return s;
+}
+
+function renderReportModal() {
+  const body = document.getElementById('report-modal-body');
+  if (!reportList.length) {
+    body.innerHTML = '<div class="empty-hint">Aún no has agregado ninguna sección. Usa "➕ Agregar al Reporte" en la barra superior.</div>';
+    return;
+  }
+  body.innerHTML = reportList.map((e, i) => `
+    <div class="report-item ${e.cumple ? '' : 'err'}">
+      <img class="report-thumb" src="${e.img}">
+      <div class="report-info">
+        <div class="report-name">${i + 1}. ${e.name}
+          <span class="report-status ${e.cumple ? 'ok' : 'err'}">${e.cumple ? '✓ Cumple' : '✗ No cumple'}</span>
+        </div>
+        <div class="report-meta">${reportEntrySummary(e)}</div>
+        <div class="report-meta" style="color:#9ca3af;font-size:11.5px;margin-top:4px">${e.timestamp}</div>
+      </div>
+      <button class="report-del" onclick="deleteReportEntry('${e.id}')">🗑️ Quitar</button>
+    </div>`).join('');
+}
+
+function exportReportPDF() {
+  if (!reportList.length) { showToast('⚠ El reporte está vacío.'); return; }
+  const win = window.open('', '', 'width=900,height=1000');
+  const rows = reportList.map((e, i) => `
+    <div class="sec">
+      <h3>${i + 1}. ${e.name} <span class="st ${e.cumple ? 'ok' : 'err'}">${e.cumple ? 'CUMPLE' : 'NO CUMPLE'}</span></h3>
+      <div class="grid">
+        <img src="${e.img}">
+        <table>
+          <tr><td>Sección</td><td>b = ${f1(e.b_cm)} cm &nbsp;·&nbsp; h = ${f1(e.h_cm)} cm &nbsp;·&nbsp; r = ${f1(e.r_cm)} cm</td></tr>
+          <tr><td>Materiales</td><td>f'c = ${e.fc} MPa &nbsp;·&nbsp; fy = ${e.fy} MPa</td></tr>
+          <tr><td>Momento</td><td>Mu = ${f1(e.Mu)} kN·m</td></tr>
+          ${e.needsComp ? `
+          <tr><td>Diseño</td><td>Doblemente reforzada (ACI 318-25)</td></tr>
+          ${e.cumple ? `
+          <tr><td>As total</td><td>${f2(e.As)} cm² (As₁=${f2(e.doubly.As1)} + As₂=${f2(e.doubly.As2)})</td></tr>
+          <tr><td>A's</td><td>${f2(e.doubly.Asp)} cm² — d'=${f1(e.dp_cm)} cm — ${e.doubly.yields ? 'fluye (f\'s\'=fy)' : `no fluye (f's'=${f1(e.doubly.fsp)} MPa)`}</td></tr>
+          <tr><td>c / a</td><td>c = ${f2(e.c)} cm &nbsp;·&nbsp; a = ${f2(e.a)} cm</td></tr>` : `
+          <tr><td colspan="2" class="errtxt">⚠ ${e.doubly.err}</td></tr>`}
+          ` : `
+          <tr><td>Diseño</td><td>Simplemente reforzada</td></tr>
+          <tr><td>As</td><td>${f2(e.As)} cm² (As mín=${f2(e.As_min)} · As máx=${f2(e.As_max)})</td></tr>
+          <tr><td>φMn</td><td>${f1(e.phi_Mmax)} kN·m ≥ Mu</td></tr>
+          <tr><td>c / a</td><td>c = ${f2(e.c)} cm &nbsp;·&nbsp; a = ${f2(e.a)} cm</td></tr>`}
+        </table>
+      </div>
+    </div>`).join('');
+
+  win.document.write(`<html><head><title>Reporte de Vigas — PortiCAD</title>
+  <style>
+    body{font-family:Arial,sans-serif;color:#111;margin:32px;}
+    h1{font-size:20px;color:#1d4ed8;margin-bottom:2px}
+    p.sub{color:#666;font-size:12px;margin-bottom:24px}
+    .sec{border:1px solid #d1d5db;border-radius:8px;padding:14px 16px;margin-bottom:18px;page-break-inside:avoid}
+    h3{font-size:15px;margin-bottom:10px}
+    .st{font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;margin-left:8px}
+    .st.ok{background:#16a34a22;color:#15803d}
+    .st.err{background:#dc262622;color:#b91c1c}
+    .grid{display:flex;gap:16px;align-items:flex-start}
+    .grid img{width:150px;border:1px solid #d1d5db;border-radius:6px}
+    table{border-collapse:collapse;font-size:12.5px;flex:1}
+    td{padding:5px 8px;border-bottom:1px solid #eee;vertical-align:top}
+    td:first-child{font-weight:700;color:#4b5563;white-space:nowrap}
+    .errtxt{color:#b91c1c;font-weight:600}
+    @media print{ body{margin:12mm} }
+  </style></head><body>
+  <h1>PortiCAD — Reporte de Diseño de Vigas a Flexión</h1>
+  <p class="sub">porticad.app · Generado ${new Date().toLocaleString('es')} · ${reportList.length} sección(es) · ACI 318-25 (beta)</p>
+  ${rows}
+  </body></html>`);
+  win.document.close();
+  win.print();
+}
+
+document.getElementById('report-count').textContent = reportList.length;
+
+/* ════════════════════════════════════════════════════════
+   MODAL — COMBINACIÓN DE BARRAS (As y A's)
+════════════════════════════════════════════════════════ */
+function openBarsModal() {
+  if (!_lastR) { showToast('⚠ Ingresa datos válidos antes de verificar barras.'); return; }
+  document.getElementById('bars-modal').style.display = 'flex';
+  renderBarsModal();
+}
+function closeBarsModal() {
+  document.getElementById('bars-modal').style.display = 'none';
+}
+
+function barsTableHtml(combos, best, target, selected, selectFn) {
+  const rows = combos.map(c => {
+    const isBest = best && c.no === best.no;
+    const cls = [isBest ? 'best' : '', c.feasible ? '' : 'infeasible'].join(' ').trim();
+    const used = selected && selected.no === c.no;
+    return `<tr class="${cls}">
+      <td>#${c.no} — Ø ${f2(c.mm)} mm (${c.inch}")</td>
+      <td>${c.n}</td>
+      <td>${f2(c.As_prov)} cm²</td>
+      <td>${c.excess >= 0 ? '+' : ''}${f1(c.excess)}%</td>
+      <td>${c.sReal != null ? f1(c.sReal) + ' mm' : '—'} <span style="color:#9ca3af">(mín ${f1(c.sMin)})</span></td>
+      <td>${c.feasible
+          ? `<span class="bars-status ok">✓ cumple</span>${isBest ? '<span class="bars-star">⭐ ÓPTIMA</span>' : ''}`
+          : '<span class="bars-status err">✗ no cabe</span>'}</td>
+      <td><button class="bars-select ${used ? 'used' : ''}" ${c.feasible ? '' : 'disabled'} onclick="${selectFn}('${c.no}')">${used ? '✓ En uso' : 'Usar'}</button></td>
+    </tr>`;
+  }).join('');
+  return `
+    <div style="overflow-x:auto">
+    <table class="bars-table">
+      <thead><tr><th>Barra</th><th>n°</th><th>As provista</th><th>% exceso</th><th>Espac. libre</th><th>Estado</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    </div>`;
+}
+
+function renderBarsModal() {
+  const r = _lastR, p = _lastP;
+  const body = document.getElementById('bars-modal-body');
+  let html = '';
+
+  const noneFeasibleMsg = `<div class="msg-box err" style="color:#b91c1c;background:#fef2f2;border:1px solid #fca5a5">
+    ⚠ Ninguna combinación en una sola capa cabe con este ancho y recubrimiento. Considera: aumentar b,
+    usar dos capas de refuerzo (no evaluado automáticamente en esta beta), o aumentar f'c/fy para reducir el As requerido.
+  </div>`;
+
+  // ── Tracción ──
+  const tensCombos = findBarCombos(r.As, r.b_cm, r.r_cm);
+  const tensBest = bestBarCombo(tensCombos);
+  html += `<div>
+    <div class="aci-h">Acero de Tracción — As requerido = ${f2(r.As)} cm²</div>
+    ${selectedTensionBar ? `<div class="bars-current">Usando: #${selectedTensionBar.no} — Ø ${f2(selectedTensionBar.mm)} mm × ${selectedTensionBar.n} barras (As provista = ${f2(selectedTensionBar.As_prov)} cm²)
+      <button onclick="clearTensionSelection()">Quitar</button></div>` : ''}
+    ${!tensBest ? noneFeasibleMsg : ''}
+    ${barsTableHtml(tensCombos, tensBest, r.As, selectedTensionBar, 'selectTensionBar')}
+  </div>`;
+
+  // ── Compresión (si aplica) ──
+  if (r.needsComp && r.doubly && !r.doubly.err) {
+    const compCombos = findBarCombos(r.doubly.Asp, r.b_cm, p.dp_cm);
+    const compBest = bestBarCombo(compCombos);
+    html += `<div>
+      <div class="aci-h">Acero de Compresión — A's requerido = ${f2(r.doubly.Asp)} cm²</div>
+      ${selectedCompBar ? `<div class="bars-current">Usando: #${selectedCompBar.no} — Ø ${f2(selectedCompBar.mm)} mm × ${selectedCompBar.n} barras (A's provista = ${f2(selectedCompBar.As_prov)} cm²)
+        <button onclick="clearCompSelection()">Quitar</button></div>` : ''}
+      ${!compBest ? noneFeasibleMsg : ''}
+      ${barsTableHtml(compCombos, compBest, r.doubly.Asp, selectedCompBar, 'selectCompBar')}
+    </div>`;
+  }
+
+  html += `<div style="font-size:12.5px;color:#6b7280;line-height:1.6">
+    Espaciamiento libre mínimo entre barras paralelas en una capa: s ≥ max(db, 25 mm) — ACI 318-25 §25.2.1
+    (no considera el tamaño máximo del agregado; si el agregado es grueso, verifica también s ≥ (4/3)·TMN).
+    El ancho disponible se calcula como b − 2·recubrimiento, asumiendo el mismo recubrimiento lateral que el ingresado.
+    "Más óptima" = la de menor exceso de área entre las que sí caben en una sola capa.
+  </div>`;
+
+  body.innerHTML = html;
+}
+
+function selectTensionBar(no) {
+  const r = _lastR;
+  const combos = findBarCombos(r.As, r.b_cm, r.r_cm);
+  const c = combos.find(x => x.no === no);
+  if (!c || !c.feasible) return;
+  selectedTensionBar = c;
+  renderBarsModal();
+  drawSection(_lastR, _lastP);
+}
+function selectCompBar(no) {
+  const r = _lastR, p = _lastP;
+  const combos = findBarCombos(r.doubly.Asp, r.b_cm, p.dp_cm);
+  const c = combos.find(x => x.no === no);
+  if (!c || !c.feasible) return;
+  selectedCompBar = c;
+  renderBarsModal();
+  drawSection(_lastR, _lastP);
+}
+function clearTensionSelection() { selectedTensionBar = null; renderBarsModal(); drawSection(_lastR, _lastP); }
+function clearCompSelection() { selectedCompBar = null; renderBarsModal(); drawSection(_lastR, _lastP); }
+
+/* ════════════════════════════════════════════════════════
    CANVAS — SECCIÓN Y REFUERZO (estilo fusiónVigaFlexiónDibujo)
 ════════════════════════════════════════════════════════ */
 function seededRng(seed) {
@@ -871,10 +1285,11 @@ function drawSection(r, p) {
     ctx.fillText(`E.N. c=${f2(r.c)}cm`, ox + b * esc + ext + 4, yC + 4);
   }
 
-  // ── Acero en tracción (As) ──
+  // ── Acero en tracción (As) — usa la combinación seleccionada si existe ──
   const yAs = oy + d * esc;
-  const rb = Math.max(4, Math.min(9, b * esc / 16));
-  const nBarsAs = Math.max(2, Math.min(6, Math.round(b / 10)));
+  const rbGeneric = Math.max(4, Math.min(9, b * esc / 16));
+  const nBarsAs = selectedTensionBar ? selectedTensionBar.n : Math.max(2, Math.min(6, Math.round(b / 10)));
+  const rb = selectedTensionBar ? Math.max(3, Math.min(10, (selectedTensionBar.mm / 10) * esc / 2)) : rbGeneric;
   const marginX = Math.max(rCover, 3) * esc;
   const xs = [];
   for (let i = 0; i < nBarsAs; i++) {
@@ -886,24 +1301,32 @@ function drawSection(r, p) {
   const lastX = xs[xs.length - 1];
   drawArrow(ctx, lastX + rb + 2, yAs + 4, ox + b * esc + 26, yAs + 30, '#c9822e', 1);
   ctx.fillStyle = '#e8b06a'; ctx.font = 'bold 14px Inter,sans-serif'; ctx.textAlign = 'left';
-  const asLabel = r.needsComp && r.doubly.err ? `As₁ (incompleto) = ${f2(r.As)} cm²` : `As = ${f2(r.As)} cm²`;
+  const asLabel = r.needsComp && r.doubly.err
+    ? `As₁ (incompleto) = ${f2(r.As)} cm²`
+    : selectedTensionBar
+      ? `${selectedTensionBar.n}#${selectedTensionBar.no} = ${f2(selectedTensionBar.As_prov)} cm² (req ${f2(r.As)})`
+      : `As = ${f2(r.As)} cm²`;
   ctx.fillText(asLabel, ox + b * esc + 28, yAs + 35);
 
   // ── Acero en compresión (A's) — automático (doblemente reforzada) o manual ──
   let yAsp = null;
   if (hasComp) {
     yAsp = oy + dp * esc;
-    const nBarsAsp = Math.max(2, Math.min(4, Math.round(b / 15)));
+    const nBarsAsp = selectedCompBar ? selectedCompBar.n : Math.max(2, Math.min(4, Math.round(b / 15)));
+    const rbComp = selectedCompBar ? Math.max(3, Math.min(10, (selectedCompBar.mm / 10) * esc / 2)) : Math.max(3.5, rb * 0.85);
     const xsp = [];
     for (let i = 0; i < nBarsAsp; i++) {
       xsp.push(ox + marginX + (nBarsAsp === 1 ? (b * esc - 2 * marginX) / 2 : i * (b * esc - 2 * marginX) / (nBarsAsp - 1)));
     }
-    xsp.forEach(px => drawBar(ctx, px, yAsp, Math.max(3.5, rb * 0.85), 'comp'));
+    xsp.forEach(px => drawBar(ctx, px, yAsp, rbComp, 'comp'));
 
     const lastXp = xsp[xsp.length - 1];
-    drawArrow(ctx, lastXp + rb + 2, yAsp - 4, ox + b * esc + 26, yAsp - 26, '#5a7a9e', 1);
+    drawArrow(ctx, lastXp + rbComp + 2, yAsp - 4, ox + b * esc + 26, yAsp - 26, '#5a7a9e', 1);
     ctx.fillStyle = '#8fb3d9'; ctx.font = 'bold 14px Inter,sans-serif'; ctx.textAlign = 'left';
-    ctx.fillText(`A's = ${f2(Asp)} cm²`, ox + b * esc + 28, yAsp - 31);
+    const aspLabel = selectedCompBar
+      ? `${selectedCompBar.n}#${selectedCompBar.no} = ${f2(selectedCompBar.As_prov)} cm² (req ${f2(Asp)})`
+      : `A's = ${f2(Asp)} cm²`;
+    ctx.fillText(aspLabel, ox + b * esc + 28, yAsp - 31);
   }
 
   // ── Cotas exteriores — h, d y d' apiladas del lado izquierdo ──
