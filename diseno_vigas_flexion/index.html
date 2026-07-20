@@ -572,25 +572,40 @@ function calcDoublyReinforced(dcm, bcm, dp_cm, fc, fy, beta_1, As1, phi_Mn1, Mu)
    COMBINACIÓN DE BARRAS — catálogo y verificación de
    espaciamiento mínimo libre, ACI 318-25 §25.2.1
 ════════════════════════════════════════════════════════ */
-const BAR_CATALOG = [
-  { no: '3',  mm: 9.525,  inch: '3/8"'   },
-  { no: '4',  mm: 12.7,   inch: '1/2"'   },
-  { no: '5',  mm: 15.875, inch: '5/8"'   },
-  { no: '6',  mm: 19.05,  inch: '3/4"'   },
-  { no: '7',  mm: 22.225, inch: '7/8"'   },
-  { no: '8',  mm: 25.4,   inch: '1"'     },
-  { no: '9',  mm: 28.575, inch: '1-1/8"' },
-  { no: '10', mm: 32.258, inch: '1-1/4"' },
-  { no: '11', mm: 35.814, inch: '1-3/8"' },
+// Dos catálogos NO intercambiables: las barras en pulgadas (ASTM/soft-métrico,
+// ej. #4 = 12.7 mm) corresponden a normas y proveedores distintos de las barras
+// métricas comerciales (ej. Ø12 mm) — cada mercado provee uno u otro, no ambos.
+const BAR_CATALOG_IN = [
+  { code: '3',  mm: 9.525,  label: '#3 — Ø 9.5 mm (3/8")',    short: '#3'  },
+  { code: '4',  mm: 12.7,   label: '#4 — Ø 12.7 mm (1/2")',   short: '#4'  },
+  { code: '5',  mm: 15.875, label: '#5 — Ø 15.9 mm (5/8")',   short: '#5'  },
+  { code: '6',  mm: 19.05,  label: '#6 — Ø 19.1 mm (3/4")',   short: '#6'  },
+  { code: '7',  mm: 22.225, label: '#7 — Ø 22.2 mm (7/8")',   short: '#7'  },
+  { code: '8',  mm: 25.4,   label: '#8 — Ø 25.4 mm (1")',     short: '#8'  },
+  { code: '9',  mm: 28.575, label: '#9 — Ø 28.6 mm (1-1/8")', short: '#9'  },
+  { code: '10', mm: 32.258, label: '#10 — Ø 32.3 mm (1-1/4")', short: '#10' },
+  { code: '11', mm: 35.814, label: '#11 — Ø 35.8 mm (1-3/8")', short: '#11' },
 ];
+const BAR_CATALOG_MM = [
+  { code: '6',  mm: 6,  label: 'Ø 6 mm',  short: 'Ø6'  },
+  { code: '8',  mm: 8,  label: 'Ø 8 mm',  short: 'Ø8'  },
+  { code: '10', mm: 10, label: 'Ø 10 mm', short: 'Ø10' },
+  { code: '12', mm: 12, label: 'Ø 12 mm', short: 'Ø12' },
+  { code: '16', mm: 16, label: 'Ø 16 mm', short: 'Ø16' },
+  { code: '20', mm: 20, label: 'Ø 20 mm', short: 'Ø20' },
+  { code: '25', mm: 25, label: 'Ø 25 mm', short: 'Ø25' },
+  { code: '32', mm: 32, label: 'Ø 32 mm', short: 'Ø32' },
+];
+let barUnitSystem = 'in'; // 'in' (pulgadas/soft-métrico) | 'mm' (métrico comercial)
+function barCatalog(system) { return (system || barUnitSystem) === 'mm' ? BAR_CATALOG_MM : BAR_CATALOG_IN; }
 function barAreaCm2(mm) { const r_cm = mm / 20; return Math.PI * r_cm * r_cm; }
 
 // Para cada diámetro, encuentra el n mínimo que cumple As_req y evalúa si cabe
 // en el ancho disponible con el espaciamiento libre mínimo del ACI 318-25 §25.2.1:
 // s ≥ max(db, 25 mm) — asumiendo agregado no controlante (sin dato de TMN).
-function findBarCombos(As_req_cm2, b_cm, cover_cm) {
+function findBarCombos(As_req_cm2, b_cm, cover_cm, system) {
   const avail_mm = (b_cm - 2 * cover_cm) * 10;
-  return BAR_CATALOG.map(bar => {
+  return barCatalog(system).map(bar => {
     const area = barAreaCm2(bar.mm);
     const sMin = Math.max(bar.mm, 25);
     let n = Math.max(2, Math.ceil(As_req_cm2 / area));
@@ -1108,11 +1123,11 @@ function closeBarsModal() {
 
 function barsTableHtml(combos, best, target, selected, selectFn) {
   const rows = combos.map(c => {
-    const isBest = best && c.no === best.no;
+    const isBest = best && c.code === best.code;
     const cls = [isBest ? 'best' : '', c.feasible ? '' : 'infeasible'].join(' ').trim();
-    const used = selected && selected.no === c.no;
+    const used = selected && selected.code === c.code;
     return `<tr class="${cls}">
-      <td>#${c.no} — Ø ${f2(c.mm)} mm (${c.inch}")</td>
+      <td>${c.label}</td>
       <td>${c.n}</td>
       <td>${f2(c.As_prov)} cm²</td>
       <td>${c.excess >= 0 ? '+' : ''}${f1(c.excess)}%</td>
@@ -1120,7 +1135,7 @@ function barsTableHtml(combos, best, target, selected, selectFn) {
       <td>${c.feasible
           ? `<span class="bars-status ok">✓ cumple</span>${isBest ? '<span class="bars-star">⭐ ÓPTIMA</span>' : ''}`
           : '<span class="bars-status err">✗ no cabe</span>'}</td>
-      <td><button class="bars-select ${used ? 'used' : ''}" ${c.feasible ? '' : 'disabled'} onclick="${selectFn}('${c.no}')">${used ? '✓ En uso' : 'Usar'}</button></td>
+      <td><button class="bars-select ${used ? 'used' : ''}" ${c.feasible ? '' : 'disabled'} onclick="${selectFn}('${c.code}')">${used ? '✓ En uso' : 'Usar'}</button></td>
     </tr>`;
   }).join('');
   return `
@@ -1132,10 +1147,23 @@ function barsTableHtml(combos, best, target, selected, selectFn) {
     </div>`;
 }
 
+function barUnitToggleHtml() {
+  return `<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px">
+    <span style="font-weight:700;font-size:13.5px">Sistema de barras:</span>
+    <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+      <input type="radio" name="barsys" ${barUnitSystem === 'in' ? 'checked' : ''} onchange="setBarUnitSystem('in')"> Pulgadas / soft-métrico (ASTM #3–#11)
+    </label>
+    <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+      <input type="radio" name="barsys" ${barUnitSystem === 'mm' ? 'checked' : ''} onchange="setBarUnitSystem('mm')"> mm comercial (Ø6–Ø32)
+    </label>
+    <span style="font-size:12px;color:#9ca3af">Los dos sistemas no son equivalentes — usa el que se venda en tu mercado.</span>
+  </div>`;
+}
+
 function renderBarsModal() {
   const r = _lastR, p = _lastP;
   const body = document.getElementById('bars-modal-body');
-  let html = '';
+  let html = barUnitToggleHtml();
 
   const noneFeasibleMsg = `<div class="msg-box err" style="color:#b91c1c;background:#fef2f2;border:1px solid #fca5a5">
     ⚠ Ninguna combinación en una sola capa cabe con este ancho y recubrimiento. Considera: aumentar b,
@@ -1147,7 +1175,7 @@ function renderBarsModal() {
   const tensBest = bestBarCombo(tensCombos);
   html += `<div>
     <div class="aci-h">Acero de Tracción — As requerido = ${f2(r.As)} cm²</div>
-    ${selectedTensionBar ? `<div class="bars-current">Usando: #${selectedTensionBar.no} — Ø ${f2(selectedTensionBar.mm)} mm × ${selectedTensionBar.n} barras (As provista = ${f2(selectedTensionBar.As_prov)} cm²)
+    ${selectedTensionBar ? `<div class="bars-current">Usando: ${selectedTensionBar.label} × ${selectedTensionBar.n} barras (As provista = ${f2(selectedTensionBar.As_prov)} cm²)
       <button onclick="clearTensionSelection()">Quitar</button></div>` : ''}
     ${!tensBest ? noneFeasibleMsg : ''}
     ${barsTableHtml(tensCombos, tensBest, r.As, selectedTensionBar, 'selectTensionBar')}
@@ -1159,7 +1187,7 @@ function renderBarsModal() {
     const compBest = bestBarCombo(compCombos);
     html += `<div>
       <div class="aci-h">Acero de Compresión — A's requerido = ${f2(r.doubly.Asp)} cm²</div>
-      ${selectedCompBar ? `<div class="bars-current">Usando: #${selectedCompBar.no} — Ø ${f2(selectedCompBar.mm)} mm × ${selectedCompBar.n} barras (A's provista = ${f2(selectedCompBar.As_prov)} cm²)
+      ${selectedCompBar ? `<div class="bars-current">Usando: ${selectedCompBar.label} × ${selectedCompBar.n} barras (A's provista = ${f2(selectedCompBar.As_prov)} cm²)
         <button onclick="clearCompSelection()">Quitar</button></div>` : ''}
       ${!compBest ? noneFeasibleMsg : ''}
       ${barsTableHtml(compCombos, compBest, r.doubly.Asp, selectedCompBar, 'selectCompBar')}
@@ -1176,19 +1204,27 @@ function renderBarsModal() {
   body.innerHTML = html;
 }
 
-function selectTensionBar(no) {
+function setBarUnitSystem(sys) {
+  barUnitSystem = sys;
+  selectedTensionBar = null;
+  selectedCompBar = null;
+  renderBarsModal();
+  if (_lastR) drawSection(_lastR, _lastP);
+}
+
+function selectTensionBar(code) {
   const r = _lastR;
   const combos = findBarCombos(r.As, r.b_cm, r.r_cm);
-  const c = combos.find(x => x.no === no);
+  const c = combos.find(x => x.code === code);
   if (!c || !c.feasible) return;
   selectedTensionBar = c;
   renderBarsModal();
   drawSection(_lastR, _lastP);
 }
-function selectCompBar(no) {
+function selectCompBar(code) {
   const r = _lastR, p = _lastP;
   const combos = findBarCombos(r.doubly.Asp, r.b_cm, p.dp_cm);
-  const c = combos.find(x => x.no === no);
+  const c = combos.find(x => x.code === code);
   if (!c || !c.feasible) return;
   selectedCompBar = c;
   renderBarsModal();
@@ -1304,7 +1340,7 @@ function drawSection(r, p) {
   const asLabel = r.needsComp && r.doubly.err
     ? `As₁ (incompleto) = ${f2(r.As)} cm²`
     : selectedTensionBar
-      ? `${selectedTensionBar.n}#${selectedTensionBar.no} = ${f2(selectedTensionBar.As_prov)} cm² (req ${f2(r.As)})`
+      ? `${selectedTensionBar.n}${selectedTensionBar.short} = ${f2(selectedTensionBar.As_prov)} cm² (req ${f2(r.As)})`
       : `As = ${f2(r.As)} cm²`;
   ctx.fillText(asLabel, ox + b * esc + 28, yAs + 35);
 
@@ -1324,7 +1360,7 @@ function drawSection(r, p) {
     drawArrow(ctx, lastXp + rbComp + 2, yAsp - 4, ox + b * esc + 26, yAsp - 26, '#5a7a9e', 1);
     ctx.fillStyle = '#8fb3d9'; ctx.font = 'bold 14px Inter,sans-serif'; ctx.textAlign = 'left';
     const aspLabel = selectedCompBar
-      ? `${selectedCompBar.n}#${selectedCompBar.no} = ${f2(selectedCompBar.As_prov)} cm² (req ${f2(Asp)})`
+      ? `${selectedCompBar.n}${selectedCompBar.short} = ${f2(selectedCompBar.As_prov)} cm² (req ${f2(Asp)})`
       : `A's = ${f2(Asp)} cm²`;
     ctx.fillText(aspLabel, ox + b * esc + 28, yAsp - 31);
   }
