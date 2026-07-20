@@ -168,6 +168,12 @@ canvas{display:block;border-radius:8px;background:#0d1117;max-width:100%}
 .bars-current button{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;font-size:12px;font-weight:600;
                       padding:4px 10px;border-radius:6px;cursor:pointer;margin-left:auto}
 
+#bar-tooltip{position:fixed;display:none;background:#111827;color:#f9fafb;font-size:12.5px;
+             padding:9px 12px;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.4);
+             z-index:3000;pointer-events:none;line-height:1.55;max-width:270px}
+#bar-tooltip b{color:#e8b06a}
+#bar-tooltip .sub{color:#9ca3af;font-size:11px}
+
 @media(max-width:900px){
   body{overflow:auto;height:auto}
   .main{grid-template-columns:1fr;height:auto}
@@ -220,6 +226,8 @@ canvas{display:block;border-radius:8px;background:#0d1117;max-width:100%}
 <div id="toast" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
      background:#161b22;border:1px solid #30363d;color:#e6edf3;padding:10px 18px;border-radius:8px;
      font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,0.5);z-index:2000;"></div>
+
+<div id="bar-tooltip"></div>
 
 <!-- ══════════════ MODAL: REPORTE ACUMULADO DE VIGAS ══════════════ -->
 <div id="report-modal" style="display:none;position:fixed;inset:0;background:rgba(1,4,9,0.72);
@@ -597,7 +605,10 @@ const BAR_CATALOG_MM = [
   { code: '32', mm: 32, label: 'Ø 32 mm', short: 'Ø32' },
 ];
 let barUnitSystem = 'in'; // 'in' (pulgadas/soft-métrico) | 'mm' (métrico comercial)
-function barCatalog(system) { return (system || barUnitSystem) === 'mm' ? BAR_CATALOG_MM : BAR_CATALOG_IN; }
+function barCatalog(system) {
+  const sys = system || barUnitSystem;
+  return (sys === 'mm' ? BAR_CATALOG_MM : BAR_CATALOG_IN).map(b => ({ ...b, system: sys }));
+}
 function barAreaCm2(mm) { const r_cm = mm / 20; return Math.PI * r_cm * r_cm; }
 
 // Para cada diámetro, encuentra el n mínimo que cumple As_req y evalúa si cabe
@@ -651,6 +662,7 @@ function readParams() {
 
 let _lastR = null, _lastP = null;
 let selectedTensionBar = null, selectedCompBar = null;
+let hoverZones = []; // regiones del canvas (As/A's) para el tooltip de barra
 
 function _doCalc() {
   const p = readParams();
@@ -1272,6 +1284,7 @@ function drawSection(r, p) {
   const ctx = cv.getContext('2d');
   const W = cv.width, H = cv.height;
   ctx.clearRect(0, 0, W, H);
+  hoverZones = [];
 
   const b = r.b_cm, h = r.h_cm, d = r.d_cm, rCover = r.r_cm;
   const autoComp = r.needsComp && r.doubly && !r.doubly.err;
@@ -1343,6 +1356,11 @@ function drawSection(r, p) {
       ? `${selectedTensionBar.n}${selectedTensionBar.short} = ${f2(selectedTensionBar.As_prov)} cm² (req ${f2(r.As)})`
       : `As = ${f2(r.As)} cm²`;
   ctx.fillText(asLabel, ox + b * esc + 28, yAs + 35);
+  const asLabelW = ctx.measureText(asLabel).width;
+
+  // Zonas de hover: fila de barras + etiqueta
+  hoverZones.push({ x: xs[0] - rb - 4, y: yAs - rb - 4, w: (lastX - xs[0]) + 2 * (rb + 4), h: 2 * (rb + 4), kind: 'tension' });
+  hoverZones.push({ x: ox + b * esc + 28 - 4, y: yAs + 35 - 15, w: asLabelW + 8, h: 20, kind: 'tension' });
 
   // ── Acero en compresión (A's) — automático (doblemente reforzada) o manual ──
   let yAsp = null;
@@ -1363,6 +1381,11 @@ function drawSection(r, p) {
       ? `${selectedCompBar.n}${selectedCompBar.short} = ${f2(selectedCompBar.As_prov)} cm² (req ${f2(Asp)})`
       : `A's = ${f2(Asp)} cm²`;
     ctx.fillText(aspLabel, ox + b * esc + 28, yAsp - 31);
+    const aspLabelW = ctx.measureText(aspLabel).width;
+
+    // Zonas de hover: fila de barras + etiqueta
+    hoverZones.push({ x: xsp[0] - rbComp - 4, y: yAsp - rbComp - 4, w: (lastXp - xsp[0]) + 2 * (rbComp + 4), h: 2 * (rbComp + 4), kind: 'comp' });
+    hoverZones.push({ x: ox + b * esc + 28 - 4, y: yAsp - 31 - 15, w: aspLabelW + 8, h: 20, kind: 'comp' });
   }
 
   // ── Cotas exteriores — h, d y d' apiladas del lado izquierdo ──
@@ -1412,8 +1435,52 @@ function onCompChange() {
   document.getElementById('i-Asp').disabled = !on;
 }
 
+/* ── Tooltip de barra al pasar el puntero sobre As / A's ── */
+function tooltipContentFor(kind) {
+  const isTension = kind === 'tension';
+  const bar = isTension ? selectedTensionBar : selectedCompBar;
+  const label = isTension ? "As — Acero de tracción" : "A's — Acero de compresión";
+  if (!bar) {
+    return `<b>${label}</b><br>Barras representativas (sin combinación seleccionada).<br>
+      <span class="sub">Usa "📐 Combinación de Barras" para elegir un diámetro real.</span>`;
+  }
+  const mmToIn = (bar.mm / 25.4).toFixed(3);
+  const convNote = bar.system === 'mm'
+    ? `≈ ${mmToIn}" <span class="sub">(conversión de referencia, no es medida comercial)</span>`
+    : `<span class="sub">(designación comercial en pulgadas)</span>`;
+  return `<b>${label}</b><br>Barra ${bar.label}<br>
+    Ø = ${f2(bar.mm)} mm ${convNote}<br>
+    ${bar.n} barras · As provista = ${f2(bar.As_prov)} cm²`;
+}
+
+function setupCanvasTooltip() {
+  const cv = document.getElementById('cviz');
+  const tip = document.getElementById('bar-tooltip');
+  cv.addEventListener('mousemove', e => {
+    const rect = cv.getBoundingClientRect();
+    const scaleX = cv.width / rect.width, scaleY = cv.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX, y = (e.clientY - rect.top) * scaleY;
+    const zone = hoverZones.find(z => x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h);
+    if (zone) {
+      tip.innerHTML = tooltipContentFor(zone.kind);
+      tip.style.left = (e.clientX + 16) + 'px';
+      tip.style.top = (e.clientY + 16) + 'px';
+      tip.style.display = 'block';
+      cv.style.cursor = 'pointer';
+    } else {
+      tip.style.display = 'none';
+      cv.style.cursor = 'default';
+    }
+  });
+  cv.addEventListener('mouseleave', () => {
+    tip.style.display = 'none';
+    cv.style.cursor = 'default';
+  });
+}
+
 window.addEventListener('resize', recalc);
 onCompChange();
+setupCanvasTooltip();
 recalc();
 </script>
 </body>
