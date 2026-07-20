@@ -681,6 +681,16 @@ function _doCalc() {
   }
   setDot('ok', 'Listo');
   document.getElementById('manual-comp-row').style.display = r.needsComp ? 'none' : '';
+
+  // Auto-selecciona la combinación de barras más óptima para este cálculo;
+  // el usuario puede cambiarla luego en "📐 Combinación de Barras".
+  if (!(r.needsComp && r.doubly && r.doubly.err)) {
+    selectedTensionBar = bestBarCombo(findBarCombos(r.As, r.b_cm, r.r_cm));
+  }
+  if (r.needsComp && r.doubly && !r.doubly.err) {
+    selectedCompBar = bestBarCombo(findBarCombos(r.doubly.Asp, r.b_cm, p.dp_cm));
+  }
+
   renderSummary(r, p);
   renderMsg(r);
   renderVerif(r, p);
@@ -1185,10 +1195,11 @@ function renderBarsModal() {
   // ── Tracción ──
   const tensCombos = findBarCombos(r.As, r.b_cm, r.r_cm);
   const tensBest = bestBarCombo(tensCombos);
+  const tensIsAuto = selectedTensionBar && tensBest && selectedTensionBar.code === tensBest.code;
   html += `<div>
     <div class="aci-h">Acero de Tracción — As requerido = ${f2(r.As)} cm²</div>
-    ${selectedTensionBar ? `<div class="bars-current">Usando: ${selectedTensionBar.label} × ${selectedTensionBar.n} barras (As provista = ${f2(selectedTensionBar.As_prov)} cm²)
-      <button onclick="clearTensionSelection()">Quitar</button></div>` : ''}
+    ${selectedTensionBar ? `<div class="bars-current">Usando (${tensIsAuto ? 'óptima automática' : 'elegida manualmente'}): ${selectedTensionBar.label} × ${selectedTensionBar.n} barras (As provista = ${f2(selectedTensionBar.As_prov)} cm²)
+      <button onclick="clearTensionSelection()">Usar genérica</button></div>` : ''}
     ${!tensBest ? noneFeasibleMsg : ''}
     ${barsTableHtml(tensCombos, tensBest, r.As, selectedTensionBar, 'selectTensionBar')}
   </div>`;
@@ -1197,10 +1208,11 @@ function renderBarsModal() {
   if (r.needsComp && r.doubly && !r.doubly.err) {
     const compCombos = findBarCombos(r.doubly.Asp, r.b_cm, p.dp_cm);
     const compBest = bestBarCombo(compCombos);
+    const compIsAuto = selectedCompBar && compBest && selectedCompBar.code === compBest.code;
     html += `<div>
       <div class="aci-h">Acero de Compresión — A's requerido = ${f2(r.doubly.Asp)} cm²</div>
-      ${selectedCompBar ? `<div class="bars-current">Usando: ${selectedCompBar.label} × ${selectedCompBar.n} barras (A's provista = ${f2(selectedCompBar.As_prov)} cm²)
-        <button onclick="clearCompSelection()">Quitar</button></div>` : ''}
+      ${selectedCompBar ? `<div class="bars-current">Usando (${compIsAuto ? 'óptima automática' : 'elegida manualmente'}): ${selectedCompBar.label} × ${selectedCompBar.n} barras (A's provista = ${f2(selectedCompBar.As_prov)} cm²)
+        <button onclick="clearCompSelection()">Usar genérica</button></div>` : ''}
       ${!compBest ? noneFeasibleMsg : ''}
       ${barsTableHtml(compCombos, compBest, r.doubly.Asp, selectedCompBar, 'selectCompBar')}
     </div>`;
