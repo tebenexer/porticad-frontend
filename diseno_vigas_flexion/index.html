@@ -31,7 +31,6 @@ body{font-family:var(--sans);background:#0d1117;color:#e6edf3;
 .topbar-title{font-size:13px;font-weight:600;color:#e6edf3}
 .badge{background:#1f6feb22;border:1px solid #1f6feb55;color:#58a6ff;
        font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px}
-.badge.beta{background:#d2992222;border-color:#d2992255;color:#d29922}
 .calc-dot{width:7px;height:7px;border-radius:50%;background:#3fb950;transition:all .3s}
 .calc-dot.busy{background:#d29922;animation:blink .6s infinite}
 .calc-dot.err{background:#f85149}
@@ -191,7 +190,7 @@ canvas{display:block;border-radius:8px;background:#0d1117;max-width:100%}
   <div class="topbar-crumb">
     <span class="topbar-title">Diseño de Vigas a Flexión</span>
   </div>
-  <span class="badge beta" style="margin-left:8px">BETA v0.1</span>
+  <span class="badge" style="margin-left:8px">ACI 318-25</span>
   <button id="btn-aci-info" onclick="openAciModal()"
     style="margin-left:12px;background:#1f6feb18;border:1px solid #1f6feb55;color:#58a6ff;
            font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:7px;cursor:pointer;
@@ -380,8 +379,7 @@ canvas{display:block;border-radius:8px;background:#0d1117;max-width:100%}
 
   <div class="aci-note">
     <strong style="color:#58a6ff">Método</strong> · Bloque rectangular equivalente (Whitney) ·
-    γ = 0.85 · εu = 0.003 · φ = 0.9<br>
-    Herramienta en <strong style="color:#d29922">beta</strong>: se irá ajustando con el uso.
+    γ = 0.85 · εu = 0.003 · φ = 0.9
   </div>
 
 </div><!-- /panel-inputs -->
@@ -1122,7 +1120,7 @@ function exportReportPDF() {
     @media print{ body{margin:12mm} }
   </style></head><body>
   <h1>PortiCAD — Reporte de Diseño de Vigas a Flexión</h1>
-  <p class="sub">porticad.app · Generado ${new Date().toLocaleString('es')} · ${reportList.length} sección(es) · ACI 318-25 (beta)</p>
+  <p class="sub">porticad.app · Generado ${new Date().toLocaleString('es')} · ${reportList.length} sección(es) · ACI 318-25</p>
   ${rows}
   </body></html>`);
   win.document.close();
@@ -1189,7 +1187,7 @@ function renderBarsModal() {
 
   const noneFeasibleMsg = `<div class="msg-box err" style="color:#b91c1c;background:#fef2f2;border:1px solid #fca5a5">
     ⚠ Ninguna combinación en una sola capa cabe con este ancho y recubrimiento. Considera: aumentar b,
-    usar dos capas de refuerzo (no evaluado automáticamente en esta beta), o aumentar f'c/fy para reducir el As requerido.
+    usar dos capas de refuerzo (no evaluado automáticamente por esta herramienta), o aumentar f'c/fy para reducir el As requerido.
   </div>`;
 
   // ── Tracción ──
@@ -1303,7 +1301,22 @@ function drawSection(r, p) {
   const hasComp = autoComp || (!r.needsComp && p.hasComp);
   const dp = p.dp_cm, Asp = autoComp ? r.doubly.Asp : p.Asp_cm2;
 
-  const ml = hasComp ? 128 : 96, mr = hasComp ? 138 : 112, mt = 36, mb = 56;
+  // Etiquetas As / A's — calculadas antes del layout para medir su ancho real
+  // y así el margen derecho nunca corte el texto (incluye "cm²").
+  const asLabel = r.needsComp && r.doubly.err
+    ? `As₁ (incompleto) = ${f2(r.As)} cm²`
+    : selectedTensionBar
+      ? `${selectedTensionBar.n}${selectedTensionBar.short} = ${f2(selectedTensionBar.As_prov)} cm²`
+      : `As = ${f2(r.As)} cm²`;
+  const aspLabel = hasComp
+    ? (selectedCompBar ? `${selectedCompBar.n}${selectedCompBar.short} = ${f2(selectedCompBar.As_prov)} cm²` : `A's = ${f2(Asp)} cm²`)
+    : null;
+  ctx.font = 'bold 14px Inter,sans-serif';
+  const labelMaxW = Math.max(ctx.measureText(asLabel).width, aspLabel ? ctx.measureText(aspLabel).width : 0);
+
+  const ml = hasComp ? 128 : 96;
+  const mr = Math.max(hasComp ? 138 : 112, labelMaxW + 40);
+  const mt = 36, mb = 56;
   const cw = W - ml - mr, ch = H - mt - mb;
   const esc = Math.min(cw / b, ch / h);
   const ox = ml + (cw - b * esc) / 2;
@@ -1362,11 +1375,6 @@ function drawSection(r, p) {
   const lastX = xs[xs.length - 1];
   drawArrow(ctx, lastX + rb + 2, yAs + 4, ox + b * esc + 26, yAs + 30, '#c9822e', 1);
   ctx.fillStyle = '#e8b06a'; ctx.font = 'bold 14px Inter,sans-serif'; ctx.textAlign = 'left';
-  const asLabel = r.needsComp && r.doubly.err
-    ? `As₁ (incompleto) = ${f2(r.As)} cm²`
-    : selectedTensionBar
-      ? `${selectedTensionBar.n}${selectedTensionBar.short} = ${f2(selectedTensionBar.As_prov)} cm² (req ${f2(r.As)})`
-      : `As = ${f2(r.As)} cm²`;
   ctx.fillText(asLabel, ox + b * esc + 28, yAs + 35);
   const asLabelW = ctx.measureText(asLabel).width;
 
@@ -1389,9 +1397,6 @@ function drawSection(r, p) {
     const lastXp = xsp[xsp.length - 1];
     drawArrow(ctx, lastXp + rbComp + 2, yAsp - 4, ox + b * esc + 26, yAsp - 26, '#5a7a9e', 1);
     ctx.fillStyle = '#8fb3d9'; ctx.font = 'bold 14px Inter,sans-serif'; ctx.textAlign = 'left';
-    const aspLabel = selectedCompBar
-      ? `${selectedCompBar.n}${selectedCompBar.short} = ${f2(selectedCompBar.As_prov)} cm² (req ${f2(Asp)})`
-      : `A's = ${f2(Asp)} cm²`;
     ctx.fillText(aspLabel, ox + b * esc + 28, yAsp - 31);
     const aspLabelW = ctx.measureText(aspLabel).width;
 
