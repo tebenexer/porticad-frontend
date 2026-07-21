@@ -1126,7 +1126,7 @@ _fbAuth.onAuthStateChanged(user => {
       </button>
 
       <!-- Panel desplegable -->
-      <div id="multitools-panel" style="display:none;position:absolute;top:calc(100% + 8px);left:0;background:#161b22;border:1px solid #30363d;border-radius:10px;padding:10px 8px;width:280px;z-index:2000;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+      <div id="multitools-panel" style="display:none;position:absolute;top:calc(100% + 8px);right:0;background:#161b22;border:1px solid #30363d;border-radius:10px;padding:10px 8px;width:280px;max-height:calc(100vh - 70px);overflow-y:auto;z-index:2000;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
         <div style="font-size:10px;font-weight:700;color:#58a6ff;padding:4px 8px 8px;letter-spacing:.5px;border-bottom:1px solid #21262d;margin-bottom:8px;">
           ⚡ MULTI-TOOLS
         </div>
@@ -10868,7 +10868,8 @@ setApoyoPreset('empotrado');
 <!-- Mobile Multi-Tools panel -->
 <div id="mob-multitools" style="display:none; position:fixed; bottom:70px; right:8px; z-index:850;
   background:rgba(22,27,34,0.98); border:1px solid #30363d; border-radius:12px;
-  padding:10px 8px; width:270px; box-shadow:0 -4px 24px rgba(0,0,0,0.5);">
+  padding:10px 8px; width:270px; max-width:calc(100vw - 16px); max-height:calc(100vh - 140px); overflow-y:auto;
+  box-shadow:0 -4px 24px rgba(0,0,0,0.5);">
   <div style="font-size:10px;color:#58a6ff;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding:0 4px;border-bottom:1px solid #21262d;padding-bottom:6px;">
     ⚡ MULTI-TOOLS
   </div>
