@@ -1126,114 +1126,15 @@ _fbAuth.onAuthStateChanged(user => {
       </button>
 
       <!-- Panel desplegable -->
-      <div id="multitools-panel" style="display:none;position:absolute;top:calc(100% + 8px);left:0;background:#161b22;border:1px solid #30363d;border-radius:10px;padding:10px 8px;min-width:200px;z-index:2000;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+      <div id="multitools-panel" style="display:none;position:absolute;top:calc(100% + 8px);left:0;background:#161b22;border:1px solid #30363d;border-radius:10px;padding:10px 8px;width:280px;z-index:2000;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
         <div style="font-size:10px;font-weight:700;color:#58a6ff;padding:4px 8px 8px;letter-spacing:.5px;border-bottom:1px solid #21262d;margin-bottom:8px;">
           ⚡ MULTI-TOOLS
         </div>
-        <div id="multitools-links">
-          <a href="/dibujo_cad" target="_blank" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='none'">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2" style="flex-shrink:0">
-              <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-            </svg>
-            <div>
-              <div style="font-size:12px;font-weight:600;">Dibujo CAD</div>
-              <div style="font-size:10px;color:#8b949e;">Líneas, rectángulos, círculos</div>
-            </div>
-          </a>
-          <a href="/as_columna_hormigon_aci" target="_blank" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='none'">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2" style="flex-shrink:0">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <line x1="8" y1="12" x2="16" y2="12"/>
-              <line x1="12" y1="8" x2="12" y2="16"/>
-            </svg>
-            <div>
-              <div style="font-size:12px;font-weight:600;">As Columna H.A.</div>
-              <div style="font-size:10px;color:#8b949e;">Diseño acero · ACI 318-25</div>
-            </div>
-          </a>
-          <a href="/diagrama_interaccion" target="_blank" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='none'">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2" style="flex-shrink:0">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-            </svg>
-            <div>
-              <div style="font-size:12px;font-weight:600;">Diagrama Interacción P-M</div>
-              <div style="font-size:10px;color:#8b949e;">Curva P-M · Rectangular · Circular</div>
-            </div>
-          </a>
-          <a href="/diseno_vigas_flexion" target="_blank" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='none'">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e2b04a" stroke-width="2" style="flex-shrink:0">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <line x1="7" y1="16" x2="17" y2="16"/>
-              <path d="M9 16V8h4a3 3 0 0 1 0 6H9"/>
-            </svg>
-            <div>
-              <div style="font-size:12px;font-weight:600;">Diseño Vigas a Flexión</div>
-              <div style="font-size:10px;color:#8b949e;">Acero a flexión · bloque Whitney</div>
-            </div>
-          </a>
-          <a href="/as_cortante_columnas_hormigon_aci" target="_blank" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='none'">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d29922" stroke-width="2" style="flex-shrink:0">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <rect x="8" y="8" width="8" height="8" rx="1"/>
-            </svg>
-            <div>
-              <div style="font-size:12px;font-weight:600;">Estribos Columna H.A.</div>
-              <div style="font-size:10px;color:#8b949e;">Cortante & estribos · ACI 318-25</div>
-            </div>
-          </a>
-          <a href="/losas_hormigon" target="_blank" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='none'">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" style="flex-shrink:0">
-              <rect x="2" y="7" width="20" height="10" rx="2"/>
-              <line x1="2" y1="12" x2="22" y2="12"/>
-              <line x1="7" y1="7" x2="7" y2="17"/>
-              <line x1="12" y1="7" x2="12" y2="17"/>
-              <line x1="17" y1="7" x2="17" y2="17"/>
-            </svg>
-            <div>
-              <div style="font-size:12px;font-weight:600;">Losas de Hormigón</div>
-              <div style="font-size:10px;color:#8b949e;">Presupuesto & materiales por M³</div>
-            </div>
-          </a>
-          <a href="/cubicacion_volumen_hormigon" target="_blank" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='none'">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2" style="flex-shrink:0">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <path d="M3 9h18M3 15h18M9 3v18"/>
-            </svg>
-            <div>
-              <div style="font-size:12px;font-weight:600;">Cubicación Hormigón</div>
-              <div style="font-size:10px;color:#8b949e;">Volumen · losas, vigas, columnas, escaleras</div>
-            </div>
-          </a>
-          <a href="/metrado_mezclas_morteros" target="_blank" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='none'">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" style="flex-shrink:0">
-              <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/>
-            </svg>
-            <div>
-              <div style="font-size:12px;font-weight:600;">Metrado Mezclas & Morteros</div>
-              <div style="font-size:10px;color:#8b949e;">Insumos, costos & bloques por partida</div>
-            </div>
-          </a>
-          <a href="/materiales_muros" target="_blank" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='none'">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f472b6" stroke-width="2" style="flex-shrink:0">
-              <rect x="3" y="10" width="4" height="8"/><rect x="8" y="10" width="4" height="8"/><rect x="13" y="10" width="4" height="8"/><rect x="18" y="10" width="3" height="8"/>
-              <line x1="3" y1="6" x2="21" y2="6"/>
-            </svg>
-            <div>
-              <div style="font-size:12px;font-weight:600;">Materiales Muros de Block</div>
-              <div style="font-size:10px;color:#8b949e;">Arena, grava, cemento, acero 3/8" & alambre</div>
-            </div>
-          </a>
-          <div style="border-top:1px solid #21262d;margin:4px 0;"></div>
-          <a href="/gastos_personales/" target="_blank" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='none'">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" style="flex-shrink:0">
-              <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/>
-            </svg>
-            <div>
-              <div style="font-size:12px;font-weight:600;">Gastos Personales</div>
-              <div style="font-size:10px;color:#8b949e;">Control financiero & presupuesto</div>
-            </div>
-          </a>
+        <div id="mt-back-row" style="display:none;align-items:center;gap:6px;padding:0 4px 8px;">
+          <button onclick="mtShowCategories(false)" style="background:none;border:none;color:#58a6ff;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:3px;padding:3px 4px;">‹ Categorías</button>
+          <span id="mt-cat-title" style="font-size:11px;color:#8b949e;font-weight:600;"></span>
         </div>
+        <div id="multitools-links"></div>
       </div>
     </div>
 
@@ -7722,12 +7623,104 @@ function redoAccion() {
 }
 
 // ── Multi-Tools ──────────────────────────────────────────────────────────────
+const MT_CATEGORIES = [
+  { id: 'dibujo', name: 'Dibujo', color: '#22d3ee',
+    icon: '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>',
+    tools: [
+      { href: '/dibujo_cad', color: '#22d3ee', icon: '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>', name: 'Dibujo CAD', desc: 'Líneas, rectángulos, círculos' },
+    ] },
+  { id: 'columnas', name: 'Diseño de Columnas', color: '#3fb950',
+    icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="12" y1="8" x2="12" y2="16"/>',
+    tools: [
+      { href: '/as_columna_hormigon_aci', color: '#3fb950', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="12" y1="8" x2="12" y2="16"/>', name: 'As Columna H.A.', desc: 'Diseño acero · ACI 318-25' },
+      { href: '/diagrama_interaccion', color: '#58a6ff', icon: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>', name: 'Diagrama Interacción P-M', desc: 'Curva P-M · Rectangular · Circular' },
+      { href: '/as_cortante_columnas_hormigon_aci', color: '#d29922', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1"/>', name: 'Estribos Columna H.A.', desc: 'Cortante & estribos · ACI 318-25' },
+    ] },
+  { id: 'vigas', name: 'Diseño de Vigas', color: '#e2b04a',
+    icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="7" y1="16" x2="17" y2="16"/><path d="M9 16V8h4a3 3 0 0 1 0 6H9"/>',
+    tools: [
+      { href: '/diseno_vigas_flexion', color: '#e2b04a', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="7" y1="16" x2="17" y2="16"/><path d="M9 16V8h4a3 3 0 0 1 0 6H9"/>', name: 'Diseño Vigas a Flexión', desc: 'Acero a flexión · bloque Whitney' },
+    ] },
+  { id: 'losas', name: 'Diseño de Losas', color: '#a78bfa',
+    icon: '<rect x="2" y="7" width="20" height="10" rx="2"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="7" y1="7" x2="7" y2="17"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="17" y1="7" x2="17" y2="17"/>',
+    tools: [
+      { href: '/losas_hormigon', color: '#a78bfa', icon: '<rect x="2" y="7" width="20" height="10" rx="2"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="7" y1="7" x2="7" y2="17"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="17" y1="7" x2="17" y2="17"/>', name: 'Losas de Hormigón', desc: 'Presupuesto & materiales por M³' },
+    ] },
+  { id: 'cubicaciones', name: 'Cubicaciones', color: '#f97316',
+    icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>',
+    tools: [
+      { href: '/cubicacion_volumen_hormigon', color: '#f97316', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>', name: 'Cubicación Hormigón', desc: 'Volumen · losas, vigas, columnas, escaleras' },
+    ] },
+  { id: 'mezclas', name: 'Mezclas', color: '#10b981',
+    icon: '<path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/>',
+    tools: [
+      { href: '/metrado_mezclas_morteros', color: '#10b981', icon: '<path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/>', name: 'Metrado Mezclas & Morteros', desc: 'Insumos, costos & bloques por partida' },
+      { href: '/materiales_muros', color: '#f472b6', icon: '<rect x="3" y="10" width="4" height="8"/><rect x="8" y="10" width="4" height="8"/><rect x="13" y="10" width="4" height="8"/><rect x="18" y="10" width="3" height="8"/><line x1="3" y1="6" x2="21" y2="6"/>', name: 'Materiales Muros de Block', desc: 'Arena, grava, cemento, acero 3/8" & alambre' },
+    ] },
+  { id: 'costos', name: 'Costos y Gastos', color: '#f0b429',
+    icon: '<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/>',
+    tools: [
+      { href: '/gastos_personales/', color: '#a78bfa', icon: '<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/>', name: 'Gastos Personales', desc: 'Control financiero & presupuesto' },
+    ] },
+];
+
+function mtToolLinkHtml(t, mobile) {
+  const closeAttr = mobile ? ' onclick="closeMobMultiTools()"' : '';
+  const padY = mobile ? '9px' : '8px';
+  const nameSize = mobile ? '13px' : '12px';
+  const hoverAttrs = mobile
+    ? ` ontouchstart="this.style.background='#21262d'" ontouchend="this.style.background='none'"`
+    : ` onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='none'"`;
+  return `<a href="${t.href}" target="_blank"${closeAttr} style="display:flex;align-items:center;gap:10px;padding:${padY} 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;${mobile ? '-webkit-tap-highlight-color:transparent;' : ''}"${hoverAttrs}>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${t.color}" stroke-width="2" style="flex-shrink:0">${t.icon}</svg>
+    <div><div style="font-size:${nameSize};font-weight:600;">${t.name}</div><div style="font-size:10px;color:#8b949e;">${t.desc}</div></div>
+  </a>`;
+}
+
+function mtCategoryGridHtml(mobile) {
+  const fn = mobile ? 'mtShowCategoryMobile' : 'mtShowCategoryDesktop';
+  return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">` +
+    MT_CATEGORIES.map(c => `
+      <button onclick="${fn}('${c.id}')" style="display:flex;flex-direction:column;align-items:center;gap:6px;
+        background:#0d1117;border:1px solid #21262d;border-radius:9px;padding:12px 8px;cursor:pointer;color:#e6edf3;font-family:inherit;
+        transition:background .15s;" onmouseover="this.style.background='#1c2128'" onmouseout="this.style.background='#0d1117'">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${c.color}" stroke-width="2">${c.icon}</svg>
+        <span style="font-size:11px;font-weight:600;text-align:center;line-height:1.3">${c.name}</span>
+        <span style="font-size:9px;color:#6e7681">${c.tools.length} herramienta${c.tools.length > 1 ? 's' : ''}</span>
+      </button>`).join('') +
+    `</div>`;
+}
+
+function mtShowCategories(mobile) {
+  const linksId = mobile ? 'mob-multitools-links' : 'multitools-links';
+  const backRowId = mobile ? 'mob-mt-back-row' : 'mt-back-row';
+  document.getElementById(linksId).innerHTML = mtCategoryGridHtml(mobile);
+  document.getElementById(backRowId).style.display = 'none';
+}
+function mtShowCategory(catId, mobile) {
+  const cat = MT_CATEGORIES.find(c => c.id === catId);
+  if (!cat) return;
+  const linksId = mobile ? 'mob-multitools-links' : 'multitools-links';
+  const backRowId = mobile ? 'mob-mt-back-row' : 'mt-back-row';
+  const titleId = mobile ? 'mob-mt-cat-title' : 'mt-cat-title';
+  document.getElementById(linksId).innerHTML = cat.tools.map(t => mtToolLinkHtml(t, mobile)).join('');
+  document.getElementById(backRowId).style.display = 'flex';
+  document.getElementById(titleId).textContent = cat.name;
+}
+function mtShowCategoryDesktop(catId) { mtShowCategory(catId, false); }
+function mtShowCategoryMobile(catId) { mtShowCategory(catId, true); }
+
 function toggleMultiTools(e) {
   e.stopPropagation();
   const panel = document.getElementById('multitools-panel');
   if (!panel) return;
   const visible = panel.style.display !== 'none';
-  panel.style.display = visible ? 'none' : 'block';
+  if (visible) {
+    panel.style.display = 'none';
+  } else {
+    mtShowCategories(false);
+    panel.style.display = 'block';
+  }
 }
 
 document.addEventListener('click', function(e) {
@@ -9380,6 +9373,7 @@ function toggleMobMultiTools() {
   if (extra) extra.style.display = 'none';
   const extraBtn = document.getElementById('mob-extra-btn');
   if (extraBtn) extraBtn.classList.remove('active');
+  if (!open) mtShowCategories(true);
   el.style.display = open ? 'none' : 'block';
   if (btn) btn.classList.toggle('active', !open);
 }
@@ -10874,51 +10868,15 @@ setApoyoPreset('empotrado');
 <!-- Mobile Multi-Tools panel -->
 <div id="mob-multitools" style="display:none; position:fixed; bottom:70px; right:8px; z-index:850;
   background:rgba(22,27,34,0.98); border:1px solid #30363d; border-radius:12px;
-  padding:10px 8px; min-width:220px; box-shadow:0 -4px 24px rgba(0,0,0,0.5);">
+  padding:10px 8px; width:270px; box-shadow:0 -4px 24px rgba(0,0,0,0.5);">
   <div style="font-size:10px;color:#58a6ff;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding:0 4px;border-bottom:1px solid #21262d;padding-bottom:6px;">
     ⚡ MULTI-TOOLS
   </div>
-  <a href="/dibujo_cad" target="_blank" onclick="closeMobMultiTools()" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;-webkit-tap-highlight-color:transparent;" ontouchstart="this.style.background='#21262d'" ontouchend="this.style.background='none'">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2" style="flex-shrink:0"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-    <div><div style="font-size:13px;font-weight:600;">Dibujo CAD</div><div style="font-size:10px;color:#8b949e;">Líneas, rectángulos, círculos</div></div>
-  </a>
-  <a href="/as_columna_hormigon_aci" target="_blank" onclick="closeMobMultiTools()" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;-webkit-tap-highlight-color:transparent;" ontouchstart="this.style.background='#21262d'" ontouchend="this.style.background='none'">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2" style="flex-shrink:0"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="12" y1="8" x2="12" y2="16"/></svg>
-    <div><div style="font-size:13px;font-weight:600;">As Columna H.A.</div><div style="font-size:10px;color:#8b949e;">Diseño acero · ACI 318-25</div></div>
-  </a>
-  <a href="/diagrama_interaccion" target="_blank" onclick="closeMobMultiTools()" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;-webkit-tap-highlight-color:transparent;" ontouchstart="this.style.background='#21262d'" ontouchend="this.style.background='none'">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2" style="flex-shrink:0"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-    <div><div style="font-size:13px;font-weight:600;">Diagrama Interacción P-M</div><div style="font-size:10px;color:#8b949e;">Curva P-M · Rectangular · Circular</div></div>
-  </a>
-  <a href="/diseno_vigas_flexion" target="_blank" onclick="closeMobMultiTools()" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;-webkit-tap-highlight-color:transparent;" ontouchstart="this.style.background='#21262d'" ontouchend="this.style.background='none'">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e2b04a" stroke-width="2" style="flex-shrink:0"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="7" y1="16" x2="17" y2="16"/><path d="M9 16V8h4a3 3 0 0 1 0 6H9"/></svg>
-    <div><div style="font-size:13px;font-weight:600;">Diseño Vigas a Flexión</div><div style="font-size:10px;color:#8b949e;">Acero a flexión · bloque Whitney</div></div>
-  </a>
-  <a href="/as_cortante_columnas_hormigon_aci" target="_blank" onclick="closeMobMultiTools()" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;-webkit-tap-highlight-color:transparent;" ontouchstart="this.style.background='#21262d'" ontouchend="this.style.background='none'">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d29922" stroke-width="2" style="flex-shrink:0"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg>
-    <div><div style="font-size:13px;font-weight:600;">Estribos Columna H.A.</div><div style="font-size:10px;color:#8b949e;">Cortante & estribos · ACI 318-25</div></div>
-  </a>
-  <a href="/losas_hormigon" target="_blank" onclick="closeMobMultiTools()" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;-webkit-tap-highlight-color:transparent;" ontouchstart="this.style.background='#21262d'" ontouchend="this.style.background='none'">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" style="flex-shrink:0"><rect x="2" y="7" width="20" height="10" rx="2"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="7" y1="7" x2="7" y2="17"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="17" y1="7" x2="17" y2="17"/></svg>
-    <div><div style="font-size:13px;font-weight:600;">Losas de Hormigón</div><div style="font-size:10px;color:#8b949e;">Presupuesto & materiales por M³</div></div>
-  </a>
-  <a href="/cubicacion_volumen_hormigon" target="_blank" onclick="closeMobMultiTools()" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;-webkit-tap-highlight-color:transparent;" ontouchstart="this.style.background='#21262d'" ontouchend="this.style.background='none'">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2" style="flex-shrink:0"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
-    <div><div style="font-size:13px;font-weight:600;">Cubicación Hormigón</div><div style="font-size:10px;color:#8b949e;">Volumen · losas, vigas, columnas</div></div>
-  </a>
-  <a href="/metrado_mezclas_morteros" target="_blank" onclick="closeMobMultiTools()" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;-webkit-tap-highlight-color:transparent;" ontouchstart="this.style.background='#21262d'" ontouchend="this.style.background='none'">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" style="flex-shrink:0"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/></svg>
-    <div><div style="font-size:13px;font-weight:600;">Metrado Mezclas & Morteros</div><div style="font-size:10px;color:#8b949e;">Insumos, costos & bloques</div></div>
-  </a>
-  <a href="/materiales_muros" target="_blank" onclick="closeMobMultiTools()" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;-webkit-tap-highlight-color:transparent;" ontouchstart="this.style.background='#21262d'" ontouchend="this.style.background='none'">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f472b6" stroke-width="2" style="flex-shrink:0"><rect x="3" y="10" width="4" height="8"/><rect x="8" y="10" width="4" height="8"/><rect x="13" y="10" width="4" height="8"/><rect x="18" y="10" width="3" height="8"/><line x1="3" y1="6" x2="21" y2="6"/></svg>
-    <div><div style="font-size:13px;font-weight:600;">Materiales Muros de Block</div><div style="font-size:10px;color:#8b949e;">Arena, grava, cemento, acero & alambre</div></div>
-  </a>
-  <div style="border-top:1px solid #21262d;margin:6px 0;"></div>
-  <a href="/gastos_personales/" target="_blank" onclick="closeMobMultiTools()" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;text-decoration:none;color:#e6edf3;transition:background .15s;-webkit-tap-highlight-color:transparent;" ontouchstart="this.style.background='#21262d'" ontouchend="this.style.background='none'">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" style="flex-shrink:0"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
-    <div><div style="font-size:13px;font-weight:600;">Gastos Personales</div><div style="font-size:10px;color:#8b949e;">Control financiero & presupuesto</div></div>
-  </a>
+  <div id="mob-mt-back-row" style="display:none;align-items:center;gap:6px;padding:0 4px 8px;">
+    <button onclick="mtShowCategories(true)" style="background:none;border:none;color:#58a6ff;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:3px;padding:3px 4px;">‹ Categorías</button>
+    <span id="mob-mt-cat-title" style="font-size:11px;color:#8b949e;font-weight:600;"></span>
+  </div>
+  <div id="mob-multitools-links"></div>
 </div>
 
 <!-- Mobile extra controls overlay -->
