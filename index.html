@@ -7733,6 +7733,11 @@ function mtShowCategory(catId, mobile) {
 // de parseo, y esto también sobrevive a que el contenido se regenere con
 // innerHTML en cada render.
 document.addEventListener('click', function(e) {
+  // ── DIAGNÓSTICO TEMPORAL ── quitar una vez resuelto el bug de Multi-Tools.
+  if (e.target.closest('#multitools-panel') || e.target.closest('#mob-multitools')) {
+    alert('MT-DEBUG click\ntarget: ' + e.target.tagName + (e.target.className ? '.' + String(e.target.className).replace(/ /g,'.') : '') +
+          '\ndata-mt-cat cercano: ' + (e.target.closest('[data-mt-cat]') ? e.target.closest('[data-mt-cat]').getAttribute('data-mt-cat') : 'ninguno'));
+  }
   const catBtn = e.target.closest('[data-mt-cat]');
   if (catBtn) {
     const mobile = !!e.target.closest('#mob-multitools');
