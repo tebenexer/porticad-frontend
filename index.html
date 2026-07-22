@@ -7717,13 +7717,20 @@ function mtShowCategories(mobile) {
 }
 function mtShowCategory(catId, mobile) {
   const cat = MT_CATEGORIES.find(c => c.id === catId);
+  // ── DIAGNÓSTICO TEMPORAL ──
+  alert('MT-DEBUG mtShowCategory\ncatId: ' + catId + '\nmobile: ' + mobile + '\ncat encontrado: ' + (cat ? cat.name : 'NO ENCONTRADO'));
   if (!cat) return;
   const linksId = mobile ? 'mob-multitools-links' : 'multitools-links';
   const backRowId = mobile ? 'mob-mt-back-row' : 'mt-back-row';
   const titleId = mobile ? 'mob-mt-cat-title' : 'mt-cat-title';
-  document.getElementById(linksId).innerHTML = cat.tools.map(t => mtToolLinkHtml(t, mobile)).join('');
-  document.getElementById(backRowId).style.display = 'flex';
-  document.getElementById(titleId).textContent = cat.name;
+  const linksEl = document.getElementById(linksId);
+  const backRowEl = document.getElementById(backRowId);
+  const titleEl = document.getElementById(titleId);
+  alert('MT-DEBUG elementos\nlinksEl: ' + (linksEl ? 'OK' : 'NULL') + '\nbackRowEl: ' + (backRowEl ? 'OK' : 'NULL') + '\ntitleEl: ' + (titleEl ? 'OK' : 'NULL'));
+  linksEl.innerHTML = cat.tools.map(t => mtToolLinkHtml(t, mobile)).join('');
+  backRowEl.style.display = 'flex';
+  titleEl.textContent = cat.name;
+  alert('MT-DEBUG listo\nlinksEl.innerHTML length: ' + linksEl.innerHTML.length + '\nbackRowEl display: ' + backRowEl.style.display);
 }
 
 // Delegación de eventos sobre `document` (no sobre los paneles directamente):
