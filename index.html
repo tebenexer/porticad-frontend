@@ -7717,50 +7717,14 @@ function mtShowCategories(mobile) {
 }
 function mtShowCategory(catId, mobile) {
   const cat = MT_CATEGORIES.find(c => c.id === catId);
-  // ── DIAGNÓSTICO TEMPORAL ──
-  alert('MT-DEBUG mtShowCategory\ncatId: ' + catId + '\nmobile: ' + mobile + '\ncat encontrado: ' + (cat ? cat.name : 'NO ENCONTRADO'));
   if (!cat) return;
   const linksId = mobile ? 'mob-multitools-links' : 'multitools-links';
   const backRowId = mobile ? 'mob-mt-back-row' : 'mt-back-row';
   const titleId = mobile ? 'mob-mt-cat-title' : 'mt-cat-title';
-  const linksEl = document.getElementById(linksId);
-  const backRowEl = document.getElementById(backRowId);
-  const titleEl = document.getElementById(titleId);
-  alert('MT-DEBUG elementos\nlinksEl: ' + (linksEl ? 'OK' : 'NULL') + '\nbackRowEl: ' + (backRowEl ? 'OK' : 'NULL') + '\ntitleEl: ' + (titleEl ? 'OK' : 'NULL'));
-  linksEl.innerHTML = cat.tools.map(t => mtToolLinkHtml(t, mobile)).join('');
-  backRowEl.style.display = 'flex';
-  titleEl.textContent = cat.name;
-  alert('MT-DEBUG listo\nlinksEl.innerHTML length: ' + linksEl.innerHTML.length + '\nbackRowEl display: ' + backRowEl.style.display);
+  document.getElementById(linksId).innerHTML = cat.tools.map(t => mtToolLinkHtml(t, mobile)).join('');
+  document.getElementById(backRowId).style.display = 'flex';
+  document.getElementById(titleId).textContent = cat.name;
 }
-
-// Delegación de eventos sobre `document` (no sobre los paneles directamente):
-// `#mob-multitools` vive mucho más abajo en el HTML y todavía no existe en el
-// DOM cuando este script corre, así que engancharse a él con getElementById
-// aquí fallaría en silencio. `document` siempre existe, sin importar el orden
-// de parseo, y esto también sobrevive a que el contenido se regenere con
-// innerHTML en cada render.
-document.addEventListener('click', function(e) {
-  // ── DIAGNÓSTICO TEMPORAL ── quitar una vez resuelto el bug de Multi-Tools.
-  if (e.target.closest('#multitools-panel') || e.target.closest('#mob-multitools')) {
-    alert('MT-DEBUG click\ntarget: ' + e.target.tagName + (e.target.className ? '.' + String(e.target.className).replace(/ /g,'.') : '') +
-          '\ndata-mt-cat cercano: ' + (e.target.closest('[data-mt-cat]') ? e.target.closest('[data-mt-cat]').getAttribute('data-mt-cat') : 'ninguno'));
-  }
-  const catBtn = e.target.closest('[data-mt-cat]');
-  if (catBtn) {
-    const mobile = !!e.target.closest('#mob-multitools');
-    mtShowCategory(catBtn.getAttribute('data-mt-cat'), mobile);
-    return;
-  }
-  const backBtn = e.target.closest('[data-mt-back]');
-  if (backBtn) {
-    const mobile = !!e.target.closest('#mob-multitools');
-    mtShowCategories(mobile);
-    return;
-  }
-  if (e.target.closest('#mob-multitools a[href]')) {
-    closeMobMultiTools();
-  }
-});
 
 function toggleMultiTools(e) {
   e.stopPropagation();
@@ -7775,13 +7739,44 @@ function toggleMultiTools(e) {
   }
 }
 
+// Un único listener en `document` para todo lo de Multi-Tools (escritorio y
+// móvil). `document` siempre existe sin importar el orden de parseo del HTML
+// (a diferencia de engancharse directo a #mob-multitools, que vive muy abajo
+// en la página y todavía no existe cuando este script corre).
+//
+// Importante: la comprobación de "¿el clic fue dentro del panel?" se hace
+// ANTES de llamar a mtShowCategory/mtShowCategories, porque esas funciones
+// reemplazan el contenido con innerHTML — eso destruye el nodo original que
+// disparó el clic (e.target). Si luego se comprobara panel.contains(e.target)
+// con ese nodo ya desconectado del DOM, la comprobación daría `false` (un nodo
+// huérfano no está "contenido" en nada) y el panel se cerraría solo, justo
+// después de haberse actualizado correctamente. Por eso todo va en un único
+// listener con la decisión de cerrar evaluada primero.
 document.addEventListener('click', function(e) {
   const panel = document.getElementById('multitools-panel');
   const btn   = document.getElementById('btn-multitools');
-  if (panel && panel.style.display !== 'none') {
-    if (!panel.contains(e.target) && !btn.contains(e.target)) {
-      panel.style.display = 'none';
-    }
+  const clickedInsidePanel = panel && panel.contains(e.target);
+  const clickedToggleBtn   = btn && btn.contains(e.target);
+
+  const catBtn = e.target.closest('[data-mt-cat]');
+  if (catBtn) {
+    const mobile = !!e.target.closest('#mob-multitools');
+    mtShowCategory(catBtn.getAttribute('data-mt-cat'), mobile);
+    return;
+  }
+  const backBtn = e.target.closest('[data-mt-back]');
+  if (backBtn) {
+    const mobile = !!e.target.closest('#mob-multitools');
+    mtShowCategories(mobile);
+    return;
+  }
+  if (e.target.closest('#mob-multitools a[href]')) {
+    closeMobMultiTools();
+    return;
+  }
+
+  if (panel && panel.style.display !== 'none' && !clickedInsidePanel && !clickedToggleBtn) {
+    panel.style.display = 'none';
   }
 });
 
