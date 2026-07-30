@@ -120,11 +120,34 @@
     border: 1px solid #21262d;
     border-radius: 10px;
     padding: 10px;
+    position: relative;
   }
   .diagram-note {
     font-size: 12px; color: #6e7681; text-align: center; margin-top: 6px;
   }
-  canvas#diagram { width: 100%; display: block; }
+  canvas#diagram { width: 100%; display: block; touch-action: manipulation; }
+
+  /* Tooltips flotantes sobre el diagrama */
+  .canvas-tooltip {
+    position: absolute;
+    transform: translate(-50%, 0);
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #e6edf3;
+    white-space: nowrap;
+    box-shadow: 0 4px 14px rgba(0,0,0,.45);
+    z-index: 20;
+    pointer-events: none;
+  }
+  .canvas-tooltip .tt-title { font-weight: 700; margin-bottom: 2px; }
+  .canvas-tooltip.ct-main { border-color: #f9731688; }
+  .canvas-tooltip.ct-main .tt-title { color: #f97316; }
+  .canvas-tooltip.ct-station { border-color: #2dd4bf88; }
+  .canvas-tooltip.ct-station .tt-title { color: #2dd4bf; }
 
   .cards-title {
     font-size: 12px; font-weight: 700; color: #8b949e;
@@ -155,6 +178,44 @@
   .scard-lbl { font-size: 11px; font-weight: 700; color: #8b949e; letter-spacing: .5px; text-transform: uppercase; }
   .scard-val { font-size: 20px; font-weight: 700; color: #e6edf3; line-height: 1.3; }
   .scard-unit { font-size: 12px; color: #6e7681; }
+
+  /* ── Estaciones ── */
+  .field-row { display: flex; align-items: center; gap: 8px; }
+  .field-row input {
+    background: #161b22; border: 1px solid #30363d; border-radius: 7px;
+    color: #e6edf3; font-size: 15px; padding: 9px 11px; flex: 1; min-width: 0;
+    outline: none; transition: border-color .15s;
+  }
+  .field-row input:focus { border-color: #38bdf8; box-shadow: 0 0 0 3px #0ea5e922; }
+  .btn {
+    background: #21262d; border: 1px solid #30363d; border-radius: 7px;
+    color: #e6edf3; font-size: 14px; font-weight: 600; padding: 9px 13px;
+    cursor: pointer; transition: all .15s; white-space: nowrap;
+  }
+  .btn:hover { border-color: #38bdf8; color: #38bdf8; }
+  .btn.primary { background: #0ea5e922; border-color: #0ea5e955; color: #38bdf8; }
+  .btn.primary:hover { background: #0ea5e933; border-color: #38bdf8; }
+  .btn.ghost { width: 100%; }
+  .btn.ghost:hover { background: #1c2128; }
+
+  .stations-table-wrap { max-height: 260px; overflow-y: auto; }
+  table.stations-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.stations-table th {
+    text-align: left; font-size: 11px; color: #8b949e; font-weight: 700;
+    letter-spacing: .4px; text-transform: uppercase;
+    padding: 6px 8px; border-bottom: 1px solid #21262d; position: sticky; top: 0; background: #0d1117;
+  }
+  table.stations-table td {
+    padding: 7px 8px; border-bottom: 1px solid #161b22; color: #e6edf3;
+  }
+  table.stations-table tr:hover td { background: #161b22; }
+  .station-dot { width: 9px; height: 9px; border-radius: 50%; background: #2dd4bf; display: inline-block; margin-right: 6px; flex-shrink: 0; }
+  .station-empty { color: #6e7681; font-size: 13px; padding: 10px 4px; text-align: center; }
+  .station-del {
+    background: none; border: none; color: #6e7681; cursor: pointer; font-size: 16px;
+    line-height: 1; padding: 2px 6px; border-radius: 5px; transition: all .15s;
+  }
+  .station-del:hover { color: #f85149; background: #f8514922; }
 </style>
 </head>
 <body>
@@ -214,6 +275,16 @@
       <div class="slide-minmax"><span>0 m</span><span id="posMaxLbl">10 m</span></div>
     </div>
 
+    <div class="input-group">
+      <div class="sec-title">Estaciones (puntos de control)</div>
+      <div class="field-row">
+        <input type="number" id="stationAdd" placeholder="Distancia (m)" min="0" step="0.1"
+               onkeydown="if(event.key==='Enter') addStationFromInput()">
+        <button type="button" class="btn primary" onclick="addStationFromInput()">+ Agregar</button>
+      </div>
+      <button type="button" class="btn ghost" onclick="addStationFromSlider()">+ Agregar en la posición actual (línea punteada)</button>
+    </div>
+
   </div>
 
   <!-- ═══ PANEL RESULTADOS ═══ -->
@@ -221,7 +292,9 @@
 
     <div class="diagram-wrap">
       <canvas id="diagram" height="320"></canvas>
-      <div class="diagram-note">Esquema referencial — pendiente exagerada verticalmente para visualizar el desnivel</div>
+      <div id="mainTooltip" class="canvas-tooltip ct-main" style="display:none;"></div>
+      <div id="stationTooltip" class="canvas-tooltip ct-station" style="display:none;"></div>
+      <div class="diagram-note">Esquema referencial — pendiente exagerada verticalmente para visualizar el desnivel · pasá el puntero (o tocá) una estación para ver su detalle</div>
     </div>
 
     <div class="cards-title">En el punto marcado (línea punteada)</div>
@@ -241,6 +314,17 @@
         <div class="scard-val" id="out-cotaParcial">–</div>
         <div class="scard-unit">invert level</div>
       </div>
+    </div>
+
+    <div class="cards-title">Estaciones agregadas <span id="stationsCount"></span></div>
+    <div class="stations-table-wrap">
+      <table class="stations-table" id="stationsTable" style="display:none;">
+        <thead>
+          <tr><th>Estación</th><th>Distancia</th><th>Desnivel</th><th>Cota</th><th></th></tr>
+        </thead>
+        <tbody id="stationsBody"></tbody>
+      </table>
+      <div class="station-empty" id="stationsEmpty">Aún no hay estaciones agregadas. Usá el panel izquierdo para ir marcando puntos a lo largo del tramo.</div>
     </div>
 
     <div class="cards-title">Tramo completo</div>
@@ -270,6 +354,74 @@
 function fmt(n, d) {
   if (!isFinite(n)) return '–';
   return n.toLocaleString('es', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+
+let stations = [];
+let stationHits = []; // posiciones (px) de las estaciones dibujadas, para hover/tap
+let mainHit = null;   // posición (px) del marcador principal
+let diagBaselineY = 0; // y fija (px) debajo de la línea "Distancia total" donde se anclan los tooltips
+let diagCssW = 0;      // ancho (px) del canvas, para no dejar que el tooltip se salga por los costados
+
+function clampTooltipX(x) {
+  const margin = 78;
+  return Math.min(diagCssW - margin, Math.max(margin, x));
+}
+
+function addStation(dist) {
+  if (isNaN(dist)) return;
+  const distTotal = Math.max(0.1, parseFloat(document.getElementById('distTotal').value) || 0.1);
+  dist = Math.min(distTotal, Math.max(0, dist));
+  if (stations.some(s => Math.abs(s - dist) < 0.001)) return;
+  stations.push(dist);
+  stations.sort((a, b) => a - b);
+  recalc();
+}
+
+function addStationFromInput() {
+  const input = document.getElementById('stationAdd');
+  const v = parseFloat(input.value);
+  addStation(v);
+  input.value = '';
+}
+
+function addStationFromSlider() {
+  const pos = parseFloat(document.getElementById('posSlider').value);
+  addStation(pos);
+}
+
+function removeStation(i) {
+  stations.splice(i, 1);
+  recalc();
+}
+
+function renderStations(distTotal, pendiente, cotaIni) {
+  const table = document.getElementById('stationsTable');
+  const body = document.getElementById('stationsBody');
+  const empty = document.getElementById('stationsEmpty');
+  const count = document.getElementById('stationsCount');
+
+  stations = stations.filter(s => s <= distTotal + 1e-9);
+  count.textContent = stations.length ? '(' + stations.length + ')' : '';
+
+  if (!stations.length) {
+    table.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+  table.style.display = 'table';
+  empty.style.display = 'none';
+
+  body.innerHTML = stations.map((d, i) => {
+    const desnivel = d * pendiente / 100;
+    const cota = cotaIni - desnivel;
+    return `<tr>
+      <td><span class="station-dot"></span>E${i + 1}</td>
+      <td>${fmt(d, 2)} m</td>
+      <td>${fmt(desnivel, 3)} m</td>
+      <td>${fmt(cota, 3)}</td>
+      <td style="text-align:right;"><button type="button" class="station-del" onclick="removeStation(${i})" title="Quitar estación">×</button></td>
+    </tr>`;
+  }).join('');
 }
 
 function onDistTotalChange() {
@@ -329,6 +481,7 @@ function recalc() {
   document.getElementById('out-desnivelTotal').textContent = fmt(desnivelTotal, 3) + ' m';
   document.getElementById('out-cotaFinal').textContent = fmt(cotaFinal, 3);
 
+  renderStations(distTotal, pendiente, cotaIni);
   drawDiagram(distTotal, pendiente, pos, desnivelTotal, desnivelParcial);
 }
 
@@ -336,7 +489,7 @@ function drawDiagram(distTotal, pendiente, pos, desnivelTotal, desnivelParcial) 
   const canvas = document.getElementById('diagram');
   const wrap = canvas.parentElement;
   const cssW = wrap.clientWidth - 20;
-  const cssH = 320;
+  const cssH = 360;
   const dpr = window.devicePixelRatio || 1;
   canvas.width = cssW * dpr;
   canvas.height = cssH * dpr;
@@ -346,7 +499,7 @@ function drawDiagram(distTotal, pendiente, pos, desnivelTotal, desnivelParcial) 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, cssW, cssH);
 
-  const padL = 70, padR = 40, padT = 40, padB = 60;
+  const padL = 70, padR = 80, padT = 40, padB = 60;
   const plotW = cssW - padL - padR;
   const slopeH = Math.min(150, Math.max(35, pendiente * 9));
 
@@ -378,17 +531,13 @@ function drawDiagram(distTotal, pendiente, pos, desnivelTotal, desnivelParcial) 
   ctx.fillStyle = '#8b949e';
   ctx.fillText('Pozo B', x1, y1 + 40);
 
-  // Tubería (línea gruesa)
-  ctx.strokeStyle = '#3fb950';
-  ctx.lineWidth = 6;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(x0, y0);
-  ctx.lineTo(x1, y1);
-  ctx.stroke();
+  // Tubería (aspecto de tubo cilíndrico: cuerpo con sombreado + tapas elípticas)
+  drawPipeSegment(ctx, x0, y0, x1, y1, 9);
 
   // Dimensión horizontal total (distancia)
   const dimY = Math.max(y0, y1) + 55;
+  diagBaselineY = dimY + 34; // los tooltips se anclan fijos debajo de esta línea, nunca arriba (evita que se salgan de la pantalla)
+  diagCssW = cssW;
   ctx.strokeStyle = '#6e7681';
   ctx.lineWidth = 1;
   drawDimLine(ctx, x0, dimY, x1, dimY);
@@ -404,6 +553,39 @@ function drawDiagram(distTotal, pendiente, pos, desnivelTotal, desnivelParcial) 
   ctx.textAlign = 'center';
   ctx.fillText('Desnivel total: ' + fmt(desnivelTotal, 3) + ' m', 0, 0);
   ctx.restore();
+
+  // Estaciones agregadas (puntos de control fijos)
+  const cotaIni = parseFloat(document.getElementById('cotaIni').value) || 0;
+  stationHits = stations.map((d, i) => {
+    const sf = distTotal > 0 ? d / distTotal : 0;
+    const sx = x0 + plotW * sf;
+    const sy = y0 + slopeH * sf;
+
+    ctx.setLineDash([3, 3]);
+    ctx.strokeStyle = '#2dd4bf88';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx, dimY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#2dd4bf';
+    ctx.beginPath();
+    ctx.arc(sx, sy, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#0d1117';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = '#2dd4bf';
+    ctx.font = 'bold 11px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('E' + (i + 1), sx, sy - 12);
+
+    const desnivel = d * pendiente / 100;
+    return { x: sx, y: sy, idx: i, dist: d, desnivel: desnivel, cota: cotaIni - desnivel };
+  });
 
   // Punto marcado + línea punteada (posición del slider)
   ctx.setLineDash([5, 4]);
@@ -430,13 +612,109 @@ function drawDiagram(distTotal, pendiente, pos, desnivelTotal, desnivelParcial) 
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  // Etiquetas del punto
-  ctx.fillStyle = '#f97316';
-  ctx.font = 'bold 12px -apple-system, sans-serif';
-  ctx.textAlign = f > 0.65 ? 'right' : 'left';
-  const lx = f > 0.65 ? xm - 10 : xm + 10;
-  ctx.fillText('d = ' + fmt(pos, 2) + ' m', lx, ym - 18);
-  ctx.fillText('Δh = ' + fmt(desnivelParcial, 3) + ' m', lx, ym - 2);
+  mainHit = { x: xm, y: ym };
+  updateMainTooltip(xm, pos, desnivelParcial);
+}
+
+function updateMainTooltip(x, pos, desnivelParcial) {
+  const tip = document.getElementById('mainTooltip');
+  tip.innerHTML = `<div class="tt-title">Punto marcado</div>
+    <div>Distancia: <b>${fmt(pos, 2)} m</b></div>
+    <div>Desnivel: <b>${fmt(desnivelParcial, 3)} m</b></div>`;
+  const canvas = document.getElementById('diagram');
+  tip.style.left = (canvas.offsetLeft + clampTooltipX(x)) + 'px';
+  tip.style.top = (canvas.offsetTop + diagBaselineY) + 'px';
+  tip.style.display = 'block';
+}
+
+function drawPipeSegment(ctx, x0, y0, x1, y1, r) {
+  const dx = x1 - x0, dy = y1 - y0;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;   // unidad a lo largo del eje del tubo
+  const nx = -uy, ny = ux;              // unidad perpendicular (ancho del tubo)
+  const angle = Math.atan2(uy, ux);
+
+  // Cuerpo del tubo: rectángulo con gradiente perpendicular al eje (sombreado cilíndrico)
+  const grad = ctx.createLinearGradient(x0 - nx * r, y0 - ny * r, x0 + nx * r, y0 + ny * r);
+  grad.addColorStop(0,    '#155225');
+  grad.addColorStop(0.3,  '#2ea043');
+  grad.addColorStop(0.5,  '#5fdb70');
+  grad.addColorStop(0.7,  '#2ea043');
+  grad.addColorStop(1,    '#123f1d');
+
+  ctx.beginPath();
+  ctx.moveTo(x0 + nx * r, y0 + ny * r);
+  ctx.lineTo(x1 + nx * r, y1 + ny * r);
+  ctx.lineTo(x1 - nx * r, y1 - ny * r);
+  ctx.lineTo(x0 - nx * r, y0 - ny * r);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.strokeStyle = '#0d1117';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Brillo superior sutil, para reforzar el efecto de volumen
+  ctx.beginPath();
+  ctx.moveTo(x0 - nx * r * 0.35, y0 - ny * r * 0.35);
+  ctx.lineTo(x1 - nx * r * 0.35, y1 - ny * r * 0.35);
+  ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+  ctx.lineWidth = Math.max(1.2, r * 0.22);
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  ctx.lineCap = 'butt';
+
+  // Pozo A (entrada): mismo arco/curvatura que la tapa de Pozo B, con el mismo relleno
+  // verde hasta ese borde, pero mostrando solo la mitad exterior izquierda (sin la mitad
+  // interior ni la línea recta de cierre) — conserva el volumen 3D sin mostrar la boca hueca.
+  {
+    const capGradA = ctx.createLinearGradient(x0 - nx * r, y0 - ny * r, x0 + nx * r, y0 + ny * r);
+    capGradA.addColorStop(0,   '#155225');
+    capGradA.addColorStop(0.5, '#5fdb70');
+    capGradA.addColorStop(1,   '#123f1d');
+
+    // Relleno (la línea recta de cierre queda tapada bajo el cuerpo del tubo)
+    ctx.save();
+    ctx.translate(x0, y0);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 0.38, r, 0, Math.PI / 2, Math.PI * 3 / 2);
+    ctx.closePath();
+    ctx.restore();
+    ctx.fillStyle = capGradA;
+    ctx.fill();
+
+    // Borde: solo el arco visible, sin la línea recta de cierre
+    ctx.save();
+    ctx.translate(x0, y0);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 0.38, r, 0, Math.PI / 2, Math.PI * 3 / 2);
+    ctx.restore();
+    ctx.strokeStyle = '#0d1117';
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
+  }
+
+  // Tapa elíptica solo en el extremo de salida (Pozo B): el extremo de entrada
+  // (Pozo A, x0/y0) queda sin tapa, como si el tubo se perdiera dentro del pozo.
+  {
+    const capGrad = ctx.createLinearGradient(x1 - nx * r, y1 - ny * r, x1 + nx * r, y1 + ny * r);
+    capGrad.addColorStop(0,   '#123f1d');
+    capGrad.addColorStop(0.5, '#3fb950');
+    capGrad.addColorStop(1,   '#0e3417');
+    ctx.save();
+    ctx.translate(x1, y1);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 0.38, r, 0, 0, Math.PI * 2);
+    ctx.restore();
+    ctx.fillStyle = capGrad;
+    ctx.fill();
+    ctx.strokeStyle = '#0d1117';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  }
 }
 
 function drawDimLine(ctx, x0, y, x1, y2) {
@@ -453,6 +731,70 @@ function drawDimLineV(ctx, x, y0, x2, y1) {
   ctx.moveTo(x - 5, y1); ctx.lineTo(x + 5, y1);
   ctx.stroke();
 }
+
+// ── Hover (desktop) / tap (móvil) sobre las estaciones ──
+function canvasPointFromEvent(e) {
+  const canvas = document.getElementById('diagram');
+  const rect = canvas.getBoundingClientRect();
+  const cx = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+  const cy = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+  return { x: cx - rect.left, y: cy - rect.top };
+}
+
+function findNearestStation(px, py, radius) {
+  radius = radius || 14;
+  let best = null, bestD = radius;
+  stationHits.forEach(s => {
+    const d = Math.hypot(s.x - px, s.y - py);
+    if (d < bestD) { bestD = d; best = s; }
+  });
+  return best;
+}
+
+function showStationTooltip(s) {
+  const tip = document.getElementById('stationTooltip');
+  tip.innerHTML = `<div class="tt-title">Estación E${s.idx + 1}</div>
+    <div>Distancia: <b>${fmt(s.dist, 2)} m</b></div>
+    <div>Desnivel: <b>${fmt(s.desnivel, 3)} m</b></div>
+    <div>Cota: <b>${fmt(s.cota, 3)}</b></div>`;
+  const canvas = document.getElementById('diagram');
+  tip.style.left = (canvas.offsetLeft + clampTooltipX(s.x)) + 'px';
+  tip.style.top = (canvas.offsetTop + diagBaselineY) + 'px';
+  tip.style.display = 'block';
+}
+
+function hideStationTooltip() {
+  document.getElementById('stationTooltip').style.display = 'none';
+}
+
+(function initCanvasInteractions() {
+  const canvas = document.getElementById('diagram');
+
+  canvas.addEventListener('pointermove', function(e) {
+    if (e.pointerType === 'touch') return;
+    const p = canvasPointFromEvent(e);
+    const s = findNearestStation(p.x, p.y);
+    if (s) showStationTooltip(s); else hideStationTooltip();
+  });
+  canvas.addEventListener('mouseleave', hideStationTooltip);
+
+  canvas.addEventListener('pointerdown', function(e) {
+    const p = canvasPointFromEvent(e);
+    const s = findNearestStation(p.x, p.y);
+    if (s) {
+      showStationTooltip(s);
+      e.stopPropagation();
+    } else {
+      hideStationTooltip();
+    }
+  });
+
+  document.addEventListener('click', function(e) {
+    const tip = document.getElementById('stationTooltip');
+    if (e.target === canvas || tip.contains(e.target)) return;
+    hideStationTooltip();
+  });
+})();
 
 window.addEventListener('resize', () => recalc());
 onDistTotalChange();
