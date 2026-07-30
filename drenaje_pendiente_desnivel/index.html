@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pendiente y Desnivel de Drenaje — PortiCAD Multi-Tools</title>
+<link rel="icon" href="/favicon.png" type="image/png" />
+<link rel="shortcut icon" href="/favicon.png" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 15px;
+    min-height: 100vh;
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 8px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .topbar-logo { font-size: 16px; font-weight: 700; color: #58a6ff; text-decoration: none; }
+  .topbar-sep  { color: #30363d; font-size: 18px; }
+  .topbar-crumb { font-size: 14px; color: #8b949e; display: flex; align-items: center; gap: 6px; }
+  .topbar-title { font-size: 15px; font-weight: 600; color: #e6edf3; }
+  .badge { background: #0ea5e922; border: 1px solid #0ea5e955; color: #38bdf8;
+           font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
+
+  /* ── Layout ── */
+  .main {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    min-height: calc(100vh - 50px);
+  }
+  @media (max-width: 900px) {
+    .main { grid-template-columns: 1fr; }
+  }
+
+  .panel-inputs {
+    background: #161b22;
+    border-right: 1px solid #21262d;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  @media (max-width: 900px) {
+    .panel-inputs { border-right: none; border-bottom: 1px solid #21262d; }
+  }
+
+  .input-group {
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .sec-title {
+    font-size: 13px; font-weight: 700; color: #38bdf8;
+    letter-spacing: .6px; text-transform: uppercase;
+    padding-bottom: 8px; border-bottom: 1px solid #21262d;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 14px; color: #8b949e; font-weight: 500; }
+  .field label em { font-style: normal; color: #6e7681; font-size: 12px; }
+  .field input {
+    background: #161b22; border: 1px solid #30363d; border-radius: 7px;
+    color: #e6edf3; font-size: 16px; padding: 9px 11px; width: 100%;
+    outline: none; transition: border-color .15s;
+  }
+  .field input:focus { border-color: #38bdf8; box-shadow: 0 0 0 3px #0ea5e922; }
+
+  /* Slider + número emparejados */
+  .slide-row {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .slide-row input[type=range] {
+    flex: 1;
+    accent-color: #38bdf8;
+    height: 4px;
+    cursor: pointer;
+  }
+  .slide-row .slide-num {
+    display: flex; align-items: center; gap: 4px;
+    background: #161b22; border: 1px solid #30363d; border-radius: 7px;
+    padding: 6px 8px; flex-shrink: 0;
+  }
+  .slide-row .slide-num input {
+    background: none; border: none; color: #e6edf3; font-size: 15px;
+    width: 60px; text-align: right; outline: none;
+  }
+  .slide-row .slide-num span { color: #6e7681; font-size: 13px; }
+  .slide-minmax {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: #6e7681;
+  }
+
+  /* ── Results ── */
+  .panel-results {
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+  }
+
+  .diagram-wrap {
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-radius: 10px;
+    padding: 10px;
+  }
+  .diagram-note {
+    font-size: 12px; color: #6e7681; text-align: center; margin-top: 6px;
+  }
+  canvas#diagram { width: 100%; display: block; }
+
+  .cards-title {
+    font-size: 12px; font-weight: 700; color: #8b949e;
+    letter-spacing: .6px; text-transform: uppercase;
+    margin-bottom: -6px;
+  }
+  .cards-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  @media (max-width: 640px) {
+    .cards-row { grid-template-columns: 1fr 1fr; }
+  }
+  .mcard {
+    background: #0ea5e914;
+    border: 1px solid #0ea5e940;
+    border-left: 3px solid #38bdf8;
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .mcard.accent {
+    background: #f9731614;
+    border: 1px solid #f9731640;
+    border-left: 3px solid #f97316;
+  }
+  .scard-lbl { font-size: 11px; font-weight: 700; color: #8b949e; letter-spacing: .5px; text-transform: uppercase; }
+  .scard-val { font-size: 20px; font-weight: 700; color: #e6edf3; line-height: 1.3; }
+  .scard-unit { font-size: 12px; color: #6e7681; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="topbar-logo" href="/">PortiCAD</a>
+  <span class="topbar-sep">›</span>
+  <div class="topbar-crumb">
+    <span>Multi-Tools</span><span>›</span>
+    <span class="topbar-title">Pendiente y Desnivel de Drenaje</span>
+  </div>
+  <span class="badge" style="margin-left:8px;">Drenajes</span>
+</div>
+
+<div class="main">
+
+  <!-- ═══ PANEL INPUTS ═══ -->
+  <div class="panel-inputs">
+
+    <div class="input-group">
+      <div class="sec-title">Datos del tramo</div>
+      <div class="field">
+        <label>Distancia total del tramo <em>(m)</em></label>
+        <input type="number" id="distTotal" value="10" min="0.1" step="0.1" oninput="onDistTotalChange()">
+      </div>
+      <div class="field">
+        <label>Cota inicial <em>(invert, opcional, m)</em></label>
+        <input type="number" id="cotaIni" value="0" step="0.01" oninput="recalc()">
+      </div>
+    </div>
+
+    <div class="input-group">
+      <div class="sec-title">Pendiente de la tubería</div>
+      <div class="slide-row">
+        <input type="range" id="pendienteSlider" min="0.5" max="15" step="0.1" value="2"
+               oninput="onSlideChange('pendiente')">
+        <div class="slide-num">
+          <input type="number" id="pendienteNum" min="0.5" max="15" step="0.1" value="2"
+                 oninput="onNumChange('pendiente')">
+          <span>%</span>
+        </div>
+      </div>
+      <div class="slide-minmax"><span>0.5%</span><span>15%</span></div>
+    </div>
+
+    <div class="input-group">
+      <div class="sec-title">Posición del punto sobre el tramo</div>
+      <div class="slide-row">
+        <input type="range" id="posSlider" min="0" max="10" step="0.05" value="5"
+               oninput="onSlideChange('pos')">
+        <div class="slide-num">
+          <input type="number" id="posNum" min="0" max="10" step="0.05" value="5"
+                 oninput="onNumChange('pos')">
+          <span>m</span>
+        </div>
+      </div>
+      <div class="slide-minmax"><span>0 m</span><span id="posMaxLbl">10 m</span></div>
+    </div>
+
+  </div>
+
+  <!-- ═══ PANEL RESULTADOS ═══ -->
+  <div class="panel-results">
+
+    <div class="diagram-wrap">
+      <canvas id="diagram" height="320"></canvas>
+      <div class="diagram-note">Esquema referencial — pendiente exagerada verticalmente para visualizar el desnivel</div>
+    </div>
+
+    <div class="cards-title">En el punto marcado (línea punteada)</div>
+    <div class="cards-row">
+      <div class="mcard accent">
+        <div class="scard-lbl">Distancia parcial</div>
+        <div class="scard-val" id="out-distParcial">–</div>
+        <div class="scard-unit">metros desde el inicio</div>
+      </div>
+      <div class="mcard accent">
+        <div class="scard-lbl">Desnivel parcial</div>
+        <div class="scard-val" id="out-desnivelParcial">–</div>
+        <div class="scard-unit">caída acumulada</div>
+      </div>
+      <div class="mcard accent">
+        <div class="scard-lbl">Cota en el punto</div>
+        <div class="scard-val" id="out-cotaParcial">–</div>
+        <div class="scard-unit">invert level</div>
+      </div>
+    </div>
+
+    <div class="cards-title">Tramo completo</div>
+    <div class="cards-row">
+      <div class="mcard">
+        <div class="scard-lbl">Distancia total</div>
+        <div class="scard-val" id="out-distTotal">–</div>
+        <div class="scard-unit">metros</div>
+      </div>
+      <div class="mcard">
+        <div class="scard-lbl">Desnivel total</div>
+        <div class="scard-val" id="out-desnivelTotal">–</div>
+        <div class="scard-unit">caída total del tramo</div>
+      </div>
+      <div class="mcard">
+        <div class="scard-lbl">Cota final</div>
+        <div class="scard-val" id="out-cotaFinal">–</div>
+        <div class="scard-unit">invert level</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+function fmt(n, d) {
+  if (!isFinite(n)) return '–';
+  return n.toLocaleString('es', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+
+function onDistTotalChange() {
+  const distTotal = Math.max(0.1, parseFloat(document.getElementById('distTotal').value) || 0.1);
+  const posSlider = document.getElementById('posSlider');
+  const posNum = document.getElementById('posNum');
+  posSlider.max = distTotal;
+  posNum.max = distTotal;
+  document.getElementById('posMaxLbl').textContent = fmt(distTotal, 2) + ' m';
+  if (parseFloat(posSlider.value) > distTotal) {
+    posSlider.value = distTotal;
+    posNum.value = distTotal;
+  }
+  recalc();
+}
+
+function onSlideChange(which) {
+  if (which === 'pendiente') {
+    document.getElementById('pendienteNum').value = document.getElementById('pendienteSlider').value;
+  } else {
+    document.getElementById('posNum').value = document.getElementById('posSlider').value;
+  }
+  recalc();
+}
+
+function onNumChange(which) {
+  if (which === 'pendiente') {
+    let v = parseFloat(document.getElementById('pendienteNum').value);
+    if (isNaN(v)) return;
+    v = Math.min(15, Math.max(0.5, v));
+    document.getElementById('pendienteSlider').value = v;
+  } else {
+    const distTotal = parseFloat(document.getElementById('distTotal').value) || 0;
+    let v = parseFloat(document.getElementById('posNum').value);
+    if (isNaN(v)) return;
+    v = Math.min(distTotal, Math.max(0, v));
+    document.getElementById('posSlider').value = v;
+  }
+  recalc();
+}
+
+function recalc() {
+  const distTotal = Math.max(0.1, parseFloat(document.getElementById('distTotal').value) || 0.1);
+  const pendiente = parseFloat(document.getElementById('pendienteSlider').value) || 0;
+  const pos = Math.min(distTotal, Math.max(0, parseFloat(document.getElementById('posSlider').value) || 0));
+  const cotaIni = parseFloat(document.getElementById('cotaIni').value) || 0;
+
+  const desnivelTotal = distTotal * pendiente / 100;
+  const desnivelParcial = pos * pendiente / 100;
+  const cotaParcial = cotaIni - desnivelParcial;
+  const cotaFinal = cotaIni - desnivelTotal;
+
+  document.getElementById('out-distParcial').textContent = fmt(pos, 2) + ' m';
+  document.getElementById('out-desnivelParcial').textContent = fmt(desnivelParcial, 3) + ' m';
+  document.getElementById('out-cotaParcial').textContent = fmt(cotaParcial, 3);
+  document.getElementById('out-distTotal').textContent = fmt(distTotal, 2) + ' m';
+  document.getElementById('out-desnivelTotal').textContent = fmt(desnivelTotal, 3) + ' m';
+  document.getElementById('out-cotaFinal').textContent = fmt(cotaFinal, 3);
+
+  drawDiagram(distTotal, pendiente, pos, desnivelTotal, desnivelParcial);
+}
+
+function drawDiagram(distTotal, pendiente, pos, desnivelTotal, desnivelParcial) {
+  const canvas = document.getElementById('diagram');
+  const wrap = canvas.parentElement;
+  const cssW = wrap.clientWidth - 20;
+  const cssH = 320;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = cssW * dpr;
+  canvas.height = cssH * dpr;
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cssW, cssH);
+
+  const padL = 70, padR = 40, padT = 40, padB = 60;
+  const plotW = cssW - padL - padR;
+  const slopeH = Math.min(150, Math.max(35, pendiente * 9));
+
+  const x0 = padL, x1 = padL + plotW;
+  const y0 = padT + 10;
+  const y1 = y0 + slopeH;
+
+  const f = distTotal > 0 ? pos / distTotal : 0;
+  const xm = x0 + plotW * f;
+  const ym = y0 + slopeH * f;
+
+  ctx.font = '12px -apple-system, sans-serif';
+  ctx.textBaseline = 'middle';
+
+  // Pozo/caja inicial
+  ctx.strokeStyle = '#30363d';
+  ctx.fillStyle = '#161b22';
+  ctx.lineWidth = 1.5;
+  ctx.fillRect(x0 - 16, y0 - 22, 32, 34);
+  ctx.strokeRect(x0 - 16, y0 - 22, 32, 34);
+  ctx.fillStyle = '#8b949e';
+  ctx.textAlign = 'center';
+  ctx.fillText('Pozo A', x0, y0 - 30);
+
+  // Pozo/caja final
+  ctx.fillStyle = '#161b22';
+  ctx.fillRect(x1 - 16, y1 - 10, 32, 34);
+  ctx.strokeRect(x1 - 16, y1 - 10, 32, 34);
+  ctx.fillStyle = '#8b949e';
+  ctx.fillText('Pozo B', x1, y1 + 40);
+
+  // Tubería (línea gruesa)
+  ctx.strokeStyle = '#3fb950';
+  ctx.lineWidth = 6;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x1, y1);
+  ctx.stroke();
+
+  // Dimensión horizontal total (distancia)
+  const dimY = Math.max(y0, y1) + 55;
+  ctx.strokeStyle = '#6e7681';
+  ctx.lineWidth = 1;
+  drawDimLine(ctx, x0, dimY, x1, dimY);
+  ctx.fillStyle = '#8b949e';
+  ctx.fillText('Distancia total: ' + fmt(distTotal, 2) + ' m', (x0 + x1) / 2, dimY + 16);
+
+  // Dimensión vertical total (desnivel), a la derecha
+  const dimX = x1 + 55;
+  drawDimLineV(ctx, dimX, y0, dimX, y1);
+  ctx.save();
+  ctx.translate(dimX + 14, (y0 + y1) / 2);
+  ctx.rotate(Math.PI / 2);
+  ctx.textAlign = 'center';
+  ctx.fillText('Desnivel total: ' + fmt(desnivelTotal, 3) + ' m', 0, 0);
+  ctx.restore();
+
+  // Punto marcado + línea punteada (posición del slider)
+  ctx.setLineDash([5, 4]);
+  ctx.strokeStyle = '#f97316';
+  ctx.lineWidth = 1.5;
+  // horizontal: desde inicio hasta la vertical del punto (a la altura y0)
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(xm, y0);
+  ctx.stroke();
+  // vertical: desde y0 hasta el punto sobre la tubería
+  ctx.beginPath();
+  ctx.moveTo(xm, y0);
+  ctx.lineTo(xm, ym);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Marcador circular
+  ctx.fillStyle = '#f97316';
+  ctx.beginPath();
+  ctx.arc(xm, ym, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#0d1117';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Etiquetas del punto
+  ctx.fillStyle = '#f97316';
+  ctx.font = 'bold 12px -apple-system, sans-serif';
+  ctx.textAlign = f > 0.65 ? 'right' : 'left';
+  const lx = f > 0.65 ? xm - 10 : xm + 10;
+  ctx.fillText('d = ' + fmt(pos, 2) + ' m', lx, ym - 18);
+  ctx.fillText('Δh = ' + fmt(desnivelParcial, 3) + ' m', lx, ym - 2);
+}
+
+function drawDimLine(ctx, x0, y, x1, y2) {
+  ctx.beginPath();
+  ctx.moveTo(x0, y - 5); ctx.lineTo(x0, y + 5);
+  ctx.moveTo(x0, y); ctx.lineTo(x1, y);
+  ctx.moveTo(x1, y - 5); ctx.lineTo(x1, y + 5);
+  ctx.stroke();
+}
+function drawDimLineV(ctx, x, y0, x2, y1) {
+  ctx.beginPath();
+  ctx.moveTo(x - 5, y0); ctx.lineTo(x + 5, y0);
+  ctx.moveTo(x, y0); ctx.lineTo(x, y1);
+  ctx.moveTo(x - 5, y1); ctx.lineTo(x + 5, y1);
+  ctx.stroke();
+}
+
+window.addEventListener('resize', () => recalc());
+onDistTotalChange();
+</script>
+
+</body>
+</html>
