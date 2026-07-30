@@ -574,6 +574,21 @@
       </div>
     </div>
 
+    <div class="input-group">
+      <div class="sec-title">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+        Cuantía de Acero (ρ)
+      </div>
+      <div class="toggle-group" id="rho-mode-toggle" style="align-self:flex-start;">
+        <button class="tgbtn active" id="rho-auto"   onclick="setRhoMode('auto')">Automático (mínimo)</button>
+        <button class="tgbtn"        id="rho-manual" onclick="setRhoMode('manual')">Manual</button>
+      </div>
+      <div class="field-row" id="field-rho-target" style="display:none;">
+        <label>ρ objetivo <em>(%)</em></label>
+        <input type="number" id="i-rho-target" value="2.00" min="1" max="8" step="0.1" oninput="recalc()">
+      </div>
+    </div>
+
     <!-- Botón diagrama de interacción -->
     <button onclick="abrirDiagrama()" style="
         width:100%; padding:11px 12px; border-radius:8px; cursor:pointer;
@@ -669,13 +684,13 @@
       <!-- Columna de métricas — entre el gráfico y las combinaciones -->
       <div class="metrics-col" id="metrics-col">
         <div class="mcard">
-          <div class="scard-lbl">As requerido</div>
+          <div class="scard-lbl" id="s-Ast-lbl">As requerido</div>
           <div class="scard-val ok" id="s-Ast">—</div>
           <div class="scard-prov" id="s-Ast-prov"></div>
           <div class="scard-unit">cm²</div>
         </div>
         <div class="mcard">
-          <div class="scard-lbl">ρ requerido</div>
+          <div class="scard-lbl" id="s-rho-lbl">ρ requerido</div>
           <div class="scard-val ok" id="s-rho">—</div>
           <div class="scard-prov" id="s-rho-prov"></div>
           <div class="scard-unit">%</div>
@@ -716,6 +731,7 @@
             <button class="tgbtn"        id="f-all" onclick="setBarFilter('all')">Ambos</button>
           </div>
         </div>
+        <div id="rho-notes"></div>
         <div id="combos-body">
           <div class="empty-hint">Calculando...</div>
         </div>
@@ -772,6 +788,7 @@ let lastResult  = null;
 let selectedIdx = 0;
 let debTimer    = null;
 let shape       = 'rect'; // 'rect' | 'circ'
+let rhoMode     = 'auto'; // 'auto' | 'manual'
 
 // ═══════════════════════════════════════════════════════
 // TOGGLES
@@ -820,6 +837,18 @@ function setBarFilter(f) {
   barFilter = f;
   ['mm','in','all'].forEach(x => document.getElementById('f-'+x).classList.toggle('active', x===f));
   if (lastResult && !lastResult.error) renderCombos(lastResult);
+}
+
+function fmtSigned(v, dec) {
+  return (v >= 0 ? '+' : '') + v.toFixed(dec);
+}
+
+function setRhoMode(m) {
+  rhoMode = m;
+  document.getElementById('rho-auto').classList.toggle('active', m==='auto');
+  document.getElementById('rho-manual').classList.toggle('active', m==='manual');
+  document.getElementById('field-rho-target').style.display = m==='manual' ? 'flex' : 'none';
+  recalc();
 }
 
 function onMatChange() {
@@ -885,7 +914,7 @@ function circleSegmentAreaCentroid(R, a) {
 // MOTOR ACI 318-25 — sección rectangular o circular
 // Modelo de 2 capas de acero (comprimida/traccionada) con refuerzo simétrico.
 // ═══════════════════════════════════════════════════════
-function calcularACI(shape, b, h, D, r, fc, fy, Pu_kN, Mu_kNm, tipo) {
+function calcularACI(shape, b, h, D, r, fc, fy, Pu_kN, Mu_kNm, tipo, rhoTarget) {
   const isCirc = shape === 'circ';
   const fc_ = fc / 10, fy_ = fy / 10, Es_ = 20000;
   const ecu = 0.003, ey = fy_ / Es_;
@@ -962,71 +991,153 @@ function calcularACI(shape, b, h, D, r, fc, fy, Pu_kN, Mu_kNm, tipo) {
 
   const p = {shape,b,h,D,r,fc,fy,Ag,d,dp,beta1,phi_c,kfac,Pu_kN,Mu_kNm,tipo,ey};
 
-  // Búsqueda binaria de ρ mínimo
+  // Búsqueda binaria del ρ mínimo estructural (óptimo ACI, entre 1% y 8%)
+  let Ast_min, chk_min;
   const chkMin = checkAst(0.01*Ag);
-  if (chkMin.ok) return build(0.01*Ag, chkMin, p);
-  const chkMax = checkAst(0.08*Ag);
-  if (!chkMax.ok) return { error: isCirc
-    ? 'Sección insuficiente. Aumenta el diámetro D o f\'c.'
-    : 'Sección insuficiente. Aumenta b×h o f\'c.' };
+  if (chkMin.ok) {
+    Ast_min = 0.01*Ag; chk_min = chkMin;
+  } else {
+    const chkMax = checkAst(0.08*Ag);
+    if (!chkMax.ok) return { error: isCirc
+      ? 'Sección insuficiente. Aumenta el diámetro D o f\'c.'
+      : 'Sección insuficiente. Aumenta b×h o f\'c.' };
 
-  let rlo=0.01, rhi=0.08;
-  for (let i=0;i<60;i++) {
-    const rm=(rlo+rhi)/2;
-    if (checkAst(rm*Ag).ok) rhi=rm; else rlo=rm;
-    if (rhi-rlo<1e-5) break;
+    let rlo=0.01, rhi=0.08;
+    for (let i=0;i<60;i++) {
+      const rm=(rlo+rhi)/2;
+      if (checkAst(rm*Ag).ok) rhi=rm; else rlo=rm;
+      if (rhi-rlo<1e-5) break;
+    }
+    Ast_min = rhi*Ag; chk_min = checkAst(Ast_min);
   }
-  const Ast_req = rhi*Ag;
-  return build(Ast_req, checkAst(Ast_req), p);
+  const rho_min = Ast_min/Ag;
+
+  // Modo manual: el usuario define un ρ objetivo (acotado a [1%, 8%] por ACI 318)
+  if (rhoTarget != null && !isNaN(rhoTarget)) {
+    const clampedHigh = rhoTarget > 0.08;
+    const clampedLow  = rhoTarget < 0.01;
+    const rhoT  = Math.min(0.08, Math.max(0.01, rhoTarget));
+    const Ast_t = rhoT * Ag;
+    const meta  = { rho_min, rhoRequested: rhoTarget, manual: true, clampedHigh, clampedLow };
+
+    if (Ast_t >= Ast_min - 1e-9) {
+      return build(Ast_t, checkAst(Ast_t), p, meta);
+    }
+    // El objetivo pedido no alcanza a resistir Pu/Mu: se respeta el mínimo estructural
+    return build(Ast_min, chk_min, p, { ...meta, insufficient: true });
+  }
+
+  return build(Ast_min, chk_min, p, { rho_min, manual: false });
 }
 
-function build(Ast_req, chk, p) {
+function build(Ast_req, chk, p, meta = {}) {
   // Generar todas las combinaciones válidas
   const { shape, b, h, D, r, Ag, ey } = p;
   const isCirc = shape === 'circ';
-  const combos = [];
   const barras = [...BARRAS_MM, ...BARRAS_IN];
   const nMin = isCirc ? 6 : 4;
 
-  for (const bar of barras) {
-    for (let n=nMin; n<=24; n+=2) {
-      const Ast_prov = n * bar.A;
-      if (Ast_prov < Ast_req * 0.995) continue;
+  function genCombos(Ast_floor) {
+    const out = [];
+    for (const bar of barras) {
+      for (let n=nMin; n<=24; n+=2) {
+        const Ast_prov = n * bar.A;
+        if (Ast_prov < Ast_floor) continue;
+        if (Ast_prov/Ag > 0.08 + 1e-9) continue; // ACI 318: ρ_máx = 8%
 
-      // Verificar espaciamiento mínimo (ACI 25.2.1 — sep mín = max(d_b, 4/3 ag, 25mm=2.5cm))
-      const sep_min = Math.max(bar.d, 2.5); // cm
-      let sep_libre;
-      if (isCirc) {
-        // Barras distribuidas uniformemente en un anillo de radio Rs
-        const Rs = D/2 - r;
-        const circunf = 2*Math.PI*Rs;
-        sep_libre = (circunf - n*bar.d) / n;
-        if (sep_libre < sep_min) continue;
-      } else {
-        const por_cara_long = Math.ceil(n/4); // aprox barras cara larga
-        const cara_util = (Math.max(b,h) - 2*r);
-        sep_libre = (cara_util - por_cara_long*bar.d) / (por_cara_long - 1 + 1e-9);
-        if (n > 4 && sep_libre < sep_min) continue;
+        // Verificar espaciamiento mínimo (ACI 25.2.1 — sep mín = max(d_b, 4/3 ag, 25mm=2.5cm))
+        const sep_min = Math.max(bar.d, 2.5); // cm
+        let sep_libre;
+        if (isCirc) {
+          // Barras distribuidas uniformemente en un anillo de radio Rs
+          const Rs = D/2 - r;
+          const circunf = 2*Math.PI*Rs;
+          sep_libre = (circunf - n*bar.d) / n;
+          if (sep_libre < sep_min) continue;
+        } else {
+          const por_cara_long = Math.ceil(n/4); // aprox barras cara larga
+          const cara_util = (Math.max(b,h) - 2*r);
+          // Con 1 barra por cara (solo esquinas) no hay separación intermedia que verificar
+          sep_libre = por_cara_long > 1
+            ? (cara_util - por_cara_long*bar.d) / (por_cara_long - 1)
+            : Infinity;
+          if (n > 4 && sep_libre < sep_min) continue;
+        }
+
+        out.push({
+          n, bar,
+          Ast_prov,
+          rho_prov: Ast_prov/Ag,
+          exceso:   ((Ast_prov/Ast_req)-1)*100,
+          sep_libre: sep_libre > 0 ? sep_libre : Infinity,
+        });
+        if (out.length >= 120) break;
       }
-
-      combos.push({
-        n, bar,
-        Ast_prov,
-        rho_prov: Ast_prov/Ag,
-        exceso:   ((Ast_prov/Ast_req)-1)*100,
-        sep_libre: sep_libre > 0 ? sep_libre : Infinity,
-      });
-      if (combos.length >= 120) break;
+      if (out.length >= 120) break;
     }
-    if (combos.length >= 120) break;
+    return out;
   }
 
-  // Ordenar por exceso ascendente
+  let combos = genCombos(Ast_req * 0.995);
+  let relaxed = false;
+  // Ast_req puede quedar pegado al techo de 8% (mínimo estructural u objetivo manual cercano/clampeado
+  // al máximo). En ese caso la ventana [0.995·Ast_req, 0.08·Ag] puede no contener ninguna combinación
+  // discreta de barras — se relaja el piso hasta el mínimo estructural real para no dejar la tabla vacía.
+  if (!combos.length && meta.rho_min != null) {
+    const Ast_min = meta.rho_min * Ag;
+    if (Ast_min < Ast_req * 0.995) {
+      combos = genCombos(Ast_min);
+      relaxed = combos.length > 0;
+    }
+  }
+
+  // Ordenar por exceso ascendente (respecto al Ast_req usado: mínimo estructural u objetivo manual)
   combos.sort((a,b) => a.exceso - b.exceso);
+
+  const rho_min = meta.rho_min != null ? meta.rho_min : Ast_req/Ag;
+  const rho_used = Ast_req/Ag;
+  const notes = [];
+
+  if (relaxed) {
+    notes.push({ type:'warn', text:
+      `No existe una combinación discreta de barras dentro del objetivo exacto de ${(rho_used*100).toFixed(2)}% ` +
+      `sin exceder el máximo de 8%. Se muestran las combinaciones más cercanas posibles, partiendo desde el ` +
+      `mínimo estructural de ${(rho_min*100).toFixed(2)}%.` });
+  }
+
+  if (meta.manual) {
+    if (meta.clampedHigh) {
+      notes.push({ type:'warn', text:
+        `El ρ solicitado (${(meta.rhoRequested*100).toFixed(2)}%) excede el máximo permitido por ACI 318 (8%). Se utilizó ρ = 8.00%.` });
+    } else if (meta.clampedLow) {
+      notes.push({ type:'warn', text:
+        `El ρ solicitado (${(meta.rhoRequested*100).toFixed(2)}%) es menor al mínimo normativo (1%). Se utilizó ρ = 1.00%.` });
+    }
+
+    if (meta.insufficient) {
+      notes.push({ type:'err', text:
+        `El ρ objetivo de ${(meta.rhoRequested*100).toFixed(2)}% no alcanza a resistir Pu/Mu con la sección actual. ` +
+        `Se requiere un mínimo estructural de ${(rho_min*100).toFixed(2)}% — las combinaciones se calcularon con ese valor.` });
+    } else {
+      const diffPts = (rho_used - rho_min) * 100;
+      if (diffPts > 0.15) {
+        const extraPct = ((Ast_req/(rho_min*Ag)) - 1) * 100;
+        notes.push({ type:'info', text:
+          `El óptimo estructural mínimo para estas cargas es ${(rho_min*100).toFixed(2)}%. Usar ${(rho_used*100).toFixed(2)}% implica ` +
+          `~${extraPct.toFixed(0)}% más acero que el mínimo requerido, pero puede resultar más práctico o económico en conjunto: ` +
+          `permite barras de mayor diámetro con menos unidades, reduce la congestión de armado en el nudo, facilita el vaciado del hormigón ` +
+          `y deja margen ante posibles ajustes de cargas — a cambio de un mayor costo de acero por metro lineal de columna.` });
+      } else {
+        notes.push({ type:'ok', text:
+          `El valor manual (${(rho_used*100).toFixed(2)}%) prácticamente coincide con el óptimo estructural mínimo (${(rho_min*100).toFixed(2)}%).` });
+      }
+    }
+  }
 
   return {
     ok: true, Ast_req,
-    rho_req: Ast_req/Ag,
+    rho_req: rho_used,
+    rho_min, manual: !!meta.manual, notes,
     phi_Pn: chk.phi_Pn,
     phi_Mn: chk.phi_Mn/100, // kN·cm → kN·m
     phi: chk.phi, et: chk.et,
@@ -1053,28 +1164,34 @@ function _doCalc() {
   const fc = getfc(), fy = getfy(), Pu = getPu(), Mu = getMu();
   const tipo = document.getElementById('i-tipo').value;
 
+  const rhoTargetPct = rhoMode === 'manual'
+    ? parseFloat(document.getElementById('i-rho-target').value)
+    : null;
+  const rhoTarget = rhoTargetPct != null ? rhoTargetPct/100 : null;
+
   const dimsInvalid = isCirc
     ? (isNaN(D) || D<=0 || r>=D/2)
     : (isNaN(b) || isNaN(h) || b<=0 || h<=0 || r>=h/2 || r>=b/2);
 
-  if ([r,fc,fy,Pu,Mu].some(v=>isNaN(v)||v<=0) || dimsInvalid) {
+  if ([r,fc,fy,Pu,Mu].some(v=>isNaN(v)||v<=0) || dimsInvalid || (rhoMode==='manual' && isNaN(rhoTarget))) {
     setDot('err','Datos inválidos');
-    clearSummary(); clearCombos('Datos inválidos'); clearViz(); return;
+    clearSummary(); clearCombos('Datos inválidos'); clearViz(); renderNotes(null); return;
   }
 
   try {
-    const res = calcularACI(shape, b, h, D, r, fc, fy, Pu, Mu, tipo);
+    const res = calcularACI(shape, b, h, D, r, fc, fy, Pu, Mu, tipo, rhoTarget);
     lastResult = res;
 
     if (res.error) {
       setDot('err', res.error);
-      clearSummary(); clearCombos(res.error); clearViz(); return;
+      clearSummary(); clearCombos(res.error); clearViz(); renderNotes(null); return;
     }
 
     setDot('ok','Listo');
     renderSummary(res, Pu, Mu);
     renderCombos(res);
     renderVerif(res, Pu, Mu);
+    renderNotes(res);
     selectedIdx = 0;
     if (res.combos.length) selectCombo(0);
 
@@ -1082,6 +1199,30 @@ function _doCalc() {
     setDot('err','Error interno');
     console.error(e);
   }
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER NOTAS (ρ manual: insuficiencia / factibilidad económica)
+// ═══════════════════════════════════════════════════════
+function renderNotes(res) {
+  const el = document.getElementById('rho-notes');
+  if (!el) return;
+  if (!res || !res.notes || !res.notes.length) { el.innerHTML = ''; return; }
+
+  const styles = {
+    err:  { bg:'#f851491a', bd:'#f8514944', tx:'#f85149', ic:'⚠' },
+    warn: { bg:'#d299221a', bd:'#d2992244', tx:'#d29922', ic:'⚠' },
+    info: { bg:'#1f6feb1a', bd:'#1f6feb44', tx:'#58a6ff', ic:'ℹ' },
+    ok:   { bg:'#3fb9501a', bd:'#3fb95044', tx:'#3fb950', ic:'✓' },
+  };
+
+  el.innerHTML = res.notes.map(n => {
+    const s = styles[n.type] || styles.info;
+    return `<div style="background:${s.bg};border:1px solid ${s.bd};border-radius:8px;
+                padding:9px 12px;font-size:13px;color:#c9d1d9;line-height:1.5;margin-bottom:6px;">
+      <strong style="color:${s.tx};">${s.ic}</strong> ${n.text}
+    </div>`;
+  }).join('');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1094,6 +1235,8 @@ function renderSummary(res, Pu, Mu) {
 
   document.getElementById('s-Ast').textContent = res.Ast_req.toFixed(2) + ' cm²';
   document.getElementById('s-rho').textContent = (res.rho_req*100).toFixed(2) + '%';
+  document.getElementById('s-Ast-lbl').textContent = res.manual ? 'As objetivo (manual)' : 'As requerido';
+  document.getElementById('s-rho-lbl').textContent = res.manual ? 'ρ objetivo (manual)'  : 'ρ requerido';
   // Valores requeridos (diseño) — fila principal
   document.getElementById('s-Pn').textContent   = (res.phi_Pn*fP).toFixed(1);
   document.getElementById('s-Mn').textContent   = (res.phi_Mn*fP).toFixed(1);
@@ -1132,7 +1275,7 @@ function renderCombos(res) {
     const rhoW = Math.min(100, (c.rho_prov/0.08)*100).toFixed(0);
     const tag  = i===0 ? '<span class="tag tag-blue">↑ Óptimo</span>'
                : c.exceso < 5  ? '<span class="tag tag-green">Ajustado</span>'
-               : c.exceso < 15 ? '' : '<span class="tag tag-gold">+' + c.exceso.toFixed(0)+'%</span>';
+               : c.exceso < 15 ? '' : '<span class="tag tag-gold">' + fmtSigned(c.exceso,0)+'%</span>';
 
     // Nombre principal + fracción comercial + equivalencia
     const fracLabel  = c.bar.frac && c.bar.frac !== '—'
@@ -1151,7 +1294,7 @@ function renderCombos(res) {
         ${(c.rho_prov*100).toFixed(2)}%
         <div class="rho-bar-wrap"><div class="rho-bar" style="width:${rhoW}%"></div></div>
       </td>
-      <td>+${c.exceso.toFixed(1)}%</td>
+      <td>${fmtSigned(c.exceso,1)}%</td>
       <td>${tag}</td>
     </tr>`;
   }).join('');
@@ -1296,7 +1439,7 @@ function selectCombo(idx) {
   document.getElementById('ci-rho').textContent = (c.rho_prov*100).toFixed(2) + '%';
 
   const excEl = document.getElementById('ci-exc');
-  excEl.textContent = '+' + c.exceso.toFixed(1)+'%';
+  excEl.textContent = fmtSigned(c.exceso,1) + '%';
   excEl.className   = 'ci-val ' + (c.exceso<15?'ok':'warn');
 
   if (shp === 'circ') {
