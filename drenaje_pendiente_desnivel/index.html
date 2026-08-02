@@ -870,6 +870,101 @@ function hideStationTooltip() {
   });
 })();
 
+// Esquema en trazo de línea (fondo blanco, sin el tubo 3D) para el reporte impreso/PDF
+function buildPrintDiagramDataURL(distTotal, pendiente, pos, desnivelTotal, desnivelParcial) {
+  const w = 720, h = 260;
+  const dpr = 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
+
+  const padL = 60, padR = 75, padT = 40;
+  const plotW = w - padL - padR;
+  const slopeH = Math.min(110, Math.max(25, pendiente * 6));
+  const x0 = padL, x1 = padL + plotW;
+  const y0 = padT, y1 = padT + slopeH;
+
+  ctx.font = '11px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Pozo A / Pozo B (solo trazo)
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1.2;
+  ctx.strokeRect(x0 - 13, y0 - 19, 26, 30);
+  ctx.strokeRect(x1 - 13, y1 - 11, 26, 30);
+  ctx.fillStyle = '#333';
+  ctx.fillText('Pozo A', x0, y0 - 27);
+  ctx.fillText('Pozo B', x1, y1 + 37);
+
+  // Tubería: línea simple (sin relleno ni sombreado 3D)
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x1, y1);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#1a1a1a';
+  ctx.stroke();
+
+  // Dimensión horizontal (distancia total)
+  const dimY = Math.max(y0, y1) + 45;
+  ctx.strokeStyle = '#777';
+  ctx.lineWidth = 1;
+  drawDimLine(ctx, x0, dimY, x1, dimY);
+  ctx.fillStyle = '#333';
+  ctx.fillText('Distancia total: ' + fmt(distTotal, 2) + ' m', (x0 + x1) / 2, dimY + 14);
+
+  // Dimensión vertical (desnivel total)
+  const dimX = x1 + 45;
+  drawDimLineV(ctx, dimX, y0, dimX, y1);
+  ctx.save();
+  ctx.translate(dimX + 12, (y0 + y1) / 2);
+  ctx.rotate(Math.PI / 2);
+  ctx.fillText('Desnivel total: ' + fmt(desnivelTotal, 3) + ' m', 0, 0);
+  ctx.restore();
+
+  // Estaciones
+  stations.forEach((d, i) => {
+    const sf = distTotal > 0 ? d / distTotal : 0;
+    const sx = x0 + plotW * sf, sy = y0 + slopeH * sf;
+    ctx.setLineDash([2, 2]);
+    ctx.strokeStyle = '#999';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx, dimY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(sx, sy, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#111';
+    ctx.fill();
+    ctx.fillText('E' + (i + 1), sx, sy - 10);
+  });
+
+  // Punto marcado (línea punteada)
+  const f = distTotal > 0 ? pos / distTotal : 0;
+  const xm = x0 + plotW * f, ym = y0 + slopeH * f;
+  ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = '#c2650a';
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(xm, y0);
+  ctx.lineTo(xm, ym);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.arc(xm, ym, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#c2650a';
+  ctx.fill();
+
+  return canvas.toDataURL('image/png');
+}
+
 // ── Reporte imprimible / PDF (usa el diálogo de impresión del navegador) ──
 function generarReporte() {
   const distTotal = Math.max(0.1, parseFloat(document.getElementById('distTotal').value) || 0.1);
@@ -882,7 +977,7 @@ function generarReporte() {
   const cotaParcial = cotaIni - desnivelParcial;
   const cotaFinal = cotaIni - desnivelTotal;
 
-  const diagramImg = document.getElementById('diagram').toDataURL('image/png');
+  const diagramImg = buildPrintDiagramDataURL(distTotal, pendiente, pos, desnivelTotal, desnivelParcial);
 
   const stationsRows = stations.length
     ? stations.map((d, i) => {
