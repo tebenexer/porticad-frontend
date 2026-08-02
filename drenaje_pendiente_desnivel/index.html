@@ -216,6 +216,27 @@
     line-height: 1; padding: 2px 6px; border-radius: 5px; transition: all .15s;
   }
   .station-del:hover { color: #f85149; background: #f8514922; }
+
+  /* ── Reporte imprimible ── */
+  #printReport { display: none; }
+  #printReport h1 { font-size: 20px; margin-bottom: 4px; }
+  #printReport .pr-sub { font-size: 12px; color: #555; margin-bottom: 18px; }
+  #printReport h2 {
+    font-size: 14px; margin: 18px 0 8px; padding-bottom: 4px;
+    border-bottom: 2px solid #222;
+  }
+  #printReport table.pr-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 13px; }
+  #printReport table.pr-table th, #printReport table.pr-table td {
+    text-align: left; padding: 5px 8px; border: 1px solid #ccc;
+  }
+  #printReport table.pr-table th { background: #f0f0f0; width: 40%; }
+  #printReport table.pr-stations th { background: #f0f0f0; }
+  #printReport img.pr-diagram { width: 100%; border: 1px solid #ccc; }
+
+  @media print {
+    body > *:not(#printReport) { display: none !important; }
+    #printReport { display: block !important; color: #111; background: #fff; }
+  }
 </style>
 </head>
 <body>
@@ -228,6 +249,7 @@
     <span class="topbar-title">Pendiente y Desnivel de Drenaje</span>
   </div>
   <span class="badge" style="margin-left:8px;">Drenajes</span>
+  <button type="button" class="btn primary" style="margin-left:auto;" onclick="generarReporte()">📄 Generar PDF</button>
 </div>
 
 <div class="main">
@@ -283,6 +305,22 @@
         <button type="button" class="btn primary" onclick="addStationFromInput()">+ Agregar</button>
       </div>
       <button type="button" class="btn ghost" onclick="addStationFromSlider()">+ Agregar en la posición actual (línea punteada)</button>
+
+      <div style="border-top:1px solid #21262d; padding-top:10px; display:flex; flex-direction:column; gap:8px;">
+        <div class="field-row">
+          <input type="number" id="stationCount" placeholder="Cantidad de estaciones" min="2" step="1"
+                 onkeydown="if(event.key==='Enter') generateEqualStations()">
+          <button type="button" class="btn primary" onclick="generateEqualStations()">Dividir en N</button>
+        </div>
+        <div class="field-row">
+          <input type="number" id="stationInterval" placeholder="Cada (m)" min="0.01" step="0.1"
+                 onkeydown="if(event.key==='Enter') generateIntervalStations()">
+          <button type="button" class="btn primary" onclick="generateIntervalStations()">Generar cada X m</button>
+        </div>
+        <div style="font-size:11px; color:#6e7681;">Estas dos opciones reemplazan las estaciones actuales por el conjunto generado (siempre incluyen los dos extremos del tramo; en "cada X m" el último tramo puede quedar más corto).</div>
+      </div>
+
+      <button type="button" class="btn ghost" onclick="clearStations()">🗑 Limpiar estaciones</button>
     </div>
 
   </div>
@@ -350,6 +388,9 @@
 
 </div>
 
+<!-- ═══ REPORTE IMPRIMIBLE (solo visible al imprimir / generar PDF) ═══ -->
+<div id="printReport"></div>
+
 <script>
 function fmt(n, d) {
   if (!isFinite(n)) return '–';
@@ -391,6 +432,39 @@ function addStationFromSlider() {
 
 function removeStation(i) {
   stations.splice(i, 1);
+  recalc();
+}
+
+function clearStations() {
+  stations = [];
+  recalc();
+}
+
+function generateEqualStations() {
+  const distTotal = Math.max(0.1, parseFloat(document.getElementById('distTotal').value) || 0.1);
+  const n = parseInt(document.getElementById('stationCount').value, 10);
+  if (!n || n < 2) return;
+  const next = [];
+  for (let i = 0; i < n; i++) {
+    next.push(i === n - 1 ? distTotal : distTotal * i / (n - 1));
+  }
+  stations = next;
+  recalc();
+}
+
+function generateIntervalStations() {
+  const distTotal = Math.max(0.1, parseFloat(document.getElementById('distTotal').value) || 0.1);
+  const step = parseFloat(document.getElementById('stationInterval').value);
+  if (!step || step <= 0) return;
+  const next = [];
+  let d = 0;
+  while (d < distTotal - 1e-9) {
+    next.push(d);
+    d += step;
+  }
+  // Siempre se agrega el extremo final, aunque el último tramo quede más corto que el intervalo
+  next.push(distTotal);
+  stations = next;
   recalc();
 }
 
@@ -795,6 +869,66 @@ function hideStationTooltip() {
     hideStationTooltip();
   });
 })();
+
+// ── Reporte imprimible / PDF (usa el diálogo de impresión del navegador) ──
+function generarReporte() {
+  const distTotal = Math.max(0.1, parseFloat(document.getElementById('distTotal').value) || 0.1);
+  const pendiente = parseFloat(document.getElementById('pendienteSlider').value) || 0;
+  const cotaIni = parseFloat(document.getElementById('cotaIni').value) || 0;
+  const pos = Math.min(distTotal, Math.max(0, parseFloat(document.getElementById('posSlider').value) || 0));
+
+  const desnivelTotal = distTotal * pendiente / 100;
+  const desnivelParcial = pos * pendiente / 100;
+  const cotaParcial = cotaIni - desnivelParcial;
+  const cotaFinal = cotaIni - desnivelTotal;
+
+  const diagramImg = document.getElementById('diagram').toDataURL('image/png');
+
+  const stationsRows = stations.length
+    ? stations.map((d, i) => {
+        const desnivel = d * pendiente / 100;
+        const cota = cotaIni - desnivel;
+        return `<tr><td>E${i + 1}</td><td>${fmt(d, 2)} m</td><td>${fmt(desnivel, 3)} m</td><td>${fmt(cota, 3)}</td></tr>`;
+      }).join('')
+    : '<tr><td colspan="4">Sin estaciones agregadas</td></tr>';
+
+  document.getElementById('printReport').innerHTML = `
+    <h1>Pendiente y Desnivel de Drenaje</h1>
+    <div class="pr-sub">PortiCAD Multi-Tools &middot; Generado el ${new Date().toLocaleString('es')}</div>
+
+    <h2>Datos del tramo</h2>
+    <table class="pr-table">
+      <tr><th>Distancia total</th><td>${fmt(distTotal, 2)} m</td></tr>
+      <tr><th>Pendiente</th><td>${fmt(pendiente, 2)} %</td></tr>
+      <tr><th>Cota inicial</th><td>${fmt(cotaIni, 3)}</td></tr>
+    </table>
+
+    <h2>Esquema</h2>
+    <img class="pr-diagram" src="${diagramImg}">
+
+    <h2>Punto marcado (línea punteada)</h2>
+    <table class="pr-table">
+      <tr><th>Distancia parcial</th><td>${fmt(pos, 2)} m</td></tr>
+      <tr><th>Desnivel parcial</th><td>${fmt(desnivelParcial, 3)} m</td></tr>
+      <tr><th>Cota en el punto</th><td>${fmt(cotaParcial, 3)}</td></tr>
+    </table>
+
+    <h2>Estaciones (${stations.length})</h2>
+    <table class="pr-table pr-stations">
+      <thead><tr><th>Estación</th><th>Distancia</th><th>Desnivel</th><th>Cota</th></tr></thead>
+      <tbody>${stationsRows}</tbody>
+    </table>
+
+    <h2>Tramo completo</h2>
+    <table class="pr-table">
+      <tr><th>Distancia total</th><td>${fmt(distTotal, 2)} m</td></tr>
+      <tr><th>Desnivel total</th><td>${fmt(desnivelTotal, 3)} m</td></tr>
+      <tr><th>Cota final</th><td>${fmt(cotaFinal, 3)}</td></tr>
+    </table>
+  `;
+
+  window.print();
+}
 
 window.addEventListener('resize', () => recalc());
 onDistTotalChange();
