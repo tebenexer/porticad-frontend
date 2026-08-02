@@ -999,7 +999,7 @@ function generarReporte() {
     </table>
 
     <h2>Esquema</h2>
-    <img class="pr-diagram" src="${diagramImg}">
+    <img class="pr-diagram" id="prDiagramImg" src="${diagramImg}">
 
     <h2>Punto marcado (línea punteada)</h2>
     <table class="pr-table">
@@ -1022,7 +1022,20 @@ function generarReporte() {
     </table>
   `;
 
-  window.print();
+  // Esperar a que la imagen del esquema termine de decodificarse antes de imprimir:
+  // si se llama a window.print() inmediatamente, el navegador puede capturar la
+  // página antes de que el <img> con el data URL haya terminado de pintarse,
+  // dejando el esquema en blanco en el PDF.
+  const img = document.getElementById('prDiagramImg');
+  let printed = false;
+  const doPrint = () => { if (!printed) { printed = true; window.print(); } };
+  if (img.complete && img.naturalWidth > 0) {
+    doPrint();
+  } else {
+    img.addEventListener('load', doPrint);
+    img.addEventListener('error', doPrint);
+    setTimeout(doPrint, 1500);
+  }
 }
 
 window.addEventListener('resize', () => recalc());
