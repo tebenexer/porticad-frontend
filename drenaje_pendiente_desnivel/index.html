@@ -307,7 +307,10 @@
                onkeydown="if(event.key==='Enter') addStationFromInput()">
         <button type="button" class="btn primary" onclick="addStationFromInput()">+ Agregar</button>
       </div>
-      <button type="button" class="btn ghost" onclick="addStationFromSlider()">+ Agregar en la posición actual (línea punteada)</button>
+      <div class="field-row">
+        <span style="flex:1; font-size:14px; color:#8b949e;">En la posición actual (línea punteada)</span>
+        <button type="button" class="btn primary" onclick="addStationFromSlider()">+ Agregar</button>
+      </div>
       <button type="button" class="btn ghost" onclick="clearStations()">🗑 Limpiar estaciones</button>
     </div>
 
