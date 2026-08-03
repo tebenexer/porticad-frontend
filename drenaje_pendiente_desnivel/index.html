@@ -148,6 +148,8 @@
   .canvas-tooltip.ct-main .tt-title { color: #f97316; }
   .canvas-tooltip.ct-station { border-color: #2dd4bf88; }
   .canvas-tooltip.ct-station .tt-title { color: #2dd4bf; }
+  .canvas-tooltip.ct-substation { border-color: #a78bfa88; }
+  .canvas-tooltip.ct-substation .tt-title { color: #a78bfa; }
 
   .cards-title {
     font-size: 12px; font-weight: 700; color: #8b949e;
@@ -210,6 +212,7 @@
   }
   table.stations-table tr:hover td { background: #161b22; }
   .station-dot { width: 9px; height: 9px; border-radius: 50%; background: #2dd4bf; display: inline-block; margin-right: 6px; flex-shrink: 0; }
+  .station-dot.sub { background: #a78bfa; }
   .station-empty { color: #6e7681; font-size: 13px; padding: 10px 4px; text-align: center; }
   .station-del {
     background: none; border: none; color: #6e7681; cursor: pointer; font-size: 16px;
@@ -305,22 +308,23 @@
         <button type="button" class="btn primary" onclick="addStationFromInput()">+ Agregar</button>
       </div>
       <button type="button" class="btn ghost" onclick="addStationFromSlider()">+ Agregar en la posición actual (línea punteada)</button>
-
-      <div style="border-top:1px solid #21262d; padding-top:10px; display:flex; flex-direction:column; gap:8px;">
-        <div class="field-row">
-          <input type="number" id="stationCount" placeholder="Cantidad de estaciones" min="2" step="1"
-                 onkeydown="if(event.key==='Enter') generateEqualStations()">
-          <button type="button" class="btn primary" onclick="generateEqualStations()">Dividir en N</button>
-        </div>
-        <div class="field-row">
-          <input type="number" id="stationInterval" placeholder="Cada (m)" min="0.01" step="0.1"
-                 onkeydown="if(event.key==='Enter') generateIntervalStations()">
-          <button type="button" class="btn primary" onclick="generateIntervalStations()">Generar cada X m</button>
-        </div>
-        <div style="font-size:11px; color:#6e7681;">Estas dos opciones reemplazan las estaciones actuales por el conjunto generado (siempre incluyen los dos extremos del tramo; en "cada X m" el último tramo puede quedar más corto).</div>
-      </div>
-
       <button type="button" class="btn ghost" onclick="clearStations()">🗑 Limpiar estaciones</button>
+    </div>
+
+    <div class="input-group">
+      <div class="sec-title" style="color:#a78bfa;">Subestaciones automáticas</div>
+      <div class="field-row">
+        <input type="number" id="stationCount" placeholder="Cantidad de subestaciones" min="2" step="1"
+               onkeydown="if(event.key==='Enter') generateEqualStations()">
+        <button type="button" class="btn primary" onclick="generateEqualStations()">Dividir en N</button>
+      </div>
+      <div class="field-row">
+        <input type="number" id="stationInterval" placeholder="Cada (m)" min="0.01" step="0.1"
+               onkeydown="if(event.key==='Enter') generateIntervalStations()">
+        <button type="button" class="btn primary" onclick="generateIntervalStations()">Generar cada X m</button>
+      </div>
+      <div style="font-size:11px; color:#6e7681;">Generan un conjunto aparte de subestaciones (color violeta), sin tocar las estaciones de arriba. Siempre incluyen los dos extremos del tramo; en "cada X m" el último tramo puede quedar más corto.</div>
+      <button type="button" class="btn ghost" onclick="clearSubStations()">🗑 Limpiar subestaciones</button>
     </div>
 
   </div>
@@ -365,6 +369,17 @@
       <div class="station-empty" id="stationsEmpty">Aún no hay estaciones agregadas. Usá el panel izquierdo para ir marcando puntos a lo largo del tramo.</div>
     </div>
 
+    <div class="cards-title">Subestaciones generadas <span id="subStationsCount"></span></div>
+    <div class="stations-table-wrap">
+      <table class="stations-table" id="subStationsTable" style="display:none;">
+        <thead>
+          <tr><th>Subestación</th><th>Distancia</th><th>Desnivel</th><th>Cota</th><th></th></tr>
+        </thead>
+        <tbody id="subStationsBody"></tbody>
+      </table>
+      <div class="station-empty" id="subStationsEmpty">Aún no hay subestaciones generadas. Usá "Dividir en N" o "Generar cada X m" en el panel izquierdo.</div>
+    </div>
+
     <div class="cards-title">Tramo completo</div>
     <div class="cards-row">
       <div class="mcard">
@@ -397,8 +412,10 @@ function fmt(n, d) {
   return n.toLocaleString('es', { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
-let stations = [];
-let stationHits = []; // posiciones (px) de las estaciones dibujadas, para hover/tap
+let stations = [];      // estaciones manuales (Distancia + Agregar / Agregar en posición actual)
+let subStations = [];   // subestaciones generadas automáticamente (Dividir en N / Generar cada X m)
+let stationHits = [];    // posiciones (px) de las estaciones dibujadas, para hover/tap
+let subStationHits = []; // posiciones (px) de las subestaciones dibujadas, para hover/tap
 let mainHit = null;   // posición (px) del marcador principal
 let diagBaselineY = 0; // y fija (px) debajo de la línea "Distancia total" donde se anclan los tooltips
 let diagCssW = 0;      // ancho (px) del canvas, para no dejar que el tooltip se salga por los costados
@@ -440,6 +457,11 @@ function clearStations() {
   recalc();
 }
 
+function clearSubStations() {
+  subStations = [];
+  recalc();
+}
+
 function generateEqualStations() {
   const distTotal = Math.max(0.1, parseFloat(document.getElementById('distTotal').value) || 0.1);
   const n = parseInt(document.getElementById('stationCount').value, 10);
@@ -448,7 +470,7 @@ function generateEqualStations() {
   for (let i = 0; i < n; i++) {
     next.push(i === n - 1 ? distTotal : distTotal * i / (n - 1));
   }
-  stations = next;
+  subStations = next;
   recalc();
 }
 
@@ -464,7 +486,12 @@ function generateIntervalStations() {
   }
   // Siempre se agrega el extremo final, aunque el último tramo quede más corto que el intervalo
   next.push(distTotal);
-  stations = next;
+  subStations = next;
+  recalc();
+}
+
+function removeSubStation(i) {
+  subStations.splice(i, 1);
   recalc();
 }
 
@@ -494,6 +521,36 @@ function renderStations(distTotal, pendiente, cotaIni) {
       <td>${fmt(desnivel, 3)} m</td>
       <td>${fmt(cota, 3)}</td>
       <td style="text-align:right;"><button type="button" class="station-del" onclick="removeStation(${i})" title="Quitar estación">×</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderSubStations(distTotal, pendiente, cotaIni) {
+  const table = document.getElementById('subStationsTable');
+  const body = document.getElementById('subStationsBody');
+  const empty = document.getElementById('subStationsEmpty');
+  const count = document.getElementById('subStationsCount');
+
+  subStations = subStations.filter(s => s <= distTotal + 1e-9);
+  count.textContent = subStations.length ? '(' + subStations.length + ')' : '';
+
+  if (!subStations.length) {
+    table.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+  table.style.display = 'table';
+  empty.style.display = 'none';
+
+  body.innerHTML = subStations.map((d, i) => {
+    const desnivel = d * pendiente / 100;
+    const cota = cotaIni - desnivel;
+    return `<tr>
+      <td><span class="station-dot sub"></span>S${i + 1}</td>
+      <td>${fmt(d, 2)} m</td>
+      <td>${fmt(desnivel, 3)} m</td>
+      <td>${fmt(cota, 3)}</td>
+      <td style="text-align:right;"><button type="button" class="station-del" onclick="removeSubStation(${i})" title="Quitar subestación">×</button></td>
     </tr>`;
   }).join('');
 }
@@ -556,6 +613,7 @@ function recalc() {
   document.getElementById('out-cotaFinal').textContent = fmt(cotaFinal, 3);
 
   renderStations(distTotal, pendiente, cotaIni);
+  renderSubStations(distTotal, pendiente, cotaIni);
   drawDiagram(distTotal, pendiente, pos, desnivelTotal, desnivelParcial);
 }
 
@@ -656,6 +714,38 @@ function drawDiagram(distTotal, pendiente, pos, desnivelTotal, desnivelParcial) 
     ctx.font = 'bold 11px -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('E' + (i + 1), sx, sy - 12);
+
+    const desnivel = d * pendiente / 100;
+    return { x: sx, y: sy, idx: i, dist: d, desnivel: desnivel, cota: cotaIni - desnivel };
+  });
+
+  // Subestaciones generadas automáticamente (color violeta, para distinguirlas de las estaciones manuales)
+  subStationHits = subStations.map((d, i) => {
+    const sf = distTotal > 0 ? d / distTotal : 0;
+    const sx = x0 + plotW * sf;
+    const sy = y0 + slopeH * sf;
+
+    ctx.setLineDash([3, 3]);
+    ctx.strokeStyle = '#a78bfa88';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx, dimY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#a78bfa';
+    ctx.beginPath();
+    ctx.arc(sx, sy, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#0d1117';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = '#a78bfa';
+    ctx.font = 'bold 11px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('S' + (i + 1), sx, sy + 16);
 
     const desnivel = d * pendiente / 100;
     return { x: sx, y: sy, idx: i, dist: d, desnivel: desnivel, cota: cotaIni - desnivel };
@@ -817,17 +907,25 @@ function canvasPointFromEvent(e) {
 
 function findNearestStation(px, py, radius) {
   radius = radius || 14;
-  let best = null, bestD = radius;
+  let best = null, bestD = radius, bestType = null;
   stationHits.forEach(s => {
     const d = Math.hypot(s.x - px, s.y - py);
-    if (d < bestD) { bestD = d; best = s; }
+    if (d < bestD) { bestD = d; best = s; bestType = 'estacion'; }
   });
-  return best;
+  subStationHits.forEach(s => {
+    const d = Math.hypot(s.x - px, s.y - py);
+    if (d < bestD) { bestD = d; best = s; bestType = 'subestacion'; }
+  });
+  if (!best) return null;
+  return Object.assign({ type: bestType }, best);
 }
 
 function showStationTooltip(s) {
   const tip = document.getElementById('stationTooltip');
-  tip.innerHTML = `<div class="tt-title">Estación E${s.idx + 1}</div>
+  const isSub = s.type === 'subestacion';
+  tip.className = 'canvas-tooltip ' + (isSub ? 'ct-substation' : 'ct-station');
+  const label = (isSub ? 'Subestación S' : 'Estación E') + (s.idx + 1);
+  tip.innerHTML = `<div class="tt-title">${label}</div>
     <div>Distancia: <b>${fmt(s.dist, 2)} m</b></div>
     <div>Desnivel: <b>${fmt(s.desnivel, 3)} m</b></div>
     <div>Cota: <b>${fmt(s.cota, 3)}</b></div>`;
@@ -945,6 +1043,26 @@ function buildPrintDiagramDataURL(distTotal, pendiente, pos, desnivelTotal, desn
     ctx.fillText('E' + (i + 1), sx, sy - 10);
   });
 
+  // Subestaciones (violeta, para diferenciarlas de las estaciones manuales)
+  subStations.forEach((d, i) => {
+    const sf = distTotal > 0 ? d / distTotal : 0;
+    const sx = x0 + plotW * sf, sy = y0 + slopeH * sf;
+    ctx.setLineDash([2, 2]);
+    ctx.strokeStyle = '#a78bfa';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx, dimY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(sx, sy, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#7c3aed';
+    ctx.fill();
+    ctx.fillStyle = '#7c3aed';
+    ctx.fillText('S' + (i + 1), sx, sy + 12);
+  });
+
   // Punto marcado (línea punteada)
   const f = distTotal > 0 ? pos / distTotal : 0;
   const xm = x0 + plotW * f, ym = y0 + slopeH * f;
@@ -987,6 +1105,14 @@ function generarReporte() {
       }).join('')
     : '<tr><td colspan="4">Sin estaciones agregadas</td></tr>';
 
+  const subStationsRows = subStations.length
+    ? subStations.map((d, i) => {
+        const desnivel = d * pendiente / 100;
+        const cota = cotaIni - desnivel;
+        return `<tr><td>S${i + 1}</td><td>${fmt(d, 2)} m</td><td>${fmt(desnivel, 3)} m</td><td>${fmt(cota, 3)}</td></tr>`;
+      }).join('')
+    : '<tr><td colspan="4">Sin subestaciones generadas</td></tr>';
+
   document.getElementById('printReport').innerHTML = `
     <h1>Pendiente y Desnivel de Drenaje</h1>
     <div class="pr-sub">PortiCAD Multi-Tools &middot; Generado el ${new Date().toLocaleString('es')}</div>
@@ -1012,6 +1138,12 @@ function generarReporte() {
     <table class="pr-table pr-stations">
       <thead><tr><th>Estación</th><th>Distancia</th><th>Desnivel</th><th>Cota</th></tr></thead>
       <tbody>${stationsRows}</tbody>
+    </table>
+
+    <h2>Subestaciones (${subStations.length})</h2>
+    <table class="pr-table pr-stations">
+      <thead><tr><th>Subestación</th><th>Distancia</th><th>Desnivel</th><th>Cota</th></tr></thead>
+      <tbody>${subStationsRows}</tbody>
     </table>
 
     <h2>Tramo completo</h2>
