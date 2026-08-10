@@ -135,6 +135,25 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0;}
 .items-list li .item-amt{color:var(--text);font-weight:600;white-space:nowrap;}
 .proveedor-cell{font-weight:600;color:var(--text);}
 .total-cell{white-space:nowrap;}
+
+/* NOTAS (Keep-style) */
+.quick-add-row{display:flex;gap:10px;align-items:flex-start;}
+.quick-add-row textarea{resize:vertical;min-height:42px;flex:1;}
+#mic-status{font-size:.72rem;color:var(--red);margin-top:6px;display:none;}
+#mic-btn{font-size:1rem;line-height:1;}
+#mic-btn.mic-active{background:var(--red);color:#fff;border-color:var(--red);animation:pulse 1s infinite;}
+.notas-board{column-width:230px;column-gap:14px;margin-top:16px;}
+.nota-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px;break-inside:avoid;}
+.nota-card.nota-expense{border-color:#43e97b55;background:#43e97b0d;}
+.nota-card.nota-archived{opacity:.55;}
+.nota-text{font-size:.85rem;white-space:pre-wrap;word-break:break-word;margin-bottom:8px;}
+.nota-meta{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;}
+.nota-amount{font-weight:700;color:var(--green);font-size:.9rem;white-space:nowrap;}
+.nota-footer{display:flex;justify-content:space-between;align-items:center;}
+.nota-date{font-size:.68rem;color:var(--muted);}
+.nota-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.85rem;}
+.nota-del:hover{color:var(--red);}
+.nrep-tabs{display:flex;gap:4px;}
 </style>
 </head>
 <body>
@@ -169,6 +188,7 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0;}
   <nav>
     <h1>💳 Gastos</h1>
     <button class="nav-btn active" onclick="showPage('dashboard')">Inicio</button>
+    <button class="nav-btn" onclick="showPage('notas')">Notas</button>
     <button class="nav-btn" onclick="showPage('gastos')">Gastos</button>
     <button class="nav-btn" onclick="showPage('reportes')">Reportes</button>
     <button class="nav-btn" onclick="showPage('presupuesto')">Presupuesto</button>
@@ -204,6 +224,56 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0;}
     <div class="card">
       <h3>Ultimas transacciones</h3>
       <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Proveedor</th><th>Articulos</th><th>Cuenta</th><th>Persona</th><th>Total</th></tr></thead><tbody id="ds-recent-rows"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- NOTAS (estilo Keep) -->
+  <div id="page-notas" class="page">
+    <div class="top-row">
+      <span class="section-title">Notas rápidas</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <select id="notas-cuenta" style="width:150px;"></select>
+        <select id="notas-persona" style="width:150px;"></select>
+        <button class="btn btn-green btn-sm" onclick="cerrarDia()">Cerrar día</button>
+      </div>
+    </div>
+    <div class="grid2" style="margin-bottom:16px;">
+      <div class="stat red"><div class="label">Gastos de hoy (sin cerrar)</div><div class="value" id="notas-hoy-total">$0</div></div>
+      <div class="stat green" id="notas-hoy-badge-wrap"><div class="label">Estado del día</div><div class="value" id="notas-hoy-badge" style="font-size:1rem;">Abierto</div></div>
+    </div>
+    <div class="card">
+      <h3>Toma una nota... (escribe o dicta un gasto, ej: "Almuerzo 250")</h3>
+      <div class="quick-add-row">
+        <textarea id="nota-input" rows="1" placeholder="Escribe una nota o un gasto..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addNotaFromInput();}"></textarea>
+        <button class="btn btn-ghost" id="mic-btn" onclick="toggleMic()" title="Dictar por voz">🎤</button>
+        <button class="btn btn-primary" onclick="addNotaFromInput()">Agregar</button>
+      </div>
+      <div id="mic-status">🎙️ Escuchando...</div>
+    </div>
+    <div class="notas-board" id="notas-board"></div>
+    <div id="notas-empty" class="empty" style="display:none;">Aún no tienes notas. Escribe o dicta tu primer gasto arriba.</div>
+
+    <div class="card" style="margin-top:20px;">
+      <div class="top-row" style="margin-bottom:10px;">
+        <span class="section-title" style="font-size:.9rem;">Reportes de notas</span>
+        <div class="nrep-tabs">
+          <button class="nav-btn active" id="nrep-tab-diario" onclick="switchNotasReportTab('diario')">Diario</button>
+          <button class="nav-btn" id="nrep-tab-semanal" onclick="switchNotasReportTab('semanal')">Semanal</button>
+          <button class="nav-btn" id="nrep-tab-mensual" onclick="switchNotasReportTab('mensual')">Mensual</button>
+        </div>
+      </div>
+      <div id="nrep-diario">
+        <div class="form-row" style="margin-bottom:12px;"><div class="form-group" style="max-width:180px;"><label>Fecha</label><input type="date" id="nrep-fecha" onchange="renderNotasReportes()"></div></div>
+        <div id="nrep-diario-content"></div>
+      </div>
+      <div id="nrep-semanal" style="display:none;">
+        <div class="form-row" style="margin-bottom:12px;"><div class="form-group" style="max-width:180px;"><label>Cualquier fecha de la semana</label><input type="date" id="nrep-semana-fecha" onchange="renderNotasReportes()"></div></div>
+        <div id="nrep-semanal-content"></div>
+      </div>
+      <div id="nrep-mensual" style="display:none;">
+        <div class="form-row" style="margin-bottom:12px;"><div class="form-group" style="max-width:180px;"><label>Mes</label><input type="month" id="nrep-mes" onchange="renderNotasReportes()"></div></div>
+        <div id="nrep-mensual-content"></div>
+      </div>
     </div>
   </div>
 
@@ -588,13 +658,15 @@ async function initUserData(user,displayName) {
 
 async function loadUserData(user) {
   const base=db.collection('users').doc(user.uid);
-  const [cfg,acc,per,cat,tx,bud]=await Promise.all([
+  const [cfg,acc,per,cat,tx,bud,notas,cierres]=await Promise.all([
     base.collection('config').doc('main').get(),
     base.collection('accounts').orderBy('name').get(),
     base.collection('persons').get(),
     base.collection('categories').get(),
     base.collection('transactions').orderBy('fecha','desc').get(),
     base.collection('budgets').get(),
+    base.collection('notas').orderBy('createdAt','desc').get(),
+    base.collection('cierres').orderBy('day','desc').get(),
   ]);
   if(!cfg.exists){await initUserData(user);return loadUserData(user);}
   STATE={
@@ -604,6 +676,8 @@ async function loadUserData(user) {
     categories:cat.docs.map(d=>({id:d.id,...d.data()})),
     transactions:tx.docs.map(d=>({id:d.id,...d.data()})),
     budgets:{},
+    notas:notas.docs.map(d=>({id:d.id,...d.data()})),
+    cierres:cierres.docs.map(d=>({id:d.id,...d.data()})),
   };
   bud.docs.forEach(d=>{STATE.budgets[d.id]=d.data();});
 }
@@ -641,6 +715,7 @@ function showPage(name){
   document.getElementById('page-'+name).classList.add('active');
   event?.target?.classList.add('active');
   if(name==='dashboard')renderDashboard();
+  if(name==='notas'){populateNotasSelectors();renderNotasBoard();renderNotasHoyStat();initNotasReportDefaults();renderNotasReportes();}
   if(name==='gastos'){populateFilters();renderGastos();}
   if(name==='reportes'){populateRepPersona();renderReportes();}
   if(name==='presupuesto')renderPresupuesto();
@@ -891,6 +966,290 @@ function renderGastos(){
   }
   document.getElementById('gastos-total-neg').textContent=fmt(txs.filter(t=>t.tipo==='gasto').reduce((s,t)=>s+txTotal(t),0));
   document.getElementById('gastos-total-pos').textContent=fmt(txs.filter(t=>t.tipo==='ingreso').reduce((s,t)=>s+txTotal(t),0));
+}
+
+// ══════════════════════════════════════════════════════
+//  NOTAS (estilo Keep) — captura rapida + voz + cierre diario
+// ══════════════════════════════════════════════════════
+const NOTA_KEYWORDS={
+  'Alimentacion':['comida','almuerzo','cena','desayuno','restaurante','cafe','café','super','supermercado','mercado','pizza','hamburguesa','panaderia','panadería','comer'],
+  'Transporte':['taxi','uber','bus','autobus','autobús','pasaje','colectivo','nafta','combustible','gasolina','peaje','metro','transporte','moto'],
+  'Vivienda':['alquiler','renta','arriendo','hipoteca'],
+  'Salud':['farmacia','medico','médico','remedio','medicina','doctor','consulta','clinica','clínica'],
+  'Entretenimiento':['cine','pelicula','película','salida','bar','entretenimiento','streaming','netflix','fiesta'],
+  'Trabajo':['oficina','trabajo','insumos'],
+  'Servicios':['luz','agua','gas','internet','telefono','teléfono','electricidad','servicio','cable'],
+};
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function getCatIdByName(name){
+  const c=STATE.categories.find(c=>c.name.toLowerCase()===name.toLowerCase());
+  if(c)return c.id;
+  const otros=STATE.categories.find(c=>c.name.toLowerCase()==='otros');
+  return (otros||STATE.categories[0]||{}).id||null;
+}
+function detectCategoryId(text){
+  const low=text.toLowerCase();
+  for(const [catName,words] of Object.entries(NOTA_KEYWORDS)){
+    if(words.some(w=>low.includes(w)))return getCatIdByName(catName);
+  }
+  return getCatIdByName('Otros');
+}
+function extractAmount(text){
+  const m=text.match(/(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)/);
+  if(!m)return null;
+  let raw=m[1];
+  raw=raw.replace(/\.(?=\d{3}(\D|$))/g,'').replace(/,(?=\d{3}(\D|$))/g,'');
+  raw=raw.replace(',','.');
+  const val=parseFloat(raw);
+  return (isNaN(val)||val<=0)?null:val;
+}
+
+function populateNotasSelectors(){
+  if(!STATE)return;
+  const cSel=document.getElementById('notas-cuenta');
+  cSel.innerHTML=STATE.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
+  const pSel=document.getElementById('notas-persona');
+  pSel.innerHTML='<option value="">Sin asignar</option>'+STATE.persons.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+}
+
+async function addNota(rawText){
+  if(!STATE)return;
+  const text=(rawText||'').trim();
+  if(!text)return;
+  const amount=extractAmount(text);
+  const isExpense=amount!==null;
+  const nota={
+    id:uid(),text,
+    amount:isExpense?amount:null,
+    catId:isExpense?detectCategoryId(text):null,
+    type:isExpense?'gasto':'nota',
+    day:todayInTZ(),
+    createdAt:new Date().toISOString(),
+    archived:false,linkedTxId:null,
+  };
+  await fsSet('notas',nota.id,nota);
+  STATE.notas.unshift(nota);
+  renderNotasBoard();renderNotasHoyStat();
+  if(document.getElementById('page-notas')?.classList.contains('active'))renderNotasReportes();
+}
+function addNotaFromInput(){
+  const el=document.getElementById('nota-input');
+  addNota(el.value);
+  el.value='';
+  el.focus();
+}
+async function deleteNota(id){
+  confirm2('Eliminar nota','Esta accion no se puede deshacer.',async()=>{
+    await fsDel('notas',id);
+    STATE.notas=STATE.notas.filter(n=>n.id!==id);
+    renderNotasBoard();renderNotasHoyStat();
+    if(document.getElementById('page-notas')?.classList.contains('active'))renderNotasReportes();
+  });
+}
+
+function notaCard(n){
+  const isExp=n.type==='gasto';
+  const cat=isExp?getCat(n.catId):null;
+  const time=new Date(n.createdAt).toLocaleString('es',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  const cls='nota-card'+(isExp?' nota-expense':'')+(n.archived?' nota-archived':'');
+  return `<div class="${cls}">
+    <div class="nota-text">${escapeHtml(n.text)}</div>
+    ${isExp?`<div class="nota-meta"><span class="badge" style="background:${cat.color}22;color:${cat.color};">${cat.icon} ${cat.name}</span><span class="nota-amount">${fmt(n.amount)}</span></div>`:''}
+    <div class="nota-footer">
+      <span class="nota-date">${time}${n.archived?' · Cerrado':''}</span>
+      <button class="nota-del" onclick="deleteNota('${n.id}')" title="Eliminar">✕</button>
+    </div>
+  </div>`;
+}
+function renderNotasBoard(){
+  if(!STATE)return;
+  const board=document.getElementById('notas-board');
+  const empty=document.getElementById('notas-empty');
+  if(!STATE.notas.length){board.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  board.innerHTML=STATE.notas.slice(0,150).map(notaCard).join('');
+}
+function renderNotasHoyStat(){
+  if(!STATE)return;
+  const day=todayInTZ();
+  const pending=STATE.notas.filter(n=>n.type==='gasto'&&n.day===day&&!n.archived);
+  const total=pending.reduce((s,n)=>s+n.amount,0);
+  document.getElementById('notas-hoy-total').textContent=fmt(total);
+  const cierre=STATE.cierres.find(c=>c.day===day);
+  document.getElementById('notas-hoy-badge').textContent=cierre?`Cerrado (${fmt(cierre.total)})`:'Abierto';
+}
+
+async function cerrarDia(){
+  if(!STATE)return;
+  const day=todayInTZ();
+  const pending=STATE.notas.filter(n=>n.type==='gasto'&&n.day===day&&!n.archived);
+  if(!pending.length){alert('No hay gastos pendientes para cerrar hoy.');return;}
+  const cuentaId=document.getElementById('notas-cuenta').value;
+  const personId=document.getElementById('notas-persona').value;
+  if(!cuentaId){alert('Selecciona una cuenta para el cierre.');return;}
+  const byCat={};
+  pending.forEach(n=>{byCat[n.catId]=(byCat[n.catId]||0)+n.amount;});
+  const items=Object.entries(byCat).map(([catId,monto])=>({desc:getCat(catId).name+' (notas)',catId,monto}));
+  const total=pending.reduce((s,n)=>s+n.amount,0);
+  const txId=uid();
+  const tx={
+    tipo:'gasto',fecha:day,proveedor:'Cierre de notas del día',items,
+    cuentaId,personIds:personId?[personId]:[],
+    notes:`Cierre automático generado desde ${pending.length} nota(s).`,
+    updatedAt:new Date().toISOString(),
+  };
+  const cierre={id:uid(),day,total,count:pending.length,byCategory:byCat,linkedTxId:txId,createdAt:new Date().toISOString()};
+
+  setSyncing(true);
+  const base=db.collection('users').doc(currentUser.uid);
+  const batch=db.batch();
+  batch.set(base.collection('transactions').doc(txId),tx);
+  batch.set(base.collection('cierres').doc(cierre.id),cierre);
+  pending.forEach(n=>{n.archived=true;n.linkedTxId=txId;batch.set(base.collection('notas').doc(n.id),n);});
+  await batch.commit();
+  setSyncing(false);
+
+  STATE.transactions.unshift({id:txId,...tx});
+  STATE.transactions.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  STATE.cierres=STATE.cierres.filter(c=>c.day!==day);
+  STATE.cierres.unshift(cierre);
+
+  renderNotasBoard();renderNotasHoyStat();renderNotasReportes();
+  alert(`Día cerrado: total ${fmt(total)} (${pending.length} gasto(s)).`);
+}
+
+// ── Voz ──
+let notaRecognition=null,notaMicActive=false;
+function initNotaRecognition(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR)return null;
+  const r=new SR();
+  r.lang='es-ES';r.continuous=false;r.interimResults=false;r.maxAlternatives=1;
+  r.onresult=(e)=>{const transcript=e.results[0][0].transcript;addNota(transcript);};
+  r.onend=()=>{notaMicActive=false;updateMicUI();};
+  r.onerror=()=>{notaMicActive=false;updateMicUI();};
+  return r;
+}
+function toggleMic(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){alert('Tu navegador no soporta dictado por voz. Prueba con Chrome.');return;}
+  if(!notaRecognition)notaRecognition=initNotaRecognition();
+  if(notaMicActive){notaRecognition.stop();notaMicActive=false;}
+  else{notaRecognition.start();notaMicActive=true;}
+  updateMicUI();
+}
+function updateMicUI(){
+  document.getElementById('mic-btn').classList.toggle('mic-active',notaMicActive);
+  document.getElementById('mic-status').style.display=notaMicActive?'block':'none';
+}
+
+// ── Reportes de notas: diario / semanal / mensual ──
+let notasReportTab='diario';
+function switchNotasReportTab(tab){
+  notasReportTab=tab;
+  ['diario','semanal','mensual'].forEach(t=>{
+    document.getElementById('nrep-'+t).style.display=t===tab?'block':'none';
+    document.getElementById('nrep-tab-'+t).classList.toggle('active',t===tab);
+  });
+  renderNotasReportes();
+}
+function initNotasReportDefaults(){
+  const today=todayInTZ();
+  const fEl=document.getElementById('nrep-fecha');if(fEl&&!fEl.value)fEl.value=today;
+  const sEl=document.getElementById('nrep-semana-fecha');if(sEl&&!sEl.value)sEl.value=today;
+  const mEl=document.getElementById('nrep-mes');if(mEl&&!mEl.value)mEl.value=today.slice(0,7);
+}
+function renderNotasReportes(){
+  if(!STATE)return;
+  if(notasReportTab==='diario')renderNotasDiario();
+  else if(notasReportTab==='semanal')renderNotasSemanal();
+  else renderNotasMensual();
+}
+function catBreakdownHtml(byCat,total){
+  return Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([catId,val])=>{
+    const c=getCat(catId);const pct=total>0?val/total*100:0;
+    return `<div style="margin-bottom:9px;"><div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:3px;"><span>${c.icon} ${c.name}</span><b style="color:var(--red);">${fmt(val)}</b></div><div class="progress-bar"><div class="progress-fill" style="width:${pct.toFixed(1)}%;background:${c.color};"></div></div></div>`;
+  }).join('')||'<div class="empty" style="padding:14px;">Sin gastos</div>';
+}
+function renderNotasDiario(){
+  const fEl=document.getElementById('nrep-fecha');if(!fEl)return;
+  const day=fEl.value||todayInTZ();fEl.value=day;
+  const notas=STATE.notas.filter(n=>n.type==='gasto'&&n.day===day);
+  const total=notas.reduce((s,n)=>s+n.amount,0);
+  const byCat={};notas.forEach(n=>{byCat[n.catId]=(byCat[n.catId]||0)+n.amount;});
+  const cierre=STATE.cierres.find(c=>c.day===day);
+  const listHtml=notas.length?notas.map(n=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:.82rem;"><span>${escapeHtml(n.text)} <span class="badge badge-gray">${getCat(n.catId).icon}</span></span><b>${fmt(n.amount)}</b></div>`).join(''):'<div class="empty">Sin gastos este día.</div>';
+  document.getElementById('nrep-diario-content').innerHTML=`
+    <div class="grid3" style="margin-bottom:14px;">
+      <div class="stat red"><div class="label">Total del día</div><div class="value">${fmt(total)}</div></div>
+      <div class="stat purple"><div class="label">Notas de gasto</div><div class="value">${notas.length}</div></div>
+      <div class="stat ${cierre?'green':'yellow'}"><div class="label">Estado</div><div class="value" style="font-size:1rem;">${cierre?'Cerrado':'Abierto'}</div></div>
+    </div>
+    <div class="grid2">
+      <div><h3 style="font-size:.75rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;">Por categoría</h3>${catBreakdownHtml(byCat,total)}</div>
+      <div><h3 style="font-size:.75rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;">Detalle</h3>${listHtml}</div>
+    </div>`;
+}
+function startOfWeekMonday(dateStr){
+  const d=new Date(dateStr+'T00:00:00');
+  const day=d.getDay();
+  const diff=(day===0?-6:1-day);
+  d.setDate(d.getDate()+diff);
+  return d;
+}
+function ymd(d){return d.toLocaleDateString('en-CA');}
+function renderNotasSemanal(){
+  const sEl=document.getElementById('nrep-semana-fecha');if(!sEl)return;
+  const ref=sEl.value||todayInTZ();sEl.value=ref;
+  const monday=startOfWeekMonday(ref);
+  const days=[];for(let i=0;i<7;i++){const d=new Date(monday);d.setDate(monday.getDate()+i);days.push(ymd(d));}
+  const notas=STATE.notas.filter(n=>n.type==='gasto'&&days.includes(n.day));
+  const total=notas.reduce((s,n)=>s+n.amount,0);
+  const byCat={};notas.forEach(n=>{byCat[n.catId]=(byCat[n.catId]||0)+n.amount;});
+  const byDay={};days.forEach(d=>byDay[d]=0);notas.forEach(n=>{byDay[n.day]=(byDay[n.day]||0)+n.amount;});
+  const maxDay=Math.max(1,...Object.values(byDay));
+  const dayNames=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  const barsHtml=days.map((d,i)=>{
+    const val=byDay[d]||0;const pct=val/maxDay*100;
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;"><span style="width:34px;font-size:.72rem;color:var(--muted);">${dayNames[i]}</span><div class="progress-bar" style="flex:1;"><div class="progress-fill" style="width:${pct.toFixed(1)}%;background:var(--accent);"></div></div><span style="width:70px;text-align:right;font-size:.78rem;">${fmt(val)}</span></div>`;
+  }).join('');
+  document.getElementById('nrep-semanal-content').innerHTML=`
+    <div class="grid3" style="margin-bottom:14px;">
+      <div class="stat red"><div class="label">Total semana (${days[0]} → ${days[6]})</div><div class="value">${fmt(total)}</div></div>
+      <div class="stat purple"><div class="label">Notas de gasto</div><div class="value">${notas.length}</div></div>
+      <div class="stat green"><div class="label">Promedio diario</div><div class="value">${fmt(total/7)}</div></div>
+    </div>
+    <div class="grid2">
+      <div><h3 style="font-size:.75rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;">Por día</h3>${barsHtml}</div>
+      <div><h3 style="font-size:.75rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;">Por categoría</h3>${catBreakdownHtml(byCat,total)}</div>
+    </div>`;
+}
+function renderNotasMensual(){
+  const mEl=document.getElementById('nrep-mes');if(!mEl)return;
+  const ym=mEl.value||todayInTZ().slice(0,7);mEl.value=ym;
+  const notas=STATE.notas.filter(n=>n.type==='gasto'&&n.day.startsWith(ym));
+  const total=notas.reduce((s,n)=>s+n.amount,0);
+  const byCat={};notas.forEach(n=>{byCat[n.catId]=(byCat[n.catId]||0)+n.amount;});
+  const [yr,mo]=ym.split('-').map(Number);
+  const daysInMonth=new Date(yr,mo,0).getDate();
+  const byDay={};for(let i=1;i<=daysInMonth;i++)byDay[i]=0;
+  notas.forEach(n=>{const d=parseInt(n.day.slice(8));byDay[d]=(byDay[d]||0)+n.amount;});
+  const maxDay=Math.max(1,...Object.values(byDay));
+  const barsHtml=Object.entries(byDay).map(([d,val])=>{
+    const pct=val/maxDay*100;
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><span style="width:22px;font-size:.68rem;color:var(--muted);">${d}</span><div class="progress-bar" style="flex:1;height:5px;"><div class="progress-fill" style="width:${pct.toFixed(1)}%;background:var(--accent);"></div></div><span style="width:65px;text-align:right;font-size:.72rem;">${val>0?fmt(val):''}</span></div>`;
+  }).join('');
+  const cierresMes=STATE.cierres.filter(c=>c.day.startsWith(ym)).length;
+  document.getElementById('nrep-mensual-content').innerHTML=`
+    <div class="grid3" style="margin-bottom:14px;">
+      <div class="stat red"><div class="label">Total del mes</div><div class="value">${fmt(total)}</div></div>
+      <div class="stat purple"><div class="label">Notas de gasto</div><div class="value">${notas.length}</div></div>
+      <div class="stat green"><div class="label">Días cerrados</div><div class="value">${cierresMes}</div></div>
+    </div>
+    <div class="grid2">
+      <div><h3 style="font-size:.75rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;">Por día</h3><div style="max-height:280px;overflow-y:auto;">${barsHtml}</div></div>
+      <div><h3 style="font-size:.75rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;">Por categoría</h3>${catBreakdownHtml(byCat,total)}</div>
+    </div>`;
 }
 
 // ══════════════════════════════════════════════════════
