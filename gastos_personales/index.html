@@ -1083,7 +1083,8 @@ function detectCategoryId(text){
   return getCatIdByName('Otros');
 }
 function extractAmount(text){
-  const matches=text.match(/\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?/g);
+  const withoutParens=text.replace(/\([^)]*\)/g,'');
+  const matches=withoutParens.match(/\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?/g);
   if(!matches)return null;
   const total=matches.reduce((sum,raw)=>{
     let r=raw.replace(/\.(?=\d{3}(\D|$))/g,'').replace(/,(?=\d{3}(\D|$))/g,'');
@@ -1142,6 +1143,7 @@ async function deleteNota(id){
 function notaEditCard(n){
   return `<div class="nota-card" data-id="${n.id}">
     <textarea id="edit-nota-${n.id}" rows="3" style="width:100%;">${escapeHtml(n.text)}</textarea>
+    <div class="form-group" style="margin-top:8px;max-width:170px;"><label style="font-size:.7rem;">Fecha</label><input type="date" id="edit-nota-fecha-${n.id}" value="${n.day}"></div>
     <div class="nota-toolbar" style="justify-content:flex-end;gap:8px;">
       <button class="btn btn-ghost btn-sm" onclick="cancelEditNota('${n.id}')">Cancelar</button>
       <button class="btn btn-primary btn-sm" onclick="saveEditNota('${n.id}')">Guardar</button>
@@ -1162,11 +1164,13 @@ async function saveEditNota(id){
   const n=STATE.notas.find(x=>x.id===id);
   if(!n)return;
   const ta=document.getElementById('edit-nota-'+id);
+  const fechaEl=document.getElementById('edit-nota-fecha-'+id);
   const text=(ta?.value||'').trim();
   if(!text){alert('La nota no puede quedar vacia.');return;}
   const amount=extractAmount(text);
   const isExpense=amount!==null;
   n.text=text;
+  n.day=fechaEl?.value||n.day;
   n.amount=isExpense?amount:null;
   n.catId=isExpense?detectCategoryId(text):null;
   n.type=isExpense?'gasto':'nota';
@@ -1316,10 +1320,34 @@ async function closeDayInternal(day){
 
 async function cerrarDia(){
   if(!STATE)return;
-  const cierre=await closeDayInternal(todayInTZ());
-  if(!cierre){alert('No hay gastos pendientes para cerrar hoy.');return;}
+  await cerrarDiaFecha(todayInTZ());
+}
+async function cerrarDiaFecha(day){
+  if(!STATE)return;
+  const cierre=await closeDayInternal(day);
+  if(!cierre){alert('No hay gastos pendientes para cerrar ese día.');return;}
   renderNotasBoard();renderNotasHoyStat();renderNotasReportes();
   alert(`Día cerrado: total ${fmt(cierre.total)} (${cierre.count} gasto(s)).`);
+}
+function reabrirDia(day){
+  if(!STATE)return;
+  const cierre=STATE.cierres.find(c=>c.day===day);
+  if(!cierre)return;
+  confirm2('Reabrir día','Se eliminará la transacción de ese cierre y las notas volverán a quedar pendientes para poder modificarlas. ¿Continuar?',async()=>{
+    const txIds=cierre.linkedTxIds||(cierre.linkedTxId?[cierre.linkedTxId]:[]);
+    const base=db.collection('users').doc(currentUser.uid);
+    const batch=db.batch();
+    txIds.forEach(txId=>batch.delete(base.collection('transactions').doc(txId)));
+    batch.delete(base.collection('cierres').doc(cierre.id));
+    const affected=STATE.notas.filter(n=>n.day===day&&n.linkedTxId&&txIds.includes(n.linkedTxId));
+    affected.forEach(n=>{n.archived=false;n.linkedTxId=null;batch.set(base.collection('notas').doc(n.id),n);});
+    setSyncing(true);
+    await batch.commit();
+    setSyncing(false);
+    STATE.transactions=STATE.transactions.filter(t=>!txIds.includes(t.id));
+    STATE.cierres=STATE.cierres.filter(c=>c.id!==cierre.id);
+    renderNotasBoard();renderNotasHoyStat();renderNotasReportes();
+  });
 }
 
 async function autoCloseOldDays(){
@@ -1419,6 +1447,10 @@ function renderNotasDiario(){
   const total=notas.reduce((s,n)=>s+n.amount,0);
   const byCat={};notas.forEach(n=>{byCat[n.catId]=(byCat[n.catId]||0)+n.amount;});
   const cierre=STATE.cierres.find(c=>c.day===day);
+  const pendingUnfiltered=STATE.notas.filter(n=>n.type==='gasto'&&n.day===day&&!n.archived);
+  const actionBtn=cierre
+    ?`<button class="btn btn-ghost btn-sm" onclick="reabrirDia('${day}')">Reabrir día</button>`
+    :(pendingUnfiltered.length?`<button class="btn btn-green btn-sm" onclick="cerrarDiaFecha('${day}')">Cerrar este día</button>`:'');
   const listHtml=notas.length?notas.map(n=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:.82rem;"><span>${escapeHtml(n.text)} <span class="badge badge-gray">${getCat(n.catId).icon}</span></span><b>${fmt(n.amount)}</b></div>`).join(''):'<div class="empty">Sin gastos este día.</div>';
   document.getElementById('nrep-diario-content').innerHTML=`
     <div class="grid3" style="margin-bottom:14px;">
@@ -1426,6 +1458,7 @@ function renderNotasDiario(){
       <div class="stat purple"><div class="label">Notas de gasto</div><div class="value">${notas.length}</div></div>
       <div class="stat ${cierre?'green':'yellow'}"><div class="label">Estado</div><div class="value" style="font-size:1rem;">${cierre?'Cerrado':'Abierto'}</div></div>
     </div>
+    <div style="margin-bottom:14px;">${actionBtn}</div>
     <div class="grid2">
       <div><h3 style="font-size:.75rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;">Por categoría</h3>${catBreakdownHtml(byCat,total)}</div>
       <div><h3 style="font-size:.75rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;">Detalle</h3>${listHtml}</div>
