@@ -153,6 +153,8 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0;}
 .nota-card.nota-archived{opacity:.55;}
 .nota-text{font-size:.85rem;white-space:pre-wrap;word-break:break-word;margin-bottom:8px;}
 .nota-meta{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;}
+.nota-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.nota-tags select{width:auto;flex:1;min-width:84px;font-size:.7rem;padding:4px 6px;}
 .nota-amount{font-weight:700;color:var(--green);font-size:.9rem;white-space:nowrap;}
 .nota-toolbar{display:flex;justify-content:space-between;align-items:center;margin-top:6px;}
 .nota-date{font-size:.68rem;color:var(--muted);}
@@ -250,6 +252,7 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0;}
     <div class="top-row">
       <span class="section-title">Notas rápidas</span>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <span style="font-size:.7rem;color:var(--muted);">Etiquetar notas nuevas con:</span>
         <select id="notas-cuenta" style="width:150px;"></select>
         <select id="notas-persona" style="width:150px;"></select>
         <button class="btn btn-green btn-sm" onclick="cerrarDia()">Cerrar día</button>
@@ -280,9 +283,16 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0;}
           <button class="nav-btn" id="nrep-tab-mensual" onclick="switchNotasReportTab('mensual')">Mensual</button>
         </div>
       </div>
+      <div class="filter-row">
+        <div class="form-group"><label>Cuenta</label><select id="nrep-filter-cuenta" onchange="renderNotasReportes()"><option value="">Todas</option></select></div>
+        <div class="form-group"><label>Persona</label><select id="nrep-filter-persona" onchange="renderNotasReportes()"><option value="">Todas</option></select></div>
+        <div class="form-group"><label>Categoría</label><select id="nrep-filter-cat" onchange="renderNotasReportes()"><option value="">Todas</option></select></div>
+      </div>
       <div id="nrep-diario">
         <div class="form-row" style="margin-bottom:12px;"><div class="form-group" style="max-width:180px;"><label>Fecha</label><input type="date" id="nrep-fecha" onchange="renderNotasReportes()"></div></div>
         <div id="nrep-diario-content"></div>
+        <h3 style="font-size:.75rem;color:var(--muted);margin:16px 0 8px;text-transform:uppercase;">Historial de cierres</h3>
+        <div id="nrep-cierres-historial"></div>
       </div>
       <div id="nrep-semanal" style="display:none;">
         <div class="form-row" style="margin-bottom:12px;"><div class="form-group" style="max-width:180px;"><label>Cualquier fecha de la semana</label><input type="date" id="nrep-semana-fecha" onchange="renderNotasReportes()"></div></div>
@@ -743,6 +753,8 @@ auth.onAuthStateChanged(async user=>{
     document.getElementById('theme-toggle').style.display='none';
     initMonthInputs();
     renderDashboard();
+    await autoCloseOldDays();
+    scheduleMidnightAutoClose();
   }else{
     currentUser=null;STATE=null;
     document.getElementById('auth-screen').style.display='flex';
@@ -765,7 +777,7 @@ function showPage(name){
   document.getElementById('page-'+name).classList.add('active');
   event?.target?.classList.add('active');
   if(name==='dashboard')renderDashboard();
-  if(name==='notas'){populateNotasSelectors();renderNotasBoard();renderNotasHoyStat();initNotasReportDefaults();renderNotasReportes();}
+  if(name==='notas'){populateNotasSelectors();populateNotasReportFilters();renderNotasBoard();renderNotasHoyStat();initNotasReportDefaults();renderNotasReportes();}
   if(name==='gastos'){populateFilters();renderGastos();}
   if(name==='reportes'){populateRepPersona();renderReportes();}
   if(name==='presupuesto')renderPresupuesto();
@@ -1104,6 +1116,8 @@ async function addNota(rawText){
     day:todayInTZ(),
     createdAt:new Date().toISOString(),
     archived:false,linkedTxId:null,color:null,
+    cuentaId:document.getElementById('notas-cuenta')?.value||null,
+    personId:document.getElementById('notas-persona')?.value||null,
   };
   await fsSet('notas',nota.id,nota);
   STATE.notas.unshift(nota);
@@ -1161,9 +1175,24 @@ async function saveEditNota(id){
   if(document.getElementById('page-notas')?.classList.contains('active'))renderNotasReportes();
 }
 
+function cuentaOptionsForNota(selId){
+  return '<option value="">Sin cuenta</option>'+STATE.accounts.map(a=>`<option value="${a.id}" ${a.id===selId?'selected':''}>${a.name}</option>`).join('');
+}
+function personaOptionsForNota(selId){
+  return '<option value="">Sin persona</option>'+STATE.persons.map(p=>`<option value="${p.id}" ${p.id===selId?'selected':''}>${p.name}</option>`).join('');
+}
+function categoriaOptionsForNota(selId){
+  return STATE.categories.map(c=>`<option value="${c.id}" ${c.id===selId?'selected':''}>${c.icon} ${c.name}</option>`).join('');
+}
+async function updateNotaTag(id,field,value){
+  const n=STATE.notas.find(x=>x.id===id);
+  if(!n)return;
+  n[field]=value||null;
+  await fsSet('notas',id,n);
+  if(document.getElementById('page-notas')?.classList.contains('active'))renderNotasReportes();
+}
 function notaCard(n){
   const isExp=n.type==='gasto';
-  const cat=isExp?getCat(n.catId):null;
   const time=new Date(n.createdAt).toLocaleString('es',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
   const bg=resolveNotaColor(n);
   const cls='nota-card'+(isExp&&!bg?' nota-expense':'')+(n.archived?' nota-archived':'');
@@ -1175,9 +1204,15 @@ function notaCard(n){
     const swStyle=hex?` style="background:${hex};"`:'';
     return `<span class="${swClass}"${swStyle} title="${c.name}" onclick="setNotaColor(event,'${n.id}','${c.key}')"></span>`;
   }).join('');
+  const disabledAttr=n.archived?' disabled':'';
   return `<div class="${cls}"${style} data-id="${n.id}">
     <div class="nota-text">${escapeHtml(n.text)}</div>
-    ${isExp?`<div class="nota-meta"><span class="badge" style="background:${cat.color}22;color:${cat.color};">${cat.icon} ${cat.name}</span><span class="nota-amount">${fmt(n.amount)}</span></div>`:''}
+    <div class="nota-tags">
+      <select onchange="updateNotaTag('${n.id}','cuentaId',this.value)" title="Cuenta"${disabledAttr}>${cuentaOptionsForNota(n.cuentaId)}</select>
+      <select onchange="updateNotaTag('${n.id}','personId',this.value)" title="Persona"${disabledAttr}>${personaOptionsForNota(n.personId)}</select>
+      ${isExp?`<select onchange="updateNotaTag('${n.id}','catId',this.value)" title="Categoría"${disabledAttr}>${categoriaOptionsForNota(n.catId)}</select>`:''}
+    </div>
+    ${isExp?`<div class="nota-meta" style="justify-content:flex-end;"><span class="nota-amount">${fmt(n.amount)}</span></div>`:''}
     <div class="nota-toolbar">
       <span class="nota-date">${time}${n.archived?' · Cerrado':''}</span>
       <div class="nota-actions">
@@ -1225,43 +1260,84 @@ function renderNotasHoyStat(){
   document.getElementById('notas-hoy-badge').textContent=cierre?`Cerrado (${fmt(cierre.total)})`:'Abierto';
 }
 
-async function cerrarDia(){
-  if(!STATE)return;
-  const day=todayInTZ();
+async function closeDayInternal(day){
+  if(!STATE)return null;
   const pending=STATE.notas.filter(n=>n.type==='gasto'&&n.day===day&&!n.archived);
-  if(!pending.length){alert('No hay gastos pendientes para cerrar hoy.');return;}
-  const cuentaId=document.getElementById('notas-cuenta').value;
-  const personId=document.getElementById('notas-persona').value;
-  if(!cuentaId){alert('Selecciona una cuenta para el cierre.');return;}
-  const byCat={};
-  pending.forEach(n=>{byCat[n.catId]=(byCat[n.catId]||0)+n.amount;});
-  const items=Object.entries(byCat).map(([catId,monto])=>({desc:getCat(catId).name+' (notas)',catId,monto}));
-  const total=pending.reduce((s,n)=>s+n.amount,0);
-  const txId=uid();
-  const tx={
-    tipo:'gasto',fecha:day,proveedor:'Cierre de notas del día',items,
-    cuentaId,personIds:personId?[personId]:[],
-    notes:`Cierre automático generado desde ${pending.length} nota(s).`,
-    updatedAt:new Date().toISOString(),
-  };
-  const cierre={id:uid(),day,total,count:pending.length,byCategory:byCat,linkedTxId:txId,createdAt:new Date().toISOString()};
+  if(!pending.length)return null;
+  const defaultCuentaId=document.getElementById('notas-cuenta')?.value||STATE.accounts[0]?.id;
+  if(!defaultCuentaId)return null;
 
-  setSyncing(true);
+  const groups={};
+  pending.forEach(n=>{
+    const cid=n.cuentaId||defaultCuentaId;
+    (groups[cid]=groups[cid]||[]).push(n);
+  });
+
   const base=db.collection('users').doc(currentUser.uid);
   const batch=db.batch();
-  batch.set(base.collection('transactions').doc(txId),tx);
+  const linkedTxIds=[];
+  const overallByCat={};
+  let overallTotal=0;
+
+  for(const [cuentaId,notesInGroup] of Object.entries(groups)){
+    const byCat={};
+    notesInGroup.forEach(n=>{
+      byCat[n.catId]=(byCat[n.catId]||0)+n.amount;
+      overallByCat[n.catId]=(overallByCat[n.catId]||0)+n.amount;
+      overallTotal+=n.amount;
+    });
+    const items=Object.entries(byCat).map(([catId,monto])=>({desc:getCat(catId).name+' (notas)',catId,monto}));
+    const personIds=[...new Set(notesInGroup.map(n=>n.personId).filter(Boolean))];
+    const txId=uid();
+    const tx={
+      tipo:'gasto',fecha:day,proveedor:'Cierre de notas del día',items,
+      cuentaId,personIds,
+      notes:`Cierre automático generado desde ${notesInGroup.length} nota(s).`,
+      updatedAt:new Date().toISOString(),
+    };
+    batch.set(base.collection('transactions').doc(txId),tx);
+    linkedTxIds.push(txId);
+    STATE.transactions.unshift({id:txId,...tx});
+    notesInGroup.forEach(n=>{n.archived=true;n.linkedTxId=txId;batch.set(base.collection('notas').doc(n.id),n);});
+  }
+
+  const cierre={id:uid(),day,total:overallTotal,count:pending.length,byCategory:overallByCat,linkedTxIds,createdAt:new Date().toISOString()};
   batch.set(base.collection('cierres').doc(cierre.id),cierre);
-  pending.forEach(n=>{n.archived=true;n.linkedTxId=txId;batch.set(base.collection('notas').doc(n.id),n);});
+
+  setSyncing(true);
   await batch.commit();
   setSyncing(false);
 
-  STATE.transactions.unshift({id:txId,...tx});
   STATE.transactions.sort((a,b)=>b.fecha.localeCompare(a.fecha));
   STATE.cierres=STATE.cierres.filter(c=>c.day!==day);
   STATE.cierres.unshift(cierre);
+  return cierre;
+}
 
+async function cerrarDia(){
+  if(!STATE)return;
+  const cierre=await closeDayInternal(todayInTZ());
+  if(!cierre){alert('No hay gastos pendientes para cerrar hoy.');return;}
   renderNotasBoard();renderNotasHoyStat();renderNotasReportes();
-  alert(`Día cerrado: total ${fmt(total)} (${pending.length} gasto(s)).`);
+  alert(`Día cerrado: total ${fmt(cierre.total)} (${cierre.count} gasto(s)).`);
+}
+
+async function autoCloseOldDays(){
+  if(!STATE)return;
+  const today=todayInTZ();
+  const pendingDays=[...new Set(STATE.notas.filter(n=>n.type==='gasto'&&!n.archived&&n.day<today).map(n=>n.day))];
+  if(!pendingDays.length)return;
+  for(const day of pendingDays)await closeDayInternal(day);
+  renderNotasBoard();renderNotasHoyStat();
+  if(document.getElementById('page-notas')?.classList.contains('active'))renderNotasReportes();
+}
+let midnightTimeoutId=null;
+function scheduleMidnightAutoClose(){
+  if(midnightTimeoutId)clearTimeout(midnightTimeoutId);
+  const now=new Date();
+  const next=new Date(now);
+  next.setHours(24,0,10,0);
+  midnightTimeoutId=setTimeout(async()=>{await autoCloseOldDays();scheduleMidnightAutoClose();},next-now);
 }
 
 // ── Voz ──
@@ -1305,6 +1381,25 @@ function initNotasReportDefaults(){
   const sEl=document.getElementById('nrep-semana-fecha');if(sEl&&!sEl.value)sEl.value=today;
   const mEl=document.getElementById('nrep-mes');if(mEl&&!mEl.value)mEl.value=today.slice(0,7);
 }
+function populateNotasReportFilters(){
+  if(!STATE)return;
+  const cSel=document.getElementById('nrep-filter-cuenta');
+  if(cSel)cSel.innerHTML='<option value="">Todas</option>'+STATE.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
+  const pSel=document.getElementById('nrep-filter-persona');
+  if(pSel)pSel.innerHTML='<option value="">Todas</option>'+STATE.persons.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  const catSel=document.getElementById('nrep-filter-cat');
+  if(catSel)catSel.innerHTML='<option value="">Todas</option>'+STATE.categories.map(c=>`<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
+}
+function filteredNotasGasto(extra){
+  const cuentaId=document.getElementById('nrep-filter-cuenta')?.value||'';
+  const personId=document.getElementById('nrep-filter-persona')?.value||'';
+  const catId=document.getElementById('nrep-filter-cat')?.value||'';
+  return STATE.notas.filter(n=>n.type==='gasto'
+    &&(!cuentaId||n.cuentaId===cuentaId)
+    &&(!personId||n.personId===personId)
+    &&(!catId||n.catId===catId)
+    &&(!extra||extra(n)));
+}
 function renderNotasReportes(){
   if(!STATE)return;
   if(notasReportTab==='diario')renderNotasDiario();
@@ -1320,7 +1415,7 @@ function catBreakdownHtml(byCat,total){
 function renderNotasDiario(){
   const fEl=document.getElementById('nrep-fecha');if(!fEl)return;
   const day=fEl.value||todayInTZ();fEl.value=day;
-  const notas=STATE.notas.filter(n=>n.type==='gasto'&&n.day===day);
+  const notas=filteredNotasGasto(n=>n.day===day);
   const total=notas.reduce((s,n)=>s+n.amount,0);
   const byCat={};notas.forEach(n=>{byCat[n.catId]=(byCat[n.catId]||0)+n.amount;});
   const cierre=STATE.cierres.find(c=>c.day===day);
@@ -1335,6 +1430,18 @@ function renderNotasDiario(){
       <div><h3 style="font-size:.75rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;">Por categoría</h3>${catBreakdownHtml(byCat,total)}</div>
       <div><h3 style="font-size:.75rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;">Detalle</h3>${listHtml}</div>
     </div>`;
+  renderCierresHistorial();
+}
+function renderCierresHistorial(){
+  const el=document.getElementById('nrep-cierres-historial');
+  if(!el)return;
+  const list=[...STATE.cierres].sort((a,b)=>b.day.localeCompare(a.day)).slice(0,30);
+  el.innerHTML=list.length?list.map(c=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:.82rem;"><span>${c.day} <span class="badge badge-gray">${c.count} nota(s)</span></span><span style="display:flex;align-items:center;gap:10px;"><b style="color:var(--red);">${fmt(c.total)}</b><button class="btn btn-ghost btn-sm" onclick="verCierreDia('${c.day}')">Ver</button></span></div>`).join(''):'<div class="empty" style="padding:14px;">Aún no hay cierres.</div>';
+}
+function verCierreDia(day){
+  const fEl=document.getElementById('nrep-fecha');
+  if(fEl)fEl.value=day;
+  switchNotasReportTab('diario');
 }
 function startOfWeekMonday(dateStr){
   const d=new Date(dateStr+'T00:00:00');
@@ -1349,7 +1456,7 @@ function renderNotasSemanal(){
   const ref=sEl.value||todayInTZ();sEl.value=ref;
   const monday=startOfWeekMonday(ref);
   const days=[];for(let i=0;i<7;i++){const d=new Date(monday);d.setDate(monday.getDate()+i);days.push(ymd(d));}
-  const notas=STATE.notas.filter(n=>n.type==='gasto'&&days.includes(n.day));
+  const notas=filteredNotasGasto(n=>days.includes(n.day));
   const total=notas.reduce((s,n)=>s+n.amount,0);
   const byCat={};notas.forEach(n=>{byCat[n.catId]=(byCat[n.catId]||0)+n.amount;});
   const byDay={};days.forEach(d=>byDay[d]=0);notas.forEach(n=>{byDay[n.day]=(byDay[n.day]||0)+n.amount;});
@@ -1373,7 +1480,7 @@ function renderNotasSemanal(){
 function renderNotasMensual(){
   const mEl=document.getElementById('nrep-mes');if(!mEl)return;
   const ym=mEl.value||todayInTZ().slice(0,7);mEl.value=ym;
-  const notas=STATE.notas.filter(n=>n.type==='gasto'&&n.day.startsWith(ym));
+  const notas=filteredNotasGasto(n=>n.day.startsWith(ym));
   const total=notas.reduce((s,n)=>s+n.amount,0);
   const byCat={};notas.forEach(n=>{byCat[n.catId]=(byCat[n.catId]||0)+n.amount;});
   const [yr,mo]=ym.split('-').map(Number);
