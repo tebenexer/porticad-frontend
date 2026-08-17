@@ -3679,14 +3679,94 @@ function agregarNudo() {
 
 function eliminarNudo(i) {
   guardarEstado();
+
+  // Las barras que tocan el nudo i no pueden sobrevivir sin él — se eliminan
+  // en cascada. barMap traduce índice-de-barra-viejo → índice-nuevo (-1 = eliminada),
+  // para poder reindexar todo lo que se guarda por índice de barra (propiedades,
+  // articulaciones, cargas distribuidas).
+  const barMap = [];
+  const nuevasBarras = [];
+  barras.forEach((b, bidx) => {
+    if (b.ni === i || b.nj === i) {
+      barMap[bidx] = -1;
+    } else {
+      barMap[bidx] = nuevasBarras.length;
+      nuevasBarras.push({
+        ...b,
+        ni: b.ni > i ? b.ni - 1 : b.ni,
+        nj: b.nj > i ? b.nj - 1 : b.nj,
+      });
+    }
+  });
+  const barrasEliminadas = barras.length - nuevasBarras.length;
+
+  const nuevasProps = {};
+  Object.entries(propiedades).forEach(([bidx, v]) => {
+    const nb = barMap[parseInt(bidx)];
+    if (nb !== undefined && nb >= 0) nuevasProps[nb] = v;
+  });
+
+  const nuevasArtic = {};
+  Object.entries(articulaciones).forEach(([bidx, v]) => {
+    const nb = barMap[parseInt(bidx)];
+    if (nb !== undefined && nb >= 0) nuevasArtic[nb] = v;
+  });
+
+  const nuevasCargasDist = [];
+  cargasDist.forEach(cd => {
+    const nb = barMap[cd.bi];
+    if (nb !== undefined && nb >= 0) nuevasCargasDist.push({ ...cd, bi: nb });
+  });
+
+  // Apoyos, cargas puntuales y resortes viven en el nudo mismo — se eliminan
+  // si estaban en el nudo i, y se reindexan si estaban en un nudo posterior.
+  const apoyosEliminados = apoyos.filter(a => a.ni === i).length;
+  const nuevosApoyos = apoyos
+    .filter(a => a.ni !== i)
+    .map(a => ({ ...a, ni: a.ni > i ? a.ni - 1 : a.ni }));
+
+  const cargasEliminadas = cargas.filter(c => c.ni === i).length;
+  const nuevasCargas = cargas
+    .filter(c => c.ni !== i)
+    .map(c => ({ ...c, ni: c.ni > i ? c.ni - 1 : c.ni }));
+
+  const nuevosResortes = {};
+  Object.entries(resortes).forEach(([ni, v]) => {
+    const n = parseInt(ni);
+    if (n === i) return;
+    nuevosResortes[n > i ? n - 1 : n] = v;
+  });
+
   nudos.splice(i, 1);
+  barras         = nuevasBarras;
+  propiedades    = nuevasProps;
+  articulaciones = nuevasArtic;
+  cargasDist     = nuevasCargasDist;
+  apoyos         = nuevosApoyos;
+  cargas         = nuevasCargas;
+  resortes       = nuevosResortes;
+
   if (nudoSel >= nudos.length) nudoSel = nudos.length - 1;
   if (nudoSel < 0 && nudos.length > 0) nudoSel = 0;
   if (nudos.length === 0) nudoSel = -1;
+
   _buildScene();
   renderNodeList();
+  renderBarList();
+  renderCargaList();
+  renderDistList();
+  renderApoyoList();
+  renderSeccionList();
+  renderResorteList();
+  renderArticList();
   updateStatus();
-  setMsg(nudos.length > 0 ? `Nudo ${i+1} eliminado` : 'Sin nudos');
+
+  const extra = [];
+  if (barrasEliminadas)  extra.push(`${barrasEliminadas} barra${barrasEliminadas>1?'s':''}`);
+  if (apoyosEliminados)  extra.push(`${apoyosEliminados} apoyo${apoyosEliminados>1?'s':''}`);
+  if (cargasEliminadas)  extra.push(`${cargasEliminadas} carga${cargasEliminadas>1?'s':''}`);
+  const sufijo = extra.length ? ` (también: ${extra.join(', ')})` : '';
+  setMsg(nudos.length > 0 ? `Nudo ${i+1} eliminado${sufijo}` : 'Sin nudos');
 }
 
 function selNudo(i) {
@@ -3847,9 +3927,48 @@ function toggleModoBarras() {
 
 function eliminarBarra(idx) {
   guardarEstado();
-  barras.splice(idx, 1);
+
+  // propiedades, cargasDist y articulaciones se guardan por índice de barra —
+  // hay que reindexarlos igual que las barras al eliminar una del medio.
+  const barMap = [];
+  const nuevasBarras = [];
+  barras.forEach((b, bidx) => {
+    if (bidx === idx) {
+      barMap[bidx] = -1;
+    } else {
+      barMap[bidx] = nuevasBarras.length;
+      nuevasBarras.push(b);
+    }
+  });
+
+  const nuevasProps = {};
+  Object.entries(propiedades).forEach(([bidx, v]) => {
+    const nb = barMap[parseInt(bidx)];
+    if (nb !== undefined && nb >= 0) nuevasProps[nb] = v;
+  });
+
+  const nuevasArtic = {};
+  Object.entries(articulaciones).forEach(([bidx, v]) => {
+    const nb = barMap[parseInt(bidx)];
+    if (nb !== undefined && nb >= 0) nuevasArtic[nb] = v;
+  });
+
+  const nuevasCargasDist = [];
+  cargasDist.forEach(cd => {
+    const nb = barMap[cd.bi];
+    if (nb !== undefined && nb >= 0) nuevasCargasDist.push({ ...cd, bi: nb });
+  });
+
+  barras         = nuevasBarras;
+  propiedades    = nuevasProps;
+  articulaciones = nuevasArtic;
+  cargasDist     = nuevasCargasDist;
+
   _buildScene();
   renderBarList();
+  renderDistList();
+  renderSeccionList();
+  renderArticList();
   updateStatus();
   setMsg(`Barra ${idx+1} eliminada`);
 }
