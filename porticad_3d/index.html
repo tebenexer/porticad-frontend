@@ -1271,8 +1271,8 @@
         <!-- Info -->
         <div style="font-size:9px;color:var(--muted);line-height:1.5;margin-bottom:10px;
              padding:5px 7px;background:var(--bg3);border-radius:4px;">
-          <b>0</b> = empotrado (rígido) &nbsp;|&nbsp; <b>1</b> = rótula completa<br>
-          Valores intermedios = semi-rígido. Activa los GDL que liberas.
+          <b>0</b> = empotrado (rígido) &nbsp;|&nbsp; <b>1</b> = rótula completa (libera el momento)<br>
+          Solo se soporta rótula completa en Mx/My/Mz — no hay semi-rígido ni liberación axial/cortante.
         </div>
 
         <!-- ── EXTREMO INICIO (🔴 rojo) ── -->
@@ -1285,12 +1285,12 @@
           <span style="font-size:9px; color:var(--muted); margin-left:auto;">0=rígido · 1=rótula</span>
         </div>
 
-        <!-- Sliders inicio — igual que 2D pero con 6 GDL -->
+        <!-- Sliders inicio — solo rótula completa (0/1) en Mx/My/Mz -->
         <div id="art-ini-sliders">
           <!-- Mx -->
           <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
             <span style="font-size:10px;color:#fca5a5;width:22px;font-weight:700;">Mx</span>
-            <input type="range" id="ai-mx" min="0" max="1" step="0.01" value="0"
+            <input type="range" id="ai-mx" min="0" max="1" step="1" value="0"
               oninput="onArticSlider('ini','mx',this)"
               style="flex:1;accent-color:#dd2222;"/>
             <span id="ai-mx-v" style="font-family:var(--mono);font-size:10px;color:#dd2222;min-width:30px;text-align:right;">0.00</span>
@@ -1298,42 +1298,18 @@
           <!-- My -->
           <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
             <span style="font-size:10px;color:#a7f3d0;width:22px;font-weight:700;">My</span>
-            <input type="range" id="ai-my" min="0" max="1" step="0.01" value="0"
+            <input type="range" id="ai-my" min="0" max="1" step="1" value="0"
               oninput="onArticSlider('ini','my',this)"
               style="flex:1;accent-color:#dd2222;"/>
             <span id="ai-my-v" style="font-family:var(--mono);font-size:10px;color:#dd2222;min-width:30px;text-align:right;">0.00</span>
           </div>
           <!-- Mz -->
-          <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
+          <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
             <span style="font-size:10px;color:#93c5fd;width:22px;font-weight:700;">Mz</span>
-            <input type="range" id="ai-mz" min="0" max="1" step="0.01" value="0"
+            <input type="range" id="ai-mz" min="0" max="1" step="1" value="0"
               oninput="onArticSlider('ini','mz',this)"
               style="flex:1;accent-color:#dd2222;"/>
             <span id="ai-mz-v" style="font-family:var(--mono);font-size:10px;color:#dd2222;min-width:30px;text-align:right;">0.00</span>
-          </div>
-          <!-- Fx -->
-          <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
-            <span style="font-size:10px;color:#f87171;width:22px;font-weight:700;">Fx</span>
-            <input type="range" id="ai-fx" min="0" max="1" step="0.01" value="0"
-              oninput="onArticSlider('ini','fx',this)"
-              style="flex:1;accent-color:#dd2222;"/>
-            <span id="ai-fx-v" style="font-family:var(--mono);font-size:10px;color:#dd2222;min-width:30px;text-align:right;">0.00</span>
-          </div>
-          <!-- Vy -->
-          <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
-            <span style="font-size:10px;color:#86efac;width:22px;font-weight:700;">Vy</span>
-            <input type="range" id="ai-vy" min="0" max="1" step="0.01" value="0"
-              oninput="onArticSlider('ini','vy',this)"
-              style="flex:1;accent-color:#dd2222;"/>
-            <span id="ai-vy-v" style="font-family:var(--mono);font-size:10px;color:#dd2222;min-width:30px;text-align:right;">0.00</span>
-          </div>
-          <!-- Vz -->
-          <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
-            <span style="font-size:10px;color:#60a5fa;width:22px;font-weight:700;">Vz</span>
-            <input type="range" id="ai-vz" min="0" max="1" step="0.01" value="0"
-              oninput="onArticSlider('ini','vz',this)"
-              style="flex:1;accent-color:#dd2222;"/>
-            <span id="ai-vz-v" style="font-family:var(--mono);font-size:10px;color:#dd2222;min-width:30px;text-align:right;">0.00</span>
           </div>
         </div>
         <div style="display:flex; gap:4px; margin:7px 0 10px;">
@@ -1370,45 +1346,24 @@
         <div id="art-fin-sliders">
           <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
             <span style="font-size:10px;color:#fca5a5;width:22px;font-weight:700;">Mx</span>
-            <input type="range" id="af-mx" min="0" max="1" step="0.01" value="0"
+            <input type="range" id="af-mx" min="0" max="1" step="1" value="0"
               oninput="onArticSlider('fin','mx',this)"
               style="flex:1;accent-color:#2244dd;"/>
             <span id="af-mx-v" style="font-family:var(--mono);font-size:10px;color:#4466ee;min-width:30px;text-align:right;">0.00</span>
           </div>
           <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
             <span style="font-size:10px;color:#a7f3d0;width:22px;font-weight:700;">My</span>
-            <input type="range" id="af-my" min="0" max="1" step="0.01" value="0"
+            <input type="range" id="af-my" min="0" max="1" step="1" value="0"
               oninput="onArticSlider('fin','my',this)"
               style="flex:1;accent-color:#2244dd;"/>
             <span id="af-my-v" style="font-family:var(--mono);font-size:10px;color:#4466ee;min-width:30px;text-align:right;">0.00</span>
           </div>
-          <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
+          <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
             <span style="font-size:10px;color:#93c5fd;width:22px;font-weight:700;">Mz</span>
-            <input type="range" id="af-mz" min="0" max="1" step="0.01" value="0"
+            <input type="range" id="af-mz" min="0" max="1" step="1" value="0"
               oninput="onArticSlider('fin','mz',this)"
               style="flex:1;accent-color:#2244dd;"/>
             <span id="af-mz-v" style="font-family:var(--mono);font-size:10px;color:#4466ee;min-width:30px;text-align:right;">0.00</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
-            <span style="font-size:10px;color:#f87171;width:22px;font-weight:700;">Fx</span>
-            <input type="range" id="af-fx" min="0" max="1" step="0.01" value="0"
-              oninput="onArticSlider('fin','fx',this)"
-              style="flex:1;accent-color:#2244dd;"/>
-            <span id="af-fx-v" style="font-family:var(--mono);font-size:10px;color:#4466ee;min-width:30px;text-align:right;">0.00</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
-            <span style="font-size:10px;color:#86efac;width:22px;font-weight:700;">Vy</span>
-            <input type="range" id="af-vy" min="0" max="1" step="0.01" value="0"
-              oninput="onArticSlider('fin','vy',this)"
-              style="flex:1;accent-color:#2244dd;"/>
-            <span id="af-vy-v" style="font-family:var(--mono);font-size:10px;color:#4466ee;min-width:30px;text-align:right;">0.00</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
-            <span style="font-size:10px;color:#60a5fa;width:22px;font-weight:700;">Vz</span>
-            <input type="range" id="af-vz" min="0" max="1" step="0.01" value="0"
-              oninput="onArticSlider('fin','vz',this)"
-              style="flex:1;accent-color:#2244dd;"/>
-            <span id="af-vz-v" style="font-family:var(--mono);font-size:10px;color:#4466ee;min-width:30px;text-align:right;">0.00</span>
           </div>
         </div>
         <div style="display:flex; gap:4px; margin:7px 0 10px;">
@@ -5327,6 +5282,18 @@ function _serializarModelo() {
       nudo: parseInt(ni),
       kx: r.kx||0, ky: r.ky||0, kz: r.kz||0,
       krx: r.krx||0, kry: r.kry||0, krz: r.krz||0,
+    };
+  });
+
+  // Articulaciones (base-0 como espera api3d) — solo Mx/My/Mz, rótula completa
+  Object.entries(articulaciones).forEach(([bi, a]) => {
+    const ini = a.ini || {}, fin = a.fin || {};
+    modelo.articulaciones[parseInt(bi)] = {
+      barra: parseInt(bi),
+      ini_mx: ini.mx||0, ini_my: ini.my||0, ini_mz: ini.mz||0,
+      ini_fx: 0, ini_vy: 0, ini_vz: 0,
+      fin_mx: fin.mx||0, fin_my: fin.my||0, fin_mz: fin.mz||0,
+      fin_fx: 0, fin_vy: 0, fin_vz: 0,
     };
   });
 
