@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Levantamiento de Coordenadas por Trilateración — PortiCAD Multi-Tools</title>
+<link rel="icon" href="/favicon.png" type="image/png" />
+<link rel="shortcut icon" href="/favicon.png" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 15px;
+    min-height: 100vh;
+  }
+
+  .topbar {
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 8px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .topbar-logo { font-size: 16px; font-weight: 700; color: #58a6ff; text-decoration: none; }
+  .topbar-sep  { color: #30363d; font-size: 18px; }
+  .topbar-crumb { font-size: 14px; color: #8b949e; display: flex; align-items: center; gap: 6px; }
+  .topbar-title { font-size: 15px; font-weight: 600; color: #e6edf3; }
+  .badge { background: #2dd4bf22; border: 1px solid #2dd4bf55; color: #2dd4bf;
+           font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
+
+  .main {
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    min-height: calc(100vh - 50px);
+  }
+  @media (max-width: 960px) {
+    .main { grid-template-columns: 1fr; }
+  }
+
+  .panel-inputs {
+    background: #161b22;
+    border-right: 1px solid #21262d;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-height: calc(100vh - 50px);
+    overflow-y: auto;
+  }
+  @media (max-width: 960px) {
+    .panel-inputs { border-right: none; border-bottom: 1px solid #21262d; max-height: none; }
+  }
+
+  .input-group {
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .sec-title {
+    font-size: 13px; font-weight: 700; color: #2dd4bf;
+    letter-spacing: .6px; text-transform: uppercase;
+    padding-bottom: 8px; border-bottom: 1px solid #21262d;
+    display: flex; align-items: center; gap: 6px; justify-content: space-between;
+  }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 14px; color: #8b949e; font-weight: 500; }
+  .field label em { font-style: normal; color: #6e7681; font-size: 12px; }
+  .field input, .field select {
+    background: #161b22; border: 1px solid #30363d; border-radius: 7px;
+    color: #e6edf3; font-size: 15px; padding: 9px 11px; width: 100%;
+    outline: none; transition: border-color .15s;
+  }
+  .field input:focus, .field select:focus { border-color: #2dd4bf; box-shadow: 0 0 0 3px #2dd4bf22; }
+  .field-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .field-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .hint { font-size: 11.5px; color: #6e7681; line-height: 1.5; }
+
+  .btn {
+    background: #21262d; border: 1px solid #30363d; border-radius: 7px;
+    color: #e6edf3; font-size: 14px; font-weight: 600; padding: 9px 13px;
+    cursor: pointer; transition: all .15s; white-space: nowrap;
+  }
+  .btn:hover { border-color: #2dd4bf; color: #2dd4bf; }
+  .btn.primary { background: #2dd4bf22; border-color: #2dd4bf55; color: #2dd4bf; }
+  .btn.primary:hover { background: #2dd4bf33; border-color: #2dd4bf; }
+  .btn.ghost { width: 100%; }
+  .btn.ghost:hover { background: #1c2128; }
+  .btn.small { padding: 5px 9px; font-size: 12px; }
+  .btn.danger:hover { border-color: #f85149; color: #f85149; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn:disabled:hover { border-color: #30363d; color: #e6edf3; }
+
+  .formMsg {
+    font-size: 13px; padding: 8px 10px; border-radius: 7px; display: none;
+  }
+  .formMsg.show { display: block; }
+  .formMsg.err { background: #f8514922; border: 1px solid #f8514955; color: #ff9d94; }
+  .formMsg.ok  { background: #2dd4bf18; border: 1px solid #2dd4bf55; color: #2dd4bf; }
+
+  .candidate-cards { display: flex; flex-direction: column; gap: 8px; }
+  .candidate-card {
+    background: #161b22; border: 1px solid #30363d; border-radius: 9px;
+    padding: 10px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .candidate-card .cc-title { font-size: 13px; font-weight: 700; color: #e6edf3; }
+  .candidate-card .cc-coords { font-size: 12.5px; color: #8b949e; font-variant-numeric: tabular-nums; }
+  .candidate-card canvas { width: 100%; height: 140px; display: block; border-radius: 6px; background: #0d1117; }
+
+  .stations-table-wrap { max-height: 320px; overflow-y: auto; }
+  table.stations-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.stations-table th {
+    text-align: left; font-size: 10.5px; color: #8b949e; font-weight: 700;
+    letter-spacing: .4px; text-transform: uppercase;
+    padding: 6px 6px; border-bottom: 1px solid #21262d; position: sticky; top: 0; background: #0d1117;
+  }
+  table.stations-table td {
+    padding: 7px 6px; border-bottom: 1px solid #161b22; color: #e6edf3; font-variant-numeric: tabular-nums;
+  }
+  table.stations-table tr:hover td { background: #161b22; }
+  table.stations-table tr.err-row td { color: #ff9d94; }
+  .mode-tag { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 10px; text-transform: uppercase; letter-spacing: .3px; }
+  .mode-tag.origen { background: #f0b42922; color: #f0b429; }
+  .mode-tag.base { background: #38bdf822; color: #38bdf8; }
+  .mode-tag.interseccion { background: #a78bfa22; color: #a78bfa; }
+  .row-actions { display: flex; gap: 3px; justify-content: flex-end; }
+  .row-actions button {
+    background: none; border: none; color: #6e7681; cursor: pointer; font-size: 14px;
+    line-height: 1; padding: 3px 6px; border-radius: 5px; transition: all .15s;
+  }
+  .row-actions button:hover { color: #2dd4bf; background: #2dd4bf22; }
+  .row-actions button.del:hover { color: #f85149; background: #f8514922; }
+  .station-empty { color: #6e7681; font-size: 13px; padding: 14px 4px; text-align: center; }
+
+  /* ── Panel derecho / visor 3D ── */
+  .panel-results { padding: 18px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .viewer-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .viewer-toolbar .spacer { flex: 1; }
+  .slide-mini { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #8b949e; }
+  .slide-mini input[type=range] { accent-color: #2dd4bf; width: 100px; }
+
+  .viewer-wrap {
+    background: #0d1117; border: 1px solid #21262d; border-radius: 10px;
+    padding: 6px; position: relative;
+  }
+  canvas#viewer3d { width: 100%; height: 480px; display: block; border-radius: 6px; cursor: grab; touch-action: none; }
+  canvas#viewer3d:active { cursor: grabbing; }
+  .viewer-note { font-size: 12px; color: #6e7681; text-align: center; margin-top: 6px; }
+
+  .canvas-tooltip3d {
+    position: absolute; transform: translate(-50%, -110%);
+    background: #0d1117; border: 1px solid #2dd4bf88; border-radius: 8px;
+    padding: 6px 10px; font-size: 12px; line-height: 1.5; color: #e6edf3;
+    white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,.45);
+    z-index: 20; pointer-events: none; display: none;
+  }
+  .canvas-tooltip3d .tt-title { font-weight: 700; color: #2dd4bf; margin-bottom: 2px; }
+
+  .cards-title { font-size: 12px; font-weight: 700; color: #8b949e; letter-spacing: .6px; text-transform: uppercase; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="topbar-logo" href="/">PortiCAD</a>
+  <span class="topbar-sep">›</span>
+  <div class="topbar-crumb">
+    <span>Multi-Tools</span><span>›</span>
+    <span class="topbar-title">Levantamiento por Trilateración</span>
+  </div>
+  <span class="badge" style="margin-left:8px;">Topografía</span>
+  <button type="button" class="btn primary" style="margin-left:auto;" onclick="exportCSV()">⬇ Exportar CSV</button>
+  <button type="button" class="btn danger" onclick="clearAll()">🗑 Borrar todo</button>
+</div>
+
+<div class="main">
+
+  <!-- ═══ PANEL INPUTS ═══ -->
+  <div class="panel-inputs">
+
+    <div class="input-group">
+      <div class="sec-title">Agregar / editar estación <span id="editingBadge" style="display:none; color:#f0b429;">✎ editando</span></div>
+
+      <div class="field">
+        <label>Nombre de la estación</label>
+        <input type="text" id="fName" placeholder="E1">
+      </div>
+
+      <div class="field">
+        <label>Cómo se calcula</label>
+        <select id="fMode" onchange="onModeChange()">
+          <option value="origen">Origen / punto conocido (fijo)</option>
+          <option value="base">Con 1 referencia (distancia + azimut)</option>
+          <option value="interseccion">Con 2 referencias (trilateración)</option>
+        </select>
+      </div>
+
+      <!-- Modo: ORIGEN -->
+      <div id="grpOrigen">
+        <div class="hint">Punto fijo o de coordenadas conocidas (ej. la primera estación, o un punto con coordenadas reales de GPS).</div>
+        <div class="field-3col" style="margin-top:8px;">
+          <div class="field"><label>X0</label><input type="number" id="oX" value="0" step="0.01"></div>
+          <div class="field"><label>Y0</label><input type="number" id="oY" value="0" step="0.01"></div>
+          <div class="field"><label>Z0</label><input type="number" id="oZ" value="0" step="0.01"></div>
+        </div>
+      </div>
+
+      <!-- Modo: BASE (1 referencia) -->
+      <div id="grpBase" style="display:none;">
+        <div class="field">
+          <label>Estación de referencia</label>
+          <select id="bRef"></select>
+        </div>
+        <div class="field-2col" style="margin-top:8px;">
+          <div class="field"><label>Distancia <em>(m)</em></label><input type="number" id="bDist" min="0" step="0.001"></div>
+          <div class="field"><label>Azimut <em>(°, desde Norte, horario)</em></label><input type="number" id="bAz" value="0" step="0.1"></div>
+        </div>
+        <div class="field" style="margin-top:8px;">
+          <label>Desnivel Δh <em>(m, + = esta estación está más alta)</em></label>
+          <input type="number" id="bDh" value="0" step="0.001">
+        </div>
+        <div class="hint">Azimut 0°=Norte(+Y), 90°=Este(+X), 180°=Sur, 270°=Oeste. Si no tenés un norte real, elegí vos la dirección de 0° y sé consistente en el resto de las estaciones.</div>
+      </div>
+
+      <!-- Modo: INTERSECCIÓN (2 referencias) -->
+      <div id="grpInter" style="display:none;">
+        <div class="field">
+          <label>Referencia A</label>
+          <select id="iRefA"></select>
+        </div>
+        <div class="field" style="margin-top:8px;">
+          <label>Distancia a A <em>(m)</em></label>
+          <input type="number" id="iDistA" min="0" step="0.001">
+        </div>
+        <div class="field" style="margin-top:8px;">
+          <label>Referencia B</label>
+          <select id="iRefB"></select>
+        </div>
+        <div class="field" style="margin-top:8px;">
+          <label>Distancia a B <em>(m)</em></label>
+          <input type="number" id="iDistB" min="0" step="0.001">
+        </div>
+        <div class="field" style="margin-top:8px;">
+          <label>Desnivel Δh desde A <em>(m, + = esta estación está más alta)</em></label>
+          <input type="number" id="iDh" value="0" step="0.001">
+        </div>
+        <div class="field" style="margin-top:8px;">
+          <label>Desnivel Δh desde B <em>(opcional, m — para verificar cierre)</em></label>
+          <input type="number" id="iDh2" placeholder="opcional" step="0.001">
+        </div>
+        <div class="hint">Con 2 distancias hay dos ubicaciones posibles (izquierda/derecha de la línea A→B). Calculá y elegí la correcta.</div>
+        <button type="button" class="btn primary ghost" style="margin-top:8px;" onclick="calcularIntersecciones()">🔍 Calcular opciones</button>
+        <div id="candidatesWrap" class="candidate-cards" style="margin-top:8px;"></div>
+      </div>
+
+      <div id="formMsg" class="formMsg"></div>
+
+      <div style="display:flex; gap:8px; margin-top:4px;">
+        <button type="button" class="btn primary ghost" id="btnAdd" onclick="submitForm()">➕ Agregar estación</button>
+        <button type="button" class="btn ghost" id="btnCancelEdit" style="display:none; flex:0 0 auto;" onclick="cancelEdit()">Cancelar</button>
+      </div>
+    </div>
+
+    <div class="input-group">
+      <div class="sec-title">Estaciones <span id="stationsCount"></span></div>
+      <div class="stations-table-wrap">
+        <table class="stations-table" id="stationsTable" style="display:none;">
+          <thead>
+            <tr><th>Nombre</th><th>Modo</th><th>X</th><th>Y</th><th>Z</th><th></th></tr>
+          </thead>
+          <tbody id="stationsBody"></tbody>
+        </table>
+        <div class="station-empty" id="stationsEmpty">Todavía no agregaste estaciones. Empezá agregando el punto de origen (por ejemplo, Estación 1 en 0,0,0).</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══ PANEL VISOR 3D ═══ -->
+  <div class="panel-results">
+
+    <div class="viewer-toolbar">
+      <button type="button" class="btn small" onclick="setView('iso')">Vista isométrica</button>
+      <button type="button" class="btn small" onclick="setView('top')">Vista en planta</button>
+      <button type="button" class="btn small" onclick="setView('front')">Vista frontal</button>
+      <div class="spacer"></div>
+      <div class="slide-mini">
+        Exagerar Z
+        <input type="range" id="zExag" min="1" max="20" step="0.5" value="1" oninput="onZExagChange()">
+        <span id="zExagLbl">1×</span>
+      </div>
+    </div>
+
+    <div class="viewer-wrap">
+      <canvas id="viewer3d"></canvas>
+      <div id="tip3d" class="canvas-tooltip3d"></div>
+      <div class="viewer-note">Arrastrá para rotar · rueda del mouse para zoom · pasá el puntero sobre un punto para ver su detalle</div>
+    </div>
+
+    <div class="cards-title">Notas y cierre de altura</div>
+    <div id="closureNotes" style="font-size:13px; color:#8b949e; display:flex; flex-direction:column; gap:4px;"></div>
+
+  </div>
+
+</div>
+
+<script>
+function fmt(n, d) {
+  if (n === null || n === undefined || !isFinite(n)) return '–';
+  return n.toLocaleString('es', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+let stations = [];   // {id, name, mode, origin:{x,y,z}, base:{...}, inter:{...}, x,y,z,error,closure}
+let nextId = 1;
+let editingId = null;
+let pendingCandidates = null; // {refA, refB, distA, distB, dh, dh2, sol}
+
+const STORAGE_KEY = 'porticad_topo_stations_v1';
+
+// ────────────────────────── Geometría ──────────────────────────
+
+function circleIntersect(P1, P2, r1, r2) {
+  const dx = P2.x - P1.x, dy = P2.y - P1.y;
+  const d = Math.hypot(dx, dy);
+  if (d < 1e-9) return null;
+  if (d > r1 + r2 + 1e-6 || d < Math.abs(r1 - r2) - 1e-6) return null;
+  const a = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
+  const h2 = Math.max(0, r1 * r1 - a * a);
+  const h = Math.sqrt(h2);
+  const mx = P1.x + a * dx / d, my = P1.y + a * dy / d;
+  const nx = -dy / d, ny = dx / d;
+  const p1 = { x: mx + h * nx, y: my + h * ny };
+  const p2 = { x: mx - h * nx, y: my - h * ny };
+  return { p1, p2 };
+}
+
+function sideLabel(P1, P2, p) {
+  const dx = P2.x - P1.x, dy = P2.y - P1.y;
+  const cross = dx * (p.y - P1.y) - dy * (p.x - P1.x);
+  return cross > 0 ? 'izquierda de A→B' : 'derecha de A→B';
+}
+
+function recomputeAll() {
+  const byId = new Map();
+  stations.forEach(s => {
+    s.error = null;
+    s.closure = null;
+    if (s.mode === 'origen') {
+      s.x = s.origin.x; s.y = s.origin.y; s.z = s.origin.z;
+    } else if (s.mode === 'base') {
+      const ref = byId.get(s.base.refId);
+      if (!ref) { s.error = 'Referencia no encontrada (fue eliminada)'; }
+      else {
+        const azRad = (s.base.azimut || 0) * Math.PI / 180;
+        s.x = ref.x + s.base.dist * Math.sin(azRad);
+        s.y = ref.y + s.base.dist * Math.cos(azRad);
+        s.z = ref.z + (s.base.dh || 0);
+      }
+    } else if (s.mode === 'interseccion') {
+      const refA = byId.get(s.inter.refAId);
+      const refB = byId.get(s.inter.refBId);
+      if (!refA || !refB) { s.error = 'Referencia no encontrada (fue eliminada)'; }
+      else {
+        const sol = circleIntersect(refA, refB, s.inter.distA, s.inter.distB);
+        if (!sol) { s.error = 'Distancias incompatibles: no hay intersección posible'; }
+        else {
+          const pt = s.inter.side === 2 ? sol.p2 : sol.p1;
+          s.x = pt.x; s.y = pt.y;
+          const z1 = refA.z + (s.inter.dh || 0);
+          if (s.inter.dh2 !== null && s.inter.dh2 !== undefined) {
+            const z2 = refB.z + s.inter.dh2;
+            s.z = (z1 + z2) / 2;
+            s.closure = Math.abs(z1 - z2);
+          } else {
+            s.z = z1;
+          }
+        }
+      }
+    }
+    if (!s.error) byId.set(s.id, s);
+  });
+}
+
+// ────────────────────────── Persistencia ──────────────────────────
+
+function saveToStorage() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ nextId, stations: stations.map(s => ({
+      id: s.id, name: s.name, mode: s.mode, origin: s.origin, base: s.base, inter: s.inter
+    })) }));
+  } catch (e) {}
+}
+
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (!data || !Array.isArray(data.stations)) return;
+    stations = data.stations;
+    nextId = data.nextId || (Math.max(0, ...stations.map(s => s.id)) + 1);
+  } catch (e) {}
+}
+
+// ────────────────────────── Formulario ──────────────────────────
+
+function onModeChange() {
+  const mode = document.getElementById('fMode').value;
+  document.getElementById('grpOrigen').style.display = mode === 'origen' ? 'block' : 'none';
+  document.getElementById('grpBase').style.display = mode === 'base' ? 'block' : 'none';
+  document.getElementById('grpInter').style.display = mode === 'interseccion' ? 'block' : 'none';
+  document.getElementById('btnAdd').style.display = mode === 'interseccion' ? 'none' : 'inline-block';
+  document.getElementById('candidatesWrap').innerHTML = '';
+  pendingCandidates = null;
+  hideMsg();
+  refreshRefSelects();
+}
+
+function validStations() {
+  return stations.filter(s => !s.error);
+}
+
+function refreshRefSelects() {
+  const valid = validStations();
+  const opts = valid.map(s => `<option value="${s.id}">${escapeHtml(s.name)}  (${fmt(s.x,2)}, ${fmt(s.y,2)}, ${fmt(s.z,2)})</option>`).join('');
+  ['bRef', 'iRefA', 'iRefB'].forEach(id => {
+    const sel = document.getElementById(id);
+    const prev = sel.value;
+    sel.innerHTML = opts || '<option value="">— no hay estaciones aún —</option>';
+    if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+  });
+
+  const modeSel = document.getElementById('fMode');
+  const baseOpt = modeSel.querySelector('option[value="base"]');
+  const interOpt = modeSel.querySelector('option[value="interseccion"]');
+  baseOpt.disabled = valid.length < 1;
+  interOpt.disabled = valid.length < 2;
+}
+
+function showMsg(text, kind) {
+  const el = document.getElementById('formMsg');
+  el.textContent = text;
+  el.className = 'formMsg show ' + (kind || 'err');
+}
+function hideMsg() {
+  const el = document.getElementById('formMsg');
+  el.className = 'formMsg';
+}
+
+function nextDefaultName() {
+  let n = stations.length + 1;
+  while (stations.some(s => s.name === ('E' + n))) n++;
+  return 'E' + n;
+}
+
+function resetForm() {
+  editingId = null;
+  document.getElementById('editingBadge').style.display = 'none';
+  document.getElementById('btnCancelEdit').style.display = 'none';
+  document.getElementById('btnAdd').textContent = '➕ Agregar estación';
+  document.getElementById('fName').value = nextDefaultName();
+  document.getElementById('fMode').value = stations.length === 0 ? 'origen' : 'base';
+  document.getElementById('oX').value = 0; document.getElementById('oY').value = 0; document.getElementById('oZ').value = 0;
+  document.getElementById('bDist').value = ''; document.getElementById('bAz').value = 0; document.getElementById('bDh').value = 0;
+  document.getElementById('iDistA').value = ''; document.getElementById('iDistB').value = '';
+  document.getElementById('iDh').value = 0; document.getElementById('iDh2').value = '';
+  document.getElementById('candidatesWrap').innerHTML = '';
+  pendingCandidates = null;
+  hideMsg();
+  onModeChange();
+}
+
+function cancelEdit() { resetForm(); }
+
+function editStation(id) {
+  const s = stations.find(x => x.id === id);
+  if (!s) return;
+  editingId = id;
+  document.getElementById('editingBadge').style.display = 'inline';
+  document.getElementById('btnCancelEdit').style.display = 'inline-block';
+  document.getElementById('fName').value = s.name;
+  document.getElementById('fMode').value = s.mode;
+  onModeChange();
+  if (s.mode === 'origen') {
+    document.getElementById('oX').value = s.origin.x;
+    document.getElementById('oY').value = s.origin.y;
+    document.getElementById('oZ').value = s.origin.z;
+    document.getElementById('btnAdd').textContent = '💾 Guardar cambios';
+  } else if (s.mode === 'base') {
+    document.getElementById('bRef').value = s.base.refId;
+    document.getElementById('bDist').value = s.base.dist;
+    document.getElementById('bAz').value = s.base.azimut;
+    document.getElementById('bDh').value = s.base.dh;
+    document.getElementById('btnAdd').textContent = '💾 Guardar cambios';
+  } else if (s.mode === 'interseccion') {
+    document.getElementById('iRefA').value = s.inter.refAId;
+    document.getElementById('iRefB').value = s.inter.refBId;
+    document.getElementById('iDistA').value = s.inter.distA;
+    document.getElementById('iDistB').value = s.inter.distB;
+    document.getElementById('iDh').value = s.inter.dh;
+    document.getElementById('iDh2').value = s.inter.dh2 === undefined || s.inter.dh2 === null ? '' : s.inter.dh2;
+    calcularIntersecciones(s.inter.side);
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function deleteStation(id) {
+  stations = stations.filter(s => s.id !== id);
+  if (editingId === id) resetForm();
+  recomputeAll();
+  renderAll();
+}
+
+function submitForm() {
+  const mode = document.getElementById('fMode').value;
+  const name = document.getElementById('fName').value.trim() || nextDefaultName();
+  hideMsg();
+
+  let entry = { id: editingId || nextId, name, mode, origin: null, base: null, inter: null };
+
+  if (mode === 'origen') {
+    entry.origin = {
+      x: parseFloat(document.getElementById('oX').value) || 0,
+      y: parseFloat(document.getElementById('oY').value) || 0,
+      z: parseFloat(document.getElementById('oZ').value) || 0,
+    };
+  } else if (mode === 'base') {
+    const refId = parseInt(document.getElementById('bRef').value, 10);
+    const dist = parseFloat(document.getElementById('bDist').value);
+    if (!refId) { showMsg('Elegí una estación de referencia.'); return; }
+    if (!(dist > 0)) { showMsg('Ingresá una distancia mayor a 0.'); return; }
+    entry.base = {
+      refId,
+      dist,
+      azimut: parseFloat(document.getElementById('bAz').value) || 0,
+      dh: parseFloat(document.getElementById('bDh').value) || 0,
+    };
+  } else {
+    showMsg('Usá "Calcular opciones" y elegí una de las dos ubicaciones.');
+    return;
+  }
+
+  finalizeSave(entry);
+}
+
+function finalizeSave(entry) {
+  if (editingId) {
+    const idx = stations.findIndex(s => s.id === editingId);
+    if (idx >= 0) stations[idx] = entry;
+  } else {
+    stations.push(entry);
+    nextId = Math.max(nextId, entry.id + 1);
+  }
+  recomputeAll();
+  renderAll();
+  saveToStorage();
+  resetForm();
+}
+
+// ────────────────────────── Intersección (trilateración) ──────────────────────────
+
+function calcularIntersecciones(forceSide) {
+  hideMsg();
+  const refAId = parseInt(document.getElementById('iRefA').value, 10);
+  const refBId = parseInt(document.getElementById('iRefB').value, 10);
+  const distA = parseFloat(document.getElementById('iDistA').value);
+  const distB = parseFloat(document.getElementById('iDistB').value);
+  const dh = parseFloat(document.getElementById('iDh').value) || 0;
+  const dh2raw = document.getElementById('iDh2').value;
+  const dh2 = dh2raw === '' ? null : parseFloat(dh2raw);
+
+  const wrap = document.getElementById('candidatesWrap');
+  wrap.innerHTML = '';
+
+  if (!refAId || !refBId) { showMsg('Elegí las dos estaciones de referencia.'); return; }
+  if (refAId === refBId) { showMsg('Referencia A y B deben ser distintas.'); return; }
+  if (!(distA > 0) || !(distB > 0)) { showMsg('Ingresá ambas distancias, mayores a 0.'); return; }
+
+  const refA = stations.find(s => s.id === refAId);
+  const refB = stations.find(s => s.id === refBId);
+  if (!refA || !refB) { showMsg('Referencia inválida.'); return; }
+
+  const sol = circleIntersect(refA, refB, distA, distB);
+  if (!sol) {
+    showMsg('Distancias incompatibles: con esos valores las dos circunferencias no se cruzan (revisá las distancias o la distancia real entre ' + refA.name + ' y ' + refB.name + ').');
+    return;
+  }
+
+  pendingCandidates = { refA, refB, distA, distB, dh, dh2 };
+
+  const z1 = refA.z + dh;
+  const z2 = dh2 !== null ? refB.z + dh2 : null;
+  const zFinal = z2 !== null ? (z1 + z2) / 2 : z1;
+
+  [sol.p1, sol.p2].forEach((p, i) => {
+    const side = i === 0 ? 1 : 2;
+    const label = sideLabel(refA, refB, p);
+    const card = document.createElement('div');
+    card.className = 'candidate-card';
+    card.innerHTML = `
+      <div class="cc-title">Opción ${side} — ${label}</div>
+      <div class="cc-coords">X = ${fmt(p.x,3)} &nbsp; Y = ${fmt(p.y,3)} &nbsp; Z = ${fmt(zFinal,3)}</div>
+      <canvas width="320" height="140"></canvas>
+      <button type="button" class="btn primary small">✓ Usar esta opción</button>
+    `;
+    const canvas = card.querySelector('canvas');
+    drawCandidatePreview(canvas, refA, refB, p, sol.p1 === p ? sol.p2 : sol.p1);
+    card.querySelector('button').onclick = () => chooseCandidate(side);
+    wrap.appendChild(card);
+  });
+
+  if (dh2 !== null) {
+    const closure = Math.abs(z1 - z2);
+    const note = document.createElement('div');
+    note.className = 'hint';
+    note.style.marginTop = '2px';
+    note.textContent = 'Cierre de altura entre ambas referencias: ' + fmt(closure, 3) + ' m' + (closure > 0.02 ? ' ⚠ diferencia notable, revisá las lecturas' : ' ✓');
+    wrap.appendChild(note);
+  }
+
+  if (forceSide) {
+    // re-highlight when coming from editStation()
+  }
+}
+
+function drawCandidatePreview(canvas, refA, refB, chosen, other) {
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.width, h = canvas.height;
+  canvas.style.width = '100%';
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  const pts = [refA, refB, chosen, other];
+  const minX = Math.min(...pts.map(p => p.x)), maxX = Math.max(...pts.map(p => p.x));
+  const minY = Math.min(...pts.map(p => p.y)), maxY = Math.max(...pts.map(p => p.y));
+  const pad = 20;
+  const spanX = Math.max(0.01, maxX - minX), spanY = Math.max(0.01, maxY - minY);
+  const scale = Math.min((w - 2 * pad) / spanX, (h - 2 * pad) / spanY);
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+  const toPx = p => ({ x: w / 2 + (p.x - cx) * scale, y: h / 2 - (p.y - cy) * scale });
+
+  const a = toPx(refA), b = toPx(refB), c = toPx(chosen), o = toPx(other);
+
+  ctx.strokeStyle = '#30363d'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+
+  [{ p: a, label: refA.name, color: '#38bdf8' }, { p: b, label: refB.name, color: '#38bdf8' }].forEach(o2 => {
+    ctx.fillStyle = o2.color;
+    ctx.beginPath(); ctx.arc(o2.p.x, o2.p.y, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#8b949e'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(o2.label, o2.p.x, o2.p.y - 8);
+  });
+
+  ctx.fillStyle = '#6e7681';
+  ctx.beginPath(); ctx.arc(o.x, o.y, 4, 0, Math.PI * 2); ctx.fill();
+
+  ctx.fillStyle = '#2dd4bf';
+  ctx.beginPath(); ctx.arc(c.x, c.y, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#0d1117'; ctx.lineWidth = 2; ctx.stroke();
+}
+
+function chooseCandidate(side) {
+  if (!pendingCandidates) return;
+  const { refA, refB, distA, distB, dh, dh2 } = pendingCandidates;
+  const name = document.getElementById('fName').value.trim() || nextDefaultName();
+  const entry = {
+    id: editingId || nextId,
+    name,
+    mode: 'interseccion',
+    origin: null, base: null,
+    inter: { refAId: refA.id, refBId: refB.id, distA, distB, dh, dh2, side },
+  };
+  finalizeSave(entry);
+}
+
+// ────────────────────────── Tabla ──────────────────────────
+
+function renderTable() {
+  const table = document.getElementById('stationsTable');
+  const body = document.getElementById('stationsBody');
+  const empty = document.getElementById('stationsEmpty');
+  const count = document.getElementById('stationsCount');
+
+  count.textContent = stations.length ? '(' + stations.length + ')' : '';
+  if (!stations.length) { table.style.display = 'none'; empty.style.display = 'block'; return; }
+  table.style.display = 'table'; empty.style.display = 'none';
+
+  body.innerHTML = stations.map(s => `
+    <tr class="${s.error ? 'err-row' : ''}">
+      <td>${escapeHtml(s.name)}</td>
+      <td><span class="mode-tag ${s.mode}">${s.mode === 'origen' ? 'Origen' : s.mode === 'base' ? '1 ref.' : '2 ref.'}</span></td>
+      <td>${s.error ? '—' : fmt(s.x, 3)}</td>
+      <td>${s.error ? '—' : fmt(s.y, 3)}</td>
+      <td>${s.error ? '—' : fmt(s.z, 3)}</td>
+      <td class="row-actions">
+        <button type="button" onclick="editStation(${s.id})" title="Editar">✎</button>
+        <button type="button" class="del" onclick="deleteStation(${s.id})" title="Eliminar">×</button>
+      </td>
+    </tr>
+    ${s.error ? `<tr class="err-row"><td colspan="6" style="padding-top:0; font-size:11.5px;">⚠ ${escapeHtml(s.error)}</td></tr>` : ''}
+  `).join('');
+}
+
+function renderClosureNotes() {
+  const el = document.getElementById('closureNotes');
+  const withClosure = stations.filter(s => s.closure !== null && s.closure !== undefined);
+  if (!withClosure.length) {
+    el.innerHTML = '<div>Agregá un "Δh desde B" opcional en estaciones por intersección para ver el cierre de altura (control de calidad).</div>';
+    return;
+  }
+  el.innerHTML = withClosure.map(s =>
+    `<div>${escapeHtml(s.name)}: cierre de altura = ${fmt(s.closure, 3)} m ${s.closure > 0.02 ? '⚠' : '✓'}</div>`
+  ).join('');
+}
+
+function renderAll() {
+  renderTable();
+  refreshRefSelects();
+  renderClosureNotes();
+  render3D();
+}
+
+function clearAll() {
+  if (!stations.length) return;
+  if (!confirm('¿Borrar todas las estaciones cargadas? Esta acción no se puede deshacer.')) return;
+  stations = [];
+  nextId = 1;
+  recomputeAll();
+  renderAll();
+  saveToStorage();
+  resetForm();
+}
+
+function exportCSV() {
+  if (!stations.length) return;
+  const rows = [['Nombre', 'Modo', 'X', 'Y', 'Z', 'Error']];
+  stations.forEach(s => rows.push([
+    s.name, s.mode,
+    s.error ? '' : s.x.toFixed(3),
+    s.error ? '' : s.y.toFixed(3),
+    s.error ? '' : s.z.toFixed(3),
+    s.error || ''
+  ]));
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'coordenadas_levantamiento.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ────────────────────────── Visor 3D ──────────────────────────
+
+let view = { yaw: 0.9, pitch: 0.75, zoom: 1, panX: 0, panY: 0 };
+let zExag = 1;
+let dragging = false, lastX = 0, lastY = 0;
+let hitPoints = []; // {sx, sy, station}
+
+function setView(preset) {
+  if (preset === 'iso') { view.yaw = 0.9; view.pitch = 0.75; }
+  else if (preset === 'top') { view.yaw = 0; view.pitch = 1.55; }
+  else if (preset === 'front') { view.yaw = 0; view.pitch = 0.05; }
+  render3D();
+}
+
+function onZExagChange() {
+  zExag = parseFloat(document.getElementById('zExag').value);
+  document.getElementById('zExagLbl').textContent = zExag + '×';
+  render3D();
+}
+
+function project3D(p, cx, cy, cz, w, h, scale) {
+  let x = p.x - cx, y = p.y - cy, z = (p.z - cz) * zExag;
+  const cosY = Math.cos(view.yaw), sinY = Math.sin(view.yaw);
+  let x1 = x * cosY - y * sinY;
+  let y1 = x * sinY + y * cosY;
+  let z1 = z;
+  const cosP = Math.cos(view.pitch), sinP = Math.sin(view.pitch);
+  let y2 = y1 * cosP - z1 * sinP;
+  let z2 = y1 * sinP + z1 * cosP;
+  const camDist = 1000;
+  const depth = camDist + y2;
+  const factor = camDist / Math.max(50, depth);
+  return {
+    sx: w / 2 + view.panX + x1 * scale * factor,
+    sy: h / 2 + view.panY - z2 * scale * factor,
+    factor
+  };
+}
+
+function render3D() {
+  const canvas = document.getElementById('viewer3d');
+  const wrap = canvas.parentElement;
+  const cssW = wrap.clientWidth - 12;
+  const cssH = 480;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = cssW * dpr; canvas.height = cssH * dpr;
+  canvas.style.width = cssW + 'px'; canvas.style.height = cssH + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cssW, cssH);
+
+  const valid = validStations();
+  hitPoints = [];
+
+  if (!valid.length) {
+    ctx.fillStyle = '#6e7681';
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Agregá estaciones para ver el levantamiento en 3D', cssW / 2, cssH / 2);
+    return;
+  }
+
+  const xs = valid.map(s => s.x), ys = valid.map(s => s.y), zs = valid.map(s => s.z);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  const cz = (Math.min(...zs) + Math.max(...zs)) / 2;
+  let extent = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), (Math.max(...zs) - Math.min(...zs)) * zExag, 1);
+  const baseScale = (Math.min(cssW, cssH) * 0.35) / (extent / 2);
+  const scale = baseScale * view.zoom;
+
+  // Piso de referencia (grilla) en Z = min
+  const zFloor = Math.min(...zs);
+  const gridN = 6;
+  const gridExtent = extent * 0.9;
+  ctx.strokeStyle = '#21262d';
+  ctx.lineWidth = 1;
+  for (let i = -gridN; i <= gridN; i++) {
+    const t = i / gridN * gridExtent;
+    const p1 = project3D({ x: cx - gridExtent, y: cy + t, z: zFloor }, cx, cy, cz, cssW, cssH, scale);
+    const p2 = project3D({ x: cx + gridExtent, y: cy + t, z: zFloor }, cx, cy, cz, cssW, cssH, scale);
+    ctx.beginPath(); ctx.moveTo(p1.sx, p1.sy); ctx.lineTo(p2.sx, p2.sy); ctx.stroke();
+    const p3 = project3D({ x: cx + t, y: cy - gridExtent, z: zFloor }, cx, cy, cz, cssW, cssH, scale);
+    const p4 = project3D({ x: cx + t, y: cy + gridExtent, z: zFloor }, cx, cy, cz, cssW, cssH, scale);
+    ctx.beginPath(); ctx.moveTo(p3.sx, p3.sy); ctx.lineTo(p4.sx, p4.sy); ctx.stroke();
+  }
+
+  // Líneas de medición (a las referencias usadas)
+  ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = '#38bdf866';
+  ctx.lineWidth = 1.3;
+  const byId = new Map(valid.map(s => [s.id, s]));
+  valid.forEach(s => {
+    const refs = [];
+    if (s.mode === 'base') refs.push(s.base.refId);
+    if (s.mode === 'interseccion') refs.push(s.inter.refAId, s.inter.refBId);
+    refs.forEach(rid => {
+      const ref = byId.get(rid);
+      if (!ref) return;
+      const p1 = project3D(s, cx, cy, cz, cssW, cssH, scale);
+      const p2 = project3D(ref, cx, cy, cz, cssW, cssH, scale);
+      ctx.beginPath(); ctx.moveTo(p1.sx, p1.sy); ctx.lineTo(p2.sx, p2.sy); ctx.stroke();
+    });
+  });
+  ctx.setLineDash([]);
+
+  // Puntos, ordenados por profundidad (pintor's algorithm aproximado usando 'factor')
+  const projected = valid.map(s => ({ s, p: project3D(s, cx, cy, cz, cssW, cssH, scale) }));
+  projected.sort((a, b) => a.p.factor - b.p.factor);
+
+  projected.forEach(({ s, p }) => {
+    const r = Math.max(3.5, 6 * p.factor);
+    ctx.fillStyle = s.mode === 'origen' ? '#f0b429' : '#2dd4bf';
+    ctx.beginPath(); ctx.arc(p.sx, p.sy, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#0d1117'; ctx.lineWidth = 1.5; ctx.stroke();
+
+    ctx.fillStyle = '#e6edf3';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(s.name, p.sx, p.sy - r - 6);
+
+    hitPoints.push({ sx: p.sx, sy: p.sy, station: s });
+  });
+
+  // Gizmo de ejes (esquina superior izquierda)
+  drawAxisGizmo(ctx, 46, 46, 28);
+}
+
+function drawAxisGizmo(ctx, gx, gy, len) {
+  const axes = [
+    { v: { x: 1, y: 0, z: 0 }, color: '#f85149', label: 'X (E)' },
+    { v: { x: 0, y: 1, z: 0 }, color: '#3fb950', label: 'Y (N)' },
+    { v: { x: 0, y: 0, z: 1 }, color: '#58a6ff', label: 'Z' },
+  ];
+  const cosY = Math.cos(view.yaw), sinY = Math.sin(view.yaw);
+  const cosP = Math.cos(view.pitch), sinP = Math.sin(view.pitch);
+  ctx.font = 'bold 10px sans-serif';
+  axes.forEach(ax => {
+    let x1 = ax.v.x * cosY - ax.v.y * sinY;
+    let y1 = ax.v.x * sinY + ax.v.y * cosY;
+    let z1 = ax.v.z;
+    let y2 = y1 * cosP - z1 * sinP;
+    let z2 = y1 * sinP + z1 * cosP;
+    const ex = gx + x1 * len, ey = gy - z2 * len;
+    ctx.strokeStyle = ax.color; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.fillStyle = ax.color;
+    ctx.textAlign = 'center';
+    ctx.fillText(ax.label, ex + (x1 >= 0 ? 12 : -12), ey);
+  });
+}
+
+function findNearestPoint(px, py, radius) {
+  radius = radius || 14;
+  let best = null, bestD = radius;
+  hitPoints.forEach(hp => {
+    const d = Math.hypot(hp.sx - px, hp.sy - py);
+    if (d < bestD) { bestD = d; best = hp; }
+  });
+  return best;
+}
+
+function showTip3D(hp) {
+  const tip = document.getElementById('tip3d');
+  const s = hp.station;
+  tip.innerHTML = `<div class="tt-title">${escapeHtml(s.name)}</div>
+    <div>X: <b>${fmt(s.x, 3)}</b> &nbsp; Y: <b>${fmt(s.y, 3)}</b> &nbsp; Z: <b>${fmt(s.z, 3)}</b></div>`;
+  tip.style.left = hp.sx + 'px';
+  tip.style.top = hp.sy + 'px';
+  tip.style.display = 'block';
+}
+function hideTip3D() { document.getElementById('tip3d').style.display = 'none'; }
+
+(function initViewerInteractions() {
+  const canvas = document.getElementById('viewer3d');
+
+  canvas.addEventListener('pointerdown', e => {
+    dragging = true; lastX = e.clientX; lastY = e.clientY;
+    canvas.setPointerCapture(e.pointerId);
+    hideTip3D();
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (dragging) {
+      const dx = e.clientX - lastX, dy = e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY;
+      view.yaw += dx * 0.008;
+      view.pitch = Math.min(1.55, Math.max(0.02, view.pitch + dy * 0.008));
+      render3D();
+    } else {
+      const rect = canvas.getBoundingClientRect();
+      const hp = findNearestPoint(e.clientX - rect.left, e.clientY - rect.top);
+      if (hp) showTip3D(hp); else hideTip3D();
+    }
+  });
+  canvas.addEventListener('pointerup', e => { dragging = false; try { canvas.releasePointerCapture(e.pointerId); } catch(err){} });
+  canvas.addEventListener('pointerleave', () => { dragging = false; hideTip3D(); });
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    view.zoom *= (e.deltaY < 0 ? 1.1 : 0.9);
+    view.zoom = Math.min(8, Math.max(0.2, view.zoom));
+    render3D();
+  }, { passive: false });
+
+  window.addEventListener('resize', () => render3D());
+})();
+
+// ────────────────────────── Init ──────────────────────────
+
+loadFromStorage();
+recomputeAll();
+renderAll();
+resetForm();
+</script>
+
+</body>
+</html>
