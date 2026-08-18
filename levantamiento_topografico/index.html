@@ -198,7 +198,7 @@
         <label>Cómo se calcula</label>
         <select id="fMode" onchange="onModeChange()">
           <option value="origen">Origen / punto conocido (fijo)</option>
-          <option value="base">Con 1 referencia (distancia + azimut)</option>
+          <option value="base">Con 1 referencia (distancia + desnivel)</option>
           <option value="interseccion">Con 2 referencias (trilateración)</option>
         </select>
       </div>
@@ -219,15 +219,18 @@
           <label>Estación de referencia</label>
           <select id="bRef"></select>
         </div>
-        <div class="field-2col" style="margin-top:8px;">
-          <div class="field"><label>Distancia <em>(m)</em></label><input type="number" id="bDist" min="0" step="0.001"></div>
-          <div class="field"><label>Azimut <em>(°, desde Norte, horario)</em></label><input type="number" id="bAz" value="0" step="0.1"></div>
-        </div>
         <div class="field" style="margin-top:8px;">
-          <label>Desnivel Δh <em>(m, + = esta estación está más alta)</em></label>
-          <input type="number" id="bDh" value="0" step="0.001">
+          <label>Tipo de distancia medida</label>
+          <select id="bTipo" onchange="onDistTypeChange('b')">
+            <option value="horizontal">Horizontal (directa)</option>
+            <option value="inclinada">Inclinada (real, se descuenta el desnivel)</option>
+          </select>
         </div>
-        <div class="hint">Azimut 0°=Norte(+Y), 90°=Este(+X), 180°=Sur, 270°=Oeste. Si no tenés un norte real, elegí vos la dirección de 0° y sé consistente en el resto de las estaciones.</div>
+        <div class="field-2col" style="margin-top:8px;">
+          <div class="field"><label id="bDistLabel">Distancia horizontal <em>(m)</em></label><input type="number" id="bDist" min="0" step="0.001"></div>
+          <div class="field"><label>Desnivel Δh <em>(m, + = más alta)</em></label><input type="number" id="bDh" value="0" step="0.001"></div>
+        </div>
+        <div class="hint">Todavía no hay una segunda referencia para triangular, así que esta estación se ubica automáticamente sobre el eje X positivo desde la referencia elegida (define la dirección base del levantamiento). A partir de la 3ª estación en adelante usá "Con 2 referencias" para que la posición quede resuelta solo con distancias.</div>
       </div>
 
       <!-- Modo: INTERSECCIÓN (2 referencias) -->
@@ -237,7 +240,14 @@
           <select id="iRefA"></select>
         </div>
         <div class="field" style="margin-top:8px;">
-          <label>Distancia a A <em>(m)</em></label>
+          <label>Tipo de distancia a A</label>
+          <select id="iTipoA" onchange="onDistTypeChange('iA')">
+            <option value="horizontal">Horizontal (directa)</option>
+            <option value="inclinada">Inclinada (real)</option>
+          </select>
+        </div>
+        <div class="field" style="margin-top:8px;">
+          <label id="iDistALabel">Distancia horizontal a A <em>(m)</em></label>
           <input type="number" id="iDistA" min="0" step="0.001">
         </div>
         <div class="field" style="margin-top:8px;">
@@ -245,7 +255,14 @@
           <select id="iRefB"></select>
         </div>
         <div class="field" style="margin-top:8px;">
-          <label>Distancia a B <em>(m)</em></label>
+          <label>Tipo de distancia a B</label>
+          <select id="iTipoB" onchange="onDistTypeChange('iB')">
+            <option value="horizontal">Horizontal (directa)</option>
+            <option value="inclinada">Inclinada (real)</option>
+          </select>
+        </div>
+        <div class="field" style="margin-top:8px;">
+          <label id="iDistBLabel">Distancia horizontal a B <em>(m)</em></label>
           <input type="number" id="iDistB" min="0" step="0.001">
         </div>
         <div class="field" style="margin-top:8px;">
@@ -253,10 +270,10 @@
           <input type="number" id="iDh" value="0" step="0.001">
         </div>
         <div class="field" style="margin-top:8px;">
-          <label>Desnivel Δh desde B <em>(opcional, m — para verificar cierre)</em></label>
+          <label id="iDh2Label">Desnivel Δh desde B <em>(opcional, m — para verificar cierre)</em></label>
           <input type="number" id="iDh2" placeholder="opcional" step="0.001">
         </div>
-        <div class="hint">Con 2 distancias hay dos ubicaciones posibles (izquierda/derecha de la línea A→B). Calculá y elegí la correcta.</div>
+        <div class="hint">Con 2 distancias hay dos ubicaciones posibles (izquierda/derecha de la línea A→B). Si alguna distancia es inclinada, se usa el desnivel correspondiente para calcular la horizontal real (Pitágoras) antes de triangular — si es la distancia a B, el Δh desde B pasa a ser obligatorio. Calculá y elegí la ubicación correcta.</div>
         <button type="button" class="btn primary ghost" style="margin-top:8px;" onclick="calcularIntersecciones()">🔍 Calcular opciones</button>
         <div id="candidatesWrap" class="candidate-cards" style="margin-top:8px;"></div>
       </div>
@@ -351,6 +368,14 @@ function sideLabel(P1, P2, p) {
   return cross > 0 ? 'izquierda de A→B' : 'derecha de A→B';
 }
 
+// Si la distancia medida es "inclinada" (real, sobre el terreno), descuenta el desnivel
+// (Pitágoras) para obtener la distancia horizontal que necesita la trilateración.
+function resolveHorizontal(dist, dh, tipo) {
+  if (tipo !== 'inclinada') return { h: dist, error: null };
+  if (!(dist > Math.abs(dh))) return { h: null, error: 'El desnivel no puede ser mayor o igual que la distancia inclinada' };
+  return { h: Math.sqrt(dist * dist - dh * dh), error: null };
+}
+
 function recomputeAll() {
   const byId = new Map();
   stations.forEach(s => {
@@ -362,28 +387,46 @@ function recomputeAll() {
       const ref = byId.get(s.base.refId);
       if (!ref) { s.error = 'Referencia no encontrada (fue eliminada)'; }
       else {
-        const azRad = (s.base.azimut || 0) * Math.PI / 180;
-        s.x = ref.x + s.base.dist * Math.sin(azRad);
-        s.y = ref.y + s.base.dist * Math.cos(azRad);
-        s.z = ref.z + (s.base.dh || 0);
+        const dh = s.base.dh || 0;
+        const r = resolveHorizontal(s.base.dist, dh, s.base.distType || 'horizontal');
+        if (r.error) { s.error = r.error; }
+        else {
+          s.x = ref.x + r.h; s.y = ref.y;
+          s.z = ref.z + dh;
+        }
       }
     } else if (s.mode === 'interseccion') {
       const refA = byId.get(s.inter.refAId);
       const refB = byId.get(s.inter.refBId);
       if (!refA || !refB) { s.error = 'Referencia no encontrada (fue eliminada)'; }
       else {
-        const sol = circleIntersect(refA, refB, s.inter.distA, s.inter.distB);
-        if (!sol) { s.error = 'Distancias incompatibles: no hay intersección posible'; }
-        else {
-          const pt = s.inter.side === 2 ? sol.p2 : sol.p1;
-          s.x = pt.x; s.y = pt.y;
-          const z1 = refA.z + (s.inter.dh || 0);
-          if (s.inter.dh2 !== null && s.inter.dh2 !== undefined) {
-            const z2 = refB.z + s.inter.dh2;
-            s.z = (z1 + z2) / 2;
-            s.closure = Math.abs(z1 - z2);
+        const dhA = s.inter.dh || 0;
+        const dhB = s.inter.dh2;
+        const rA = resolveHorizontal(s.inter.distA, dhA, s.inter.distTypeA || 'horizontal');
+        const typeB = s.inter.distTypeB || 'horizontal';
+        if (rA.error) {
+          s.error = rA.error + ' (referencia A)';
+        } else if (typeB === 'inclinada' && (dhB === null || dhB === undefined)) {
+          s.error = 'Falta el desnivel desde B (obligatorio para distancia inclinada a B)';
+        } else {
+          const rB = typeB === 'inclinada' ? resolveHorizontal(s.inter.distB, dhB, 'inclinada') : { h: s.inter.distB, error: null };
+          if (rB.error) {
+            s.error = rB.error + ' (referencia B)';
           } else {
-            s.z = z1;
+            const sol = circleIntersect(refA, refB, rA.h, rB.h);
+            if (!sol) { s.error = 'Distancias incompatibles: no hay intersección posible'; }
+            else {
+              const pt = s.inter.side === 2 ? sol.p2 : sol.p1;
+              s.x = pt.x; s.y = pt.y;
+              const z1 = refA.z + dhA;
+              if (dhB !== null && dhB !== undefined) {
+                const z2 = refB.z + dhB;
+                s.z = (z1 + z2) / 2;
+                s.closure = Math.abs(z1 - z2);
+              } else {
+                s.z = z1;
+              }
+            }
           }
         }
       }
@@ -425,6 +468,28 @@ function onModeChange() {
   pendingCandidates = null;
   hideMsg();
   refreshRefSelects();
+}
+
+function onDistTypeChange(which) {
+  if (which === 'b') {
+    const tipo = document.getElementById('bTipo').value;
+    document.getElementById('bDistLabel').innerHTML = tipo === 'inclinada'
+      ? 'Distancia inclinada <em>(real, m)</em>'
+      : 'Distancia horizontal <em>(m)</em>';
+  } else if (which === 'iA') {
+    const tipo = document.getElementById('iTipoA').value;
+    document.getElementById('iDistALabel').innerHTML = tipo === 'inclinada'
+      ? 'Distancia inclinada a A <em>(real, m)</em>'
+      : 'Distancia horizontal a A <em>(m)</em>';
+  } else if (which === 'iB') {
+    const tipo = document.getElementById('iTipoB').value;
+    document.getElementById('iDistBLabel').innerHTML = tipo === 'inclinada'
+      ? 'Distancia inclinada a B <em>(real, m)</em>'
+      : 'Distancia horizontal a B <em>(m)</em>';
+    document.getElementById('iDh2Label').innerHTML = tipo === 'inclinada'
+      ? 'Desnivel Δh desde B <em>(obligatorio: descuenta la inclinación)</em>'
+      : 'Desnivel Δh desde B <em>(opcional, m — para verificar cierre)</em>';
+  }
 }
 
 function validStations() {
@@ -472,13 +537,19 @@ function resetForm() {
   document.getElementById('fName').value = nextDefaultName();
   document.getElementById('fMode').value = stations.length === 0 ? 'origen' : 'base';
   document.getElementById('oX').value = 0; document.getElementById('oY').value = 0; document.getElementById('oZ').value = 0;
-  document.getElementById('bDist').value = ''; document.getElementById('bAz').value = 0; document.getElementById('bDh').value = 0;
+  document.getElementById('bTipo').value = 'horizontal';
+  document.getElementById('bDist').value = ''; document.getElementById('bDh').value = 0;
+  document.getElementById('iTipoA').value = 'horizontal';
+  document.getElementById('iTipoB').value = 'horizontal';
   document.getElementById('iDistA').value = ''; document.getElementById('iDistB').value = '';
   document.getElementById('iDh').value = 0; document.getElementById('iDh2').value = '';
   document.getElementById('candidatesWrap').innerHTML = '';
   pendingCandidates = null;
   hideMsg();
   onModeChange();
+  onDistTypeChange('b');
+  onDistTypeChange('iA');
+  onDistTypeChange('iB');
 }
 
 function cancelEdit() { resetForm(); }
@@ -499,13 +570,18 @@ function editStation(id) {
     document.getElementById('btnAdd').textContent = '💾 Guardar cambios';
   } else if (s.mode === 'base') {
     document.getElementById('bRef').value = s.base.refId;
+    document.getElementById('bTipo').value = s.base.distType || 'horizontal';
+    onDistTypeChange('b');
     document.getElementById('bDist').value = s.base.dist;
-    document.getElementById('bAz').value = s.base.azimut;
     document.getElementById('bDh').value = s.base.dh;
     document.getElementById('btnAdd').textContent = '💾 Guardar cambios';
   } else if (s.mode === 'interseccion') {
     document.getElementById('iRefA').value = s.inter.refAId;
+    document.getElementById('iTipoA').value = s.inter.distTypeA || 'horizontal';
+    onDistTypeChange('iA');
     document.getElementById('iRefB').value = s.inter.refBId;
+    document.getElementById('iTipoB').value = s.inter.distTypeB || 'horizontal';
+    onDistTypeChange('iB');
     document.getElementById('iDistA').value = s.inter.distA;
     document.getElementById('iDistB').value = s.inter.distB;
     document.getElementById('iDh').value = s.inter.dh;
@@ -538,14 +614,12 @@ function submitForm() {
   } else if (mode === 'base') {
     const refId = parseInt(document.getElementById('bRef').value, 10);
     const dist = parseFloat(document.getElementById('bDist').value);
+    const distType = document.getElementById('bTipo').value;
+    const dh = parseFloat(document.getElementById('bDh').value) || 0;
     if (!refId) { showMsg('Elegí una estación de referencia.'); return; }
     if (!(dist > 0)) { showMsg('Ingresá una distancia mayor a 0.'); return; }
-    entry.base = {
-      refId,
-      dist,
-      azimut: parseFloat(document.getElementById('bAz').value) || 0,
-      dh: parseFloat(document.getElementById('bDh').value) || 0,
-    };
+    if (distType === 'inclinada' && !(dist > Math.abs(dh))) { showMsg('El desnivel no puede ser mayor o igual que la distancia inclinada.'); return; }
+    entry.base = { refId, dist, distType, dh };
   } else {
     showMsg('Usá "Calcular opciones" y elegí una de las dos ubicaciones.');
     return;
@@ -576,6 +650,8 @@ function calcularIntersecciones(forceSide) {
   const refBId = parseInt(document.getElementById('iRefB').value, 10);
   const distA = parseFloat(document.getElementById('iDistA').value);
   const distB = parseFloat(document.getElementById('iDistB').value);
+  const distTypeA = document.getElementById('iTipoA').value;
+  const distTypeB = document.getElementById('iTipoB').value;
   const dh = parseFloat(document.getElementById('iDh').value) || 0;
   const dh2raw = document.getElementById('iDh2').value;
   const dh2 = dh2raw === '' ? null : parseFloat(dh2raw);
@@ -591,13 +667,23 @@ function calcularIntersecciones(forceSide) {
   const refB = stations.find(s => s.id === refBId);
   if (!refA || !refB) { showMsg('Referencia inválida.'); return; }
 
-  const sol = circleIntersect(refA, refB, distA, distB);
+  const rA = resolveHorizontal(distA, dh, distTypeA);
+  if (rA.error) { showMsg(rA.error + ' (referencia A).'); return; }
+
+  if (distTypeB === 'inclinada' && dh2 === null) {
+    showMsg('La distancia a B es inclinada: ingresá el desnivel Δh desde B (es obligatorio en ese caso).');
+    return;
+  }
+  const rB = distTypeB === 'inclinada' ? resolveHorizontal(distB, dh2, 'inclinada') : { h: distB, error: null };
+  if (rB.error) { showMsg(rB.error + ' (referencia B).'); return; }
+
+  const sol = circleIntersect(refA, refB, rA.h, rB.h);
   if (!sol) {
     showMsg('Distancias incompatibles: con esos valores las dos circunferencias no se cruzan (revisá las distancias o la distancia real entre ' + refA.name + ' y ' + refB.name + ').');
     return;
   }
 
-  pendingCandidates = { refA, refB, distA, distB, dh, dh2 };
+  pendingCandidates = { refA, refB, distA, distB, distTypeA, distTypeB, dh, dh2 };
 
   const z1 = refA.z + dh;
   const z2 = dh2 !== null ? refB.z + dh2 : null;
@@ -674,14 +760,14 @@ function drawCandidatePreview(canvas, refA, refB, chosen, other) {
 
 function chooseCandidate(side) {
   if (!pendingCandidates) return;
-  const { refA, refB, distA, distB, dh, dh2 } = pendingCandidates;
+  const { refA, refB, distA, distB, distTypeA, distTypeB, dh, dh2 } = pendingCandidates;
   const name = document.getElementById('fName').value.trim() || nextDefaultName();
   const entry = {
     id: editingId || nextId,
     name,
     mode: 'interseccion',
     origin: null, base: null,
-    inter: { refAId: refA.id, refBId: refB.id, distA, distB, dh, dh2, side },
+    inter: { refAId: refA.id, refBId: refB.id, distA, distTypeA, distB, distTypeB, dh, dh2, side },
   };
   finalizeSave(entry);
 }
