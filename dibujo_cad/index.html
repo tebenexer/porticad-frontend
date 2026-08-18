@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
-<title>Dibujo CAD — PortiCAD Multi-Tools</title>
+<title>CrokisCAD — PortiCAD Multi-Tools</title>
 <link rel="icon" href="/favicon.png" type="image/png" />
 <link rel="shortcut icon" href="/favicon.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -96,6 +96,12 @@ body{ display:flex; flex-direction:column; }
 #theme-menu-panel .file-menu-item{ gap:12px; padding:9px 10px; }
 .theme-swatch{ width:21px; height:21px; border-radius:5px; border:2px solid; flex-shrink:0; display:inline-block; }
 #theme-menu-panel .file-menu-item.active-theme{ background:var(--accent-dim); }
+
+/* ── Menú "Unidades" (unidad de visualización de longitudes/áreas/volúmenes) ── */
+#unit-menu-panel{ min-width:210px; }
+#unit-menu-panel .file-menu-item.active-unit{ background:var(--accent-dim); font-weight:600; }
+.unit-check{ width:16px; flex-shrink:0; text-align:center; opacity:0; }
+.active-unit .unit-check{ opacity:1; }
 
 /* ── Menú "Propiedades" (coordenadas/dimensiones del objeto seleccionado) ── */
 .file-menu-wrap .props-panel{ min-width:260px; max-width:300px; }
@@ -262,7 +268,7 @@ body{ display:flex; flex-direction:column; }
   <span class="topbar-sep">›</span>
   <div class="topbar-crumb">
     <span>Multi-Tools</span><span>›</span>
-    <span class="topbar-title">Dibujo CAD</span>
+    <span class="topbar-title">CrokisCAD</span>
   </div>
   <span class="badge">BETA</span>
 
@@ -312,7 +318,7 @@ body{ display:flex; flex-direction:column; }
         <label id="size-selected-label">Selección actual</label>
         <div class="size-input-row">
           <input type="number" class="size-input" id="size-selected-input" step="0.05" min="0.05" disabled>
-          <span style="font-size:11px;color:var(--muted);">m</span>
+          <span class="unit-suffix-lbl" style="font-size:11px;color:var(--muted);">m</span>
           <button class="size-apply-btn" id="size-selected-btn" onclick="applySizeToSelection()" disabled>Aplicar</button>
         </div>
       </div>
@@ -321,7 +327,7 @@ body{ display:flex; flex-direction:column; }
         <label>Todos los textos del dibujo</label>
         <div class="size-input-row">
           <input type="number" class="size-input" id="size-text-all-input" step="0.05" min="0.05">
-          <span style="font-size:11px;color:var(--muted);">m</span>
+          <span class="unit-suffix-lbl" style="font-size:11px;color:var(--muted);">m</span>
           <button class="size-apply-btn" onclick="applyTextSizeAll()">Aplicar a todos</button>
         </div>
       </div>
@@ -329,7 +335,7 @@ body{ display:flex; flex-direction:column; }
         <label>Todas las cotas del dibujo</label>
         <div class="size-input-row">
           <input type="number" class="size-input" id="size-dim-all-input" step="0.05" min="0.05">
-          <span style="font-size:11px;color:var(--muted);">m</span>
+          <span class="unit-suffix-lbl" style="font-size:11px;color:var(--muted);">m</span>
           <button class="size-apply-btn" onclick="applyDimSizeAll()">Aplicar a todas</button>
         </div>
       </div>
@@ -424,6 +430,25 @@ body{ display:flex; flex-direction:column; }
       <div style="border-top:1px solid var(--border2);margin:6px 0 4px;"></div>
       <div style="padding:2px 10px 4px;font-size:10px;color:var(--muted);line-height:1.4;">
         Cambia el fondo y el color por defecto de la capa "0". Las capas con color propio no se ven afectadas.
+      </div>
+    </div>
+  </div>
+
+  <div class="file-menu-wrap" id="unit-menu-wrap" style="margin-left:8px;">
+    <button class="mt-btn" onclick="toggleUnitMenu(event)" title="Unidades — en qué unidad se muestran y se teclean longitudes, áreas y volúmenes">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="10" rx="1"/><path d="M6 7v3M10 7v3M14 7v3M18 7v3"/></svg>
+      <span id="unit-btn-label">m</span>
+    </button>
+    <div class="mt-panel" id="unit-menu-panel">
+      <div class="mt-hd">UNIDADES</div>
+      <button class="file-menu-item" data-unit="m" onclick="pickUnit('m')"><span class="unit-check">✓</span>Metros (m)</button>
+      <button class="file-menu-item" data-unit="cm" onclick="pickUnit('cm')"><span class="unit-check">✓</span>Centímetros (cm)</button>
+      <button class="file-menu-item" data-unit="mm" onclick="pickUnit('mm')"><span class="unit-check">✓</span>Milímetros (mm)</button>
+      <button class="file-menu-item" data-unit="ft" onclick="pickUnit('ft')"><span class="unit-check">✓</span>Pies (ft)</button>
+      <button class="file-menu-item" data-unit="in" onclick="pickUnit('in')"><span class="unit-check">✓</span>Pulgadas (in)</button>
+      <div style="border-top:1px solid var(--border2);margin:6px 0 4px;"></div>
+      <div style="padding:2px 10px 4px;font-size:10px;color:var(--muted);line-height:1.4;">
+        Solo cambia cómo se muestran y se teclean las medidas — el dibujo se guarda igual sin importar la unidad elegida.
       </div>
     </div>
   </div>
@@ -713,8 +738,8 @@ body{ display:flex; flex-direction:column; }
   <div class="statusbar">
     <span class="hint" id="hint">Selecciona una herramienta para empezar a dibujar</span>
     <div class="sp">
-      <span>X: <b id="coord-x">0.00</b> m</span>
-      <span>Y: <b id="coord-y">0.00</b> m</span>
+      <span>X: <b id="coord-x">0.00</b> <span class="unit-suffix-lbl">m</span></span>
+      <span>Y: <b id="coord-y">0.00</b> <span class="unit-suffix-lbl">m</span></span>
       <span>Zoom: <b id="zoom-lbl">100%</b></span>
       <span>Grilla: <b id="grid-lbl">0.5 m</b></span>
     </div>
@@ -816,6 +841,67 @@ function pickCanvasTheme(key) {
 }
 
 /* ════════════════════════════════════════════════
+   UNIDADES DE VISUALIZACIÓN — el mundo interno (coordenadas, radios, etc. de
+   cada entidad) siempre se guarda en metros; esto solo cambia en qué unidad
+   se muestran las medidas (etiquetas, panel de propiedades, barra de estado)
+   y en qué unidad se interpreta lo que el usuario teclea mientras dibuja.
+════════════════════════════════════════════════ */
+const UNITS = {
+  m:  { label: 'Metros (m)',       suffix: 'm',  factor: 1,                decimals: 2 },
+  cm: { label: 'Centímetros (cm)', suffix: 'cm', factor: 100,              decimals: 1 },
+  mm: { label: 'Milímetros (mm)',  suffix: 'mm', factor: 1000,             decimals: 0 },
+  ft: { label: 'Pies (ft)',        suffix: 'ft', factor: 3.280839895013123, decimals: 2 },
+  in: { label: 'Pulgadas (in)',    suffix: 'in', factor: 39.37007874015748, decimals: 1 },
+};
+let currentUnit = 'm';
+function unitDef() { return UNITS[currentUnit] || UNITS.m; }
+function unitFactor() { return unitDef().factor; }
+function unitSuffix() { return unitDef().suffix; }
+// metros → unidad de visualización actual, ya formateado con sufijo (para etiquetas de solo lectura)
+function fmtLen(m, decimals) { const u = unitDef(); return (m * u.factor).toFixed(decimals != null ? decimals : u.decimals) + ' ' + u.suffix; }
+function fmtArea(m2, decimals) { const u = unitDef(); return (m2 * u.factor * u.factor).toFixed(decimals != null ? decimals : u.decimals) + ' ' + u.suffix + '²'; }
+function fmtVol(m3, decimals) { const u = unitDef(); return (m3 * u.factor * u.factor * u.factor).toFixed(decimals != null ? decimals : u.decimals) + ' ' + u.suffix + '³'; }
+// como fmtLen, pero sin decimales sobrantes cuando el valor es un entero exacto (para la etiqueta de la grilla)
+function fmtLenTrim(m) { const u = unitDef(); const v = m * u.factor; const d = v % 1 === 0 ? 0 : u.decimals; return v.toFixed(d) + ' ' + u.suffix; }
+// metros → número plano en la unidad actual, sin sufijo (para el valor de un <input> editable)
+function toDisplayLen(m) { return m * unitFactor(); }
+// unidad de visualización actual → metros (para leer un <input> editable o un valor recién tecleado)
+function toWorldLen(v) { return v / unitFactor(); }
+
+function updateAllUnitSuffixLabels() {
+  document.querySelectorAll('.unit-suffix-lbl').forEach(el => { el.textContent = unitSuffix(); });
+  const btnLbl = document.getElementById('unit-btn-label');
+  if (btnLbl) btnLbl.textContent = unitSuffix();
+}
+function updateUnitMenuHighlight() {
+  document.querySelectorAll('#unit-menu-panel .file-menu-item').forEach(btn => {
+    btn.classList.toggle('active-unit', btn.dataset.unit === currentUnit);
+  });
+}
+function toggleUnitMenu(e) {
+  e.stopPropagation();
+  const p = document.getElementById('unit-menu-panel');
+  if (p.style.display === 'block') { p.style.display = 'none'; return; }
+  updateUnitMenuHighlight();
+  p.style.display = 'block';
+}
+function closeUnitMenu() { document.getElementById('unit-menu-panel').style.display = 'none'; }
+document.addEventListener('click', () => closeUnitMenu());
+document.getElementById('unit-menu-panel').addEventListener('click', e => e.stopPropagation());
+function pickUnit(key) {
+  closeUnitMenu();
+  if (!UNITS[key] || key === currentUnit) return;
+  currentUnit = key;
+  updateUnitMenuHighlight();
+  updateAllUnitSuffixLabels();
+  updateCoordLabels(mouseWorld);
+  updateSizeMenuFields();
+  if (selected.size > 0) updatePropertiesPanel();
+  saveLocal();
+  draw();
+}
+
+/* ════════════════════════════════════════════════
    TRANSFORMACIÓN MUNDO ↔ PANTALLA
 ════════════════════════════════════════════════ */
 function toScreen(wx, wy) { return { x: view.ox + wx * view.scale, y: view.oy - wy * view.scale }; }
@@ -869,7 +955,7 @@ function updateHistoryButtons() {
 }
 
 function saveLocal() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entities, textHDefault, dimTextDefault, layers, currentLayer, canvasTheme })); } catch (e) {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entities, textHDefault, dimTextDefault, layers, currentLayer, canvasTheme, currentUnit })); } catch (e) {}
 }
 function loadLocal() {
   try {
@@ -884,6 +970,7 @@ function loadLocal() {
       if (Array.isArray(data.layers) && data.layers.length > 0) layers = data.layers;
       if (typeof data.currentLayer === 'string') currentLayer = data.currentLayer;
       if (typeof data.canvasTheme === 'string' && CANVAS_THEMES[data.canvasTheme]) canvasTheme = data.canvasTheme;
+      if (typeof data.currentUnit === 'string' && UNITS[data.currentUnit]) currentUnit = data.currentUnit;
     }
     history = [JSON.stringify(entities)]; histIndex = 0;
   } catch (e) {}
@@ -895,8 +982,8 @@ function loadLocal() {
 const TOOL_HINTS = {
   select:     'Clic para seleccionar · arrastra para mover · Shift+clic o Ctrl+clic suma · Supr para borrar',
   'select-box': 'Arrastra para seleccionar por área (previsualizada) · mantén Shift o Ctrl para sumar',
-  line:       'Clic, clic para el segundo punto · escribe un valor (m) y Enter para longitud exacta · Esc cancela',
-  polyline:   'Clic para cada vértice · escribe una longitud (m) y Enter por tramo · clic cerca del inicio cierra · Enter (sin escribir) termina · Supr deshace el último vértice',
+  line:       'Clic, clic para el segundo punto · escribe un valor ({u}) y Enter para longitud exacta · Esc cancela',
+  polyline:   'Clic para cada vértice · escribe una longitud ({u}) y Enter por tramo · clic cerca del inicio cierra · Enter (sin escribir) termina · Supr deshace el último vértice',
   rect:       'Clic en una esquina y la opuesta · escribe ancho,alto (o un valor = cuadrado) y Enter · Esc cancela',
   circle:     'Clic en el centro y el radio · escribe r,valor o d,valor (o un número = radio) y Enter · Esc cancela',
   pan:        'Arrastra para desplazar la vista',
@@ -929,6 +1016,8 @@ const TOOL_HINTS = {
   'm-area':   'Clic en un círculo, rectángulo o polilínea cerrada para ver su área y perímetro · o clic en puntos vacíos para trazar un polígono (Enter cierra, Retroceso deshace) · Esc cancela',
   'm-volume': 'Igual que Área — al terminar, pide la altura/espesor y calcula el volumen · Esc cancela',
 };
+// TOOL_HINTS[tool], pero sustituyendo "{u}" por la unidad de visualización actual (m, cm, mm, ft, in)
+function hintFor(tool) { const h = TOOL_HINTS[tool]; return h ? h.replace('{u}', unitSuffix()) : (h || ''); }
 
 let copyPhase = 'pick';   // 'pick' (eligiendo el objeto) → 'place' (colocando copias)
 let offsetPhase = 'pick'; // 'pick' (eligiendo el objeto) → 'place' (definiendo lado/distancia) — solo aplica al Offset dinámico
@@ -998,7 +1087,7 @@ function setTool(t) {
   const utilBtn = document.getElementById('tool-util-btn');
   if (utilBtn) utilBtn.classList.toggle('active', isMeasureTool(t));
   canvas.className = 'tool-' + t + (t === 'copy' ? '-' + copyPhase : t === 'offset' ? '-' + offsetPhase : isTrimExtendTool() ? '-' + trimExtendPhase : '');
-  document.getElementById('hint').textContent = TOOL_HINTS[t] || '';
+  document.getElementById('hint').textContent = hintFor(t) || '';
   draw();
 }
 
@@ -1044,7 +1133,7 @@ function beginTrimExtendAction() {
   if (trimExtendBoundary.length === 0) { setTool('select'); return; }
   trimExtendPhase = 'action';
   canvas.className = 'tool-' + tool + '-action';
-  document.getElementById('hint').textContent = TOOL_HINTS[tool === 'trim' ? 'trimAction' : 'extendAction'];
+  document.getElementById('hint').textContent = hintFor(tool === 'trim' ? 'trimAction' : 'extendAction');
   draw();
 }
 
@@ -1274,7 +1363,7 @@ function drawGrid() {
   ctx.strokeStyle = 'rgba(63,185,80,0.45)';
   ctx.beginPath(); ctx.moveTo(origin.x, 0); ctx.lineTo(origin.x, H); ctx.stroke();
 
-  document.getElementById('grid-lbl').textContent = (step >= 1 ? step.toFixed(step % 1 === 0 ? 0 : 1) : step.toFixed(2)) + ' m';
+  document.getElementById('grid-lbl').textContent = fmtLenTrim(step);
 }
 
 /* ════════════════════════════════════════════════
@@ -1408,7 +1497,7 @@ function commitArcDraw(entity) {
   pushHistory();
   arcDraw = null;
   typedBuffer = '';
-  document.getElementById('hint').textContent = TOOL_HINTS[tool];
+  document.getElementById('hint').textContent = hintFor(tool);
 }
 
 function drawArcDrawPreview() {
@@ -1421,7 +1510,7 @@ function drawArcDrawPreview() {
 
   if (arcDraw.method === 'arc-ser' && pts.length === 2) {
     let typedR = null;
-    if (typedBuffer) { const v = parseFloat(typedBuffer); if (!isNaN(v) && v > 0) typedR = v; }
+    if (typedBuffer) { const v = toWorldLen(parseFloat(typedBuffer)); if (!isNaN(v) && v > 0) typedR = v; }
     const arc = computeSERArc(pts[0], pts[1], mouseWorld, typedR);
     if (arc) { drawEntityPath(arc); ctx.stroke(); }
     ctx.setLineDash([]);
@@ -1430,8 +1519,8 @@ function drawArcDrawPreview() {
     [chord0, chord1].forEach(s => { ctx.beginPath(); ctx.arc(s.x, s.y, 3, 0, Math.PI * 2); ctx.fill(); });
     if (arc) {
       const mp = toScreen(mouseWorld.x, mouseWorld.y);
-      const label = 'r=' + arc.r.toFixed(2) + ' m';
-      if (typedBuffer) drawTypedTooltip(mp, typedBuffer + ' ↵');
+      const label = 'r=' + fmtLen(arc.r);
+      if (typedBuffer) drawTypedTooltip(mp, typedBuffer + ' ' + unitSuffix() + ' ↵');
       else { ctx.font = '11px "JetBrains Mono", monospace'; ctx.textBaseline = 'bottom'; ctx.textAlign = 'left'; ctx.fillText(label, mp.x + 10, mp.y - 8); }
     }
   } else if ((arcDraw.method === 'arc-sed' || arcDraw.method === 'arc-sedo') && pts.length === 2) {
@@ -1454,7 +1543,7 @@ function drawArcDrawPreview() {
     [chord0, chord1].forEach(s => { ctx.beginPath(); ctx.arc(s.x, s.y, 3, 0, Math.PI * 2); ctx.fill(); });
     const mp = toScreen(mouseWorld.x, mouseWorld.y);
     if (typedBuffer) drawTypedTooltip(mp, typedBuffer + '° ↵');
-    else if (arc) { ctx.font = '11px "JetBrains Mono", monospace'; ctx.textBaseline = 'bottom'; ctx.textAlign = 'left'; ctx.fillText('r=' + arc.r.toFixed(2) + ' m', mp.x + 10, mp.y - 8); }
+    else if (arc) { ctx.font = '11px "JetBrains Mono", monospace'; ctx.textBaseline = 'bottom'; ctx.textAlign = 'left'; ctx.fillText('r=' + fmtLen(arc.r), mp.x + 10, mp.y - 8); }
   } else if (pts.length === 1) {
     if (arcDraw.method === 'arc-cse') {
       // centro fijo: mostrar el radio en vivo (círculo guía) hacia el mouse
@@ -1590,7 +1679,7 @@ function drawDimEntity(e, isSel) {
     const nx = -dyL / lenL, ny = dxL / lenL, textGap = 10 / view.scale;
     const textP = { x: mid.x + nx * textGap, y: mid.y + ny * textGap };
     const sAng = Math.atan2(toScreen(g.d2.x, g.d2.y).y - toScreen(g.d1.x, g.d1.y).y, toScreen(g.d2.x, g.d2.y).x - toScreen(g.d1.x, g.d1.y).x);
-    dimText(g.value.toFixed(2) + ' m', textP, sAng, col, e.th);
+    dimText(fmtLen(g.value), textP, sAng, col, e.th);
   } else if (e.type === 'dim-angular') {
     const g = dimAngularGeom(e);
     const c = toScreen(e.vertex.x, e.vertex.y);
@@ -1614,14 +1703,14 @@ function drawDimEntity(e, isSel) {
     drawArrowHead(d1p, t1, arrowSize);
     const midA = e.a0 + (e.a1 - e.a0) / 2;
     const textP = arcPoint(e.c, e.dimR + 14 / view.scale, midA);
-    dimText('⌢ ' + (e.r * (e.a1 - e.a0)).toFixed(2) + ' m', textP, 0, col, e.th);
+    dimText('⌢ ' + fmtLen(e.r * (e.a1 - e.a0)), textP, 0, col, e.th);
   } else if (e.type === 'dim-radius') {
     const ang = Math.atan2(e.anchor.y - e.c.y, e.anchor.x - e.c.x);
     const onCirc = arcPoint(e.c, e.r, ang);
     const a = toScreen(onCirc.x, onCirc.y), b = toScreen(e.anchor.x, e.anchor.y);
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     drawArrowHead(onCirc, e.anchor, arrowSize);
-    dimText('R ' + e.r.toFixed(2) + ' m', e.anchor, 0, col, e.th);
+    dimText('R ' + fmtLen(e.r), e.anchor, 0, col, e.th);
   } else if (e.type === 'dim-diameter') {
     const ang = Math.atan2(e.anchor.y - e.c.y, e.anchor.x - e.c.x);
     const p1 = arcPoint(e.c, e.r, ang), p2 = arcPoint(e.c, e.r, ang + Math.PI);
@@ -1636,7 +1725,7 @@ function drawDimEntity(e, isSel) {
     } else {
       textP = arcPoint(e.c, e.r + 14 / view.scale, ang);
     }
-    dimText('⌀ ' + (e.r * 2).toFixed(2) + ' m', textP, 0, col, e.th);
+    dimText('⌀ ' + fmtLen(e.r * 2), textP, 0, col, e.th);
   }
   ctx.restore();
 }
@@ -1726,14 +1815,14 @@ function commitTextInput() {
     selected = new Set([entities.length - 1]);
     pushHistory();
   }
-  document.getElementById('hint').textContent = TOOL_HINTS[tool] || '';
+  document.getElementById('hint').textContent = hintFor(tool) || '';
   draw();
 }
 function cancelTextInput() {
   if (!textEdit) return;
   document.getElementById('text-input-overlay').style.display = 'none';
   textEdit = null;
-  document.getElementById('hint').textContent = TOOL_HINTS[tool] || '';
+  document.getElementById('hint').textContent = hintFor(tool) || '';
   draw();
 }
 (function initTextOverlay() {
@@ -1804,16 +1893,16 @@ function effectiveP2() {
   const buf = typedBuffer.trim();
 
   if (drawState.type === 'line' || drawState.type === 'polyline') {
-    const len = parseFloat(buf);
+    const len = toWorldLen(parseFloat(buf));
     if (isNaN(len) || len <= 0) return m;
     const a = (m.x === p1.x && m.y === p1.y) ? 0 : Math.atan2(m.y - p1.y, m.x - p1.x);
     return { x: p1.x + len * Math.cos(a), y: p1.y + len * Math.sin(a) };
   }
   if (drawState.type === 'rect') {
     const parts = buf.split(',');
-    let w = parseFloat(parts[0]);
+    let w = toWorldLen(parseFloat(parts[0]));
     if (isNaN(w) || w <= 0) return m;
-    let h = parts.length > 1 ? parseFloat(parts[1]) : NaN;
+    let h = parts.length > 1 ? toWorldLen(parseFloat(parts[1])) : NaN;
     if (isNaN(h) || h <= 0) h = w; // sin coma (o alto incompleto) → cuadrado
     const sx = (m.x >= p1.x) ? 1 : -1, sy = (m.y >= p1.y) ? 1 : -1;
     return { x: p1.x + sx * Math.abs(w), y: p1.y + sy * Math.abs(h) };
@@ -1822,9 +1911,9 @@ function effectiveP2() {
     let r = null;
     const rm = /^r,?\s*(-?[\d.]+)/i.exec(buf);
     const dm = /^d,?\s*(-?[\d.]+)/i.exec(buf);
-    if (rm) r = parseFloat(rm[1]);
-    else if (dm) r = parseFloat(dm[1]) / 2;
-    else if (/^-?[\d.]+$/.test(buf)) r = parseFloat(buf);
+    if (rm) r = toWorldLen(parseFloat(rm[1]));
+    else if (dm) r = toWorldLen(parseFloat(dm[1])) / 2;
+    else if (/^-?[\d.]+$/.test(buf)) r = toWorldLen(parseFloat(buf));
     if (r === null || isNaN(r) || r <= 0) return m;
     const a = (m.x === p1.x && m.y === p1.y) ? 0 : Math.atan2(m.y - p1.y, m.x - p1.x);
     return { x: p1.x + r * Math.cos(a), y: p1.y + r * Math.sin(a) };
@@ -1906,7 +1995,7 @@ function drawPreview() {
     const a = toScreen(p1.x, p1.y), b = toScreen(p2.x, p2.y);
     ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
     ctx.stroke(); // pintar el tramo punteado ya mismo — el beginPath() de abajo (círculo de inicio) reemplazaría esta ruta antes de llegar al ctx.stroke() compartido del final
-    label = dist(p1, p2).toFixed(2) + ' m';
+    label = fmtLen(dist(p1, p2));
     // resaltar el punto de inicio (clic cerca cierra la polilínea)
     const s0 = toScreen(drawState.pts[0].x, drawState.pts[0].y);
     ctx.save(); ctx.setLineDash([]); ctx.strokeStyle = '#3fb950'; ctx.lineWidth = 1.5;
@@ -1915,22 +2004,23 @@ function drawPreview() {
   } else if (drawState.type === 'line') {
     const a = toScreen(p1.x, p1.y), b = toScreen(p2.x, p2.y);
     ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-    label = dist(p1, p2).toFixed(2) + ' m';
+    label = fmtLen(dist(p1, p2));
   } else if (drawState.type === 'rect') {
     const a = toScreen(Math.min(p1.x, p2.x), Math.max(p1.y, p2.y));
     const b = toScreen(Math.max(p1.x, p2.x), Math.min(p1.y, p2.y));
     ctx.rect(a.x, a.y, b.x - a.x, b.y - a.y);
-    label = Math.abs(p2.x - p1.x).toFixed(2) + ' × ' + Math.abs(p2.y - p1.y).toFixed(2) + ' m';
+    const wd = unitDef().decimals;
+    label = toDisplayLen(Math.abs(p2.x - p1.x)).toFixed(wd) + ' × ' + toDisplayLen(Math.abs(p2.y - p1.y)).toFixed(wd) + ' ' + unitSuffix();
   } else if (drawState.type === 'circle') {
     const c = toScreen(p1.x, p1.y), r = dist(p1, p2) * view.scale;
     ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
-    label = 'r = ' + dist(p1, p2).toFixed(2) + ' m';
+    label = 'r = ' + fmtLen(dist(p1, p2));
   }
   ctx.stroke();
   ctx.setLineDash([]);
   const bp = toScreen(p2.x, p2.y);
   if (typedBuffer) {
-    drawTypedTooltip(bp, typedBuffer + ' ↵');
+    drawTypedTooltip(bp, typedBuffer + ' ' + unitSuffix() + ' ↵');
   } else {
     ctx.fillStyle = '#58a6ff';
     ctx.font = '11px "JetBrains Mono", monospace';
@@ -2021,7 +2111,7 @@ function effectiveCopyOffset() {
   const base = copyState.base, m = copyState.raw;
   let dx = m.x - base.x, dy = m.y - base.y;
   if (typedBuffer) {
-    const len = parseFloat(typedBuffer);
+    const len = toWorldLen(parseFloat(typedBuffer));
     if (!isNaN(len) && len > 0) {
       const a = (dx === 0 && dy === 0) ? 0 : Math.atan2(dy, dx);
       dx = len * Math.cos(a); dy = len * Math.sin(a);
@@ -2177,7 +2267,7 @@ function applyOffset(e, sign, magnitude, info) {
 function offsetMagnitude(info) {
   if (typedBuffer) {
     const v = parseFloat(typedBuffer);
-    if (!isNaN(v) && v > 0) return v;
+    if (!isNaN(v) && v > 0) return toWorldLen(v);
   }
   if (tool === 'offset-fixed' && offsetLocked !== null) return offsetLocked;
   return info.dist;
@@ -2223,12 +2313,12 @@ function drawOffsetPreview() {
   if (any) {
     const mp = toScreen(m.x, m.y);
     if (typedBuffer) {
-      drawTypedTooltip(mp, typedBuffer + ' ↵');
+      drawTypedTooltip(mp, typedBuffer + ' ' + unitSuffix() + ' ↵');
     } else {
       ctx.fillStyle = '#f59e0b';
       ctx.font = '11px "JetBrains Mono", monospace';
       ctx.textBaseline = 'bottom'; ctx.textAlign = 'left';
-      ctx.fillText(mag.toFixed(2) + ' m', mp.x + 10, mp.y - 8);
+      ctx.fillText(fmtLen(mag), mp.x + 10, mp.y - 8);
     }
   }
   ctx.restore();
@@ -2254,13 +2344,13 @@ function drawOffsetFixedPreview() {
   ctx.setLineDash([]);
   const mp = toScreen(mouseWorld.x, mouseWorld.y);
   if (typedBuffer) {
-    drawTypedTooltip(mp, typedBuffer + ' ↵');
+    drawTypedTooltip(mp, typedBuffer + ' ' + unitSuffix() + ' ↵');
   } else {
     const locked = offsetLocked !== null;
     ctx.fillStyle = '#f59e0b';
     ctx.font = '11px "JetBrains Mono", monospace';
     ctx.textBaseline = 'bottom'; ctx.textAlign = 'left';
-    ctx.fillText(mag.toFixed(2) + ' m' + (locked ? ' 🔒' : ''), mp.x + 10, mp.y - 8);
+    ctx.fillText(fmtLen(mag) + (locked ? ' 🔒' : ''), mp.x + 10, mp.y - 8);
   }
   ctx.restore();
 }
@@ -2278,7 +2368,7 @@ function placeOffsetFixed(sx, sy) {
   selected = new Set([entities.length - 1]);
   if (typedBuffer) {
     const v = parseFloat(typedBuffer);
-    if (!isNaN(v) && v > 0) offsetLocked = v;
+    if (!isNaN(v) && v > 0) offsetLocked = toWorldLen(v);
     typedBuffer = '';
   }
   pushHistory();
@@ -2304,11 +2394,11 @@ function drawCopyPreview() {
   ctx.beginPath(); ctx.arc(bp.x, bp.y, 3, 0, Math.PI * 2); ctx.fill();
 
   if (typedBuffer) {
-    drawTypedTooltip(mp, typedBuffer + ' ↵');
+    drawTypedTooltip(mp, typedBuffer + ' ' + unitSuffix() + ' ↵');
   } else {
     ctx.font = '11px "JetBrains Mono", monospace';
     ctx.textBaseline = 'bottom'; ctx.textAlign = 'left';
-    ctx.fillText(Math.hypot(off.dx, off.dy).toFixed(2) + ' m', mp.x + 10, mp.y - 8);
+    ctx.fillText(fmtLen(Math.hypot(off.dx, off.dy)), mp.x + 10, mp.y - 8);
   }
   ctx.restore();
 }
@@ -3025,24 +3115,24 @@ function drawMeasureResult() {
 }
 function finishAreaMeasurement(area, perimeter, kind, point, needsHeight) {
   if (needsHeight) {
-    const hStr = prompt('Altura / espesor (m) para calcular el volumen:');
+    const hStr = prompt('Altura / espesor (' + unitSuffix() + ') para calcular el volumen:');
     if (hStr === null) { measureResult = null; draw(); return; }
-    const h = parseFloat(hStr);
+    const h = toWorldLen(parseFloat(hStr));
     if (isNaN(h) || h <= 0) {
-      measureResult = { point, lines: ['⚠ Altura inválida', (kind ? kind + ' — ' : '') + 'Área: ' + area.toFixed(3) + ' m²', 'Perímetro: ' + perimeter.toFixed(3) + ' m'] };
+      measureResult = { point, lines: ['⚠ Altura inválida', (kind ? kind + ' — ' : '') + 'Área: ' + fmtArea(area, 3), 'Perímetro: ' + fmtLen(perimeter, 3)] };
       draw();
       return;
     }
     measureResult = { point, lines: [
-      (kind ? kind + ' — ' : '') + 'Área: ' + area.toFixed(3) + ' m²',
-      'Perímetro: ' + perimeter.toFixed(3) + ' m',
-      'Altura: ' + h.toFixed(3) + ' m',
-      'Volumen: ' + (area * h).toFixed(3) + ' m³'
+      (kind ? kind + ' — ' : '') + 'Área: ' + fmtArea(area, 3),
+      'Perímetro: ' + fmtLen(perimeter, 3),
+      'Altura: ' + fmtLen(h, 3),
+      'Volumen: ' + fmtVol(area * h, 3)
     ] };
   } else {
     measureResult = { point, lines: [
-      (kind ? kind + ' — ' : '') + 'Área: ' + area.toFixed(3) + ' m²',
-      'Perímetro: ' + perimeter.toFixed(3) + ' m'
+      (kind ? kind + ' — ' : '') + 'Área: ' + fmtArea(area, 3),
+      'Perímetro: ' + fmtLen(perimeter, 3)
     ] };
   }
   draw();
@@ -3191,8 +3281,9 @@ function clearAll() {
    INTERACCIÓN — PUNTERO (mouse + touch unificados)
 ════════════════════════════════════════════════ */
 function updateCoordLabels(w) {
-  document.getElementById('coord-x').textContent = w.x.toFixed(2);
-  document.getElementById('coord-y').textContent = w.y.toFixed(2);
+  const d = unitDef().decimals;
+  document.getElementById('coord-x').textContent = toDisplayLen(w.x).toFixed(d);
+  document.getElementById('coord-y').textContent = toDisplayLen(w.y).toFixed(d);
 }
 
 function pointerDown(sx, sy, button, shiftKey) { // shiftKey: Shift, Ctrl o Cmd (cualquiera "suma a la selección")
@@ -3342,7 +3433,7 @@ function pointerDown(sx, sy, button, shiftKey) { // shiftKey: Shift, Ctrl o Cmd 
         return;
       }
       let typedR = null;
-      if (typedBuffer) { const v = parseFloat(typedBuffer); if (!isNaN(v) && v > 0) typedR = v; }
+      if (typedBuffer) { const v = toWorldLen(parseFloat(typedBuffer)); if (!isNaN(v) && v > 0) typedR = v; }
       commitArcDraw(computeSERArc(arcDraw.pts[0], arcDraw.pts[1], mouseWorld, typedR));
       draw();
       return;
@@ -3500,8 +3591,8 @@ function pointerDown(sx, sy, button, shiftKey) { // shiftKey: Shift, Ctrl o Cmd 
       const dx = Math.abs(p.x - p1.x), dy = Math.abs(p.y - p1.y);
       const ang = normalizeAngle(Math.atan2(p.y - p1.y, p.x - p1.x)) * 180 / Math.PI;
       measureResult = { point: p, lines: [
-        'Distancia: ' + d.toFixed(3) + ' m',
-        'Δx: ' + dx.toFixed(3) + ' m   Δy: ' + dy.toFixed(3) + ' m',
+        'Distancia: ' + fmtLen(d, 3),
+        'Δx: ' + fmtLen(dx, 3) + '   Δy: ' + fmtLen(dy, 3),
         'Ángulo: ' + ang.toFixed(1) + '°'
       ] };
       measureDraw = { method: 'm-dist', pts: [p] }; // encadena: el punto final es el nuevo inicio
@@ -3518,9 +3609,9 @@ function pointerDown(sx, sy, button, shiftKey) { // shiftKey: Shift, Ctrl o Cmd 
       const e = entities[hit];
       selected = new Set([hit]);
       measureResult = { point: { x: mouseWorld.x, y: mouseWorld.y }, lines: [
-        'Radio: ' + e.r.toFixed(3) + ' m',
-        'Diámetro: ' + (e.r * 2).toFixed(3) + ' m',
-        'Circunferencia: ' + (2 * Math.PI * e.r).toFixed(3) + ' m'
+        'Radio: ' + fmtLen(e.r, 3),
+        'Diámetro: ' + fmtLen(e.r * 2, 3),
+        'Circunferencia: ' + fmtLen(2 * Math.PI * e.r, 3)
       ] };
       draw();
       return;
@@ -3767,8 +3858,8 @@ canvas.addEventListener('contextmenu', e => {
   else if (drawState) { drawState = null; typedBuffer = ''; draw(); }
   else if (tool === 'fillet' && filletPick) { filletPick = null; selected.clear(); document.getElementById('hint').textContent = TOOL_HINTS.fillet; draw(); }
   else if (isArcDrawTool(tool) && arcDraw) { arcDraw = null; typedBuffer = ''; draw(); }
-  else if (isDimTool(tool) && dimDraw) { dimDraw = null; selected.clear(); document.getElementById('hint').textContent = TOOL_HINTS[tool]; draw(); }
-  else if (isMeasureTool(tool) && (measureDraw || measureResult)) { measureDraw = null; measureResult = null; selected.clear(); document.getElementById('hint').textContent = TOOL_HINTS[tool]; draw(); }
+  else if (isDimTool(tool) && dimDraw) { dimDraw = null; selected.clear(); document.getElementById('hint').textContent = hintFor(tool); draw(); }
+  else if (isMeasureTool(tool) && (measureDraw || measureResult)) { measureDraw = null; measureResult = null; selected.clear(); document.getElementById('hint').textContent = hintFor(tool); draw(); }
   else if (tool === 'copy' || isOffsetTool() || isTrimExtendTool()) { setTool('select'); }
 });
 canvas.addEventListener('dblclick', e => {
@@ -3877,7 +3968,7 @@ window.addEventListener('keydown', e => {
     if (e.key === 'Enter') {
       e.preventDefault();
       if (typedBuffer) {
-        const v = parseFloat(typedBuffer);
+        const v = toWorldLen(parseFloat(typedBuffer));
         if (!isNaN(v) && v > 0) offsetLocked = v;
         typedBuffer = '';
         draw();
@@ -3895,7 +3986,7 @@ window.addEventListener('keydown', e => {
     if (e.key === 'Enter') {
       e.preventDefault();
       let typedR = null;
-      if (typedBuffer) { const v = parseFloat(typedBuffer); if (!isNaN(v) && v > 0) typedR = v; }
+      if (typedBuffer) { const v = toWorldLen(parseFloat(typedBuffer)); if (!isNaN(v) && v > 0) typedR = v; }
       if (typedR === null) return; // Enter sin un radio válido: no hace nada (usa clic para confirmar el radio en vivo)
       commitArcDraw(computeSERArc(arcDraw.pts[0], arcDraw.pts[1], mouseWorld, typedR));
       return;
@@ -3961,8 +4052,8 @@ window.addEventListener('keydown', e => {
     if (tool === 'copy' || isOffsetTool() || isTrimExtendTool()) { setTool('select'); return; }
     if (tool === 'fillet' && filletPick) { filletPick = null; selected.clear(); document.getElementById('hint').textContent = TOOL_HINTS.fillet; draw(); return; }
     if (isArcDrawTool(tool) && arcDraw) { arcDraw = null; typedBuffer = ''; draw(); return; }
-    if (isDimTool(tool) && dimDraw) { dimDraw = null; selected.clear(); document.getElementById('hint').textContent = TOOL_HINTS[tool]; draw(); return; }
-    if (isMeasureTool(tool) && (measureDraw || measureResult)) { measureDraw = null; measureResult = null; selected.clear(); document.getElementById('hint').textContent = TOOL_HINTS[tool]; draw(); return; }
+    if (isDimTool(tool) && dimDraw) { dimDraw = null; selected.clear(); document.getElementById('hint').textContent = hintFor(tool); draw(); return; }
+    if (isMeasureTool(tool) && (measureDraw || measureResult)) { measureDraw = null; measureResult = null; selected.clear(); document.getElementById('hint').textContent = hintFor(tool); draw(); return; }
     if (drawState && drawState.type === 'polyline') { finishPolyline(false); return; }
     drawState = null; typedBuffer = ''; boxSelect = null; selected.clear(); draw(); return;
   }
@@ -4042,15 +4133,16 @@ document.addEventListener('click', () => closeSizeMenu());
 document.getElementById('size-menu-panel').addEventListener('click', e => e.stopPropagation());
 
 function updateSizeMenuFields() {
-  document.getElementById('size-text-all-input').value = textHDefault;
-  document.getElementById('size-dim-all-input').value = dimTextDefault;
+  const r = (m) => Math.round(toDisplayLen(m) * 1000) / 1000;
+  document.getElementById('size-text-all-input').value = r(textHDefault);
+  document.getElementById('size-dim-all-input').value = r(dimTextDefault);
   const selInput = document.getElementById('size-selected-input');
   const selBtn = document.getElementById('size-selected-btn');
   const selLabel = document.getElementById('size-selected-label');
   const selAnn = [...selected].filter(i => entities[i] && isAnnotationType(entities[i].type));
   if (selAnn.length > 0) {
     const first = entities[selAnn[0]];
-    selInput.value = first.type === 'text' ? first.h : (first.th || dimTextDefault);
+    selInput.value = r(first.type === 'text' ? first.h : (first.th || dimTextDefault));
     selInput.disabled = false;
     selBtn.disabled = false;
     selLabel.textContent = 'Selección actual (' + selAnn.length + (selAnn.length === 1 ? ' objeto)' : ' objetos)');
@@ -4063,7 +4155,7 @@ function updateSizeMenuFields() {
 }
 
 function applySizeToSelection() {
-  const v = parseFloat(document.getElementById('size-selected-input').value);
+  const v = toWorldLen(parseFloat(document.getElementById('size-selected-input').value));
   if (isNaN(v) || v <= 0) return;
   let changed = false;
   selected.forEach(i => {
@@ -4077,7 +4169,7 @@ function applySizeToSelection() {
 }
 
 function applyTextSizeAll() {
-  const v = parseFloat(document.getElementById('size-text-all-input').value);
+  const v = toWorldLen(parseFloat(document.getElementById('size-text-all-input').value));
   if (isNaN(v) || v <= 0) return;
   textHDefault = v;
   let changed = false;
@@ -4088,7 +4180,7 @@ function applyTextSizeAll() {
 }
 
 function applyDimSizeAll() {
-  const v = parseFloat(document.getElementById('size-dim-all-input').value);
+  const v = toWorldLen(parseFloat(document.getElementById('size-dim-all-input').value));
   if (isNaN(v) || v <= 0) return;
   dimTextDefault = v;
   let changed = false;
@@ -4137,52 +4229,55 @@ function closePropertiesMenu() { document.getElementById('props-menu-panel').sty
 document.addEventListener('click', () => closePropertiesMenu());
 document.getElementById('props-menu-panel').addEventListener('click', e => e.stopPropagation());
 
-function propNum(v) { return (Math.round(v * 1000) / 1000).toString(); }
+function propNum(v) { return (Math.round(v * 1000) / 1000).toString(); } // sin conversión de unidad — para ángulos y conteos
+function propLen(v) { return (Math.round(toDisplayLen(v) * 1000) / 1000).toString(); } // longitudes/coordenadas, en la unidad actual
+function propArea(v) { return (Math.round(v * unitFactor() * unitFactor() * 1000) / 1000).toString(); } // áreas, en la unidad actual al cuadrado
+const propU = () => unitSuffix();
 function propFieldsHTML(e) {
   if (e.type === 'line' || e.type === 'rect') {
     const lenInfo = e.type === 'line'
-      ? 'Longitud: ' + propNum(dist(e.p1, e.p2)) + ' m &nbsp;·&nbsp; Ángulo: ' + propNum(normalizeAngle(Math.atan2(e.p2.y - e.p1.y, e.p2.x - e.p1.x)) * 180 / Math.PI) + '°'
-      : 'Ancho: ' + propNum(Math.abs(e.p2.x - e.p1.x)) + ' m &nbsp;·&nbsp; Alto: ' + propNum(Math.abs(e.p2.y - e.p1.y)) + ' m &nbsp;·&nbsp; Área: ' + propNum(Math.abs((e.p2.x - e.p1.x) * (e.p2.y - e.p1.y))) + ' m²';
+      ? 'Longitud: ' + fmtLen(dist(e.p1, e.p2)) + ' &nbsp;·&nbsp; Ángulo: ' + propNum(normalizeAngle(Math.atan2(e.p2.y - e.p1.y, e.p2.x - e.p1.x)) * 180 / Math.PI) + '°'
+      : 'Ancho: ' + fmtLen(Math.abs(e.p2.x - e.p1.x)) + ' &nbsp;·&nbsp; Alto: ' + fmtLen(Math.abs(e.p2.y - e.p1.y)) + ' &nbsp;·&nbsp; Área: ' + fmtArea(Math.abs((e.p2.x - e.p1.x) * (e.p2.y - e.p1.y)));
     return '' +
-      '<div class="size-row"><label>Punto ' + (e.type === 'line' ? 'inicial' : '1') + ' (X, Y)</label><div class="size-input-row">' +
-        '<input type="number" class="size-input" id="pf-x1" step="0.01" value="' + propNum(e.p1.x) + '">' +
-        '<input type="number" class="size-input" id="pf-y1" step="0.01" value="' + propNum(e.p1.y) + '">' +
+      '<div class="size-row"><label>Punto ' + (e.type === 'line' ? 'inicial' : '1') + ' (X, Y — ' + propU() + ')</label><div class="size-input-row">' +
+        '<input type="number" class="size-input" id="pf-x1" step="0.01" value="' + propLen(e.p1.x) + '">' +
+        '<input type="number" class="size-input" id="pf-y1" step="0.01" value="' + propLen(e.p1.y) + '">' +
       '</div></div>' +
-      '<div class="size-row"><label>Punto ' + (e.type === 'line' ? 'final' : '2') + ' (X, Y)</label><div class="size-input-row">' +
-        '<input type="number" class="size-input" id="pf-x2" step="0.01" value="' + propNum(e.p2.x) + '">' +
-        '<input type="number" class="size-input" id="pf-y2" step="0.01" value="' + propNum(e.p2.y) + '">' +
+      '<div class="size-row"><label>Punto ' + (e.type === 'line' ? 'final' : '2') + ' (X, Y — ' + propU() + ')</label><div class="size-input-row">' +
+        '<input type="number" class="size-input" id="pf-x2" step="0.01" value="' + propLen(e.p2.x) + '">' +
+        '<input type="number" class="size-input" id="pf-y2" step="0.01" value="' + propLen(e.p2.y) + '">' +
       '</div></div>' +
       '<div class="prop-readonly">' + lenInfo + '</div>' +
       '<button class="size-apply-btn" style="margin:2px 10px 8px;width:calc(100% - 20px);" onclick="applyEntityProperties()">Aplicar</button>';
   }
   if (e.type === 'circle') {
     return '' +
-      '<div class="size-row"><label>Centro (X, Y)</label><div class="size-input-row">' +
-        '<input type="number" class="size-input" id="pf-cx" step="0.01" value="' + propNum(e.c.x) + '">' +
-        '<input type="number" class="size-input" id="pf-cy" step="0.01" value="' + propNum(e.c.y) + '">' +
+      '<div class="size-row"><label>Centro (X, Y — ' + propU() + ')</label><div class="size-input-row">' +
+        '<input type="number" class="size-input" id="pf-cx" step="0.01" value="' + propLen(e.c.x) + '">' +
+        '<input type="number" class="size-input" id="pf-cy" step="0.01" value="' + propLen(e.c.y) + '">' +
       '</div></div>' +
       '<div class="size-row"><label>Radio</label><div class="size-input-row">' +
-        '<input type="number" class="size-input" id="pf-r" step="0.01" min="0.001" value="' + propNum(e.r) + '">' +
-        '<span style="font-size:11px;color:var(--muted);">m</span>' +
+        '<input type="number" class="size-input" id="pf-r" step="0.01" min="0.001" value="' + propLen(e.r) + '">' +
+        '<span class="unit-suffix-lbl" style="font-size:11px;color:var(--muted);">' + propU() + '</span>' +
       '</div></div>' +
-      '<div class="prop-readonly">Diámetro: ' + propNum(e.r * 2) + ' m &nbsp;·&nbsp; Área: ' + propNum(Math.PI * e.r * e.r) + ' m² &nbsp;·&nbsp; Circunferencia: ' + propNum(2 * Math.PI * e.r) + ' m</div>' +
+      '<div class="prop-readonly">Diámetro: ' + fmtLen(e.r * 2) + ' &nbsp;·&nbsp; Área: ' + fmtArea(Math.PI * e.r * e.r) + ' &nbsp;·&nbsp; Circunferencia: ' + fmtLen(2 * Math.PI * e.r) + '</div>' +
       '<button class="size-apply-btn" style="margin:2px 10px 8px;width:calc(100% - 20px);" onclick="applyEntityProperties()">Aplicar</button>';
   }
   if (e.type === 'arc') {
     return '' +
-      '<div class="size-row"><label>Centro (X, Y)</label><div class="size-input-row">' +
-        '<input type="number" class="size-input" id="pf-cx" step="0.01" value="' + propNum(e.c.x) + '">' +
-        '<input type="number" class="size-input" id="pf-cy" step="0.01" value="' + propNum(e.c.y) + '">' +
+      '<div class="size-row"><label>Centro (X, Y — ' + propU() + ')</label><div class="size-input-row">' +
+        '<input type="number" class="size-input" id="pf-cx" step="0.01" value="' + propLen(e.c.x) + '">' +
+        '<input type="number" class="size-input" id="pf-cy" step="0.01" value="' + propLen(e.c.y) + '">' +
       '</div></div>' +
       '<div class="size-row"><label>Radio</label><div class="size-input-row">' +
-        '<input type="number" class="size-input" id="pf-r" step="0.01" min="0.001" value="' + propNum(e.r) + '">' +
-        '<span style="font-size:11px;color:var(--muted);">m</span>' +
+        '<input type="number" class="size-input" id="pf-r" step="0.01" min="0.001" value="' + propLen(e.r) + '">' +
+        '<span class="unit-suffix-lbl" style="font-size:11px;color:var(--muted);">' + propU() + '</span>' +
       '</div></div>' +
       '<div class="size-row"><label>Ángulo inicial / final (°)</label><div class="size-input-row">' +
         '<input type="number" class="size-input" id="pf-a0" step="1" value="' + propNum(e.a0 * 180 / Math.PI) + '">' +
         '<input type="number" class="size-input" id="pf-a1" step="1" value="' + propNum(e.a1 * 180 / Math.PI) + '">' +
       '</div></div>' +
-      '<div class="prop-readonly">Longitud de arco: ' + propNum(e.r * (e.a1 - e.a0)) + ' m</div>' +
+      '<div class="prop-readonly">Longitud de arco: ' + fmtLen(e.r * (e.a1 - e.a0)) + '</div>' +
       '<button class="size-apply-btn" style="margin:2px 10px 8px;width:calc(100% - 20px);" onclick="applyEntityProperties()">Aplicar</button>';
   }
   if (e.type === 'text') {
@@ -4190,19 +4285,19 @@ function propFieldsHTML(e) {
       '<div class="size-row"><label>Contenido</label>' +
         '<input type="text" class="size-input" id="pf-str" style="width:100%;" value="' + escAttr(e.str) + '">' +
       '</div>' +
-      '<div class="size-row"><label>Posición (X, Y)</label><div class="size-input-row">' +
-        '<input type="number" class="size-input" id="pf-x" step="0.01" value="' + propNum(e.p.x) + '">' +
-        '<input type="number" class="size-input" id="pf-y" step="0.01" value="' + propNum(e.p.y) + '">' +
+      '<div class="size-row"><label>Posición (X, Y — ' + propU() + ')</label><div class="size-input-row">' +
+        '<input type="number" class="size-input" id="pf-x" step="0.01" value="' + propLen(e.p.x) + '">' +
+        '<input type="number" class="size-input" id="pf-y" step="0.01" value="' + propLen(e.p.y) + '">' +
       '</div></div>' +
       '<div class="size-row"><label>Altura de texto</label><div class="size-input-row">' +
-        '<input type="number" class="size-input" id="pf-h" step="0.01" min="0.01" value="' + propNum(e.h) + '">' +
-        '<span style="font-size:11px;color:var(--muted);">m</span>' +
+        '<input type="number" class="size-input" id="pf-h" step="0.01" min="0.01" value="' + propLen(e.h) + '">' +
+        '<span class="unit-suffix-lbl" style="font-size:11px;color:var(--muted);">' + propU() + '</span>' +
       '</div></div>' +
       '<button class="size-apply-btn" style="margin:2px 10px 8px;width:calc(100% - 20px);" onclick="applyEntityProperties()">Aplicar</button>';
   }
   if (e.type === 'polyline') {
     return '<div class="prop-readonly">Vértices: ' + e.pts.length + ' &nbsp;·&nbsp; ' + (e.closed ? 'Cerrada' : 'Abierta') +
-      (e.closed ? ' &nbsp;·&nbsp; Perímetro: ' + propNum(polygonPerimeter(e.pts, true)) + ' m &nbsp;·&nbsp; Área: ' + propNum(polygonArea(e.pts)) + ' m²' : ' &nbsp;·&nbsp; Longitud: ' + propNum(polygonPerimeter(e.pts, false)) + ' m') +
+      (e.closed ? ' &nbsp;·&nbsp; Perímetro: ' + fmtLen(polygonPerimeter(e.pts, true)) + ' &nbsp;·&nbsp; Área: ' + fmtArea(polygonArea(e.pts)) : ' &nbsp;·&nbsp; Longitud: ' + fmtLen(polygonPerimeter(e.pts, false))) +
       '<br><span style="opacity:.7;">Edita sus vértices arrastrándolos o usando las herramientas de dibujo.</span></div>';
   }
   const ap = entityAreaPerimeter(e);
@@ -4232,16 +4327,17 @@ function applyEntityProperties() {
   const e = entities[idx];
   if (!e) return;
   const num = (id) => { const el = document.getElementById(id); return el ? parseFloat(el.value) : NaN; };
+  const lenNum = (id) => toWorldLen(num(id)); // los campos de coordenadas/radios/alturas se muestran y se editan en la unidad actual
   if (e.type === 'line' || e.type === 'rect') {
-    const x1 = num('pf-x1'), y1 = num('pf-y1'), x2 = num('pf-x2'), y2 = num('pf-y2');
+    const x1 = lenNum('pf-x1'), y1 = lenNum('pf-y1'), x2 = lenNum('pf-x2'), y2 = lenNum('pf-y2');
     if ([x1, y1, x2, y2].some(isNaN)) return;
     e.p1 = { x: x1, y: y1 }; e.p2 = { x: x2, y: y2 };
   } else if (e.type === 'circle') {
-    const cx = num('pf-cx'), cy = num('pf-cy'), rr = num('pf-r');
+    const cx = lenNum('pf-cx'), cy = lenNum('pf-cy'), rr = lenNum('pf-r');
     if ([cx, cy, rr].some(isNaN) || rr <= 0) return;
     e.c = { x: cx, y: cy }; e.r = rr;
   } else if (e.type === 'arc') {
-    const cx = num('pf-cx'), cy = num('pf-cy'), rr = num('pf-r');
+    const cx = lenNum('pf-cx'), cy = lenNum('pf-cy'), rr = lenNum('pf-r');
     let a0 = num('pf-a0'), a1 = num('pf-a1');
     if ([cx, cy, rr, a0, a1].some(isNaN) || rr <= 0) return;
     a0 = (a0 * Math.PI / 180); a1 = (a1 * Math.PI / 180);
@@ -4249,7 +4345,7 @@ function applyEntityProperties() {
     if (a1 <= a0) a1 += 2 * Math.PI;
     e.c = { x: cx, y: cy }; e.r = rr; e.a0 = a0; e.a1 = a1;
   } else if (e.type === 'text') {
-    const x = num('pf-x'), y = num('pf-y'), h = num('pf-h');
+    const x = lenNum('pf-x'), y = lenNum('pf-y'), h = lenNum('pf-h');
     const strEl = document.getElementById('pf-str');
     if ([x, y, h].some(isNaN) || h <= 0 || !strEl) return;
     e.p = { x, y }; e.h = h; e.str = strEl.value;
@@ -4491,7 +4587,7 @@ async function fileOpen() {
   if (window.showOpenFilePicker) {
     try {
       const [handle] = await window.showOpenFilePicker({
-        types: [{ description: 'Dibujo CAD PortiCAD', accept: { 'application/json': [FILE_EXT] } }],
+        types: [{ description: 'CrokisCAD PortiCAD', accept: { 'application/json': [FILE_EXT] } }],
       });
       const file = await handle.getFile();
       loadDrawingFromText(await file.text(), handle.name);
@@ -4525,7 +4621,7 @@ async function fileSaveAs() {
     try {
       const handle = await window.showSaveFilePicker({
         suggestedName: currentFileName || ('dibujo' + FILE_EXT),
-        types: [{ description: 'Dibujo CAD PortiCAD', accept: { 'application/json': [FILE_EXT] } }],
+        types: [{ description: 'CrokisCAD PortiCAD', accept: { 'application/json': [FILE_EXT] } }],
       });
       await writeToHandle(handle);
       currentFileHandle = handle;
@@ -4612,7 +4708,7 @@ function toDXF() {
     } else if (e.type === 'dim-linear' || e.type === 'dim-aligned') {
       const gd = e.type === 'dim-linear' ? dimLinearGeom(e) : dimAlignedGeom(e);
       writeLine(e.p1, gd.d1); writeLine(e.p2, gd.d2); writeLine(gd.d1, gd.d2);
-      writeText({ x: (gd.d1.x + gd.d2.x) / 2, y: (gd.d1.y + gd.d2.y) / 2 }, gd.value.toFixed(2) + ' m', e.th || dimTextDefault);
+      writeText({ x: (gd.d1.x + gd.d2.x) / 2, y: (gd.d1.y + gd.d2.y) / 2 }, fmtLen(gd.value), e.th || dimTextDefault);
     } else if (e.type === 'dim-angular') {
       const gd = dimAngularGeom(e);
       writeArc(e.vertex, gd.radius, gd.a0, gd.a1);
@@ -4623,15 +4719,15 @@ function toDXF() {
       writeArc(e.c, e.dimR, e.a0, e.a1);
       writeLine(arcPoint(e.c, e.r, e.a0), arcPoint(e.c, e.dimR, e.a0));
       writeLine(arcPoint(e.c, e.r, e.a1), arcPoint(e.c, e.dimR, e.a1));
-      writeText(arcPoint(e.c, e.dimR, e.a0 + (e.a1 - e.a0) / 2), (e.r * (e.a1 - e.a0)).toFixed(2) + ' m', e.th || dimTextDefault);
+      writeText(arcPoint(e.c, e.dimR, e.a0 + (e.a1 - e.a0) / 2), fmtLen(e.r * (e.a1 - e.a0)), e.th || dimTextDefault);
     } else if (e.type === 'dim-radius') {
       const ang = Math.atan2(e.anchor.y - e.c.y, e.anchor.x - e.c.x);
       writeLine(arcPoint(e.c, e.r, ang), e.anchor);
-      writeText(e.anchor, 'R ' + e.r.toFixed(2) + ' m', e.th || dimTextDefault);
+      writeText(e.anchor, 'R ' + fmtLen(e.r), e.th || dimTextDefault);
     } else if (e.type === 'dim-diameter') {
       const ang = Math.atan2(e.anchor.y - e.c.y, e.anchor.x - e.c.x);
       writeLine(arcPoint(e.c, e.r, ang), arcPoint(e.c, e.r, ang + Math.PI));
-      writeText(e.anchor, '⌀ ' + (e.r * 2).toFixed(2) + ' m', e.th || dimTextDefault);
+      writeText(e.anchor, '⌀ ' + fmtLen(e.r * 2), e.th || dimTextDefault);
     } else if (e.type === 'text') {
       writeText(e.p, e.str, e.h);
     }
@@ -4805,6 +4901,8 @@ window.addEventListener('resize', () => { resizeCanvas(); });
 loadLocal();
 applyCanvasThemeVisuals(canvasTheme);
 updateThemeMenuHighlight();
+updateAllUnitSuffixLabels();
+updateUnitMenuHighlight();
 centerView();
 resizeCanvas();
 updateZoomLabel();
