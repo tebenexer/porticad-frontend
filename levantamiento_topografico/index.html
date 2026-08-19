@@ -19,10 +19,11 @@
   .topbar {
     background: #161b22;
     border-bottom: 1px solid #30363d;
-    height: 50px;
+    min-height: 50px;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    padding: 0 16px;
+    padding: 8px 16px;
     gap: 8px;
     position: sticky; top: 0; z-index: 100;
   }
@@ -177,9 +178,14 @@
     <span class="topbar-title">Levantamiento por Trilateración</span>
   </div>
   <span class="badge" style="margin-left:8px;">Topografía</span>
-  <span class="badge" style="border-color:#f0b42955; color:#f0b429; background:#f0b42922;">🧪 Versión demo</span>
-  <button type="button" class="btn primary" style="margin-left:auto;" onclick="exportCSV()">⬇ Exportar CSV</button>
+  <span class="badge" style="border-color:#f0b42955; color:#f0b429; background:#f0b42922;">🧪 Versión beta</span>
+  <div style="margin-left:auto; display:flex; flex-wrap:wrap; gap:8px;">
+  <button type="button" class="btn" onclick="saveToFile()">💾 Guardar archivo</button>
+  <input type="file" id="loadFileInput" accept="application/json,.json" style="display:none" onchange="handleLoadFile(event)">
+  <button type="button" class="btn" onclick="document.getElementById('loadFileInput').click()">📂 Cargar archivo</button>
+  <button type="button" class="btn primary" onclick="exportCSV()">⬇ Exportar CSV</button>
   <button type="button" class="btn danger" onclick="clearAll()">🗑 Borrar todo</button>
+  </div>
 </div>
 
 <div class="main">
@@ -438,11 +444,22 @@ function recomputeAll() {
 
 // ────────────────────────── Persistencia ──────────────────────────
 
+function stationsToPlainData() {
+  return { nextId, stations: stations.map(s => ({
+    id: s.id, name: s.name, mode: s.mode, origin: s.origin, base: s.base, inter: s.inter
+  })) };
+}
+
+function applyLoadedData(data) {
+  if (!data || !Array.isArray(data.stations)) return false;
+  stations = data.stations;
+  nextId = data.nextId || (Math.max(0, ...stations.map(s => s.id)) + 1);
+  return true;
+}
+
 function saveToStorage() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ nextId, stations: stations.map(s => ({
-      id: s.id, name: s.name, mode: s.mode, origin: s.origin, base: s.base, inter: s.inter
-    })) }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stationsToPlainData()));
   } catch (e) {}
 }
 
@@ -450,11 +467,44 @@ function loadFromStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
-    const data = JSON.parse(raw);
-    if (!data || !Array.isArray(data.stations)) return;
-    stations = data.stations;
-    nextId = data.nextId || (Math.max(0, ...stations.map(s => s.id)) + 1);
+    applyLoadedData(JSON.parse(raw));
   } catch (e) {}
+}
+
+// ────────────────────────── Guardar / cargar archivo ──────────────────────────
+
+function saveToFile() {
+  const data = Object.assign(
+    { app: 'porticad-levantamiento-topografico', formatVersion: 1, savedAt: new Date().toISOString() },
+    stationsToPlainData()
+  );
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  const a = document.createElement('a');
+  a.href = url; a.download = `levantamiento_${stamp}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function handleLoadFile(event) {
+  const file = event.target.files && event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  if (stations.length && !confirm('Cargar este archivo va a reemplazar el levantamiento actual (que sigue guardado automáticamente en este navegador). ¿Continuar?')) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let ok = false;
+    try { ok = applyLoadedData(JSON.parse(reader.result)); } catch (e) { ok = false; }
+    if (!ok) { alert('No se pudo leer el archivo. Verificá que sea un archivo de levantamiento válido (.json exportado desde esta herramienta).'); return; }
+    recomputeAll();
+    renderAll();
+    saveToStorage();
+    resetForm();
+  };
+  reader.onerror = () => alert('No se pudo leer el archivo.');
+  reader.readAsText(file);
 }
 
 // ────────────────────────── Formulario ──────────────────────────
