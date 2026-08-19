@@ -177,6 +177,7 @@
     <span class="topbar-title">Levantamiento por Trilateración</span>
   </div>
   <span class="badge" style="margin-left:8px;">Topografía</span>
+  <span class="badge" style="border-color:#f0b42955; color:#f0b429; background:#f0b42922;">🧪 Versión demo</span>
   <button type="button" class="btn primary" style="margin-left:auto;" onclick="exportCSV()">⬇ Exportar CSV</button>
   <button type="button" class="btn danger" onclick="clearAll()">🗑 Borrar todo</button>
 </div>
@@ -205,7 +206,7 @@
 
       <!-- Modo: ORIGEN -->
       <div id="grpOrigen">
-        <div class="hint">Punto fijo o de coordenadas conocidas (ej. la primera estación, o un punto con coordenadas reales de GPS).</div>
+        <div class="hint">Punto fijo o de coordenadas ya conocidas (por ejemplo, tomadas con GPS). <b>Tip:</b> si ya conocés las coordenadas reales de las dos primeras estaciones, cargá ambas en este modo — así toda la red queda orientada a coordenadas reales desde el arranque, en vez de depender del eje X automático de la 2ª estación (ver modo "Con 1 referencia").</div>
         <div class="field-3col" style="margin-top:8px;">
           <div class="field"><label>X0</label><input type="number" id="oX" value="0" step="0.01"></div>
           <div class="field"><label>Y0</label><input type="number" id="oY" value="0" step="0.01"></div>
@@ -230,7 +231,7 @@
           <div class="field"><label id="bDistLabel">Distancia horizontal <em>(m)</em></label><input type="number" id="bDist" min="0" step="0.001"></div>
           <div class="field"><label>Desnivel Δh <em>(m, + = más alta)</em></label><input type="number" id="bDh" value="0" step="0.001"></div>
         </div>
-        <div class="hint">Todavía no hay una segunda referencia para triangular, así que esta estación se ubica automáticamente sobre el eje X positivo desde la referencia elegida (define la dirección base del levantamiento). A partir de la 3ª estación en adelante usá "Con 2 referencias" para que la posición quede resuelta solo con distancias.</div>
+        <div class="hint">Usá este modo solo si <b>no</b> conocés las coordenadas reales de esta estación. Como todavía no hay una segunda referencia para triangular, se ubica automáticamente sobre el eje X positivo desde la referencia elegida (define la dirección base, arbitraria, del levantamiento). Si en cambio sí conocés sus coordenadas reales (GPS u otra referencia), usá mejor el modo "Origen". A partir de la 3ª estación en adelante ya podés usar "Con 2 referencias" para que la posición quede resuelta solo con distancias.</div>
       </div>
 
       <!-- Modo: INTERSECCIÓN (2 referencias) -->
@@ -535,7 +536,8 @@ function resetForm() {
   document.getElementById('btnCancelEdit').style.display = 'none';
   document.getElementById('btnAdd').textContent = '➕ Agregar estación';
   document.getElementById('fName').value = nextDefaultName();
-  document.getElementById('fMode').value = stations.length === 0 ? 'origen' : 'base';
+  const validCount = validStations().length;
+  document.getElementById('fMode').value = validCount < 2 ? 'origen' : 'interseccion';
   document.getElementById('oX').value = 0; document.getElementById('oY').value = 0; document.getElementById('oZ').value = 0;
   document.getElementById('bTipo').value = 'horizontal';
   document.getElementById('bDist').value = ''; document.getElementById('bDh').value = 0;
