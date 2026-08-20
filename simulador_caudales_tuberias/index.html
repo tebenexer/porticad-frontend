@@ -1237,8 +1237,10 @@
     schematicEl.setAttribute("height", svgH*schematicZoom);
     schematicEl.setAttribute("viewBox", "0 0 " + totalW + " " + svgH);
 
+    var NODE_R = 13; // debe coincidir con el "nr" usado en nodeMarkup()
     var x0 = 50;
     var parts = [];
+    var nodeParts = []; // se dibujan al final para quedar por encima de las tuberías
     var geom = []; // datos para la animación de flujo
 
     for(var i=0;i<n;i++){
@@ -1253,8 +1255,9 @@
       var midY = (y1+y2)/2;
       var pipes = row.t.pipes;
 
-      // nodo aguas arriba (registro de paso)
-      parts.push(nodeMarkup(x1, y1));
+      // nodo aguas arriba (registro de paso) — se agrega a nodeParts, no a parts,
+      // para que quede dibujado encima del extremo de la tubería que llega/sale de ahí
+      nodeParts.push(nodeMarkup(x1, y1));
       parts.push('<text x="'+x1+'" y="'+(y1-26)+'" text-anchor="middle" class="node-label">R'+(i+1)+'</text>');
       if(row.t.aporte>0){
         parts.push('<text x="'+x1+'" y="'+(y1+27)+'" text-anchor="middle" class="node-sub">+'+fmt(row.t.aporte,1)+' L/s</text>');
@@ -1265,30 +1268,25 @@
       parts.push('<g class="tramo-hit" data-tramo-id="'+row.t.id+'">');
       parts.push('<rect class="hitzone" x="'+x1+'" y="'+bandTop+'" width="'+(x2-x1)+'" height="'+bandH+'" rx="8"/>');
 
+      // medidor circular de llenado (y/D para una tubería, % de capacidad combinado si hay varias)
       var gcy = midY - 48, gr = 12;
-      if(pipes.length === 1){
-        // mini sección transversal (gauge y/D) para una sola tubería
-        var yDfrac = res.pendienteInvalida ? 0 : Math.min(1, res.pipesRes[0].yD || 0);
-        var fillH = 2*gr*yDfrac;
-        var clipId = "gclip" + row.t.id;
-        parts.push('<clipPath id="'+clipId+'"><circle cx="'+mid+'" cy="'+gcy+'" r="'+gr+'"/></clipPath>');
-        parts.push('<circle class="gauge-bg" cx="'+mid+'" cy="'+gcy+'" r="'+gr+'"/>');
-        if(fillH > 0.3){
-          parts.push('<rect x="'+(mid-gr)+'" y="'+(gcy+gr-fillH)+'" width="'+(2*gr)+'" height="'+fillH+'" fill="'+colorVar+'" clip-path="url(#'+clipId+')"/>');
-        }
-        parts.push('<circle cx="'+mid+'" cy="'+gcy+'" r="'+gr+'" fill="none" stroke="'+colorVar+'" stroke-width="1.3" opacity="0.8"/>');
-      } else {
-        // varias tuberías: barra de capacidad combinada
-        var barW=54, barH=8, bx=mid-barW/2, by=gcy-barH/2;
-        parts.push('<rect x="'+bx+'" y="'+by+'" width="'+barW+'" height="'+barH+'" rx="3.5" class="gauge-bg"/>');
-        var fillFrac = isFinite(res.pctCapacidad) ? Math.max(0,Math.min(1,res.pctCapacidad/100)) : 1;
-        parts.push('<rect x="'+bx+'" y="'+by+'" width="'+(fillFrac*barW)+'" height="'+barH+'" rx="3.5" fill="'+colorVar+'"/>');
+      var fillFrac = res.pendienteInvalida ? 0 :
+        (pipes.length === 1 ? Math.min(1, res.pipesRes[0].yD || 0)
+                             : (isFinite(res.pctCapacidad) ? Math.max(0,Math.min(1,res.pctCapacidad/100)) : 1));
+      var fillH = 2*gr*fillFrac;
+      var clipId = "gclip" + row.t.id;
+      parts.push('<clipPath id="'+clipId+'"><circle cx="'+mid+'" cy="'+gcy+'" r="'+gr+'"/></clipPath>');
+      parts.push('<circle class="gauge-bg" cx="'+mid+'" cy="'+gcy+'" r="'+gr+'"/>');
+      if(fillH > 0.3){
+        parts.push('<rect x="'+(mid-gr)+'" y="'+(gcy+gr-fillH)+'" width="'+(2*gr)+'" height="'+fillH+'" fill="'+colorVar+'" clip-path="url(#'+clipId+')"/>');
       }
+      parts.push('<circle cx="'+mid+'" cy="'+gcy+'" r="'+gr+'" fill="none" stroke="'+colorVar+'" stroke-width="1.3" opacity="0.8"/>');
 
       // etiqueta material + diámetro + pendiente
       parts.push('<text x="'+mid+'" y="'+(midY-26)+'" text-anchor="middle" class="tramo-label">'+pipesSchematicLabel(row.t)+' · '+fmt(row.t.pendiente,2)+'%</text>');
 
-      // tubería(s), dibujadas con la inclinación real de nodo a nodo
+      // tubería(s), dibujadas con la inclinación real de nodo a nodo — el extremo llega
+      // justo al borde del registro (mismo radio NODE_R) para que se vea conectada
       var k = pipes.length;
       pipes.forEach(function(p, pi){
         var offset = k>1 ? (pi - (k-1)/2) * 9 : 0;
@@ -1296,7 +1294,7 @@
         var pr = res.pipesRes[pi];
         var pc = pipeColor(pr, res.pendienteInvalida);
         var pColorVar = pc === "ok" ? "var(--accent)" : (pc === "danger" ? "var(--danger)" : "var(--warn)");
-        parts.push('<line x1="'+(x1+15)+'" y1="'+(y1+offset)+'" x2="'+(x2-15)+'" y2="'+(y2+offset)+'" stroke="'+pColorVar+'" stroke-width="'+strokeW+'" stroke-linecap="round" opacity="0.85"/>');
+        parts.push('<line x1="'+(x1+NODE_R)+'" y1="'+(y1+offset)+'" x2="'+(x2-NODE_R)+'" y2="'+(y2+offset)+'" stroke="'+pColorVar+'" stroke-width="'+strokeW+'" stroke-linecap="round" opacity="0.85"/>');
       });
 
       // caudales
@@ -1308,7 +1306,7 @@
       var tr = travelInfo.travel[i];
       geom.push({
         tramoId: row.t.id,
-        x1: x1+15, y1: y1, x2: x2-15, y2: y2,
+        x1: x1+NODE_R, y1: y1, x2: x2-NODE_R, y2: y2,
         color: color, exceeds: res.exceeds,
         realTime: tr.valid ? tr.t : 0.8,
         cumRealStart: travelInfo.cum[i]
@@ -1319,8 +1317,12 @@
     // último nodo
     var xLast = x0 + (n>0 ? stepW-40 : 0);
     var yLastNode = nodeY[n];
-    parts.push(nodeMarkup(xLast, yLastNode));
+    nodeParts.push(nodeMarkup(xLast, yLastNode));
     parts.push('<text x="'+xLast+'" y="'+(yLastNode-26)+'" text-anchor="middle" class="node-label">R'+(n+1)+'</text>');
+
+    // los registros se dibujan al final (encima de todas las tuberías) para que cada
+    // extremo se vea claramente conectado/recibido por el registro correspondiente
+    parts = parts.concat(nodeParts);
 
     parts.push('<circle id="flowmarker" cx="'+(geom.length?geom[0].x1:0)+'" cy="'+(geom.length?geom[0].y1:0)+'" r="5" fill="var(--accent)" opacity="0.95"/>');
 
