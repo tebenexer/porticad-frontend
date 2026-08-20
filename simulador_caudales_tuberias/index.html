@@ -211,10 +211,13 @@
     overflow:auto;
     max-height:min(68vh, 620px);
     border-radius:8px;
+    cursor:grab;
     background:
       linear-gradient(90deg, var(--line-soft) 1px, transparent 1px) 0 0 / 40px 40px,
       linear-gradient(var(--line-soft) 1px, transparent 1px) 0 0 / 40px 40px;
   }
+  .schematic-scroll.panning{cursor:grabbing;}
+  .schematic-scroll.panning .tramo-hit{pointer-events:none;}
   svg.schematic{display:block;}
   .zoomctl{display:flex;align-items:center;gap:2px;}
   .zoomctl button{
@@ -513,7 +516,7 @@
         <span><i style="background:var(--ok)"></i> dentro de capacidad</span>
         <span><i style="background:var(--warn)"></i> velocidad fuera de rango (0.6–5 m/s)</span>
         <span><i style="background:var(--danger)"></i> excede Q lleno</span>
-        <span class="note">la inclinación de cada tramo refleja su pendiente real · clic para editarlo</span>
+        <span class="note">arrastra para mover · scroll para zoom · clic en un tramo para editarlo</span>
       </div>
       <div class="zoomctl" id="zoomctl">
         <button type="button" id="zoomOut" title="Alejar">−</button>
@@ -521,7 +524,7 @@
         <button type="button" id="zoomIn" title="Acercar">+</button>
       </div>
     </div>
-    <div class="schematic-scroll">
+    <div class="schematic-scroll" id="schematicScroll">
       <svg class="schematic" id="schematic" height="176"></svg>
     </div>
     <div class="simbar">
@@ -884,9 +887,10 @@
     render();
   });
 
-  // zoom del esquema
+  // zoom del esquema (botones + rueda del mouse, ambos centrados en el punto apuntado)
+  var schematicScrollEl = document.getElementById("schematicScroll");
   var schematicZoom = 1;
-  var ZOOM_MIN = 0.6, ZOOM_MAX = 2.6, ZOOM_STEP = 0.2;
+  var ZOOM_MIN = 0.6, ZOOM_MAX = 2.6, ZOOM_STEP = 0.2, ZOOM_WHEEL_STEP = 0.1;
   var zoomInBtn = document.getElementById("zoomIn");
   var zoomOutBtn = document.getElementById("zoomOut");
   var zoomLabelEl = document.getElementById("zoomLabel");
@@ -895,18 +899,60 @@
     zoomInBtn.disabled = schematicZoom >= ZOOM_MAX - 1e-9;
     zoomOutBtn.disabled = schematicZoom <= ZOOM_MIN + 1e-9;
   }
-  zoomInBtn.addEventListener("click", function(){
-    schematicZoom = Math.min(ZOOM_MAX, +(schematicZoom+ZOOM_STEP).toFixed(2));
-    refreshZoomUI(); render();
-  });
-  zoomOutBtn.addEventListener("click", function(){
-    schematicZoom = Math.max(ZOOM_MIN, +(schematicZoom-ZOOM_STEP).toFixed(2));
-    refreshZoomUI(); render();
-  });
+  // aplica un nuevo nivel de zoom manteniendo fijo el punto (clientX,clientY) bajo el cursor
+  // (o el centro del panel si no se indica, como al usar los botones + / −)
+  function setZoom(newZoom, clientX, clientY){
+    newZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, +newZoom.toFixed(2)));
+    if(newZoom === schematicZoom) return;
+    var rect = schematicScrollEl.getBoundingClientRect();
+    var offsetX = (clientX != null) ? (clientX-rect.left) : schematicScrollEl.clientWidth/2;
+    var offsetY = (clientY != null) ? (clientY-rect.top) : schematicScrollEl.clientHeight/2;
+    var contentX = schematicScrollEl.scrollLeft + offsetX;
+    var contentY = schematicScrollEl.scrollTop + offsetY;
+    var ratio = newZoom/schematicZoom;
+    schematicZoom = newZoom;
+    refreshZoomUI();
+    render();
+    schematicScrollEl.scrollLeft = contentX*ratio - offsetX;
+    schematicScrollEl.scrollTop = contentY*ratio - offsetY;
+  }
+  zoomInBtn.addEventListener("click", function(){ setZoom(schematicZoom+ZOOM_STEP); });
+  zoomOutBtn.addEventListener("click", function(){ setZoom(schematicZoom-ZOOM_STEP); });
   refreshZoomUI();
 
-  // clic en el esquema: salta a la tarjeta del tramo correspondiente
+  schematicScrollEl.addEventListener("wheel", function(e){
+    e.preventDefault();
+    var dir = e.deltaY < 0 ? 1 : -1;
+    setZoom(schematicZoom + dir*ZOOM_WHEEL_STEP, e.clientX, e.clientY);
+  }, {passive:false});
+
+  // arrastrar para desplazar (pan) el esquema
+  var panState = {active:false, moved:false, startX:0, startY:0, scrollX:0, scrollY:0};
+  schematicScrollEl.addEventListener("mousedown", function(e){
+    if(e.button !== 0) return;
+    panState.active = true;
+    panState.moved = false;
+    panState.startX = e.clientX; panState.startY = e.clientY;
+    panState.scrollX = schematicScrollEl.scrollLeft; panState.scrollY = schematicScrollEl.scrollTop;
+    schematicScrollEl.classList.add("panning");
+  });
+  window.addEventListener("mousemove", function(e){
+    if(!panState.active) return;
+    var dx = e.clientX - panState.startX, dy = e.clientY - panState.startY;
+    if(!panState.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) panState.moved = true;
+    if(panState.moved){
+      schematicScrollEl.scrollLeft = panState.scrollX - dx;
+      schematicScrollEl.scrollTop = panState.scrollY - dy;
+    }
+  });
+  window.addEventListener("mouseup", function(){
+    panState.active = false;
+    schematicScrollEl.classList.remove("panning");
+  });
+
+  // clic en el esquema: salta a la tarjeta del tramo correspondiente (se ignora si fue un arrastre)
   schematicEl.addEventListener("click", function(e){
+    if(panState.moved){ panState.moved = false; return; }
     var g = e.target.closest("[data-tramo-id]");
     if(!g) return;
     var card = document.getElementById("tramo-card-" + g.getAttribute("data-tramo-id"));
