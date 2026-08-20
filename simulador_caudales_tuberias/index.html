@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador de Caudales — PortiCAD Multi-Tools</title>
+<link rel="icon" href="/favicon.png" type="image/png" />
+<link rel="shortcut icon" href="/favicon.png" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* ---- topbar del sitio (PortiCAD Multi-Tools) ---- */
+  .topbar {
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    min-height: 50px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 8px 16px;
+    gap: 8px;
+    position: sticky; top: 0; z-index: 100;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  .topbar-logo { font-size: 16px; font-weight: 700; color: #58a6ff; text-decoration: none; }
+  .topbar-sep  { color: #30363d; font-size: 18px; }
+  .topbar-crumb { font-size: 14px; color: #8b949e; display: flex; align-items: center; gap: 6px; }
+  .topbar-title { font-size: 15px; font-weight: 600; color: #e6edf3; }
+  .topbar .badge {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 20px;
+    text-transform: none; letter-spacing: normal;
+  }
+
+  :root{
+    --bg:#f3f1ea;
+    --paper:#fffdf8;
+    --card:#ffffff;
+    --ink:#1c2b33;
+    --ink-dim:#5a6b73;
+    --ink-faint:#8a97a0;
+    --line:#d9d3c4;
+    --line-soft:#e8e3d6;
+    --accent:#0e7490;
+    --accent-ink:#ffffff;
+    --accent-soft:#d7ecf0;
+    --accent-strong:#0a5a6e;
+    --ok:#1f8a54;
+    --ok-soft:#dcefe2;
+    --warn:#b8720b;
+    --warn-soft:#f7e9d2;
+    --danger:#c0392b;
+    --danger-soft:#f8ddd8;
+    --pipe-empty:#c9c2ae;
+    --shadow: 0 1px 2px rgba(28,43,51,0.06), 0 6px 20px -8px rgba(28,43,51,0.18);
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#11181c;
+      --paper:#161f24;
+      --card:#1a252b;
+      --ink:#e8edee;
+      --ink-dim:#93a3aa;
+      --ink-faint:#5f6f77;
+      --line:#2c3a41;
+      --line-soft:#222e34;
+      --accent:#4fb3c2;
+      --accent-ink:#0a1a1e;
+      --accent-soft:#1c3a41;
+      --accent-strong:#7cc9d6;
+      --ok:#4cbf82;
+      --ok-soft:#173328;
+      --warn:#e0a542;
+      --warn-soft:#3a2c10;
+      --danger:#e0685a;
+      --danger-soft:#3d1e19;
+      --pipe-empty:#3a4650;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -8px rgba(0,0,0,0.5);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#11181c;
+    --paper:#161f24;
+    --card:#1a252b;
+    --ink:#e8edee;
+    --ink-dim:#93a3aa;
+    --ink-faint:#5f6f77;
+    --line:#2c3a41;
+    --line-soft:#222e34;
+    --accent:#4fb3c2;
+    --accent-ink:#0a1a1e;
+    --accent-soft:#1c3a41;
+    --accent-strong:#7cc9d6;
+    --ok:#4cbf82;
+    --ok-soft:#173328;
+    --warn:#e0a542;
+    --warn-soft:#3a2c10;
+    --danger:#e0685a;
+    --danger-soft:#3d1e19;
+    --pipe-empty:#3a4650;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -8px rgba(0,0,0,0.5);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Public Sans', system-ui, sans-serif;
+    -webkit-font-smoothing:antialiased;
+    line-height:1.45;
+    padding:28px 20px 80px;
+  }
+  .wrap{max-width:1160px;margin:0 auto;}
+
+  h1,h2,h3{font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:0.01em;text-wrap:balance;margin:0;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--accent-strong);
+    font-weight:600;
+  }
+  header{margin-bottom:22px;}
+  header h1{font-size:32px;color:var(--ink);margin-top:4px;}
+  header p{color:var(--ink-dim);font-size:14.5px;margin:6px 0 0;max-width:68ch;}
+
+  .num{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;}
+
+  /* ---- global bar ---- */
+  .globalbar{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:16px 18px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:18px 28px;
+    align-items:flex-end;
+    margin-bottom:22px;
+    box-shadow:var(--shadow);
+  }
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{
+    font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
+    color:var(--ink-dim);
+  }
+  .field input, .field select{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:14px;
+    padding:7px 9px;
+    border:1px solid var(--line);
+    border-radius:7px;
+    background:var(--card);
+    color:var(--ink);
+    min-width:100px;
+  }
+  .field select{
+    appearance:none;
+    -webkit-appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path d='M5 7l5 5 5-5' fill='none' stroke='%237c8a92' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;
+    background-position:right 8px center;
+    background-size:14px;
+    padding-right:26px;
+    cursor:pointer;
+  }
+  .field input:focus, .field select:focus{
+    outline:2px solid var(--accent);
+    outline-offset:1px;
+    border-color:var(--accent);
+  }
+  .field input:hover, .field select:hover{border-color:var(--ink-faint);}
+  .field.grow{flex:1;min-width:220px;}
+  .field .hint{font-size:11px;color:var(--ink-dim);font-family:'Public Sans',sans-serif;}
+
+  .themebtn{
+    margin-left:auto;
+    display:flex;gap:6px;
+    align-self:flex-start;
+  }
+  .themebtn button{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    padding:6px 10px;
+    border-radius:7px;
+    border:1px solid var(--line);
+    background:var(--card);
+    color:var(--ink-dim);
+    cursor:pointer;
+  }
+  .themebtn button.active{
+    background:var(--accent);
+    color:var(--accent-ink);
+    border-color:var(--accent);
+  }
+
+  /* ---- schematic ---- */
+  .schematic-wrap{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:18px 18px 10px;
+    margin-bottom:26px;
+    overflow-x:auto;
+    box-shadow:var(--shadow);
+  }
+  .schematic-head{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px 20px;margin-bottom:8px;}
+  .schematic-wrap h2{font-size:17px;color:var(--ink);}
+  svg.schematic{display:block;min-width:100%;}
+  .node-label{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;fill:var(--ink);}
+  .node-sub{font-family:'IBM Plex Mono',monospace;font-size:9.5px;fill:var(--accent-strong);}
+  .tramo-label{font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:600;fill:var(--ink);}
+  .tramo-sub{font-family:'IBM Plex Mono',monospace;font-size:9.5px;fill:var(--ink-dim);}
+  .tramo-status{font-family:'IBM Plex Mono',monospace;font-size:9.5px;font-weight:600;letter-spacing:0.03em;}
+  .tramo-status.ok{fill:var(--ok);}
+  .tramo-status.warn{fill:var(--warn);}
+  .tramo-status.danger{fill:var(--danger);}
+  .tramo-hit{cursor:pointer;}
+  .tramo-hit .hitzone{fill:transparent;transition:fill .15s ease;}
+  .tramo-hit:hover .hitzone{fill:var(--accent-soft);opacity:0.5;}
+  .tramo-hit:hover .tramo-label{fill:var(--accent-strong);}
+  .gauge-bg{fill:var(--pipe-empty);stroke:var(--line);stroke-width:1;}
+  .node-elev{font-family:'IBM Plex Mono',monospace;font-size:9px;fill:var(--ink-faint);}
+
+  .legend{
+    display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-dim);
+    padding:2px 2px 12px;font-family:'IBM Plex Mono',monospace;
+  }
+  .legend span{display:inline-flex;align-items:center;gap:5px;}
+  .legend i{width:9px;height:9px;border-radius:2px;display:inline-block;}
+  .legend .note{font-family:'Public Sans',sans-serif;color:var(--ink-dim);}
+
+  /* ---- simulación de flujo ---- */
+  .simbar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    margin-top:12px;padding-top:12px;border-top:1px solid var(--line-soft);
+  }
+  .simplay{
+    font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;
+    background:var(--accent);color:var(--accent-ink);border:none;border-radius:7px;
+    padding:8px 14px;cursor:pointer;
+  }
+  .simplay:hover{background:var(--accent-strong);}
+  .simplay.playing{background:var(--accent-strong);}
+  .simspeed{display:flex;gap:4px;}
+  .simspeed button{
+    font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600;
+    background:var(--card);color:var(--ink-dim);border:1px solid var(--line);
+    border-radius:6px;padding:6px 10px;cursor:pointer;
+  }
+  .simspeed button.active{background:var(--accent-soft);color:var(--accent-strong);border-color:var(--accent);}
+  .simclock{
+    font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--ink-dim);
+    margin-left:auto;font-variant-numeric:tabular-nums;
+  }
+  .overflow-note{
+    margin-top:10px;padding:9px 12px;border-radius:8px;font-size:12.5px;
+    display:flex;align-items:center;gap:8px;line-height:1.4;
+  }
+  .overflow-note.ok{background:var(--ok-soft);color:var(--ok);}
+  .overflow-note.danger{background:var(--danger-soft);color:var(--danger);font-weight:600;}
+  @keyframes pulseDanger{0%,100%{box-shadow:0 0 0 0 rgba(192,57,43,.35);}50%{box-shadow:0 0 0 6px rgba(192,57,43,0);}}
+  .overflow-note.flash{animation:pulseDanger 1s ease-in-out infinite;}
+  @media (prefers-reduced-motion: reduce){
+    .overflow-note.flash{animation:none;}
+  }
+
+  /* ---- tramo cards ---- */
+  .tramos{display:flex;flex-direction:column;gap:16px;}
+  .tramo{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    overflow:hidden;
+    scroll-margin-top:20px;
+    transition:box-shadow .2s ease;
+  }
+  .tramo.flash{box-shadow:0 0 0 3px var(--accent), var(--shadow);}
+  .tramo-head{
+    display:flex;align-items:center;gap:12px;
+    padding:12px 16px;
+    background:var(--paper);
+    border-bottom:1px solid var(--line-soft);
+  }
+  .tramo-head .tag{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;font-weight:600;
+    background:var(--accent-soft);color:var(--accent-strong);
+    padding:3px 8px;border-radius:5px;letter-spacing:0.03em;
+  }
+  .tramo-head .route{
+    font-family:'Barlow Condensed',sans-serif;
+    font-size:18px;font-weight:600;color:var(--ink);
+    flex:1;
+  }
+  .tramo-head .route .arrow{color:var(--ink-dim);padding:0 4px;}
+  .tramo-head .matchip{
+    font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;
+    color:var(--ink-dim); border:1px solid var(--line); border-radius:999px;
+    padding:2px 8px;letter-spacing:0.02em;white-space:nowrap;
+  }
+  .badge{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;font-weight:600;letter-spacing:0.04em;
+    padding:4px 10px;border-radius:999px;
+    text-transform:uppercase;
+    white-space:nowrap;
+  }
+  .badge.ok{background:var(--ok-soft);color:var(--ok);}
+  .badge.warn{background:var(--warn-soft);color:var(--warn);}
+  .badge.danger{background:var(--danger-soft);color:var(--danger);}
+  .removebtn{
+    border:none;background:transparent;color:var(--ink-dim);
+    font-size:18px;line-height:1;cursor:pointer;padding:4px 6px;border-radius:6px;
+    flex-shrink:0;
+  }
+  .removebtn:hover{background:var(--danger-soft);color:var(--danger);}
+  .removebtn:disabled{opacity:0.25;cursor:not-allowed;}
+  .removebtn:disabled:hover{background:transparent;color:var(--ink-dim);}
+
+  .tramo-body{
+    display:grid;
+    grid-template-columns:1.25fr 1fr;
+    gap:0;
+  }
+  @media (max-width:800px){ .tramo-body{grid-template-columns:1fr;} }
+
+  .inputs{
+    padding:14px 16px;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px 14px;
+    border-right:1px solid var(--line-soft);
+    align-content:start;
+  }
+  @media (max-width:800px){ .inputs{border-right:none;border-bottom:1px solid var(--line-soft);} }
+  .field.span2{grid-column:1 / -1;}
+  .field-sep{grid-column:1 / -1;height:1px;background:var(--line-soft);margin:2px 0;}
+
+  /* ---- lista de tuberías dentro de un tramo ---- */
+  .pipelist-wrap{grid-column:1 / -1;display:flex;flex-direction:column;gap:8px;}
+  .pipelist-head{display:flex;align-items:baseline;justify-content:space-between;}
+  .pipelist-head label{font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-dim);}
+  .pipelist-head .pipelist-hint{font-size:10.5px;color:var(--ink-faint);font-family:'Public Sans',sans-serif;}
+  .pipelist{display:flex;flex-direction:column;gap:8px;}
+  .piperow{
+    display:grid;
+    grid-template-columns:1.3fr 0.85fr 1.3fr 24px;
+    gap:8px;
+    align-items:end;
+    padding:9px 10px;
+    background:var(--paper);
+    border:1px solid var(--line-soft);
+    border-radius:8px;
+  }
+  @media (max-width:520px){ .piperow{grid-template-columns:1fr 1fr;} .piperow .removebtn{grid-column:2;justify-self:end;} }
+  .piperow .field{gap:3px;}
+  .piperow .field label{font-size:9.5px;}
+  .piperow .field input, .piperow .field select{font-size:12.5px;padding:6px 8px;min-width:0;}
+  .piperow .field select{background-position:right 6px center;background-size:12px;padding-right:22px;}
+  .piperow .removebtn{font-size:15px;padding:4px;align-self:center;}
+  .piperow .span-all{grid-column:1 / -1;}
+  .piperow-index{
+    font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--ink-faint);
+    grid-column:1 / -1;letter-spacing:0.05em;text-transform:uppercase;
+  }
+  .addpipe-btn{
+    font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;
+    background:transparent;color:var(--accent-strong);
+    border:1.5px dashed var(--accent-soft);border-radius:8px;
+    padding:8px 10px;cursor:pointer;text-align:center;
+  }
+  .addpipe-btn:hover{background:var(--accent-soft);border-color:var(--accent);}
+
+  .results{
+    padding:14px 16px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    background:var(--paper);
+  }
+  .result-row{
+    display:flex;justify-content:space-between;align-items:baseline;
+    font-size:13.5px;
+    padding-bottom:9px;
+    border-bottom:1px dashed var(--line-soft);
+  }
+  .result-row:last-child{border-bottom:none;padding-bottom:0;}
+  .result-row .rlabel{color:var(--ink-dim);}
+  .result-row .rval{font-weight:600;font-size:15px;}
+  .result-row .rval.big{font-size:19px;}
+  .fill-bar-track{
+    height:7px;border-radius:99px;background:var(--pipe-empty);
+    overflow:hidden;margin-top:4px;
+  }
+  .fill-bar-fill{height:100%;border-radius:99px;background:var(--accent);transition:width .15s ease;}
+  .fill-bar-fill.warn{background:var(--warn);}
+  .fill-bar-fill.danger{background:var(--danger);}
+
+  .pipe-breakdown{display:flex;flex-direction:column;gap:8px;}
+  .pipe-breakdown-title{font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-dim);}
+  .piperesult{
+    border:1px solid var(--line-soft); border-radius:8px; padding:8px 10px;
+    display:flex; flex-direction:column; gap:5px; font-size:12.5px;background:var(--card);
+  }
+  .piperesult-head{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .piperesult-head .pname{display:flex;align-items:center;gap:6px;font-weight:600;color:var(--ink);}
+  .piperesult-head .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .piperesult-head .dot.ok{background:var(--ok);}
+  .piperesult-head .dot.warn{background:var(--warn);}
+  .piperesult-head .dot.danger{background:var(--danger);}
+  .piperesult-metrics{display:flex;gap:14px;flex-wrap:wrap;color:var(--ink-dim);font-family:'IBM Plex Mono',monospace;font-size:11.5px;}
+  .piperesult-metrics b{color:var(--ink);font-weight:600;}
+
+  .addbar{
+    display:flex;justify-content:center;margin-top:20px;
+  }
+  .addbtn{
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:600;font-size:16px;letter-spacing:0.02em;
+    background:var(--accent);color:var(--accent-ink);
+    border:none;border-radius:8px;
+    padding:11px 22px;cursor:pointer;
+    display:flex;align-items:center;gap:8px;
+    box-shadow:var(--shadow);
+  }
+  .addbtn:hover{background:var(--accent-strong);}
+  .addbtn .plus{font-size:19px;line-height:1;}
+
+  footer{
+    text-align:center;color:var(--ink-dim);font-size:12px;margin-top:34px;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="topbar-logo" href="/">PortiCAD</a>
+  <span class="topbar-sep">›</span>
+  <div class="topbar-crumb">
+    <span>Multi-Tools</span><span>›</span>
+    <span class="topbar-title">Simulador de Caudales</span>
+  </div>
+  <span class="badge" style="margin-left:8px;background:#0ea5e922;border:1px solid #0ea5e955;color:#38bdf8;">Drenajes</span>
+  <span class="badge" style="background:#f0b42922;border:1px solid #f0b42955;color:#f0b429;">🧪 Beta</span>
+</div>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Hidráulica de conducciones — flujo a superficie libre</div>
+    <h1>Simulador de caudales en pendiente</h1>
+    <p>Arma una red de tramos y registros. Cada tramo puede llevar una o varias tuberías en paralelo (mismo registro de entrada y salida, misma pendiente), cada una con su propio material, catálogo comercial de diámetros y unidad de medida. Revisa en tiempo real si la capacidad combinada alcanza para el caudal que llega.</p>
+  </header>
+
+  <div class="globalbar">
+    <div class="field">
+      <label for="qbase">Caudal de cabecera</label>
+      <input id="qbase" type="number" min="0" step="0.1" value="15" />
+      <span class="hint">litros / segundo</span>
+    </div>
+    <div class="field">
+      <label for="defmat">Material por defecto</label>
+      <select id="defmat"></select>
+      <span class="hint">para tuberías nuevas</span>
+    </div>
+    <div class="field">
+      <label for="defunit">Unidad por defecto</label>
+      <select id="defunit">
+        <option value="mm">Milímetros (mm)</option>
+        <option value="m">Metros (m)</option>
+        <option value="in">Pulgadas (")</option>
+      </select>
+      <span class="hint">para tuberías nuevas</span>
+    </div>
+    <div class="field grow">
+      <label>&nbsp;</label>
+      <span class="hint">El caudal se acumula tramo a tramo, sumando los aportes que definas en cada registro. Dentro de un tramo, el caudal que llega se reparte entre sus tuberías en paralelo según la capacidad de cada una.</span>
+    </div>
+    <div class="themebtn" id="themebtn">
+      <button data-t="light">Claro</button>
+      <button data-t="dark">Oscuro</button>
+      <button data-t="system" class="active">Sistema</button>
+    </div>
+  </div>
+
+  <div class="schematic-wrap">
+    <div class="schematic-head">
+      <h2>Esquema de la red</h2>
+      <div class="legend">
+        <span><i style="background:var(--ok)"></i> dentro de capacidad</span>
+        <span><i style="background:var(--warn)"></i> velocidad fuera de rango (0.6–5 m/s)</span>
+        <span><i style="background:var(--danger)"></i> excede Q lleno</span>
+        <span class="note">la inclinación de cada tramo refleja su pendiente real · clic para editarlo</span>
+      </div>
+    </div>
+    <svg class="schematic" id="schematic" height="176"></svg>
+    <div class="simbar">
+      <button type="button" class="simplay" id="simplay">▶ Simular flujo</button>
+      <div class="simspeed" id="simspeed">
+        <button type="button" data-speed="1" class="active">1×</button>
+        <button type="button" data-speed="2">2×</button>
+        <button type="button" data-speed="4">4×</button>
+      </div>
+      <span class="simclock" id="simclock">t = 0.0 s</span>
+    </div>
+    <div class="overflow-note" id="overflowNote"></div>
+  </div>
+
+  <div class="tramos" id="tramos"></div>
+
+  <div class="addbar">
+    <button class="addbtn" id="addtramo"><span class="plus">+</span> Agregar tramo</button>
+  </div>
+
+  <footer>Cálculo por fórmula de Manning en régimen uniforme, sección circular. Cuando hay varias tuberías en un mismo tramo, el caudal se reparte entre ellas en proporción a su capacidad a tubo lleno. Diámetros comerciales referenciales por material — verifica siempre contra la normativa local.</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var GENERIC_DIAM = [100,150,200,250,300,375,450,600,750,900,1200];
+
+  var MATERIALS = [
+    {id:"pvc", label:"PVC corrugado (alcantarillado)", abbr:"PVC", n:0.010,
+      diam:[110,160,200,250,315,400,500,630]},
+    {id:"pead", label:"Polietileno corrugado (PEAD)", abbr:"PEAD", n:0.011,
+      diam:[110,160,200,250,315,400,500,600,800,1000,1200]},
+    {id:"hormigon", label:"Hormigón armado", abbr:"HA", n:0.013,
+      diam:[300,400,500,600,800,1000,1200,1500,1800,2000]},
+    {id:"hormigon_rugoso", label:"Hormigón (junta rústica)", abbr:"HA-R", n:0.015,
+      diam:[300,400,500,600,800,1000,1200,1500,1800,2000]},
+    {id:"fierro", label:"Fierro fundido dúctil", abbr:"FFD", n:0.013,
+      diam:[80,100,150,200,250,300,350,400,450,500,600,700,800,900,1000]},
+    {id:"corrugado", label:"Acero corrugado (CSP)", abbr:"CSP", n:0.024,
+      diam:[300,375,450,525,600,750,900,1050,1200,1350,1500,1800,2100,2400]},
+    {id:"custom", label:"Personalizado…", abbr:"PERS", n:0.013, diam:GENERIC_DIAM}
+  ];
+
+  var UNITS = {
+    mm: {decimals:0, step:1,    factor:1},
+    m:  {decimals:3, step:0.01, factor:0.001},
+    in: {decimals:2, step:0.05, factor:1/25.4}
+  };
+
+  function findMaterial(id){
+    return MATERIALS.find(function(x){return x.id===id;}) || MATERIALS[0];
+  }
+  function mmTo(unit, mm){ return mm * UNITS[unit].factor; }
+  function toMm(unit, val){ return val / UNITS[unit].factor; }
+  function fmtDiam(mm, unit){
+    unit = UNITS[unit] ? unit : "mm";
+    var u = UNITS[unit];
+    var val = fmt(mm * u.factor, u.decimals);
+    return unit === "in" ? (val + '"') : (val + " " + unit);
+  }
+
+  var VMIN = 0.6, VMAX = 5.0; // m/s, criterio típico de alcantarillado
+
+  var STORAGE_KEY = "simulador-caudales-v3";
+
+  var state = {
+    qBase: 15,
+    defaultN: 0.010,
+    defaultUnit: "mm",
+    tramos: []
+  };
+
+  var nextId = 1;
+  var nextPipeId = 1;
+
+  function newPipe(overrides){
+    var p = {
+      id: nextPipeId++,
+      materialId: "pvc",
+      diametro: 200,      // mm, siempre almacenado en mm internamente
+      diametroCustom: false,
+      unit: state.defaultUnit,
+      n: state.defaultN
+    };
+    Object.assign(p, overrides || {});
+    return p;
+  }
+
+  function newTramo(overrides){
+    overrides = overrides || {};
+    // migra el formato antiguo (una sola tubería embebida en el tramo) a la lista de tuberías
+    if(!overrides.pipes && (overrides.materialId || overrides.diametro !== undefined)){
+      overrides = Object.assign({}, overrides, {
+        pipes: [newPipe({
+          materialId: overrides.materialId,
+          diametro: overrides.diametro,
+          diametroCustom: overrides.diametroCustom,
+          unit: overrides.unit,
+          n: overrides.n
+        })]
+      });
+    }
+    var t = {
+      id: nextId++,
+      pendiente: 1.0,        // %
+      longitud: 30,          // m (solo referencia)
+      aporte: 0,              // L/s adicional que entra en el registro aguas arriba de este tramo
+      pipes: [newPipe()]
+    };
+    Object.assign(t, overrides);
+    if(!t.pipes || !t.pipes.length){ t.pipes = [newPipe()]; }
+    t.pipes = t.pipes.map(function(p){ return newPipe(p); });
+    return t;
+  }
+
+  function load(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) raw = localStorage.getItem("simulador-caudales-v2");
+      if(!raw) raw = localStorage.getItem("simulador-caudales-v1");
+      if(!raw) return false;
+      var data = JSON.parse(raw);
+      if(!data || !Array.isArray(data.tramos) || data.tramos.length === 0) return false;
+      state.qBase = typeof data.qBase === "number" ? data.qBase : 15;
+      state.defaultN = typeof data.defaultN === "number" ? data.defaultN : 0.010;
+      var savedUnit = data.defaultUnit || data.diamUnit;
+      state.defaultUnit = UNITS[savedUnit] ? savedUnit : "mm";
+      state.tramos = data.tramos.map(function(t){ return newTramo(t); });
+      nextId = Math.max.apply(null, state.tramos.map(function(t){return t.id;})) + 1;
+      var allPipeIds = [].concat.apply([], state.tramos.map(function(t){return t.pipes.map(function(p){return p.id;});}));
+      nextPipeId = (allPipeIds.length ? Math.max.apply(null, allPipeIds) : 0) + 1;
+      return true;
+    }catch(e){ return false; }
+  }
+
+  function save(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }catch(e){ /* ignore */ }
+  }
+
+  if(!load()){
+    state.tramos = [
+      newTramo({pendiente:1.5, aporte:0, pipes:[
+        newPipe({materialId:"hormigon", n:0.013, diametro:600, unit:"mm"})
+      ]}),
+      newTramo({pendiente:0.8, aporte:5, pipes:[
+        newPipe({materialId:"pvc", n:0.010, diametro:200, unit:"mm"}),
+        newPipe({materialId:"pvc", n:0.010, diametro:160, unit:"mm"})
+      ]})
+    ];
+  }
+
+  // ---------- hidráulica ----------
+
+  // Q a tubo lleno (m3/s) para diámetro D (m), pendiente S (m/m), n de Manning
+  function qFull(D, S, n){
+    if(S <= 0 || D <= 0) return 0;
+    var A = Math.PI * D * D / 4;
+    var R = D / 4;
+    return (1/n) * A * Math.pow(R, 2/3) * Math.sqrt(S);
+  }
+
+  // resuelve theta (rad) tal que Q(theta) = Qtarget, en la rama creciente [0, 5.2778rad] (~y/D 0..0.94)
+  function solveTheta(Qtarget, D, S, n){
+    if(Qtarget <= 0) return 0;
+    function Qtheta(theta){
+      var A = D*D/8*(theta - Math.sin(theta));
+      var P = D/2*theta;
+      var R = A/P;
+      return (1/n) * A * Math.pow(R, 2/3) * Math.sqrt(S);
+    }
+    var lo = 1e-5, hi = 5.2778;
+    for(var i=0;i<70;i++){
+      var mid = (lo+hi)/2;
+      if(Qtheta(mid) < Qtarget) lo = mid; else hi = mid;
+    }
+    return (lo+hi)/2;
+  }
+
+  // calcula resultados hidráulicos para un tramo (posiblemente con varias tuberías en paralelo)
+  // dado el caudal acumulado que le llega (L/s). El caudal se reparte entre tuberías en
+  // proporción a la capacidad a tubo lleno de cada una.
+  function computeTramo(t, qLlegaLs){
+    var S = t.pendiente / 100; // m/m
+    var pendienteInvalida = S <= 0;
+
+    var pipesRes = t.pipes.map(function(p){
+      var D = p.diametro / 1000; // m
+      var m = findMaterial(p.materialId);
+      var n = (p.materialId === "custom") ? (p.n || 0.013) : m.n;
+      var Qf = pendienteInvalida ? 0 : qFull(D, S, n); // m3/s
+      return {pipe:p, material:m, D:D, n:n, Qfull:Qf, QfullLs: Qf*1000};
+    });
+
+    var sumQfullLs = pipesRes.reduce(function(s,r){ return s + r.QfullLs; }, 0);
+    var out = {
+      pipesRes: pipesRes,
+      QfullLs: sumQfullLs,
+      exceeds: false,
+      pendienteInvalida: pendienteInvalida,
+      pctCapacidad: 0
+    };
+
+    if(pendienteInvalida || sumQfullLs <= 0){
+      out.exceeds = qLlegaLs > 0;
+      out.pctCapacidad = qLlegaLs > 0 ? Infinity : 0;
+      pipesRes.forEach(function(r){ r.Q=0; r.yD=0; r.V=0; r.exceeds = qLlegaLs>0; });
+      return out;
+    }
+
+    out.pctCapacidad = (qLlegaLs / sumQfullLs) * 100;
+    var QtargetTotalM3 = qLlegaLs / 1000;
+
+    if(QtargetTotalM3 > sumQfullLs/1000){
+      out.exceeds = true;
+      pipesRes.forEach(function(r){
+        var share = sumQfullLs>0 ? r.QfullLs/sumQfullLs : 1/pipesRes.length;
+        var Qi = QtargetTotalM3*share;
+        var Afull = Math.PI*r.D*r.D/4;
+        r.Q = Qi; r.V = Afull>0 ? Qi/Afull : 0; r.yD = 1; r.exceeds = true;
+      });
+      return out;
+    }
+
+    pipesRes.forEach(function(r){
+      var share = sumQfullLs>0 ? r.QfullLs/sumQfullLs : 1/pipesRes.length;
+      var Qi = QtargetTotalM3*share; // m3/s asignado a esta tubería
+      var theta = solveTheta(Qi, r.D, S, r.n);
+      var A = r.D*r.D/8*(theta - Math.sin(theta));
+      r.yD = (1 - Math.cos(theta/2)) / 2;
+      r.V = A > 0 ? Qi/A : 0;
+      r.Q = Qi;
+      r.exceeds = false;
+    });
+    return out;
+  }
+
+  function fmt(n, dec){
+    if(!isFinite(n)) return "—";
+    return n.toFixed(dec===undefined?2:dec);
+  }
+
+  function pipeColor(r, pendienteInvalida){
+    if(pendienteInvalida) return "warn";
+    if(r.exceeds) return "danger";
+    if(r.V < VMIN || r.V > VMAX) return "warn";
+    return "ok";
+  }
+
+  function stateColor(res){
+    if(res.pendienteInvalida) return "warn";
+    if(res.exceeds) return "danger";
+    var bad = res.pipesRes.some(function(r){ return r.V < VMIN || r.V > VMAX; });
+    return bad ? "warn" : "ok";
+  }
+
+  function statusText(res, short){
+    if(res.pendienteInvalida) return short ? "SIN PEND." : "SIN PENDIENTE";
+    if(res.exceeds) return "EXCEDE" + (short ? "" : " CAPACIDAD");
+    var bad = res.pipesRes.some(function(r){ return r.V < VMIN || r.V > VMAX; });
+    if(bad) return short ? "VERIF. VEL." : "VERIFICAR VEL.";
+    return "OK";
+  }
+
+  function pipesTag(t){
+    var n = t.pipes.length;
+    if(n === 1) return findMaterial(t.pipes[0].materialId).abbr;
+    var sameMat = t.pipes.every(function(p){ return p.materialId === t.pipes[0].materialId; });
+    var matLabel = sameMat ? findMaterial(t.pipes[0].materialId).abbr : "MIXTO";
+    return n + "×" + matLabel;
+  }
+
+  function pipesSchematicLabel(t){
+    var n = t.pipes.length;
+    if(n === 1){
+      var p = t.pipes[0];
+      return findMaterial(p.materialId).abbr + " Ø" + fmtDiam(p.diametro, p.unit);
+    }
+    var sameSpec = t.pipes.every(function(p){
+      return p.materialId === t.pipes[0].materialId && p.diametro === t.pipes[0].diametro && p.unit === t.pipes[0].unit;
+    });
+    if(sameSpec){
+      return n + "×" + findMaterial(t.pipes[0].materialId).abbr + " Ø" + fmtDiam(t.pipes[0].diametro, t.pipes[0].unit);
+    }
+    return n + " tuberías en paralelo";
+  }
+
+  // ---------- UI: barra global ----------
+
+  var qBaseInput = document.getElementById("qbase");
+  var defMatSelect = document.getElementById("defmat");
+  var defUnitSelect = document.getElementById("defunit");
+
+  MATERIALS.forEach(function(m){
+    var opt = document.createElement("option");
+    opt.value = m.id;
+    opt.textContent = m.label + " · n=" + m.n.toFixed(3);
+    defMatSelect.appendChild(opt);
+  });
+  defMatSelect.value = "pvc";
+
+  qBaseInput.value = state.qBase;
+  qBaseInput.addEventListener("input", function(){
+    state.qBase = parseFloat(qBaseInput.value) || 0;
+    save();
+    render();
+  });
+  defMatSelect.addEventListener("change", function(){
+    var m = findMaterial(defMatSelect.value);
+    state.defaultN = m.n;
+    save();
+  });
+
+  defUnitSelect.value = state.defaultUnit;
+  defUnitSelect.addEventListener("change", function(){
+    state.defaultUnit = defUnitSelect.value;
+    save();
+  });
+
+  // tema
+  var themebtn = document.getElementById("themebtn");
+  function applyTheme(t){
+    if(t === "system"){ document.documentElement.removeAttribute("data-theme"); }
+    else { document.documentElement.setAttribute("data-theme", t); }
+    Array.prototype.forEach.call(themebtn.querySelectorAll("button"), function(b){
+      b.classList.toggle("active", b.getAttribute("data-t") === t);
+    });
+    try{ localStorage.setItem("simulador-caudales-theme", t); }catch(e){}
+  }
+  themebtn.addEventListener("click", function(e){
+    var b = e.target.closest("button");
+    if(!b) return;
+    applyTheme(b.getAttribute("data-t"));
+  });
+  (function initTheme(){
+    var saved = "system";
+    try{ saved = localStorage.getItem("simulador-caudales-theme") || "system"; }catch(e){}
+    applyTheme(saved);
+  })();
+
+  // ---------- render tramos ----------
+
+  var tramosEl = document.getElementById("tramos");
+  var addBtn = document.getElementById("addtramo");
+  var schematicEl = document.getElementById("schematic");
+
+  addBtn.addEventListener("click", function(){
+    var last = state.tramos[state.tramos.length-1];
+    state.tramos.push(newTramo({
+      pendiente: last ? last.pendiente : 1.0,
+      aporte: 0,
+      pipes: last ? last.pipes.map(function(p){
+        return newPipe({materialId:p.materialId, diametro:p.diametro, diametroCustom:p.diametroCustom, unit:p.unit, n:p.n});
+      }) : undefined
+    }));
+    save();
+    render();
+  });
+
+  // clic en el esquema: salta a la tarjeta del tramo correspondiente
+  schematicEl.addEventListener("click", function(e){
+    var g = e.target.closest("[data-tramo-id]");
+    if(!g) return;
+    var card = document.getElementById("tramo-card-" + g.getAttribute("data-tramo-id"));
+    if(!card) return;
+    card.scrollIntoView({behavior:"smooth", block:"center"});
+    card.classList.add("flash");
+    setTimeout(function(){ card.classList.remove("flash"); }, 900);
+  });
+
+  function buildDiamSelect(sel, p){
+    var m = findMaterial(p.materialId);
+    var list = (m.diam && m.diam.length) ? m.diam : GENERIC_DIAM;
+    if(!p.diametroCustom && list.indexOf(p.diametro) === -1){
+      p.diametroCustom = true; // el valor guardado ya no está en el catálogo del material actual
+    }
+    sel.innerHTML = "";
+    list.forEach(function(d){
+      var o = document.createElement("option");
+      o.value = d; o.textContent = "Ø " + fmtDiam(d, p.unit);
+      sel.appendChild(o);
+    });
+    var o2 = document.createElement("option");
+    o2.value = "custom"; o2.textContent = "Otro / personalizado…";
+    sel.appendChild(o2);
+    sel.value = p.diametroCustom ? "custom" : String(p.diametro);
+  }
+
+  function buildMatSelect(sel, p){
+    sel.innerHTML = "";
+    MATERIALS.forEach(function(m){
+      var o = document.createElement("option");
+      o.value = m.id;
+      o.textContent = m.label + " · n=" + m.n.toFixed(3);
+      sel.appendChild(o);
+    });
+    sel.value = p.materialId;
+  }
+
+  // velocidad representativa de un tramo (promedio ponderado por caudal entre sus tuberías)
+  function tramoVelocity(res){
+    var totalQ = res.pipesRes.reduce(function(s,r){ return s + (r.Q||0); }, 0);
+    if(totalQ <= 0) return 0;
+    var weighted = res.pipesRes.reduce(function(s,r){ return s + (r.V||0)*(r.Q||0); }, 0);
+    return weighted / totalQ;
+  }
+
+  // tiempo de recorrido del frente de agua desde R1 hasta cada registro, asumiendo
+  // flujo permanente y uniforme al caudal de diseño actual (no es un tránsito dinámico real)
+  function computeTravel(rows){
+    var STALL_PLACEHOLDER = 0.8; // s, marcador visual cuando un tramo no tiene flujo (pendiente nula)
+    var travel = rows.map(function(row){
+      var V = tramoVelocity(row.res);
+      var L = row.t.longitud;
+      var valid = !row.res.pendienteInvalida && V > 0 && L > 0;
+      return { V:V, L:L, valid:valid, t: valid ? L/V : null };
+    });
+    var cum = [0], cumValid = [true];
+    travel.forEach(function(tr, i){
+      cum.push(cum[i] + (tr.valid ? tr.t : STALL_PLACEHOLDER));
+      cumValid.push(cumValid[i] && tr.valid);
+    });
+    return { travel:travel, cum:cum, cumValid:cumValid };
+  }
+
+  function renderOverflowNote(rows, travelInfo){
+    var noteEl = document.getElementById("overflowNote");
+    var firstOverflow = -1;
+    for(var i=0;i<rows.length;i++){ if(rows[i].res.exceeds){ firstOverflow = i; break; } }
+    if(firstOverflow === -1){
+      noteEl.className = "overflow-note ok";
+      noteEl.innerHTML = "✓ Sin desbordes — todos los tramos tienen capacidad para el caudal que reciben.";
+    } else {
+      var label = "Tramo " + (firstOverflow+1) + " (R" + (firstOverflow+1) + "→R" + (firstOverflow+2) + ")";
+      var timeTxt = travelInfo.cumValid[firstOverflow]
+        ? ("~" + fmt(travelInfo.cum[firstOverflow],1) + " s de recorrido desde R1")
+        : "tiempo no determinable (hay un tramo sin pendiente aguas arriba)";
+      noteEl.className = "overflow-note danger";
+      noteEl.innerHTML = "⚠ Desborda en " + label + " — el frente de agua llega ahí a los " + timeTxt + " (estimado, flujo permanente al caudal de diseño actual).";
+    }
+    return firstOverflow;
+  }
+
+  function render(){
+    // acumular caudales
+    var acumLs = state.qBase;
+    var rows = state.tramos.map(function(t, idx){
+      acumLs += t.aporte;
+      var res = computeTramo(t, acumLs);
+      return {t:t, idx:idx, qLlegaLs:acumLs, res:res};
+    });
+
+    var travelInfo = computeTravel(rows);
+    var firstOverflow = renderOverflowNote(rows, travelInfo);
+    renderSchematic(rows, travelInfo, firstOverflow);
+    renderCards(rows);
+  }
+
+  function buildPipeRow(t, p, pipeIdx, canRemove){
+    var row = document.createElement("div");
+    row.className = "piperow";
+    row.innerHTML =
+      (t.pipes.length > 1 ? '<div class="piperow-index">Tubería ' + (pipeIdx+1) + '</div>' : '') +
+      '<div class="field"><label>Material</label><select class="p-mat"></select></div>' +
+      '<div class="field"><label>Unidad</label><select class="p-unit">' +
+        '<option value="mm">mm</option><option value="m">m</option><option value="in">pulg</option>' +
+      '</select></div>' +
+      '<div class="field"><label>Diámetro comercial</label><select class="p-diam"></select></div>' +
+      '<button class="removebtn p-remove" title="Quitar tubería" ' + (canRemove ? '' : 'disabled') + '>✕</button>' +
+      '<div class="field span-all p-diam-custom-wrap" style="display:none"><label class="p-diam-custom-label">Diámetro</label><input type="number" class="p-diam-custom" min="0"/></div>' +
+      '<div class="field span-all p-n-custom-wrap" style="display:none"><label>n de Manning</label><input type="number" class="p-n-custom" step="0.001" min="0.005"/></div>';
+
+    var matSel = row.querySelector(".p-mat");
+    buildMatSelect(matSel, p);
+    var unitSel = row.querySelector(".p-unit");
+    unitSel.value = p.unit;
+    var diamSel = row.querySelector(".p-diam");
+    buildDiamSelect(diamSel, p);
+    var diamCustomWrap = row.querySelector(".p-diam-custom-wrap");
+    var diamCustom = row.querySelector(".p-diam-custom");
+    var diamCustomLabel = row.querySelector(".p-diam-custom-label");
+    var nCustomWrap = row.querySelector(".p-n-custom-wrap");
+    var nCustom = row.querySelector(".p-n-custom");
+
+    diamCustomLabel.textContent = "Diámetro (" + (p.unit === "in" ? '"' : p.unit) + ")";
+    diamCustom.step = UNITS[p.unit].step;
+    diamCustom.value = fmt(mmTo(p.unit, p.diametro), UNITS[p.unit].decimals);
+    diamCustomWrap.style.display = p.diametroCustom ? "flex" : "none";
+    nCustom.value = p.n;
+    nCustomWrap.style.display = p.materialId === "custom" ? "flex" : "none";
+
+    matSel.addEventListener("change", function(){
+      p.materialId = matSel.value;
+      var m = findMaterial(matSel.value);
+      p.n = m.n;
+      save(); render();
+    });
+    unitSel.addEventListener("change", function(){
+      p.unit = unitSel.value;
+      save(); render();
+    });
+    diamSel.addEventListener("change", function(){
+      if(diamSel.value === "custom"){
+        p.diametroCustom = true;
+        diamCustomWrap.style.display = "flex";
+        diamCustom.focus();
+      } else {
+        p.diametroCustom = false;
+        diamCustomWrap.style.display = "none";
+        p.diametro = parseFloat(diamSel.value);
+      }
+      save(); render();
+    });
+    diamCustom.addEventListener("input", function(){
+      var val = parseFloat(diamCustom.value);
+      p.diametro = isNaN(val) ? 0 : toMm(p.unit, val);
+      save(); render();
+    });
+    nCustom.addEventListener("input", function(){
+      p.n = parseFloat(nCustom.value) || 0.01;
+      save(); render();
+    });
+    row.querySelector(".p-remove").addEventListener("click", function(){
+      if(t.pipes.length <= 1) return;
+      t.pipes = t.pipes.filter(function(x){ return x.id !== p.id; });
+      save(); render();
+    });
+
+    return row;
+  }
+
+  function renderCards(rows){
+    tramosEl.innerHTML = "";
+    rows.forEach(function(row){
+      var t = row.t, res = row.res;
+      var card = document.createElement("div");
+      card.className = "tramo";
+      card.id = "tramo-card-" + t.id;
+
+      var color = stateColor(res);
+      var badgeText = statusText(res, false);
+
+      var rUp = "R" + (row.idx+1), rDown = "R" + (row.idx+2);
+
+      card.innerHTML =
+        '<div class="tramo-head">' +
+          '<span class="tag">Tramo ' + (row.idx+1) + '</span>' +
+          '<span class="route">' + rUp + '<span class="arrow">→</span>' + rDown + '</span>' +
+          '<span class="matchip">' + pipesTag(t) + '</span>' +
+          '<span class="badge ' + color + '">' + badgeText + '</span>' +
+          '<button class="removebtn" title="Eliminar tramo" ' + (rows.length<=1?'disabled':'') + '>✕</button>' +
+        '</div>' +
+        '<div class="tramo-body">' +
+          '<div class="inputs">' +
+            '<div class="field"><label>Pendiente (%)</label><input type="number" class="in-pend" step="0.05" min="0"/></div>' +
+            '<div class="field"><label>Longitud (m)</label><input type="number" class="in-long" step="1" min="0"/></div>' +
+            '<div class="field span2"><label>Aporte en ' + rUp + ' (L/s)</label><input type="number" class="in-aporte" step="0.1" min="0"/></div>' +
+            '<div class="field-sep"></div>' +
+            '<div class="pipelist-wrap">' +
+              '<div class="pipelist-head"><label>Tuberías del tramo (en paralelo)</label><span class="pipelist-hint">mismos registros, misma pendiente</span></div>' +
+              '<div class="pipelist"></div>' +
+              '<button type="button" class="addpipe-btn">+ Añadir tubería en paralelo</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="results"></div>' +
+        '</div>';
+
+      // pendiente
+      var pendInput = card.querySelector(".in-pend");
+      pendInput.value = t.pendiente;
+      pendInput.addEventListener("input", function(){
+        t.pendiente = parseFloat(pendInput.value) || 0;
+        save(); render();
+      });
+
+      // longitud
+      var longInput = card.querySelector(".in-long");
+      longInput.value = t.longitud;
+      longInput.addEventListener("input", function(){
+        t.longitud = parseFloat(longInput.value) || 0;
+        save(); render();
+      });
+
+      // aporte
+      var aporteInput = card.querySelector(".in-aporte");
+      aporteInput.value = t.aporte;
+      aporteInput.addEventListener("input", function(){
+        t.aporte = parseFloat(aporteInput.value) || 0;
+        save(); render();
+      });
+
+      // remove tramo
+      card.querySelector(".removebtn").addEventListener("click", function(){
+        if(rows.length<=1) return;
+        state.tramos = state.tramos.filter(function(x){return x.id!==t.id;});
+        save(); render();
+      });
+
+      // lista de tuberías
+      var pipelistEl = card.querySelector(".pipelist");
+      t.pipes.forEach(function(p, pi){
+        pipelistEl.appendChild(buildPipeRow(t, p, pi, t.pipes.length > 1));
+      });
+      card.querySelector(".addpipe-btn").addEventListener("click", function(){
+        var lastPipe = t.pipes[t.pipes.length-1];
+        t.pipes.push(newPipe(lastPipe ? {
+          materialId: lastPipe.materialId, diametro: lastPipe.diametro,
+          diametroCustom: lastPipe.diametroCustom, unit: lastPipe.unit, n: lastPipe.n
+        } : {}));
+        save(); render();
+      });
+
+      // resultados agregados
+      var resultsEl = card.querySelector(".results");
+      var fillPct = res.pendienteInvalida ? 0 : Math.min(100, res.pctCapacidad);
+      var fillColor = color === "ok" ? "" : (color === "danger" ? "danger" : "warn");
+
+      var summaryHtml =
+        '<div>' +
+        '<div class="result-row"><span class="rlabel">Caudal que llega a ' + rUp + '</span><span class="rval num">' + fmt(row.qLlegaLs,2) + ' L/s</span></div>' +
+        '<div class="result-row"><span class="rlabel">Capacidad total a tubo lleno (Q<sub>lleno</sub>)</span><span class="rval num big">' + fmt(res.QfullLs,2) + ' L/s</span></div>' +
+        '<div class="result-row"><span class="rlabel">% de la capacidad utilizada</span><span class="rval num">' + (isFinite(res.pctCapacidad) ? fmt(res.pctCapacidad,1)+' %' : '> límite') + '</span></div>' +
+        '<div class="fill-bar-track"><div class="fill-bar-fill ' + fillColor + '" style="width:' + fillPct + '%"></div></div>' +
+        '</div>';
+
+      var breakdownHtml = '<div class="pipe-breakdown">';
+      if(t.pipes.length > 1){
+        breakdownHtml += '<div class="pipe-breakdown-title">Detalle por tubería</div>';
+      }
+      res.pipesRes.forEach(function(r, ri){
+        var pc = pipeColor(r, res.pendienteInvalida);
+        var pipeName = t.pipes.length > 1 ? ("Tubería " + (ri+1) + " · " + r.material.abbr) : r.material.abbr;
+        breakdownHtml +=
+          '<div class="piperesult">' +
+            '<div class="piperesult-head"><span class="pname"><span class="dot ' + pc + '"></span>' + pipeName + ' Ø' + fmtDiam(r.pipe.diametro, r.pipe.unit) + '</span>' +
+            '<span class="num" style="font-size:11.5px;color:var(--ink-dim)">' + (res.pendienteInvalida ? '—' : fmt(r.QfullLs,1)+' L/s lleno') + '</span></div>' +
+            '<div class="piperesult-metrics">' +
+              '<span>Q asignado: <b class="num">' + (res.pendienteInvalida ? '—' : fmt(r.Q*1000,2)+' L/s') + '</b></span>' +
+              '<span>y/D: <b class="num">' + (res.pendienteInvalida ? '—' : fmt(r.yD*100,0)+'%') + '</b></span>' +
+              '<span>V: <b class="num">' + (res.pendienteInvalida ? '—' : fmt(r.V,2)+' m/s') + '</b></span>' +
+            '</div>' +
+          '</div>';
+      });
+      breakdownHtml += '</div>';
+
+      resultsEl.innerHTML = summaryHtml + breakdownHtml;
+
+      if(res.pendienteInvalida){
+        var w = document.createElement("div");
+        w.className = "result-row";
+        w.innerHTML = '<span class="rlabel" style="color:var(--warn)">La pendiente debe ser mayor a 0 para que exista flujo.</span>';
+        resultsEl.insertBefore(w, resultsEl.firstChild);
+      }
+
+      tramosEl.appendChild(card);
+    });
+  }
+
+  // ---------- esquema SVG (perfil con pendientes a escala vertical exagerada) ----------
+
+  function renderSchematic(rows, travelInfo, firstOverflow){
+    var n = rows.length;
+    var stepW = 200;
+    var totalW = Math.max(640, n*stepW + 80);
+
+    // altura de cada nodo: la pendiente real de cada tramo se traduce en un descenso
+    // vertical proporcional (escala exagerada y normalizada para que quepa en el panel)
+    var baseK = 22; // px por 1% de pendiente, antes de normalizar
+    var rawDrops = rows.map(function(row){
+      return row.res.pendienteInvalida ? 0 : row.t.pendiente * baseK;
+    });
+    var totalRaw = rawDrops.reduce(function(a,b){ return a+b; }, 0);
+    var desiredMaxDrop = 130;
+    var scale = totalRaw > 0 ? Math.min(3, Math.max(0.4, desiredMaxDrop/totalRaw)) : 1;
+    var drops = rawDrops.map(function(d){ return d*scale; });
+
+    var yTop = 70;
+    var nodeY = [yTop];
+    for(var ni=0; ni<n; ni++){ nodeY.push(nodeY[ni] + drops[ni]); }
+    var maxY = Math.max.apply(null, nodeY);
+    var svgH = maxY + 130;
+    schematicEl.setAttribute("width", totalW);
+    schematicEl.setAttribute("viewBox", "0 0 " + totalW + " " + svgH);
+
+    var x0 = 40;
+    var parts = [];
+    var geom = []; // datos para la animación de flujo
+
+    for(var i=0;i<n;i++){
+      var row = rows[i];
+      var res = row.res;
+      var color = stateColor(res);
+      var colorVar = color === "ok" ? "var(--accent)" : (color === "danger" ? "var(--danger)" : "var(--warn)");
+      var x1 = x0 + i*stepW;
+      var x2 = x1 + stepW - 40;
+      var mid = (x1+x2)/2;
+      var y1 = nodeY[i], y2 = nodeY[i+1];
+      var midY = (y1+y2)/2;
+      var pipes = row.t.pipes;
+
+      // nodo aguas arriba (tapa de registro)
+      parts.push('<circle cx="'+x1+'" cy="'+y1+'" r="9" fill="var(--paper)" stroke="var(--ink-dim)" stroke-width="1.5"/>');
+      parts.push('<circle cx="'+x1+'" cy="'+y1+'" r="3.2" fill="var(--ink-dim)"/>');
+      parts.push('<text x="'+x1+'" y="'+(y1-22)+'" text-anchor="middle" class="node-label">R'+(i+1)+'</text>');
+      if(row.t.aporte>0){
+        parts.push('<text x="'+x1+'" y="'+(y1+16)+'" text-anchor="middle" class="node-sub">+'+fmt(row.t.aporte,1)+' L/s</text>');
+      }
+
+      // grupo interactivo del tramo
+      var bandTop = Math.min(y1,y2) - 55, bandH = Math.abs(y2-y1) + 95;
+      parts.push('<g class="tramo-hit" data-tramo-id="'+row.t.id+'">');
+      parts.push('<rect class="hitzone" x="'+x1+'" y="'+bandTop+'" width="'+(x2-x1)+'" height="'+bandH+'" rx="8"/>');
+
+      var gcy = midY - 42, gr = 10;
+      if(pipes.length === 1){
+        // mini sección transversal (gauge y/D) para una sola tubería
+        var yDfrac = res.pendienteInvalida ? 0 : Math.min(1, res.pipesRes[0].yD || 0);
+        var fillH = 2*gr*yDfrac;
+        var clipId = "gclip" + row.t.id;
+        parts.push('<clipPath id="'+clipId+'"><circle cx="'+mid+'" cy="'+gcy+'" r="'+gr+'"/></clipPath>');
+        parts.push('<circle class="gauge-bg" cx="'+mid+'" cy="'+gcy+'" r="'+gr+'"/>');
+        if(fillH > 0.3){
+          parts.push('<rect x="'+(mid-gr)+'" y="'+(gcy+gr-fillH)+'" width="'+(2*gr)+'" height="'+fillH+'" fill="'+colorVar+'" clip-path="url(#'+clipId+')"/>');
+        }
+        parts.push('<circle cx="'+mid+'" cy="'+gcy+'" r="'+gr+'" fill="none" stroke="'+colorVar+'" stroke-width="1.3" opacity="0.8"/>');
+      } else {
+        // varias tuberías: barra de capacidad combinada
+        var barW=44, barH=7, bx=mid-barW/2, by=gcy-barH/2;
+        parts.push('<rect x="'+bx+'" y="'+by+'" width="'+barW+'" height="'+barH+'" rx="3.5" class="gauge-bg"/>');
+        var fillFrac = isFinite(res.pctCapacidad) ? Math.max(0,Math.min(1,res.pctCapacidad/100)) : 1;
+        parts.push('<rect x="'+bx+'" y="'+by+'" width="'+(fillFrac*barW)+'" height="'+barH+'" rx="3.5" fill="'+colorVar+'"/>');
+      }
+
+      // etiqueta material + diámetro + pendiente
+      parts.push('<text x="'+mid+'" y="'+(midY-22)+'" text-anchor="middle" class="tramo-label">'+pipesSchematicLabel(row.t)+' · '+fmt(row.t.pendiente,2)+'%</text>');
+
+      // tubería(s), dibujadas con la inclinación real de nodo a nodo
+      var k = pipes.length;
+      pipes.forEach(function(p, pi){
+        var offset = k>1 ? (pi - (k-1)/2) * 8 : 0;
+        var strokeW = k>1 ? Math.max(3, Math.min(9, p.diametro/150)) : (4 + Math.min(20, p.diametro/100));
+        var pr = res.pipesRes[pi];
+        var pc = pipeColor(pr, res.pendienteInvalida);
+        var pColorVar = pc === "ok" ? "var(--accent)" : (pc === "danger" ? "var(--danger)" : "var(--warn)");
+        parts.push('<line x1="'+(x1+11)+'" y1="'+(y1+offset)+'" x2="'+(x2-11)+'" y2="'+(y2+offset)+'" stroke="'+pColorVar+'" stroke-width="'+strokeW+'" stroke-linecap="round" opacity="0.85"/>');
+      });
+
+      // caudales
+      parts.push('<text x="'+mid+'" y="'+(midY+24)+'" text-anchor="middle" class="tramo-sub">'+fmt(row.qLlegaLs,1)+' / '+fmt(res.QfullLs,1)+' L/s</text>');
+      parts.push('<text x="'+mid+'" y="'+(midY+40)+'" text-anchor="middle" class="tramo-status '+color+'">'+statusText(res, true)+'</text>');
+
+      parts.push('</g>');
+
+      var tr = travelInfo.travel[i];
+      geom.push({
+        tramoId: row.t.id,
+        x1: x1+11, y1: y1, x2: x2-11, y2: y2,
+        color: color, exceeds: res.exceeds,
+        realTime: tr.valid ? tr.t : 0.8,
+        cumRealStart: travelInfo.cum[i]
+      });
+
+      x0 = x1;
+    }
+    // último nodo
+    var xLast = x0 + (n>0 ? stepW-40 : 0);
+    var yLastNode = nodeY[n];
+    parts.push('<circle cx="'+xLast+'" cy="'+yLastNode+'" r="9" fill="var(--paper)" stroke="var(--ink-dim)" stroke-width="1.5"/>');
+    parts.push('<circle cx="'+xLast+'" cy="'+yLastNode+'" r="3.2" fill="var(--ink-dim)"/>');
+    parts.push('<text x="'+xLast+'" y="'+(yLastNode-22)+'" text-anchor="middle" class="node-label">R'+(n+1)+'</text>');
+
+    parts.push('<circle id="flowmarker" cx="'+(geom.length?geom[0].x1:0)+'" cy="'+(geom.length?geom[0].y1:0)+'" r="5" fill="var(--accent)" opacity="0.95"/>');
+
+    schematicEl.innerHTML = parts.join("");
+
+    ANIM.geom = geom;
+    ANIM.firstOverflow = firstOverflow;
+  }
+
+  // ---------- animación del flujo ----------
+
+  var ANIM = { geom: [], firstOverflow: -1 };
+  var simState = { playing:false, speed:1, virtualMs:0 };
+  var rafLastTs = null;
+
+  var simPlayBtn = document.getElementById("simplay");
+  var simSpeedWrap = document.getElementById("simspeed");
+  var simClockEl = document.getElementById("simclock");
+
+  simPlayBtn.addEventListener("click", function(){
+    simState.playing = !simState.playing;
+    simPlayBtn.textContent = simState.playing ? "⏸ Pausar" : "▶ Simular flujo";
+    simPlayBtn.classList.toggle("playing", simState.playing);
+  });
+  simSpeedWrap.addEventListener("click", function(e){
+    var b = e.target.closest("button");
+    if(!b) return;
+    simState.speed = parseFloat(b.getAttribute("data-speed"));
+    Array.prototype.forEach.call(simSpeedWrap.querySelectorAll("button"), function(x){
+      x.classList.toggle("active", x===b);
+    });
+  });
+
+  function colorVarFor(c){
+    return c === "ok" ? "var(--accent)" : (c === "danger" ? "var(--danger)" : "var(--warn)");
+  }
+
+  function tick(ts){
+    if(rafLastTs === null) rafLastTs = ts;
+    var dt = ts - rafLastTs;
+    rafLastTs = ts;
+    if(dt > 200 || dt < 0) dt = 16;
+
+    var marker = document.getElementById("flowmarker");
+    var overflowNote = document.getElementById("overflowNote");
+
+    if(simState.playing && ANIM.geom.length && marker){
+      simState.virtualMs += dt * simState.speed;
+
+      var totalRealTravel = ANIM.geom.reduce(function(s,g){ return s+g.realTime; }, 0) || 1;
+      var baseDurSec = Math.min(16, Math.max(4, totalRealTravel*0.4));
+      var totalMs = 0;
+      var geomMs = ANIM.geom.map(function(g){
+        var share = totalRealTravel>0 ? g.realTime/totalRealTravel : 1/ANIM.geom.length;
+        var durMs = Math.max(200, baseDurSec*1000*share);
+        totalMs += durMs;
+        return durMs;
+      });
+
+      var loopPos = simState.virtualMs % totalMs;
+      var idx = 0, acc = 0;
+      for(idx=0; idx<ANIM.geom.length; idx++){
+        if(loopPos < acc + geomMs[idx]) break;
+        acc += geomMs[idx];
+      }
+      if(idx >= ANIM.geom.length) idx = ANIM.geom.length-1;
+
+      var g = ANIM.geom[idx];
+      var frac = geomMs[idx] > 0 ? (loopPos-acc)/geomMs[idx] : 0;
+      marker.setAttribute("cx", g.x1 + (g.x2-g.x1)*frac);
+      marker.setAttribute("cy", g.y1 + (g.y2-g.y1)*frac);
+      marker.setAttribute("r", g.exceeds ? 7 : 5);
+      marker.setAttribute("fill", g.exceeds ? "var(--danger)" : colorVarFor(g.color));
+      marker.setAttribute("opacity", "0.95");
+
+      var simSeconds = g.cumRealStart + frac*g.realTime;
+      if(simClockEl) simClockEl.textContent = "t = " + simSeconds.toFixed(1) + " s";
+      if(overflowNote) overflowNote.classList.toggle("flash", !!g.exceeds);
+    } else if(overflowNote){
+      overflowNote.classList.remove("flash");
+    }
+
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  render();
+})();
+</script>
+</body>
+</html>
