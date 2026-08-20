@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Levantamiento de Coordenadas por Trilateración — PortiCAD Multi-Tools</title>
+<title>TopoCAD3D — PortiCAD Multi-Tools</title>
 <link rel="icon" href="/favicon.png" type="image/png" />
 <link rel="shortcut icon" href="/favicon.png" />
 <style>
@@ -33,6 +33,24 @@
   .topbar-title { font-size: 15px; font-weight: 600; color: #e6edf3; }
   .badge { background: #2dd4bf22; border: 1px solid #2dd4bf55; color: #2dd4bf;
            font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
+
+  .menu-wrap { position: relative; }
+  .menu-drop {
+    position: absolute; top: calc(100% + 4px); left: 0;
+    background: #161b22; border: 1px solid #30363d;
+    border-radius: 8px; min-width: 220px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.5);
+    z-index: 200; overflow: hidden; padding: 4px;
+  }
+  .menu-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; font-size: 14px; border-radius: 6px;
+    color: #e6edf3; cursor: pointer; transition: background .1s;
+  }
+  .menu-item:hover { background: #2dd4bf22; color: #2dd4bf; }
+  .menu-ico { font-size: 14px; }
+  .menu-atajo { margin-left: auto; font-size: 11px; color: #6e7681; }
+  .menu-sep { height: 1px; background: #21262d; margin: 4px 2px; }
 
   .main {
     display: grid;
@@ -141,6 +159,14 @@
   .row-actions button.del:hover { color: #f85149; background: #f8514922; }
   .station-empty { color: #6e7681; font-size: 13px; padding: 14px 4px; text-align: center; }
 
+  .meas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .meas-card {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 8px 10px;
+  }
+  .meas-lbl { font-size: 10.5px; color: #8b949e; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
+  .meas-val { font-size: 15px; font-weight: 700; color: #f0b429; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
   /* ── Panel derecho / visor 3D ── */
   .panel-results { padding: 18px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
   .viewer-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -175,16 +201,39 @@
   <span class="topbar-sep">›</span>
   <div class="topbar-crumb">
     <span>Multi-Tools</span><span>›</span>
-    <span class="topbar-title">Levantamiento por Trilateración</span>
+    <span class="topbar-title">TopoCAD3D</span>
   </div>
   <span class="badge" style="margin-left:8px;">Topografía</span>
   <span class="badge" style="border-color:#f0b42955; color:#f0b429; background:#f0b42922;">🧪 Versión beta</span>
+
+  <div class="menu-wrap" id="menu-archivo-wrap">
+    <button type="button" class="btn" onclick="toggleMenu('archivo')">📁 Archivo ▾</button>
+    <div class="menu-drop" id="menu-archivo" style="display:none">
+      <div class="menu-item" onclick="archivoNuevo()">
+        <span class="menu-ico">📄</span> Nuevo
+        <span class="menu-atajo">Ctrl+N</span>
+      </div>
+      <div class="menu-sep"></div>
+      <div class="menu-item" onclick="archivoAbrir()">
+        <span class="menu-ico">📂</span> Abrir…
+        <span class="menu-atajo">Ctrl+O</span>
+      </div>
+      <div class="menu-sep"></div>
+      <div class="menu-item" onclick="archivoGuardar()">
+        <span class="menu-ico">💾</span> Guardar
+        <span class="menu-atajo">Ctrl+S</span>
+      </div>
+      <div class="menu-item" onclick="archivoGuardarComo()">
+        <span class="menu-ico">💾</span> Guardar como…
+        <span class="menu-atajo">Ctrl+Shift+S</span>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="file-input-t3d" accept=".t3d" style="display:none" onchange="archivoCargar(this)">
+  <span id="archivoActualLbl" style="font-size:12px; color:#6e7681;"></span>
+
   <div style="margin-left:auto; display:flex; flex-wrap:wrap; gap:8px;">
-  <button type="button" class="btn" onclick="saveToFile()">💾 Guardar archivo</button>
-  <input type="file" id="loadFileInput" accept="application/json,.json" style="display:none" onchange="handleLoadFile(event)">
-  <button type="button" class="btn" onclick="document.getElementById('loadFileInput').click()">📂 Cargar archivo</button>
   <button type="button" class="btn primary" onclick="exportCSV()">⬇ Exportar CSV</button>
-  <button type="button" class="btn danger" onclick="clearAll()">🗑 Borrar todo</button>
   </div>
 </div>
 
@@ -304,6 +353,16 @@
         </table>
         <div class="station-empty" id="stationsEmpty">Todavía no agregaste estaciones. Empezá agregando el punto de origen (por ejemplo, Estación 1 en 0,0,0).</div>
       </div>
+    </div>
+
+    <div class="input-group">
+      <div class="sec-title">📏 Cinta métrica — medir entre estaciones</div>
+      <div class="field-2col">
+        <div class="field"><label>Estación A</label><select id="measA" onchange="onMeasureSelectChange()"></select></div>
+        <div class="field"><label>Estación B</label><select id="measB" onchange="onMeasureSelectChange()"></select></div>
+      </div>
+      <button type="button" class="btn primary ghost" id="btnMeasurePick" onclick="toggleMeasureMode()">🎯 Elegir en el visor 3D</button>
+      <div id="measureResults"></div>
     </div>
 
   </div>
@@ -471,40 +530,107 @@ function loadFromStorage() {
   } catch (e) {}
 }
 
-// ────────────────────────── Guardar / cargar archivo ──────────────────────────
+// ────────────────────────── Menú Archivo (.t3d) ──────────────────────────
 
-function saveToFile() {
+let archivoActual = null; // nombre del archivo .t3d actualmente abierto/guardado
+
+function _actualizarTituloArchivo() {
+  document.title = 'TopoCAD3D — ' + (archivoActual || 'sin guardar');
+  const lbl = document.getElementById('archivoActualLbl');
+  if (lbl) lbl.textContent = archivoActual ? archivoActual : '(sin guardar)';
+}
+
+function toggleMenu(id) {
+  const drop = document.getElementById('menu-' + id);
+  const visible = drop.style.display === 'block';
+  document.querySelectorAll('.menu-drop').forEach(d => d.style.display = 'none');
+  if (!visible) drop.style.display = 'block';
+}
+function closeMenus() {
+  document.querySelectorAll('.menu-drop').forEach(d => d.style.display = 'none');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.menu-wrap')) closeMenus();
+});
+document.addEventListener('keydown', e => {
+  const tag = document.activeElement.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (!(e.ctrlKey || e.metaKey)) return;
+  if (e.key === 'n' || e.key === 'N') { e.preventDefault(); archivoNuevo(); }
+  else if (e.key === 'o' || e.key === 'O') { e.preventDefault(); archivoAbrir(); }
+  else if (e.shiftKey && (e.key === 's' || e.key === 'S')) { e.preventDefault(); archivoGuardarComo(); }
+  else if (e.key === 's' || e.key === 'S') { e.preventDefault(); archivoGuardar(); }
+});
+
+function archivoNuevo() {
+  closeMenus();
+  if (stations.length && !confirm('¿Crear un levantamiento nuevo? Se perderán los cambios que no hayas guardado en un archivo .t3d.')) return;
+  stations = [];
+  nextId = 1;
+  archivoActual = null;
+  resetMeasure();
+  recomputeAll();
+  renderAll();
+  saveToStorage();
+  resetForm();
+  _actualizarTituloArchivo();
+}
+
+function archivoAbrir() {
+  closeMenus();
+  document.getElementById('file-input-t3d').click();
+}
+
+function archivoCargar(input) {
+  const file = input.files && input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (stations.length && !confirm('Abrir este archivo va a reemplazar el levantamiento actual. ¿Continuar?')) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let ok = false;
+    try { ok = applyLoadedData(JSON.parse(reader.result)); } catch (e) { ok = false; }
+    if (!ok) { alert('No se pudo leer el archivo. Verificá que sea un archivo .t3d válido, exportado desde TopoCAD3D.'); return; }
+    archivoActual = file.name;
+    resetMeasure();
+    recomputeAll();
+    renderAll();
+    saveToStorage();
+    resetForm();
+    _actualizarTituloArchivo();
+  };
+  reader.onerror = () => alert('No se pudo leer el archivo.');
+  reader.readAsText(file);
+}
+
+function archivoGuardar() {
+  closeMenus();
+  if (!archivoActual) { archivoGuardarComo(); return; }
+  _descargarArchivo(archivoActual);
+}
+
+function archivoGuardarComo() {
+  closeMenus();
+  const nombre = prompt('Nombre del archivo:', archivoActual || 'levantamiento.t3d');
+  if (!nombre) return;
+  const nombreFinal = nombre.endsWith('.t3d') ? nombre : nombre.replace(/\.[^.]+$/, '') + '.t3d';
+  _descargarArchivo(nombreFinal);
+  archivoActual = nombreFinal;
+  _actualizarTituloArchivo();
+}
+
+function _descargarArchivo(nombre) {
   const data = Object.assign(
-    { app: 'porticad-levantamiento-topografico', formatVersion: 1, savedAt: new Date().toISOString() },
+    { app: 'TopoCAD3D', formatVersion: 1, savedAt: new Date().toISOString() },
     stationsToPlainData()
   );
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
-  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
   const a = document.createElement('a');
-  a.href = url; a.download = `levantamiento_${stamp}.json`;
+  a.href = url; a.download = nombre;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
-}
-
-function handleLoadFile(event) {
-  const file = event.target.files && event.target.files[0];
-  event.target.value = '';
-  if (!file) return;
-  if (stations.length && !confirm('Cargar este archivo va a reemplazar el levantamiento actual (que sigue guardado automáticamente en este navegador). ¿Continuar?')) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    let ok = false;
-    try { ok = applyLoadedData(JSON.parse(reader.result)); } catch (e) { ok = false; }
-    if (!ok) { alert('No se pudo leer el archivo. Verificá que sea un archivo de levantamiento válido (.json exportado desde esta herramienta).'); return; }
-    recomputeAll();
-    renderAll();
-    saveToStorage();
-    resetForm();
-  };
-  reader.onerror = () => alert('No se pudo leer el archivo.');
-  reader.readAsText(file);
 }
 
 // ────────────────────────── Formulario ──────────────────────────
@@ -867,19 +993,99 @@ function renderClosureNotes() {
 function renderAll() {
   renderTable();
   refreshRefSelects();
+  refreshMeasureSelects();
   renderClosureNotes();
+  computeMeasure();
   render3D();
 }
 
-function clearAll() {
-  if (!stations.length) return;
-  if (!confirm('¿Borrar todas las estaciones cargadas? Esta acción no se puede deshacer.')) return;
-  stations = [];
-  nextId = 1;
-  recomputeAll();
-  renderAll();
-  saveToStorage();
-  resetForm();
+// ────────────────────────── Cinta métrica (medir entre estaciones) ──────────────────────────
+
+let measA = null, measB = null; // ids de las estaciones elegidas para medir
+let measureMode = false; // armado para elegir estaciones haciendo clic en el visor 3D
+
+function refreshMeasureSelects() {
+  const valid = validStations();
+  const opts = valid.map(s => `<option value="${s.id}">${escapeHtml(s.name)}  (${fmt(s.x,2)}, ${fmt(s.y,2)}, ${fmt(s.z,2)})</option>`).join('');
+  if (measA !== null && !valid.some(s => s.id === measA)) measA = null;
+  if (measB !== null && !valid.some(s => s.id === measB)) measB = null;
+  const selA = document.getElementById('measA'), selB = document.getElementById('measB');
+  selA.innerHTML = '<option value="">— elegir —</option>' + opts;
+  selB.innerHTML = '<option value="">— elegir —</option>' + opts;
+  selA.value = measA || '';
+  selB.value = measB || '';
+}
+
+function onMeasureSelectChange() {
+  measA = parseInt(document.getElementById('measA').value, 10) || null;
+  measB = parseInt(document.getElementById('measB').value, 10) || null;
+  computeMeasure();
+  render3D();
+}
+
+function computeMeasure() {
+  const out = document.getElementById('measureResults');
+  if (!out) return;
+  const A = stations.find(s => s.id === measA && !s.error);
+  const B = stations.find(s => s.id === measB && !s.error);
+  if (!A || !B) {
+    out.innerHTML = '<div class="hint">Elegí dos estaciones (o tocá "Elegir en el visor 3D" y hacé clic sobre dos puntos) para medir la distancia y el desnivel real entre ellas.</div>';
+    return;
+  }
+  if (A.id === B.id) {
+    out.innerHTML = '<div class="hint">Elegí dos estaciones distintas.</div>';
+    return;
+  }
+  const dx = B.x - A.x, dy = B.y - A.y, dz = B.z - A.z;
+  const horiz = Math.hypot(dx, dy);
+  const dist3d = Math.hypot(dx, dy, dz);
+  out.innerHTML = `
+    <div class="meas-grid">
+      <div class="meas-card"><div class="meas-lbl">Distancia real (3D)</div><div class="meas-val">${fmt(dist3d,3)} m</div></div>
+      <div class="meas-card"><div class="meas-lbl">Distancia horizontal</div><div class="meas-val">${fmt(horiz,3)} m</div></div>
+      <div class="meas-card"><div class="meas-lbl">Δ Este-Oeste (ΔX)</div><div class="meas-val">${dx>=0?'+':''}${fmt(dx,3)} m</div></div>
+      <div class="meas-card"><div class="meas-lbl">Δ Norte-Sur (ΔY)</div><div class="meas-val">${dy>=0?'+':''}${fmt(dy,3)} m</div></div>
+      <div class="meas-card" style="grid-column:1 / -1;"><div class="meas-lbl">Desnivel (ΔZ, ${escapeHtml(A.name)} → ${escapeHtml(B.name)})</div><div class="meas-val">${dz>=0?'+':''}${fmt(dz,3)} m</div></div>
+    </div>
+  `;
+}
+
+function updateMeasureBtn() {
+  const btn = document.getElementById('btnMeasurePick');
+  if (!btn) return;
+  if (!measureMode) { btn.textContent = '🎯 Elegir en el visor 3D'; return; }
+  btn.textContent = measA === null
+    ? '✕ Cancelar — hacé clic en el punto A del visor'
+    : '✕ Cancelar — hacé clic en el punto B del visor';
+}
+
+function toggleMeasureMode() {
+  measureMode = !measureMode;
+  if (measureMode) {
+    measA = null; measB = null;
+    refreshMeasureSelects();
+    computeMeasure();
+  }
+  updateMeasureBtn();
+  render3D();
+}
+
+function pickMeasureStation(id) {
+  if (measA === null || measA === undefined) {
+    measA = id;
+  } else if (id !== measA) {
+    measB = id;
+    measureMode = false;
+  }
+  refreshMeasureSelects();
+  updateMeasureBtn();
+  computeMeasure();
+  render3D();
+}
+
+function resetMeasure() {
+  measA = null; measB = null; measureMode = false;
+  updateMeasureBtn();
 }
 
 function exportCSV() {
@@ -1024,6 +1230,32 @@ function render3D() {
     hitPoints.push({ sx: p.sx, sy: p.sy, station: s });
   });
 
+  // Cinta métrica: línea resaltada entre las dos estaciones elegidas para medir
+  if (measA !== null && measB !== null) {
+    const A = byId.get(measA), B = byId.get(measB);
+    if (A && B) {
+      const pA = project3D(A, cx, cy, cz, cssW, cssH, scale);
+      const pB = project3D(B, cx, cy, cz, cssW, cssH, scale);
+      ctx.strokeStyle = '#f0b429';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(pA.sx, pA.sy); ctx.lineTo(pB.sx, pB.sy); ctx.stroke();
+
+      const dist3d = Math.hypot(B.x - A.x, B.y - A.y, B.z - A.z);
+      const label = fmt(dist3d, 3) + ' m';
+      const midX = (pA.sx + pB.sx) / 2, midY = (pA.sy + pB.sy) / 2;
+      ctx.font = 'bold 12px sans-serif';
+      const tw = ctx.measureText(label).width;
+      ctx.fillStyle = '#0d1117';
+      ctx.fillRect(midX - tw / 2 - 6, midY - 10, tw + 12, 20);
+      ctx.strokeStyle = '#f0b429'; ctx.lineWidth = 1;
+      ctx.strokeRect(midX - tw / 2 - 6, midY - 10, tw + 12, 20);
+      ctx.fillStyle = '#f0b429';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, midX, midY);
+      ctx.textBaseline = 'alphabetic';
+    }
+  }
+
   // Gizmo de ejes (esquina superior izquierda)
   drawAxisGizmo(ctx, 46, 46, 28);
 }
@@ -1075,15 +1307,18 @@ function hideTip3D() { document.getElementById('tip3d').style.display = 'none'; 
 
 (function initViewerInteractions() {
   const canvas = document.getElementById('viewer3d');
+  let downX = 0, downY = 0, movedSinceDown = false;
 
   canvas.addEventListener('pointerdown', e => {
     dragging = true; lastX = e.clientX; lastY = e.clientY;
+    downX = e.clientX; downY = e.clientY; movedSinceDown = false;
     canvas.setPointerCapture(e.pointerId);
     hideTip3D();
   });
   canvas.addEventListener('pointermove', e => {
     if (dragging) {
       const dx = e.clientX - lastX, dy = e.clientY - lastY;
+      if (Math.abs(e.clientX - downX) > 4 || Math.abs(e.clientY - downY) > 4) movedSinceDown = true;
       lastX = e.clientX; lastY = e.clientY;
       view.yaw += dx * 0.008;
       view.pitch = Math.min(1.55, Math.max(0.02, view.pitch + dy * 0.008));
@@ -1094,7 +1329,15 @@ function hideTip3D() { document.getElementById('tip3d').style.display = 'none'; 
       if (hp) showTip3D(hp); else hideTip3D();
     }
   });
-  canvas.addEventListener('pointerup', e => { dragging = false; try { canvas.releasePointerCapture(e.pointerId); } catch(err){} });
+  canvas.addEventListener('pointerup', e => {
+    dragging = false;
+    try { canvas.releasePointerCapture(e.pointerId); } catch(err){}
+    if (!movedSinceDown && measureMode) {
+      const rect = canvas.getBoundingClientRect();
+      const hp = findNearestPoint(e.clientX - rect.left, e.clientY - rect.top);
+      if (hp) pickMeasureStation(hp.station.id);
+    }
+  });
   canvas.addEventListener('pointerleave', () => { dragging = false; hideTip3D(); });
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
@@ -1112,6 +1355,7 @@ loadFromStorage();
 recomputeAll();
 renderAll();
 resetForm();
+_actualizarTituloArchivo();
 </script>
 
 </body>
