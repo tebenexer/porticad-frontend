@@ -44,6 +44,7 @@
     --accent-ink:#ffffff;
     --accent-soft:#d7ecf0;
     --accent-strong:#0a5a6e;
+    --water:#2f6fd6;
     --ok:#1f8a54;
     --ok-soft:#dcefe2;
     --warn:#b8720b;
@@ -68,6 +69,7 @@
       --accent-ink:#0a1a1e;
       --accent-soft:#1c3a41;
       --accent-strong:#7cc9d6;
+      --water:#5b9eef;
       --ok:#4cbf82;
       --ok-soft:#173328;
       --warn:#e0a542;
@@ -205,16 +207,16 @@
     margin-bottom:26px;
     box-shadow:var(--shadow);
   }
-  .schematic-head{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px 20px;margin-bottom:8px;}
+  .schematic-head{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px 20px;margin-bottom:10px;}
   .schematic-wrap h2{font-size:17px;color:var(--ink);}
+  .schematic-head .note{font-size:11.5px;color:var(--ink-dim);font-family:'Public Sans',sans-serif;margin-top:4px;}
   .schematic-scroll{
     overflow:auto;
-    max-height:min(68vh, 620px);
+    max-height:min(72vh, 680px);
     border-radius:8px;
     cursor:grab;
-    background:
-      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px) 0 0 / 40px 40px,
-      linear-gradient(var(--line-soft) 1px, transparent 1px) 0 0 / 40px 40px;
+    background:var(--card);
+    border:1px solid var(--line-soft);
   }
   .schematic-scroll.panning{cursor:grabbing;}
   .schematic-scroll.panning .tramo-hit{pointer-events:none;}
@@ -243,22 +245,27 @@
   .tramo-hit .hitzone{fill:transparent;transition:fill .15s ease;}
   .tramo-hit:hover .hitzone{fill:var(--accent-soft);opacity:0.5;}
   .tramo-hit:hover .tramo-label{fill:var(--accent-strong);}
-  .gauge-bg{fill:var(--pipe-empty);stroke:var(--line);stroke-width:1;}
+  .gauge-bg{fill:var(--card);stroke:var(--ink-dim);stroke-width:2;}
   .node-elev{font-family:'IBM Plex Mono',monospace;font-size:9px;fill:var(--ink-faint);}
-  .node-reg{fill:var(--paper);stroke:var(--ink-dim);stroke-width:1.6;stroke-dasharray:4 3;}
+  .bracket{fill:none;stroke:var(--ink-dim);stroke-width:1.6;stroke-dasharray:5 4;}
 
   .legend{
-    display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:11px;color:var(--ink-dim);
-    padding:7px 12px;font-family:'IBM Plex Mono',monospace;
+    display:flex;flex-direction:column;gap:6px;font-size:11.5px;color:var(--ink);
+    padding:10px 14px;font-family:'Public Sans',sans-serif;
     background:var(--card);border:1px solid var(--line);border-radius:8px;
     box-shadow:var(--shadow);
   }
-  .legend span{display:inline-flex;align-items:center;gap:5px;}
-  .legend i{width:9px;height:9px;border-radius:2px;display:inline-block;}
-  .legend .note{font-family:'Public Sans',sans-serif;color:var(--ink-dim);}
-  .flow-label{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;fill:var(--accent-strong);letter-spacing:0.04em;}
-  .tube-title{font-family:'Barlow Condensed',sans-serif;font-size:14.5px;font-weight:700;fill:var(--ink);}
-  .tube-stat{font-family:'IBM Plex Mono',monospace;font-size:11px;fill:var(--accent-strong);}
+  .legend .legend-title{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:2px;}
+  .legend .legend-row{display:flex;align-items:center;gap:8px;}
+  .legend .swatch{width:22px;height:0;border-top:3px solid var(--water);flex-shrink:0;}
+  .legend .swatch.dashed{border-top-style:dashed;border-top-color:var(--ink-dim);}
+  .legend .swatch.pipe{width:22px;height:9px;border-radius:5px;background:linear-gradient(180deg,#eef0f1,#9aa1a8);border:1px solid var(--ink-faint);border-top:none;}
+  .legend .dot{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+  .legend .note{font-family:'Public Sans',sans-serif;color:var(--ink-dim);font-size:10.5px;margin-top:2px;}
+  .flow-label{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;fill:var(--accent-strong);letter-spacing:0.04em;font-style:italic;}
+  .tube-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;fill:var(--ink);}
+  .tube-stat{font-family:'IBM Plex Mono',monospace;font-size:12px;fill:var(--water);}
+  .schem-caption{font-family:'Public Sans',sans-serif;font-size:10.5px;fill:var(--ink-faint);}
 
   /* ---- simulación de flujo ---- */
   .simbar{
@@ -516,17 +523,22 @@
 
   <div class="schematic-wrap">
     <div class="schematic-head">
-      <h2>Esquema de la red</h2>
-      <div class="legend">
-        <span><i style="background:var(--ok)"></i> dentro de capacidad</span>
-        <span><i style="background:var(--warn)"></i> velocidad fuera de rango (0.6–5 m/s)</span>
-        <span><i style="background:var(--danger)"></i> excede Q lleno</span>
-        <span class="note">arrastra para mover · scroll para zoom · clic en un tramo para editarlo</span>
+      <div>
+        <h2>Esquema de la red</h2>
+        <div class="note">arrastra para mover · scroll para zoom · clic en un tramo para editarlo</div>
       </div>
       <div class="zoomctl" id="zoomctl">
         <button type="button" id="zoomOut" title="Alejar">−</button>
         <span id="zoomLabel">100%</span>
         <button type="button" id="zoomIn" title="Acercar">+</button>
+      </div>
+      <div class="legend">
+        <div class="legend-title">Leyenda</div>
+        <div class="legend-row"><span class="swatch"></span> Nivel de agua</div>
+        <div class="legend-row"><span class="swatch pipe"></span> Tubería</div>
+        <div class="legend-row"><span class="swatch dashed"></span> Registro (conexión)</div>
+        <div class="legend-row"><span class="dot" style="background:var(--warn)"></span> Verificar velocidad</div>
+        <div class="legend-row"><span class="dot" style="background:var(--danger)"></span> Excede capacidad</div>
       </div>
     </div>
     <div class="schematic-scroll" id="schematicScroll">
@@ -1258,12 +1270,6 @@
 
   // ---------- esquema SVG (perfil con pendientes a escala vertical exagerada) ----------
 
-  // marca un registro como un cuadrado punteado (símbolo de registro de paso)
-  function nodeMarkup(x, y){
-    var nr = 13;
-    return '<rect class="node-reg" x="'+(x-nr)+'" y="'+(y-nr)+'" width="'+(2*nr)+'" height="'+(2*nr)+'" rx="3" filter="url(#pipeShadow)"/>';
-  }
-
   function isDarkSchematic(){
     var t = document.documentElement.getAttribute("data-theme");
     if(t === "dark") return true;
@@ -1273,8 +1279,11 @@
 
   function renderSchematic(rows, travelInfo, firstOverflow){
     var n = rows.length;
-    var stepW = 270;
-    var totalW = Math.max(720, n*stepW + 110);
+    var stepW = 340;
+    var GAP = 70;   // ancho de la zona del registro (bracket punteado) entre tramos
+    var END = 26;   // margen del extremo abierto en R1 y en el último registro
+    var X0 = 30;
+    var totalW = Math.max(760, X0 + n*stepW + 90);
     var dark = isDarkSchematic();
 
     // altura de cada nodo: la pendiente real de cada tramo se traduce en un descenso
@@ -1288,31 +1297,20 @@
     var scale = totalRaw > 0 ? Math.min(3, Math.max(0.4, desiredMaxDrop/totalRaw)) : 1;
     var drops = rawDrops.map(function(d){ return d*scale; });
 
-    var yTop = 128;
+    var yTop = 190;
     var nodeY = [yTop];
     for(var ni=0; ni<n; ni++){ nodeY.push(nodeY[ni] + drops[ni]); }
     var maxY = Math.max.apply(null, nodeY);
-    var svgH = maxY + 150;
+    var svgH = maxY + 170;
     schematicEl.setAttribute("width", totalW*schematicZoom);
     schematicEl.setAttribute("height", svgH*schematicZoom);
     schematicEl.setAttribute("viewBox", "0 0 " + totalW + " " + svgH);
 
-    var NODE_R = 13; // debe coincidir con el "nr" usado en nodeMarkup()
-    var x0 = 50;
     var parts = [];
-    var nodeParts = []; // se dibujan al final para quedar por encima de las tuberías
     var geom = []; // datos para la animación de flujo
 
     parts.push(
       '<defs>' +
-        '<filter id="pipeShadow" x="-30%" y="-60%" width="160%" height="220%">' +
-          '<feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.22"/>' +
-        '</filter>' +
-        '<radialGradient id="gaugeGloss" cx="32%" cy="26%" r="80%">' +
-          '<stop offset="0%" stop-color="#ffffff" stop-opacity="0.6"/>' +
-          '<stop offset="55%" stop-color="#ffffff" stop-opacity="0.12"/>' +
-          '<stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>' +
-        '</radialGradient>' +
         '<linearGradient id="tubeMetal" x1="0" y1="0" x2="0" y2="1">' +
           (dark
             ? '<stop offset="0%" stop-color="#aeb8c2"/><stop offset="20%" stop-color="#7c8794"/><stop offset="52%" stop-color="#4b525c"/><stop offset="80%" stop-color="#33383f"/><stop offset="100%" stop-color="#5b6169"/>'
@@ -1321,106 +1319,121 @@
       '</defs>'
     );
     parts.push(
-      '<g transform="translate(18,24)">' +
+      '<g transform="translate(20,26)">' +
         '<text x="0" y="0" class="flow-label">Flujo</text>' +
-        '<path d="M 0 11 L 40 11 M 32 5 L 40 11 L 32 17" fill="none" stroke="var(--accent-strong)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>' +
+        '<path d="M 0 12 L 44 12 M 35 5 L 44 12 L 35 19" fill="none" stroke="var(--accent-strong)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>' +
       '</g>'
     );
+
+    var lastPipeEndX = 0, lastY = yTop;
 
     for(var i=0;i<n;i++){
       var row = rows[i];
       var res = row.res;
       var color = stateColor(res);
-      var colorVar = color === "ok" ? "var(--accent)" : (color === "danger" ? "var(--danger)" : "var(--warn)");
-      var x1 = x0 + i*stepW;
-      var x2 = x1 + stepW - 40;
-      var mid = (x1+x2)/2;
+      var zoneLeft = X0 + i*stepW;
+      var zoneRight = zoneLeft + stepW;
       var y1 = nodeY[i], y2 = nodeY[i+1];
+      var pipeStartX = zoneLeft + (i===0 ? END : GAP/2);
+      var pipeEndX = zoneRight - (i===n-1 ? END : GAP/2);
+      var mid = (pipeStartX+pipeEndX)/2;
       var midY = (y1+y2)/2;
       var pipes = row.t.pipes;
 
-      // nodo aguas arriba (registro de paso) — se agrega a nodeParts, no a parts,
-      // para que quede dibujado encima del extremo de la tubería que llega/sale de ahí
-      nodeParts.push(nodeMarkup(x1, y1));
-      parts.push('<text x="'+x1+'" y="'+(y1-26)+'" text-anchor="middle" class="node-label">R'+(i+1)+'</text>');
-      if(row.t.aporte>0){
-        parts.push('<text x="'+x1+'" y="'+(y1+27)+'" text-anchor="middle" class="node-sub">+'+fmt(row.t.aporte,1)+' L/s</text>');
+      // registro de entrada de este tramo: R1 es un extremo abierto; los demás son
+      // el "salto" en zigzag punteado que conecta con el final del tramo anterior
+      if(i === 0){
+        parts.push('<text x="'+pipeStartX+'" y="'+(y1-16)+'" text-anchor="middle" class="node-label">R1</text>');
+        if(row.t.aporte>0){
+          parts.push('<text x="'+pipeStartX+'" y="'+(y1+24)+'" text-anchor="middle" class="node-sub">+'+fmt(row.t.aporte,1)+' L/s</text>');
+        }
+      } else {
+        var bxL = zoneLeft - GAP/2, bxR = zoneLeft + GAP/2, bDrop = 24;
+        parts.push('<path class="bracket" d="M '+bxL+' '+y1+' L '+bxL+' '+(y1+bDrop)+' L '+bxR+' '+(y1+bDrop)+' L '+bxR+' '+y1+'"/>');
+        parts.push('<text x="'+zoneLeft+'" y="'+(y1-16)+'" text-anchor="middle" class="node-label">R'+(i+1)+'</text>');
+        if(row.t.aporte>0){
+          parts.push('<text x="'+zoneLeft+'" y="'+(y1+bDrop+18)+'" text-anchor="middle" class="node-sub">+'+fmt(row.t.aporte,1)+' L/s</text>');
+        }
       }
 
       // grupo interactivo del tramo
-      var bandTop = Math.min(y1,y2) - 118, bandH = Math.abs(y2-y1) + 168;
+      var bandTop = Math.min(y1,y2) - 165, bandH = Math.abs(y2-y1) + 235;
       parts.push('<g class="tramo-hit" data-tramo-id="'+row.t.id+'">');
-      parts.push('<rect class="hitzone" x="'+x1+'" y="'+bandTop+'" width="'+(x2-x1)+'" height="'+bandH+'" rx="8"/>');
+      parts.push('<rect class="hitzone" x="'+zoneLeft+'" y="'+bandTop+'" width="'+stepW+'" height="'+bandH+'" rx="8"/>');
 
-      // tarjeta: medidor circular de llenado + texto (material/Ø, pendiente, nivel),
-      // al estilo de una ficha técnica junto al tramo
+      // ficha técnica: medidor circular de nivel de agua + material/Ø, pendiente y nivel,
+      // al estilo de una tarjeta junto al tramo
       var fillFrac = res.pendienteInvalida ? 0 :
         (pipes.length === 1 ? Math.min(1, res.pipesRes[0].yD || 0)
                              : (isFinite(res.pctCapacidad) ? Math.max(0,Math.min(1,res.pctCapacidad/100)) : 1));
-      var gr = 21, gx = mid - 44, gcy = midY - 62;
+      var gr = 40, gx = mid - 68, gcy = midY - 100;
       var fillH = 2*gr*fillFrac;
       var clipId = "gclip" + row.t.id;
       parts.push('<clipPath id="'+clipId+'"><circle cx="'+gx+'" cy="'+gcy+'" r="'+gr+'"/></clipPath>');
-      parts.push('<circle class="gauge-bg" cx="'+gx+'" cy="'+gcy+'" r="'+gr+'" filter="url(#pipeShadow)"/>');
-      if(fillH > 0.3){
-        parts.push('<rect x="'+(gx-gr)+'" y="'+(gcy+gr-fillH)+'" width="'+(2*gr)+'" height="'+fillH+'" fill="'+colorVar+'" clip-path="url(#'+clipId+')"/>');
+      parts.push('<circle class="gauge-bg" cx="'+gx+'" cy="'+gcy+'" r="'+gr+'"/>');
+      if(fillH > 0.4){
+        parts.push('<rect x="'+(gx-gr)+'" y="'+(gcy+gr-fillH)+'" width="'+(2*gr)+'" height="'+fillH+'" fill="var(--water)" clip-path="url(#'+clipId+')"/>');
+        parts.push('<line x1="'+(gx-gr)+'" y1="'+(gcy+gr-fillH)+'" x2="'+(gx+gr)+'" y2="'+(gcy+gr-fillH)+'" stroke="var(--accent-strong)" stroke-width="1.4" clip-path="url(#'+clipId+')"/>');
       }
-      parts.push('<circle cx="'+gx+'" cy="'+gcy+'" r="'+gr+'" fill="url(#gaugeGloss)" clip-path="url(#'+clipId+')"/>');
-      parts.push('<circle cx="'+gx+'" cy="'+gcy+'" r="'+gr+'" fill="none" stroke="'+colorVar+'" stroke-width="1.5" opacity="0.9"/>');
+      parts.push('<circle cx="'+gx+'" cy="'+gcy+'" r="'+gr+'" fill="none" stroke="var(--ink-dim)" stroke-width="2.2"/>');
 
-      var tx = gx + gr + 11;
-      parts.push('<text x="'+tx+'" y="'+(gcy-12)+'" text-anchor="start" class="tube-title">'+pipesSchematicLabel(row.t)+'</text>');
-      parts.push('<text x="'+tx+'" y="'+(gcy+3)+'" text-anchor="start" class="tube-stat">S = '+fmt(row.t.pendiente,2)+'%</text>');
-      parts.push('<text x="'+tx+'" y="'+(gcy+18)+'" text-anchor="start" class="tube-stat">Nivel = '+(res.pendienteInvalida?'—':fmt(fillFrac*100,0)+'%')+'</text>');
+      var pipesOne = pipes.length === 1;
+      var m0 = findMaterial(pipes[0].materialId);
+      var titleTxt = pipesOne ? m0.abbr : (pipes.length + "×" + m0.abbr);
+      var sameSpec = pipes.every(function(p){ return p.materialId===pipes[0].materialId && p.diametro===pipes[0].diametro && p.unit===pipes[0].unit; });
+      var dTxt = sameSpec ? ("D = " + fmtDiam(pipes[0].diametro, pipes[0].unit)) : (pipes.length + " Ø distintos");
+      var tx = gx + gr + 14;
+      parts.push('<text x="'+tx+'" y="'+(gcy-30)+'" text-anchor="start" class="tube-title">Tramo '+(i+1)+' · '+titleTxt+'</text>');
+      parts.push('<text x="'+tx+'" y="'+(gcy-10)+'" text-anchor="start" class="tube-stat">'+dTxt+'</text>');
+      parts.push('<text x="'+tx+'" y="'+(gcy+10)+'" text-anchor="start" class="tube-stat">S = '+fmt(row.t.pendiente,2)+'%</text>');
+      parts.push('<text x="'+tx+'" y="'+(gcy+30)+'" text-anchor="start" class="tube-stat">Nivel = '+(res.pendienteInvalida?'—':fmt(fillFrac*100,0)+'%')+'</text>');
 
-      // tubería(s): tubo metálico neutro (color de estado sólo como halo cuando hay
-      // advertencia/exceso) inclinadas con la pendiente real de nodo a nodo — el
-      // extremo llega justo al borde del registro para que se vea conectada
+      // tubería(s): tubo metálico neutro con borde definido; el color de estado se
+      // usa sólo como halo cuando hay advertencia o exceso de capacidad
       var k = pipes.length;
       pipes.forEach(function(p, pi){
-        var offset = k>1 ? (pi - (k-1)/2) * 10 : 0;
-        var strokeW = k>1 ? Math.max(4, Math.min(12, p.diametro/120)) : (7 + Math.min(30, p.diametro/70));
+        var offset = k>1 ? (pi - (k-1)/2) * 15 : 0;
+        var strokeW = k>1 ? Math.max(7, Math.min(18, p.diametro/90)) : (15 + Math.min(42, p.diametro/45));
         var pr = res.pipesRes[pi];
         var pc = pipeColor(pr, res.pendienteInvalida);
         var pColorVar = pc === "ok" ? "var(--accent)" : (pc === "danger" ? "var(--danger)" : "var(--warn)");
-        var lx1 = x1+NODE_R, lx2 = x2-NODE_R, ly1 = y1+offset, ly2 = y2+offset;
+        var lx1 = pipeStartX, lx2 = pipeEndX, ly1 = y1+offset, ly2 = y2+offset;
         if(pc !== "ok"){
-          parts.push('<line x1="'+lx1+'" y1="'+ly1+'" x2="'+lx2+'" y2="'+ly2+'" stroke="'+pColorVar+'" stroke-width="'+(strokeW+7)+'" stroke-linecap="round" opacity="0.28"/>');
+          parts.push('<line x1="'+lx1+'" y1="'+ly1+'" x2="'+lx2+'" y2="'+ly2+'" stroke="'+pColorVar+'" stroke-width="'+(strokeW+12)+'" stroke-linecap="round" opacity="0.25"/>');
         }
-        parts.push('<line x1="'+lx1+'" y1="'+(ly1+strokeW*0.16)+'" x2="'+lx2+'" y2="'+(ly2+strokeW*0.16)+'" stroke="rgba(0,0,0,0.28)" stroke-width="'+(strokeW*1.04)+'" stroke-linecap="round"/>');
+        parts.push('<line x1="'+lx1+'" y1="'+ly1+'" x2="'+lx2+'" y2="'+ly2+'" stroke="rgba(0,0,0,0.4)" stroke-width="'+(strokeW+5)+'" stroke-linecap="round"/>');
         parts.push('<line x1="'+lx1+'" y1="'+ly1+'" x2="'+lx2+'" y2="'+ly2+'" stroke="url(#tubeMetal)" stroke-width="'+strokeW+'" stroke-linecap="round"/>');
-        parts.push('<ellipse cx="'+lx1+'" cy="'+ly1+'" rx="'+(strokeW*0.3)+'" ry="'+(strokeW*0.5)+'" fill="url(#tubeMetal)" stroke="rgba(0,0,0,0.35)" stroke-width="0.7"/>');
-        parts.push('<ellipse cx="'+lx2+'" cy="'+ly2+'" rx="'+(strokeW*0.3)+'" ry="'+(strokeW*0.5)+'" fill="url(#tubeMetal)" stroke="rgba(0,0,0,0.35)" stroke-width="0.7"/>');
+        parts.push('<line x1="'+lx1+'" y1="'+(ly1-strokeW*0.22)+'" x2="'+lx2+'" y2="'+(ly2-strokeW*0.22)+'" stroke="rgba(255,255,255,0.55)" stroke-width="'+(strokeW*0.2)+'" stroke-linecap="round"/>');
+        parts.push('<ellipse cx="'+lx1+'" cy="'+ly1+'" rx="'+(strokeW*0.32)+'" ry="'+(strokeW*0.5)+'" fill="url(#tubeMetal)" stroke="rgba(0,0,0,0.4)" stroke-width="1"/>');
+        parts.push('<ellipse cx="'+lx2+'" cy="'+ly2+'" rx="'+(strokeW*0.32)+'" ry="'+(strokeW*0.5)+'" fill="url(#tubeMetal)" stroke="rgba(0,0,0,0.4)" stroke-width="1"/>');
       });
 
       // caudales
-      parts.push('<text x="'+mid+'" y="'+(midY+28)+'" text-anchor="middle" class="tramo-sub">'+fmt(row.qLlegaLs,1)+' / '+fmt(res.QfullLs,1)+' L/s</text>');
-      parts.push('<text x="'+mid+'" y="'+(midY+46)+'" text-anchor="middle" class="tramo-status '+color+'">'+statusText(res, true)+'</text>');
+      parts.push('<text x="'+mid+'" y="'+(midY+ (k>1?38:32) )+'" text-anchor="middle" class="tramo-sub">'+fmt(row.qLlegaLs,1)+' / '+fmt(res.QfullLs,1)+' L/s</text>');
+      parts.push('<text x="'+mid+'" y="'+(midY+ (k>1?54:48) )+'" text-anchor="middle" class="tramo-status '+color+'">'+statusText(res, true)+'</text>');
 
       parts.push('</g>');
 
       var tr = travelInfo.travel[i];
       geom.push({
         tramoId: row.t.id,
-        x1: x1+NODE_R, y1: y1, x2: x2-NODE_R, y2: y2,
+        x1: pipeStartX, y1: y1, x2: pipeEndX, y2: y2,
         color: color, exceeds: res.exceeds,
         realTime: tr.valid ? tr.t : 0.8,
         cumRealStart: travelInfo.cum[i]
       });
 
-      x0 = x1;
+      lastPipeEndX = pipeEndX;
+      lastY = y2;
     }
-    // último nodo
-    var xLast = x0 + (n>0 ? stepW-40 : 0);
-    var yLastNode = nodeY[n];
-    nodeParts.push(nodeMarkup(xLast, yLastNode));
-    parts.push('<text x="'+xLast+'" y="'+(yLastNode-26)+'" text-anchor="middle" class="node-label">R'+(n+1)+'</text>');
 
-    // los registros se dibujan al final (encima de todas las tuberías) para que cada
-    // extremo se vea claramente conectado/recibido por el registro correspondiente
-    parts = parts.concat(nodeParts);
+    // registro final (extremo abierto de la red)
+    parts.push('<text x="'+(lastPipeEndX+22)+'" y="'+(lastY-16)+'" text-anchor="middle" class="node-label">R'+(n+1)+'</text>');
 
-    parts.push('<circle id="flowmarker" cx="'+(geom.length?geom[0].x1:0)+'" cy="'+(geom.length?geom[0].y1:0)+'" r="5" fill="var(--accent)" opacity="0.95"/>');
+    parts.push('<text x="'+(totalW-16)+'" y="'+(svgH-30)+'" text-anchor="end" class="schem-caption">Vista: Esquema</text>');
+    parts.push('<text x="'+(totalW-16)+'" y="'+(svgH-16)+'" text-anchor="end" class="schem-caption">Escala: N/A</text>');
+
+    parts.push('<circle id="flowmarker" cx="'+(geom.length?geom[0].x1:0)+'" cy="'+(geom.length?geom[0].y1:0)+'" r="6" fill="var(--accent)" stroke="rgba(0,0,0,0.3)" stroke-width="1" opacity="0.95"/>');
 
     schematicEl.innerHTML = parts.join("");
 
