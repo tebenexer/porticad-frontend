@@ -113,7 +113,7 @@
     line-height:1.45;
     padding:28px 20px 80px;
   }
-  .wrap{max-width:1160px;margin:0 auto;}
+  .wrap{max-width:1900px;margin:0 auto;}
 
   h1,h2,h3{font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:0.01em;text-wrap:balance;margin:0;}
   .eyebrow{
@@ -126,23 +126,27 @@
   }
   header{margin-bottom:22px;}
   header h1{font-size:32px;color:var(--ink);margin-top:4px;}
-  header p{color:var(--ink-dim);font-size:14.5px;margin:6px 0 0;max-width:68ch;}
+
+  .header-row{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px 20px;}
+  .header-actions{display:flex;gap:8px;flex-shrink:0;}
+  .iconbtn{
+    font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;
+    background:var(--paper);color:var(--ink-dim);border:1px solid var(--line);
+    border-radius:8px;padding:8px 13px;cursor:pointer;
+  }
+  .iconbtn:hover{border-color:var(--accent);color:var(--accent-strong);}
+  .popover-wrap{position:relative;}
+  .popover{
+    position:absolute;top:calc(100% + 8px);right:0;z-index:50;
+    width:300px;background:var(--card);border:1px solid var(--line);
+    border-radius:10px;box-shadow:var(--shadow);padding:16px;
+    display:flex;flex-direction:column;gap:14px;
+  }
+  .popover p{margin:0;color:var(--ink-dim);font-size:13px;line-height:1.5;}
+  .popover p.popover-note{font-size:12px;color:var(--ink-faint);}
 
   .num{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;}
 
-  /* ---- global bar ---- */
-  .globalbar{
-    background:var(--paper);
-    border:1px solid var(--line);
-    border-radius:var(--radius);
-    padding:16px 18px;
-    display:flex;
-    flex-wrap:wrap;
-    gap:18px 28px;
-    align-items:flex-end;
-    margin-bottom:22px;
-    box-shadow:var(--shadow);
-  }
   .field{display:flex;flex-direction:column;gap:5px;}
   .field label{
     font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
@@ -174,13 +178,12 @@
     border-color:var(--accent);
   }
   .field input:hover, .field select:hover{border-color:var(--ink-faint);}
-  .field.grow{flex:1;min-width:220px;}
   .field .hint{font-size:11px;color:var(--ink-dim);font-family:'Public Sans',sans-serif;}
+  .field-inline{min-width:150px;}
+  .field-inline input{width:100%;}
 
   .themebtn{
-    margin-left:auto;
     display:flex;gap:6px;
-    align-self:flex-start;
   }
   .themebtn button{
     font-family:'IBM Plex Mono',monospace;
@@ -206,7 +209,7 @@
     margin-bottom:26px;
   }
   .tramo-panel{
-    width:410px;
+    width:440px;
     flex-shrink:0;
     min-width:0;
   }
@@ -505,41 +508,49 @@
 
 <div class="wrap">
   <header>
-    <div class="eyebrow">Hidráulica de conducciones — flujo a superficie libre</div>
-    <h1>Simulador de caudales en pendiente</h1>
-    <p>Arma una red de tramos y registros. Cada tramo puede llevar una o varias tuberías en paralelo (mismo registro de entrada y salida, misma pendiente), cada una con su propio material, catálogo comercial de diámetros y unidad de medida. Revisa en tiempo real si la capacidad combinada alcanza para el caudal que llega.</p>
+    <div class="header-row">
+      <div>
+        <div class="eyebrow">Hidráulica de conducciones — flujo a superficie libre</div>
+        <h1>Simulador de caudales en pendiente</h1>
+      </div>
+      <div class="header-actions">
+        <div class="popover-wrap">
+          <button type="button" class="iconbtn" id="infoBtn">ⓘ Acerca de</button>
+          <div class="popover" id="infoPopover" hidden>
+            <p>Arma una red de tramos y registros. Cada tramo puede llevar una o varias tuberías en paralelo (mismo registro de entrada y salida, misma pendiente), cada una con su propio material, catálogo comercial de diámetros y unidad de medida. Revisa en tiempo real si la capacidad combinada alcanza para el caudal que llega.</p>
+            <p class="popover-note">El caudal se acumula tramo a tramo, sumando los aportes que definas en cada registro. Dentro de un tramo, el caudal que llega se reparte entre sus tuberías en paralelo según la capacidad de cada una.</p>
+          </div>
+        </div>
+        <div class="popover-wrap">
+          <button type="button" class="iconbtn" id="settingsBtn">⚙ Configuración</button>
+          <div class="popover" id="settingsPopover" hidden>
+            <div class="field">
+              <label for="defmat">Material por defecto</label>
+              <select id="defmat"></select>
+              <span class="hint">para tuberías nuevas</span>
+            </div>
+            <div class="field">
+              <label for="defunit">Unidad por defecto</label>
+              <select id="defunit">
+                <option value="mm">Milímetros (mm)</option>
+                <option value="m">Metros (m)</option>
+                <option value="in">Pulgadas (")</option>
+              </select>
+              <span class="hint">para tuberías nuevas</span>
+            </div>
+            <div class="field">
+              <label>Tema</label>
+              <div class="themebtn" id="themebtn">
+                <button data-t="light">Claro</button>
+                <button data-t="dark">Oscuro</button>
+                <button data-t="system" class="active">Sistema</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </header>
-
-  <div class="globalbar">
-    <div class="field">
-      <label for="qbase">Caudal de cabecera</label>
-      <input id="qbase" type="number" min="0" step="0.1" value="15" />
-      <span class="hint">litros / segundo</span>
-    </div>
-    <div class="field">
-      <label for="defmat">Material por defecto</label>
-      <select id="defmat"></select>
-      <span class="hint">para tuberías nuevas</span>
-    </div>
-    <div class="field">
-      <label for="defunit">Unidad por defecto</label>
-      <select id="defunit">
-        <option value="mm">Milímetros (mm)</option>
-        <option value="m">Metros (m)</option>
-        <option value="in">Pulgadas (")</option>
-      </select>
-      <span class="hint">para tuberías nuevas</span>
-    </div>
-    <div class="field grow">
-      <label>&nbsp;</label>
-      <span class="hint">El caudal se acumula tramo a tramo, sumando los aportes que definas en cada registro. Dentro de un tramo, el caudal que llega se reparte entre sus tuberías en paralelo según la capacidad de cada una.</span>
-    </div>
-    <div class="themebtn" id="themebtn">
-      <button data-t="light">Claro</button>
-      <button data-t="dark">Oscuro</button>
-      <button data-t="system" class="active">Sistema</button>
-    </div>
-  </div>
 
   <div class="workspace">
     <div class="tramo-panel">
@@ -553,6 +564,11 @@
           <div>
             <h2>Esquema de la red</h2>
             <div class="note">arrastra para mover · scroll para zoom · clic en un tramo para editarlo</div>
+          </div>
+          <div class="field field-inline">
+            <label for="qbase">Caudal de cabecera</label>
+            <input id="qbase" type="number" min="0" step="0.1" value="15" />
+            <span class="hint">L/s que entran en R1</span>
           </div>
           <div class="zoomctl" id="zoomctl">
             <button type="button" id="zoomOut" title="Alejar">−</button>
@@ -907,6 +923,24 @@
     var saved = "system";
     try{ saved = localStorage.getItem("simulador-caudales-theme") || "system"; }catch(e){}
     applyTheme(saved);
+  })();
+
+  // menús desplegables "Acerca de" y "Configuración" del encabezado
+  (function setupPopovers(){
+    var popovers = Array.prototype.slice.call(document.querySelectorAll(".popover"));
+    function closeAll(){ popovers.forEach(function(p){ p.hidden = true; }); }
+    [["infoBtn","infoPopover"], ["settingsBtn","settingsPopover"]].forEach(function(pair){
+      var btn = document.getElementById(pair[0]);
+      var pop = document.getElementById(pair[1]);
+      btn.addEventListener("click", function(e){
+        e.stopPropagation();
+        var wasOpen = !pop.hidden;
+        closeAll();
+        pop.hidden = wasOpen;
+      });
+      pop.addEventListener("click", function(e){ e.stopPropagation(); });
+    });
+    document.addEventListener("click", closeAll);
   })();
 
   // ---------- render tramos (panel de pestañas a la izquierda) ----------
