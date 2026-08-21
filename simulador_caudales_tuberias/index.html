@@ -1519,14 +1519,21 @@
         var pc = pipeColor(pr, res.pendienteInvalida);
         var pColorVar = pc === "ok" ? "var(--accent)" : (pc === "danger" ? "var(--danger)" : "var(--warn)");
         var lx1 = pipeStartX, lx2 = pipeEndX, ly1 = y1+offset, ly2 = y2+offset;
+        var edgeOff = strokeW/2;
+        var edgeW = Math.max(2.4, strokeW*0.15);
         if(pc !== "ok"){
-          parts.push('<line x1="'+lx1+'" y1="'+ly1+'" x2="'+lx2+'" y2="'+ly2+'" stroke="'+pColorVar+'" stroke-width="'+(strokeW+12)+'" stroke-linecap="round" opacity="0.25"/>');
+          parts.push('<line x1="'+lx1+'" y1="'+ly1+'" x2="'+lx2+'" y2="'+ly2+'" stroke="'+pColorVar+'" stroke-width="'+(strokeW+14)+'" stroke-linecap="round" opacity="0.25"/>');
         }
-        parts.push('<line x1="'+lx1+'" y1="'+ly1+'" x2="'+lx2+'" y2="'+ly2+'" stroke="rgba(0,0,0,0.4)" stroke-width="'+(strokeW+5)+'" stroke-linecap="round"/>');
+        // cuerpo del tubo (gradiente metálico)
         parts.push('<line x1="'+lx1+'" y1="'+ly1+'" x2="'+lx2+'" y2="'+ly2+'" stroke="url(#tubeMetal)" stroke-width="'+strokeW+'" stroke-linecap="round"/>');
-        parts.push('<line x1="'+lx1+'" y1="'+(ly1-strokeW*0.22)+'" x2="'+lx2+'" y2="'+(ly2-strokeW*0.22)+'" stroke="rgba(255,255,255,0.55)" stroke-width="'+(strokeW*0.2)+'" stroke-linecap="round"/>');
-        parts.push('<ellipse cx="'+lx1+'" cy="'+ly1+'" rx="'+(strokeW*0.32)+'" ry="'+(strokeW*0.5)+'" fill="url(#tubeMetal)" stroke="rgba(0,0,0,0.4)" stroke-width="1"/>');
-        parts.push('<ellipse cx="'+lx2+'" cy="'+ly2+'" rx="'+(strokeW*0.32)+'" ry="'+(strokeW*0.5)+'" fill="url(#tubeMetal)" stroke="rgba(0,0,0,0.4)" stroke-width="1"/>');
+        // brillo superior sutil
+        parts.push('<line x1="'+lx1+'" y1="'+(ly1-strokeW*0.22)+'" x2="'+lx2+'" y2="'+(ly2-strokeW*0.22)+'" stroke="rgba(255,255,255,0.55)" stroke-width="'+(strokeW*0.18)+'" stroke-linecap="round"/>');
+        // bordes gruesos marcando el contorno del tubo (da la sensación de volumen/3D)
+        parts.push('<line x1="'+lx1+'" y1="'+(ly1-edgeOff)+'" x2="'+lx2+'" y2="'+(ly2-edgeOff)+'" stroke="rgba(0,0,0,0.62)" stroke-width="'+edgeW+'" stroke-linecap="round"/>');
+        parts.push('<line x1="'+lx1+'" y1="'+(ly1+edgeOff)+'" x2="'+lx2+'" y2="'+(ly2+edgeOff)+'" stroke="rgba(0,0,0,0.62)" stroke-width="'+edgeW+'" stroke-linecap="round"/>');
+        // extremos abiertos, con el mismo borde grueso
+        parts.push('<ellipse cx="'+lx1+'" cy="'+ly1+'" rx="'+(strokeW*0.32)+'" ry="'+(strokeW*0.5)+'" fill="url(#tubeMetal)" stroke="rgba(0,0,0,0.62)" stroke-width="'+edgeW+'"/>');
+        parts.push('<ellipse cx="'+lx2+'" cy="'+ly2+'" rx="'+(strokeW*0.32)+'" ry="'+(strokeW*0.5)+'" fill="url(#tubeMetal)" stroke="rgba(0,0,0,0.62)" stroke-width="'+edgeW+'"/>');
       });
 
       // caudales
