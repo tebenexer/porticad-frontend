@@ -248,12 +248,15 @@
   .node-reg{fill:var(--paper);stroke:var(--ink-dim);stroke-width:1.6;stroke-dasharray:4 3;}
 
   .legend{
-    display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-dim);
-    padding:2px 2px 12px;font-family:'IBM Plex Mono',monospace;
+    display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:11px;color:var(--ink-dim);
+    padding:7px 12px;font-family:'IBM Plex Mono',monospace;
+    background:var(--card);border:1px solid var(--line);border-radius:8px;
+    box-shadow:var(--shadow);
   }
   .legend span{display:inline-flex;align-items:center;gap:5px;}
   .legend i{width:9px;height:9px;border-radius:2px;display:inline-block;}
   .legend .note{font-family:'Public Sans',sans-serif;color:var(--ink-dim);}
+  .flow-label{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;fill:var(--accent-strong);letter-spacing:0.04em;}
 
   /* ---- simulación de flujo ---- */
   .simbar{
@@ -1255,7 +1258,7 @@
   // marca un registro como un cuadrado punteado (símbolo de registro de paso)
   function nodeMarkup(x, y){
     var nr = 13;
-    return '<rect class="node-reg" x="'+(x-nr)+'" y="'+(y-nr)+'" width="'+(2*nr)+'" height="'+(2*nr)+'" rx="2"/>';
+    return '<rect class="node-reg" x="'+(x-nr)+'" y="'+(y-nr)+'" width="'+(2*nr)+'" height="'+(2*nr)+'" rx="3" filter="url(#pipeShadow)"/>';
   }
 
   function renderSchematic(rows, travelInfo, firstOverflow){
@@ -1289,6 +1292,25 @@
     var nodeParts = []; // se dibujan al final para quedar por encima de las tuberías
     var geom = []; // datos para la animación de flujo
 
+    parts.push(
+      '<defs>' +
+        '<filter id="pipeShadow" x="-30%" y="-60%" width="160%" height="220%">' +
+          '<feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.22"/>' +
+        '</filter>' +
+        '<radialGradient id="gaugeGloss" cx="32%" cy="26%" r="80%">' +
+          '<stop offset="0%" stop-color="#ffffff" stop-opacity="0.6"/>' +
+          '<stop offset="55%" stop-color="#ffffff" stop-opacity="0.12"/>' +
+          '<stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>' +
+        '</radialGradient>' +
+      '</defs>'
+    );
+    parts.push(
+      '<g transform="translate(14,20)">' +
+        '<text x="0" y="0" class="flow-label">Flujo</text>' +
+        '<path d="M 0 9 L 34 9 M 27 4 L 34 9 L 27 14" fill="none" stroke="var(--accent-strong)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '</g>'
+    );
+
     for(var i=0;i<n;i++){
       var row = rows[i];
       var res = row.res;
@@ -1310,29 +1332,31 @@
       }
 
       // grupo interactivo del tramo
-      var bandTop = Math.min(y1,y2) - 65, bandH = Math.abs(y2-y1) + 115;
+      var bandTop = Math.min(y1,y2) - 72, bandH = Math.abs(y2-y1) + 122;
       parts.push('<g class="tramo-hit" data-tramo-id="'+row.t.id+'">');
       parts.push('<rect class="hitzone" x="'+x1+'" y="'+bandTop+'" width="'+(x2-x1)+'" height="'+bandH+'" rx="8"/>');
 
       // medidor circular de llenado (y/D para una tubería, % de capacidad combinado si hay varias)
-      var gcy = midY - 48, gr = 12;
+      var gcy = midY - 54, gr = 13;
       var fillFrac = res.pendienteInvalida ? 0 :
         (pipes.length === 1 ? Math.min(1, res.pipesRes[0].yD || 0)
                              : (isFinite(res.pctCapacidad) ? Math.max(0,Math.min(1,res.pctCapacidad/100)) : 1));
       var fillH = 2*gr*fillFrac;
       var clipId = "gclip" + row.t.id;
       parts.push('<clipPath id="'+clipId+'"><circle cx="'+mid+'" cy="'+gcy+'" r="'+gr+'"/></clipPath>');
-      parts.push('<circle class="gauge-bg" cx="'+mid+'" cy="'+gcy+'" r="'+gr+'"/>');
+      parts.push('<circle class="gauge-bg" cx="'+mid+'" cy="'+gcy+'" r="'+gr+'" filter="url(#pipeShadow)"/>');
       if(fillH > 0.3){
         parts.push('<rect x="'+(mid-gr)+'" y="'+(gcy+gr-fillH)+'" width="'+(2*gr)+'" height="'+fillH+'" fill="'+colorVar+'" clip-path="url(#'+clipId+')"/>');
       }
-      parts.push('<circle cx="'+mid+'" cy="'+gcy+'" r="'+gr+'" fill="none" stroke="'+colorVar+'" stroke-width="1.3" opacity="0.8"/>');
+      parts.push('<circle cx="'+mid+'" cy="'+gcy+'" r="'+gr+'" fill="url(#gaugeGloss)" clip-path="url(#'+clipId+')"/>');
+      parts.push('<circle cx="'+mid+'" cy="'+gcy+'" r="'+gr+'" fill="none" stroke="'+colorVar+'" stroke-width="1.4" opacity="0.9"/>');
 
       // etiqueta material + diámetro + pendiente
-      parts.push('<text x="'+mid+'" y="'+(midY-26)+'" text-anchor="middle" class="tramo-label">'+pipesSchematicLabel(row.t)+' · '+fmt(row.t.pendiente,2)+'%</text>');
+      parts.push('<text x="'+mid+'" y="'+(midY-24)+'" text-anchor="middle" class="tramo-label">'+pipesSchematicLabel(row.t)+' · '+fmt(row.t.pendiente,2)+'%</text>');
 
-      // tubería(s), dibujadas con la inclinación real de nodo a nodo — el extremo llega
-      // justo al borde del registro (mismo radio NODE_R) para que se vea conectada
+      // tubería(s), dibujadas como un tubo con volumen (sombra + cuerpo + brillo) e
+      // inclinadas con la pendiente real de nodo a nodo — el extremo llega justo al
+      // borde del registro (mismo radio NODE_R) para que se vea conectada
       var k = pipes.length;
       pipes.forEach(function(p, pi){
         var offset = k>1 ? (pi - (k-1)/2) * 9 : 0;
@@ -1340,7 +1364,12 @@
         var pr = res.pipesRes[pi];
         var pc = pipeColor(pr, res.pendienteInvalida);
         var pColorVar = pc === "ok" ? "var(--accent)" : (pc === "danger" ? "var(--danger)" : "var(--warn)");
-        parts.push('<line x1="'+(x1+NODE_R)+'" y1="'+(y1+offset)+'" x2="'+(x2-NODE_R)+'" y2="'+(y2+offset)+'" stroke="'+pColorVar+'" stroke-width="'+strokeW+'" stroke-linecap="round" opacity="0.85"/>');
+        var lx1 = x1+NODE_R, lx2 = x2-NODE_R, ly1 = y1+offset, ly2 = y2+offset;
+        parts.push('<line x1="'+lx1+'" y1="'+(ly1+strokeW*0.22)+'" x2="'+lx2+'" y2="'+(ly2+strokeW*0.22)+'" stroke="rgba(0,0,0,0.20)" stroke-width="'+(strokeW*0.9)+'" stroke-linecap="round"/>');
+        parts.push('<line x1="'+lx1+'" y1="'+ly1+'" x2="'+lx2+'" y2="'+ly2+'" stroke="'+pColorVar+'" stroke-width="'+strokeW+'" stroke-linecap="round"/>');
+        parts.push('<line x1="'+lx1+'" y1="'+(ly1-strokeW*0.24)+'" x2="'+lx2+'" y2="'+(ly2-strokeW*0.24)+'" stroke="rgba(255,255,255,0.5)" stroke-width="'+(strokeW*0.32)+'" stroke-linecap="round"/>');
+        parts.push('<ellipse cx="'+lx1+'" cy="'+ly1+'" rx="'+(strokeW*0.22)+'" ry="'+(strokeW*0.5)+'" fill="'+pColorVar+'" stroke="rgba(0,0,0,0.28)" stroke-width="0.6"/>');
+        parts.push('<ellipse cx="'+lx2+'" cy="'+ly2+'" rx="'+(strokeW*0.22)+'" ry="'+(strokeW*0.5)+'" fill="'+pColorVar+'" stroke="rgba(0,0,0,0.28)" stroke-width="0.6"/>');
       });
 
       // caudales
