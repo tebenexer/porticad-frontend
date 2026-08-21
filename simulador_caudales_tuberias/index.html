@@ -257,6 +257,8 @@
   .legend i{width:9px;height:9px;border-radius:2px;display:inline-block;}
   .legend .note{font-family:'Public Sans',sans-serif;color:var(--ink-dim);}
   .flow-label{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;fill:var(--accent-strong);letter-spacing:0.04em;}
+  .tube-title{font-family:'Barlow Condensed',sans-serif;font-size:14.5px;font-weight:700;fill:var(--ink);}
+  .tube-stat{font-family:'IBM Plex Mono',monospace;font-size:11px;fill:var(--accent-strong);}
 
   /* ---- simulación de flujo ---- */
   .simbar{
@@ -864,6 +866,7 @@
     var b = e.target.closest("button");
     if(!b) return;
     applyTheme(b.getAttribute("data-t"));
+    render(); // el tubo metálico del esquema depende del tema (claro/oscuro)
   });
   (function initTheme(){
     var saved = "system";
@@ -1261,10 +1264,18 @@
     return '<rect class="node-reg" x="'+(x-nr)+'" y="'+(y-nr)+'" width="'+(2*nr)+'" height="'+(2*nr)+'" rx="3" filter="url(#pipeShadow)"/>';
   }
 
+  function isDarkSchematic(){
+    var t = document.documentElement.getAttribute("data-theme");
+    if(t === "dark") return true;
+    if(t === "light") return false;
+    return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  }
+
   function renderSchematic(rows, travelInfo, firstOverflow){
     var n = rows.length;
-    var stepW = 240;
-    var totalW = Math.max(680, n*stepW + 100);
+    var stepW = 270;
+    var totalW = Math.max(720, n*stepW + 110);
+    var dark = isDarkSchematic();
 
     // altura de cada nodo: la pendiente real de cada tramo se traduce en un descenso
     // vertical proporcional (escala exagerada y normalizada para que quepa en el panel)
@@ -1277,7 +1288,7 @@
     var scale = totalRaw > 0 ? Math.min(3, Math.max(0.4, desiredMaxDrop/totalRaw)) : 1;
     var drops = rawDrops.map(function(d){ return d*scale; });
 
-    var yTop = 84;
+    var yTop = 128;
     var nodeY = [yTop];
     for(var ni=0; ni<n; ni++){ nodeY.push(nodeY[ni] + drops[ni]); }
     var maxY = Math.max.apply(null, nodeY);
@@ -1302,12 +1313,17 @@
           '<stop offset="55%" stop-color="#ffffff" stop-opacity="0.12"/>' +
           '<stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>' +
         '</radialGradient>' +
+        '<linearGradient id="tubeMetal" x1="0" y1="0" x2="0" y2="1">' +
+          (dark
+            ? '<stop offset="0%" stop-color="#aeb8c2"/><stop offset="20%" stop-color="#7c8794"/><stop offset="52%" stop-color="#4b525c"/><stop offset="80%" stop-color="#33383f"/><stop offset="100%" stop-color="#5b6169"/>'
+            : '<stop offset="0%" stop-color="#f6f7f8"/><stop offset="20%" stop-color="#d9dce0"/><stop offset="52%" stop-color="#a7adb4"/><stop offset="80%" stop-color="#828a92"/><stop offset="100%" stop-color="#c2c7cc"/>') +
+        '</linearGradient>' +
       '</defs>'
     );
     parts.push(
-      '<g transform="translate(14,20)">' +
+      '<g transform="translate(18,24)">' +
         '<text x="0" y="0" class="flow-label">Flujo</text>' +
-        '<path d="M 0 9 L 34 9 M 27 4 L 34 9 L 27 14" fill="none" stroke="var(--accent-strong)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+        '<path d="M 0 11 L 40 11 M 32 5 L 40 11 L 32 17" fill="none" stroke="var(--accent-strong)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>' +
       '</g>'
     );
 
@@ -1332,44 +1348,49 @@
       }
 
       // grupo interactivo del tramo
-      var bandTop = Math.min(y1,y2) - 72, bandH = Math.abs(y2-y1) + 122;
+      var bandTop = Math.min(y1,y2) - 118, bandH = Math.abs(y2-y1) + 168;
       parts.push('<g class="tramo-hit" data-tramo-id="'+row.t.id+'">');
       parts.push('<rect class="hitzone" x="'+x1+'" y="'+bandTop+'" width="'+(x2-x1)+'" height="'+bandH+'" rx="8"/>');
 
-      // medidor circular de llenado (y/D para una tubería, % de capacidad combinado si hay varias)
-      var gcy = midY - 54, gr = 13;
+      // tarjeta: medidor circular de llenado + texto (material/Ø, pendiente, nivel),
+      // al estilo de una ficha técnica junto al tramo
       var fillFrac = res.pendienteInvalida ? 0 :
         (pipes.length === 1 ? Math.min(1, res.pipesRes[0].yD || 0)
                              : (isFinite(res.pctCapacidad) ? Math.max(0,Math.min(1,res.pctCapacidad/100)) : 1));
+      var gr = 21, gx = mid - 44, gcy = midY - 62;
       var fillH = 2*gr*fillFrac;
       var clipId = "gclip" + row.t.id;
-      parts.push('<clipPath id="'+clipId+'"><circle cx="'+mid+'" cy="'+gcy+'" r="'+gr+'"/></clipPath>');
-      parts.push('<circle class="gauge-bg" cx="'+mid+'" cy="'+gcy+'" r="'+gr+'" filter="url(#pipeShadow)"/>');
+      parts.push('<clipPath id="'+clipId+'"><circle cx="'+gx+'" cy="'+gcy+'" r="'+gr+'"/></clipPath>');
+      parts.push('<circle class="gauge-bg" cx="'+gx+'" cy="'+gcy+'" r="'+gr+'" filter="url(#pipeShadow)"/>');
       if(fillH > 0.3){
-        parts.push('<rect x="'+(mid-gr)+'" y="'+(gcy+gr-fillH)+'" width="'+(2*gr)+'" height="'+fillH+'" fill="'+colorVar+'" clip-path="url(#'+clipId+')"/>');
+        parts.push('<rect x="'+(gx-gr)+'" y="'+(gcy+gr-fillH)+'" width="'+(2*gr)+'" height="'+fillH+'" fill="'+colorVar+'" clip-path="url(#'+clipId+')"/>');
       }
-      parts.push('<circle cx="'+mid+'" cy="'+gcy+'" r="'+gr+'" fill="url(#gaugeGloss)" clip-path="url(#'+clipId+')"/>');
-      parts.push('<circle cx="'+mid+'" cy="'+gcy+'" r="'+gr+'" fill="none" stroke="'+colorVar+'" stroke-width="1.4" opacity="0.9"/>');
+      parts.push('<circle cx="'+gx+'" cy="'+gcy+'" r="'+gr+'" fill="url(#gaugeGloss)" clip-path="url(#'+clipId+')"/>');
+      parts.push('<circle cx="'+gx+'" cy="'+gcy+'" r="'+gr+'" fill="none" stroke="'+colorVar+'" stroke-width="1.5" opacity="0.9"/>');
 
-      // etiqueta material + diámetro + pendiente
-      parts.push('<text x="'+mid+'" y="'+(midY-24)+'" text-anchor="middle" class="tramo-label">'+pipesSchematicLabel(row.t)+' · '+fmt(row.t.pendiente,2)+'%</text>');
+      var tx = gx + gr + 11;
+      parts.push('<text x="'+tx+'" y="'+(gcy-12)+'" text-anchor="start" class="tube-title">'+pipesSchematicLabel(row.t)+'</text>');
+      parts.push('<text x="'+tx+'" y="'+(gcy+3)+'" text-anchor="start" class="tube-stat">S = '+fmt(row.t.pendiente,2)+'%</text>');
+      parts.push('<text x="'+tx+'" y="'+(gcy+18)+'" text-anchor="start" class="tube-stat">Nivel = '+(res.pendienteInvalida?'—':fmt(fillFrac*100,0)+'%')+'</text>');
 
-      // tubería(s), dibujadas como un tubo con volumen (sombra + cuerpo + brillo) e
-      // inclinadas con la pendiente real de nodo a nodo — el extremo llega justo al
-      // borde del registro (mismo radio NODE_R) para que se vea conectada
+      // tubería(s): tubo metálico neutro (color de estado sólo como halo cuando hay
+      // advertencia/exceso) inclinadas con la pendiente real de nodo a nodo — el
+      // extremo llega justo al borde del registro para que se vea conectada
       var k = pipes.length;
       pipes.forEach(function(p, pi){
-        var offset = k>1 ? (pi - (k-1)/2) * 9 : 0;
-        var strokeW = k>1 ? Math.max(3, Math.min(10, p.diametro/140)) : (5 + Math.min(24, p.diametro/85));
+        var offset = k>1 ? (pi - (k-1)/2) * 10 : 0;
+        var strokeW = k>1 ? Math.max(4, Math.min(12, p.diametro/120)) : (7 + Math.min(30, p.diametro/70));
         var pr = res.pipesRes[pi];
         var pc = pipeColor(pr, res.pendienteInvalida);
         var pColorVar = pc === "ok" ? "var(--accent)" : (pc === "danger" ? "var(--danger)" : "var(--warn)");
         var lx1 = x1+NODE_R, lx2 = x2-NODE_R, ly1 = y1+offset, ly2 = y2+offset;
-        parts.push('<line x1="'+lx1+'" y1="'+(ly1+strokeW*0.22)+'" x2="'+lx2+'" y2="'+(ly2+strokeW*0.22)+'" stroke="rgba(0,0,0,0.20)" stroke-width="'+(strokeW*0.9)+'" stroke-linecap="round"/>');
-        parts.push('<line x1="'+lx1+'" y1="'+ly1+'" x2="'+lx2+'" y2="'+ly2+'" stroke="'+pColorVar+'" stroke-width="'+strokeW+'" stroke-linecap="round"/>');
-        parts.push('<line x1="'+lx1+'" y1="'+(ly1-strokeW*0.24)+'" x2="'+lx2+'" y2="'+(ly2-strokeW*0.24)+'" stroke="rgba(255,255,255,0.5)" stroke-width="'+(strokeW*0.32)+'" stroke-linecap="round"/>');
-        parts.push('<ellipse cx="'+lx1+'" cy="'+ly1+'" rx="'+(strokeW*0.22)+'" ry="'+(strokeW*0.5)+'" fill="'+pColorVar+'" stroke="rgba(0,0,0,0.28)" stroke-width="0.6"/>');
-        parts.push('<ellipse cx="'+lx2+'" cy="'+ly2+'" rx="'+(strokeW*0.22)+'" ry="'+(strokeW*0.5)+'" fill="'+pColorVar+'" stroke="rgba(0,0,0,0.28)" stroke-width="0.6"/>');
+        if(pc !== "ok"){
+          parts.push('<line x1="'+lx1+'" y1="'+ly1+'" x2="'+lx2+'" y2="'+ly2+'" stroke="'+pColorVar+'" stroke-width="'+(strokeW+7)+'" stroke-linecap="round" opacity="0.28"/>');
+        }
+        parts.push('<line x1="'+lx1+'" y1="'+(ly1+strokeW*0.16)+'" x2="'+lx2+'" y2="'+(ly2+strokeW*0.16)+'" stroke="rgba(0,0,0,0.28)" stroke-width="'+(strokeW*1.04)+'" stroke-linecap="round"/>');
+        parts.push('<line x1="'+lx1+'" y1="'+ly1+'" x2="'+lx2+'" y2="'+ly2+'" stroke="url(#tubeMetal)" stroke-width="'+strokeW+'" stroke-linecap="round"/>');
+        parts.push('<ellipse cx="'+lx1+'" cy="'+ly1+'" rx="'+(strokeW*0.3)+'" ry="'+(strokeW*0.5)+'" fill="url(#tubeMetal)" stroke="rgba(0,0,0,0.35)" stroke-width="0.7"/>');
+        parts.push('<ellipse cx="'+lx2+'" cy="'+ly2+'" rx="'+(strokeW*0.3)+'" ry="'+(strokeW*0.5)+'" fill="url(#tubeMetal)" stroke="rgba(0,0,0,0.35)" stroke-width="0.7"/>');
       });
 
       // caudales
