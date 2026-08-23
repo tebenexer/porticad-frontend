@@ -325,6 +325,13 @@
       position: relative; top: 1px;
     }
     .seg-tab-add:hover { background: var(--accent-soft); border-color: var(--primary); }
+    .seg-tab-remove {
+      flex: 0 0 auto; margin-left: auto; align-self: center;
+      border: none; background: transparent; color: var(--danger);
+      font-size: 0.8rem; padding: 5px 8px; border-radius: 6px; cursor: pointer;
+    }
+    .seg-tab-remove:hover:not(:disabled) { background: var(--danger-soft); }
+    .seg-tab-remove:disabled { color: var(--muted); opacity: 0.4; cursor: not-allowed; }
     .seg-panel { display: none; }
     .seg-panel.active { display: block; }
     .pipe-card {
@@ -599,6 +606,15 @@
       addBtn.textContent = '＋';
       addBtn.addEventListener('click', addSegment);
       box.appendChild(addBtn);
+
+      var rmBtn = document.createElement('button');
+      rmBtn.type = 'button';
+      rmBtn.className = 'seg-tab-remove';
+      rmBtn.title = segments.length > 2 ? ('Eliminar T' + (activeSegIdx + 1)) : 'Debe haber al menos 2 tramos';
+      rmBtn.textContent = '🗑';
+      rmBtn.disabled = segments.length <= 2;
+      rmBtn.addEventListener('click', removeActiveSegment);
+      box.appendChild(rmBtn);
     }
 
     function renderSegEditor() {
@@ -660,10 +676,6 @@
         html += '<div class="field"><label>Pérdida K</label><input type="number" id="ed_kLoss" value="' + conn.kLoss + '" min="0" max="2" step="0.05" /></div>';
         html += '<div class="field"><label>Altura de salto (m)</label><input type="number" id="ed_dropH" value="' + conn.dropH + '" min="0" max="5" step="0.05" /></div>';
         html += '</div>';
-      }
-
-      if (segments.length > 2) {
-        html += '<button type="button" class="btn btn-sm" id="ed_rmSeg" style="margin-top:8px;background:var(--danger-soft);color:var(--danger)">Eliminar este tramo</button>';
       }
 
       ed.innerHTML = html;
@@ -745,27 +757,24 @@
           conn.dropH = parseFloat(this.value) || 0; if (lastResults) calculate();
         });
       }
+    }
 
-      var rmSeg = document.getElementById('ed_rmSeg');
-      if (rmSeg) {
-        rmSeg.addEventListener('click', function() {
-          if (segments.length <= 2) return;
-          var idx = activeSegIdx;
-          segments.splice(idx, 1);
-          // connections: remove the one before or at idx
-          if (idx < connections.length) connections.splice(idx, 1);
-          else if (connections.length) connections.pop();
-          // ensure connections length = segments.length - 1
-          while (connections.length > segments.length - 1) connections.pop();
-          while (connections.length < segments.length - 1) {
-            connections.push({ type: 'caida', kLoss: 0.5, dropH: 0.5 });
-          }
-          activeSegIdx = Math.min(idx, segments.length - 1);
-          renderSegTabs();
-          renderSegEditor();
-          if (lastResults) calculate();
-        });
+    function removeActiveSegment() {
+      if (segments.length <= 2) return;
+      var idx = activeSegIdx;
+      segments.splice(idx, 1);
+      // connections: remove the one before or at idx
+      if (idx < connections.length) connections.splice(idx, 1);
+      else if (connections.length) connections.pop();
+      // ensure connections length = segments.length - 1
+      while (connections.length > segments.length - 1) connections.pop();
+      while (connections.length < segments.length - 1) {
+        connections.push({ type: 'caida', kLoss: 0.5, dropH: 0.5 });
       }
+      activeSegIdx = Math.min(idx, segments.length - 1);
+      renderSegTabs();
+      renderSegEditor();
+      if (lastResults) calculate();
     }
 
     function refreshPipeList() {
