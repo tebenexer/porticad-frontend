@@ -384,6 +384,7 @@
         <button type="button" data-t="system" class="active">Sistema</button>
       </div>
       <button class="btn" id="btnResetCam" title="Reset cámara">🎥 Cámara</button>
+      <button class="btn" id="btnToggleGrid" title="Mostrar u ocultar la malla del piso">▦ Ocultar malla</button>
       <button class="btn" id="btnExport">⬇ Exportar</button>
     </div>
   </header>
@@ -976,7 +977,7 @@
     }
 
     // ========== THREE.JS ==========
-    let renderer, scene, camera, controls, pipeGroup = null;
+    let renderer, scene, camera, controls, pipeGroup = null, gridHelper = null;
     const VIEW = document.getElementById('view3d');
 
     function init3D() {
@@ -1042,8 +1043,8 @@
       dir.position.set(10, 16, 8); dir.castShadow = true; scene.add(dir);
       var fill = new THREE.DirectionalLight(0xaaccff, 0.35);
       fill.position.set(-8, 5, -5); scene.add(fill);
-      var grid = new THREE.GridHelper(50, 50, 0xb0b8c4, 0xd0d6e0);
-      grid.position.y = -3; scene.add(grid);
+      gridHelper = new THREE.GridHelper(50, 50, 0xb0b8c4, 0xd0d6e0);
+      gridHelper.position.y = -3; scene.add(gridHelper);
       pipeGroup = new THREE.Group(); scene.add(pipeGroup);
 
       // hover / clic sobre una tubería: muestra sus datos en un tooltip
@@ -1832,6 +1833,11 @@
 
     document.getElementById('btnCalc').addEventListener('click', calculate);
     document.getElementById('btnResetCam').addEventListener('click', resetCamera);
+    document.getElementById('btnToggleGrid').addEventListener('click', function() {
+      if (!gridHelper) return;
+      gridHelper.visible = !gridHelper.visible;
+      this.textContent = gridHelper.visible ? '▦ Ocultar malla' : '▦ Mostrar malla';
+    });
 
     document.getElementById('btnSimPlay').addEventListener('click', function() {
       if (!lastResults) { calculate(); }
