@@ -430,7 +430,7 @@
                   <div class="view3d-label" id="labelT1">Tubería 1</div>
                   <div class="view3d-label" id="labelT2">Tubería 2</div>
                 </div>
-                <div class="view3d-hint">Arrastra para rotar · Rueda para zoom · pasa el cursor o haz clic en una tubería para ver sus datos</div>
+                <div class="view3d-hint">Arrastra para rotar · Rueda para zoom · clic de la rueda + arrastrar para desplazar · pasa el cursor o haz clic en una tubería para ver sus datos</div>
                 <div class="pipe-tooltip" id="pipeTooltip" hidden></div>
                 <div class="sim-bar" id="simBar">
                   <button type="button" id="btnSimPlay">▶ Simular</button>
@@ -999,14 +999,31 @@
         controls.dampingFactor = 0.08;
         controls.minDistance = 4;
         controls.maxDistance = 40;
+        // clic con el botón de la rueda (central) + arrastrar = desplazar la imagen (pan)
+        controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN;
+        controls.screenSpacePanning = true;
       } else {
         controls = { update: function(){}, target: new THREE.Vector3(4, 0.5, 0) };
-        var dragging = false, px, py;
-        renderer.domElement.addEventListener('pointerdown', function(e) { dragging = true; px = e.clientX; py = e.clientY; });
-        window.addEventListener('pointerup', function() { dragging = false; });
+        var dragging = false, panning = false, px, py;
+        renderer.domElement.addEventListener('pointerdown', function(e) {
+          if (e.button === 1) { panning = true; e.preventDefault(); }
+          else if (e.button === 0) { dragging = true; }
+          px = e.clientX; py = e.clientY;
+        });
+        window.addEventListener('pointerup', function() { dragging = false; panning = false; });
         window.addEventListener('pointermove', function(e) {
-          if (!dragging) return;
           var dx = e.clientX - px, dy = e.clientY - py; px = e.clientX; py = e.clientY;
+          if (panning) {
+            var dist = camera.position.distanceTo(controls.target);
+            var panSpeed = dist * 0.0018;
+            var right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).multiplyScalar(-dx * panSpeed);
+            var up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion).multiplyScalar(dy * panSpeed);
+            camera.position.add(right).add(up);
+            controls.target.add(right).add(up);
+            camera.lookAt(controls.target);
+            return;
+          }
+          if (!dragging) return;
           var sph = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
           sph.theta -= dx * 0.01;
           sph.phi = Math.max(0.15, Math.min(Math.PI - 0.15, sph.phi - dy * 0.01));
