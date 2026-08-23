@@ -297,16 +297,31 @@
     }
 
     .seg-tabs {
-      display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap;
+      display: flex; gap: 3px; margin-bottom: 12px; flex-wrap: wrap; align-items: flex-end;
+      border-bottom: 1px solid var(--border);
+      max-height: 120px; overflow-y: auto;
     }
     .seg-tab {
-      flex: 1; min-width: 70px; padding: 8px 6px; text-align: center;
-      font-size: 0.78rem; font-weight: 600; border: 1px solid var(--border);
-      border-radius: 8px; background: var(--panel-soft); cursor: pointer; color: var(--muted);
+      flex: 0 0 auto; min-width: 42px; padding: 7px 12px; text-align: center;
+      font-size: 0.78rem; font-weight: 600;
+      border: 1px solid var(--border); border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      background: var(--panel-soft); cursor: pointer; color: var(--muted);
+      position: relative; top: 1px;
     }
+    .seg-tab:hover:not(.active) { background: var(--accent-soft); color: var(--primary); }
     .seg-tab.active {
-      background: var(--primary); color: #fff; border-color: var(--primary);
+      background: var(--panel); color: var(--primary); border-color: var(--border);
     }
+    .seg-tab-add {
+      flex: 0 0 auto; min-width: 30px; padding: 7px 12px;
+      font-size: 0.85rem; font-weight: 700; line-height: 1;
+      border: 1.5px dashed var(--border); border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      background: transparent; cursor: pointer; color: var(--primary);
+      position: relative; top: 1px;
+    }
+    .seg-tab-add:hover { background: var(--accent-soft); border-color: var(--primary); }
     .seg-panel { display: none; }
     .seg-panel.active { display: block; }
     .pipe-card {
@@ -333,7 +348,6 @@
       background: var(--panel-soft); color: var(--text); font-size: 0.8rem; padding: 4px;
     }
     .pipe-list option { padding: 4px 6px; }
-    .seg-tabs { max-height: 90px; overflow-y: auto; }
     .conn-box {
       background: var(--warning-soft); border: 1px solid var(--warning-soft-border);
       border-radius: 8px; padding: 10px; margin-top: 8px;
@@ -403,8 +417,7 @@
       </div>
 
       <div class="seg-tabs" id="segTabs"></div>
-      <button type="button" class="btn btn-primary btn-sm" id="btnAddSeg" style="margin-bottom:12px;width:100%">＋ Añadir tramo (T3, T4…)</button>
-      <div class="hint" style="margin-bottom:10px;font-size:0.72rem;color:var(--muted)">Crea un nuevo tramo en serie después del último. El registro entre tramos se ajusta solo.</div>
+      <div class="hint" style="margin-bottom:10px;font-size:0.72rem;color:var(--muted)">Pestaña "+" = nuevo tramo en serie después del último. El registro entre tramos se ajusta solo.</div>
 
       <div id="segEditor">
         <!-- rellenado por JS -->
@@ -576,6 +589,13 @@
         });
         box.appendChild(btn);
       });
+      var addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'seg-tab-add';
+      addBtn.title = 'Añadir tramo (T' + (segments.length + 1) + '…)';
+      addBtn.textContent = '＋';
+      addBtn.addEventListener('click', addSegment);
+      box.appendChild(addBtn);
     }
 
     function renderSegEditor() {
@@ -757,7 +777,7 @@
       el.textContent = r.surcharge ? '100 % (sobretiro)' : r.y_pct.toFixed(1) + ' %';
     }
 
-    document.getElementById('btnAddSeg').addEventListener('click', function() {
+    function addSegment() {
       var id = nextSegId++;
       segments.push({
         id: id, slope: 1.0, length: 50, unit: 'mm',
@@ -770,7 +790,7 @@
       renderSegTabs();
       renderSegEditor();
       if (lastResults) calculate();
-    });
+    }
 
     function circularSection(D, y) {
       if (y <= 0) return { A: 0, P: 0, R: 0, theta: 0 };
