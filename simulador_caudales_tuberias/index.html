@@ -197,6 +197,21 @@
     }
     .view3d-label strong { color: var(--primary); }
 
+    .pipe-tooltip {
+      position: absolute; z-index: 6; pointer-events: none;
+      background: rgba(255,255,255,.97); border: 1px solid #e2e8f0; border-radius: 8px;
+      padding: 10px 12px; font-size: 0.76rem; color: #1e293b;
+      box-shadow: var(--shadow); width: 220px; line-height: 1.55;
+    }
+    .pipe-tooltip[hidden] { display: none; }
+    .pipe-tooltip h5 { font-size: 0.82rem; margin-bottom: 6px; color: #2563eb; }
+    .pipe-tooltip .row { display: flex; justify-content: space-between; gap: 10px; }
+    .pipe-tooltip .row .k { color: #64748b; }
+    .pipe-tooltip .badge-mini { display: inline-block; margin-top: 6px; padding: 2px 8px; border-radius: 999px; font-size: 0.68rem; font-weight: 700; }
+    .pipe-tooltip .badge-mini.ok { background: #f0fdf4; color: #16a34a; }
+    .pipe-tooltip .badge-mini.warn { background: #fffbeb; color: #d97706; }
+    .pipe-tooltip .badge-mini.bad { background: #fef2f2; color: #dc2626; }
+
     /* Columna de resultados a la derecha */
     .results {
       flex: 0 0 280px;
@@ -415,7 +430,8 @@
                   <div class="view3d-label" id="labelT1">Tubería 1</div>
                   <div class="view3d-label" id="labelT2">Tubería 2</div>
                 </div>
-                <div class="view3d-hint">Arrastra para rotar · Rueda para zoom · Escala por longitud real</div>
+                <div class="view3d-hint">Arrastra para rotar · Rueda para zoom · pasa el cursor o haz clic en una tubería para ver sus datos</div>
+                <div class="pipe-tooltip" id="pipeTooltip" hidden></div>
                 <div class="sim-bar" id="simBar">
                   <button type="button" id="btnSimPlay">▶ Simular</button>
                   <button type="button" id="btnSimReset">↺</button>
@@ -1012,6 +1028,31 @@
       var grid = new THREE.GridHelper(50, 50, 0xb0b8c4, 0xd0d6e0);
       grid.position.y = -3; scene.add(grid);
       pipeGroup = new THREE.Group(); scene.add(pipeGroup);
+
+      // hover / clic sobre una tubería: muestra sus datos en un tooltip
+      var downX = 0, downY = 0, downMoved = false;
+      renderer.domElement.addEventListener('mousemove', function(e) {
+        if (hoverPinned) return;
+        var info = pickPipeAt(e.clientX, e.clientY);
+        if (info) { showPipeTooltip(info, e.clientX, e.clientY); renderer.domElement.style.cursor = 'pointer'; }
+        else { hidePipeTooltip(); renderer.domElement.style.cursor = 'default'; }
+      });
+      renderer.domElement.addEventListener('mouseleave', function() {
+        if (!hoverPinned) hidePipeTooltip();
+      });
+      renderer.domElement.addEventListener('pointerdown', function(e) {
+        downX = e.clientX; downY = e.clientY; downMoved = false;
+      });
+      renderer.domElement.addEventListener('pointermove', function(e) {
+        if (Math.abs(e.clientX - downX) > 4 || Math.abs(e.clientY - downY) > 4) downMoved = true;
+      });
+      renderer.domElement.addEventListener('pointerup', function(e) {
+        if (downMoved) return; // fue un arrastre de cámara, no un clic de selección
+        var info = pickPipeAt(e.clientX, e.clientY);
+        if (info) { hoverPinned = true; showPipeTooltip(info, e.clientX, e.clientY); }
+        else { hoverPinned = false; hidePipeTooltip(); }
+      });
+
       window.addEventListener('resize', onResize);
       (function loop(ts) { requestAnimationFrame(loop); tickSim(ts || 0); if (controls && controls.update) controls.update(); renderer.render(scene, camera); })();
     }
@@ -1218,6 +1259,69 @@
       markers: []
     };
 
+    // —— Tooltip de tubería: hover / clic para inspeccionar datos ——
+    var pipeTooltipEl = document.getElementById('pipeTooltip');
+    var raycaster = new THREE.Raycaster();
+    var mouseNDC = new THREE.Vector2();
+    var hoverPinned = false;
+
+    function findPipeInfo(obj) {
+      while (obj) {
+        if (obj.userData && obj.userData.pipeInfo) return obj.userData.pipeInfo;
+        obj = obj.parent;
+      }
+      return null;
+    }
+    function materialLabel(n) {
+      var m = MATERIALS.find(function(mm) { return Math.abs(mm.n - n) < 1e-6; });
+      return m ? m.label : ('n=' + n);
+    }
+    function pipeStatusInfo(detail) {
+      if (detail.Qfull > 0 && detail.Q >= detail.Qfull * 0.999) return { cls: 'bad', label: 'Excede capacidad' };
+      if (detail.V > 0 && (detail.V < 0.6 || detail.V > 4.5)) return { cls: 'warn', label: 'Verificar velocidad' };
+      return { cls: 'ok', label: 'OK' };
+    }
+    function buildTooltipHtml(info) {
+      var seg = info.seg, d = info.detail, pipe = seg.pipes[info.pipeIndex];
+      var st = pipeStatusInfo(d);
+      var title = 'Tramo T' + (info.segIndex + 1) + (seg.pipes.length > 1 ? (' · Tubo ' + (info.pipeIndex + 1)) : '');
+      var html = '<h5>' + title + '</h5>';
+      html += '<div class="row"><span class="k">Material</span><span>' + materialLabel(pipe.n) + '</span></div>';
+      html += '<div class="row"><span class="k">Diámetro</span><span>' + formatDiam(pipe.diamMm, seg.unit) + '</span></div>';
+      html += '<div class="row"><span class="k">Pendiente</span><span>' + seg.slope.toFixed(2) + ' %</span></div>';
+      html += '<div class="row"><span class="k">Longitud</span><span>' + seg.length + ' m</span></div>';
+      html += '<div class="row"><span class="k">Caudal Q</span><span>' + d.Q.toFixed(3) + ' m³/s</span></div>';
+      html += '<div class="row"><span class="k">Cap. a tubo lleno</span><span>' + d.Qfull.toFixed(3) + ' m³/s</span></div>';
+      html += '<div class="row"><span class="k">Velocidad</span><span>' + d.V.toFixed(2) + ' m/s</span></div>';
+      html += '<div class="row"><span class="k">Tirante y/D</span><span>' + d.y_pct.toFixed(1) + ' %</span></div>';
+      html += '<span class="badge-mini ' + st.cls + '">' + st.label + '</span>';
+      return html;
+    }
+    function showPipeTooltip(info, clientX, clientY) {
+      var rect = VIEW.getBoundingClientRect();
+      pipeTooltipEl.innerHTML = buildTooltipHtml(info);
+      pipeTooltipEl.hidden = false;
+      var x = clientX - rect.left, y = clientY - rect.top;
+      var maxX = rect.width - pipeTooltipEl.offsetWidth - 8;
+      var maxY = rect.height - pipeTooltipEl.offsetHeight - 8;
+      pipeTooltipEl.style.left = Math.max(8, Math.min(x + 16, maxX)) + 'px';
+      pipeTooltipEl.style.top = Math.max(8, Math.min(y + 16, maxY)) + 'px';
+    }
+    function hidePipeTooltip() { pipeTooltipEl.hidden = true; }
+    function pickPipeAt(clientX, clientY) {
+      if (!pipeGroup) return null;
+      var rect = renderer.domElement.getBoundingClientRect();
+      mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouseNDC, camera);
+      var hits = raycaster.intersectObjects(pipeGroup.children, true);
+      for (var i = 0; i < hits.length; i++) {
+        var info = findPipeInfo(hits[i].object);
+        if (info) return info;
+      }
+      return null;
+    }
+
     function updateScene3D() {
       if (!pipeGroup || !lastResults) return;
       while (pipeGroup.children.length) {
@@ -1225,6 +1329,8 @@
         pipeGroup.remove(c);
         disposeObject(c);
       }
+      hoverPinned = false;
+      hidePipeTooltip();
       sim.paths = [];
       sim.markers = [];
 
@@ -1292,6 +1398,7 @@
         for (var j = 0; j < details.length; j++) {
           var pipe = makePipe(radii[j], LEN, details[j].y_pct, ang);
           pipe.position.set(cX, cY, zOff[j] || 0);
+          pipe.userData.pipeInfo = { segIndex: si, pipeIndex: j, seg: segments[si], detail: details[j] };
           pipeGroup.add(pipe);
 
           // Marcador de frente de onda / partícula de caudal
