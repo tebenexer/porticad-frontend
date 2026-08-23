@@ -114,6 +114,9 @@
     }
     .field { margin-bottom: 9px; }
     .field label { display: block; font-size: 0.76rem; color: var(--muted); margin-bottom: 3px; }
+    .field-row { display: flex; gap: 8px; align-items: flex-end; }
+    .field-row > .field { flex: 1; min-width: 0; }
+    .field-narrow { max-width: 128px; }
     .field input, .field select {
       width: 100%; padding: 7px 9px; border: 1px solid var(--border);
       border-radius: 7px; background: var(--panel-soft); color: var(--text);
@@ -615,16 +618,22 @@
 
       var html = '';
       html += '<div class="section"><div class="section-title">Tramo T' + (activeSegIdx + 1) + ' — general</div>';
+      html += '<div class="field-row">';
       html += '<div class="field"><label>Pendiente (%)</label><input type="number" id="ed_slope" value="' + seg.slope + '" min="0.05" max="15" step="0.05" /></div>';
       html += '<div class="field"><label>Longitud (m)</label><input type="number" id="ed_length" value="' + seg.length + '" min="1" max="5000" step="1" /></div>';
-      html += '<div class="field"><label>Unidad de diámetro</label><select id="ed_unit">';
+      html += '</div>';
+      html += '<div class="field field-narrow"><label>Unidad de diámetro</label><select id="ed_unit">';
       html += '<option value="mm"' + (seg.unit === 'mm' ? ' selected' : '') + '>mm</option>';
       html += '<option value="m"' + (seg.unit === 'm' ? ' selected' : '') + '>m</option>';
       html += '<option value="in"' + (seg.unit === 'in' ? ' selected' : '') + '>pulg (in)</option>';
       html += '</select></div>';
-      html += '<div class="field"><label>Nivel de agua (calculado)</label><div class="readonly-box" id="ySegDisplay">— %</div></div>';
       if (activeSegIdx > 0) {
+        html += '<div class="field-row">';
+        html += '<div class="field"><label>Nivel de agua (calculado)</label><div class="readonly-box" id="ySegDisplay">— %</div></div>';
         html += '<div class="field"><label>Caudal (continuidad)</label><div class="readonly-box">= Q entrada</div></div>';
+        html += '</div>';
+      } else {
+        html += '<div class="field field-narrow"><label>Nivel de agua (calculado)</label><div class="readonly-box" id="ySegDisplay">— %</div></div>';
       }
       html += '</div>';
 
