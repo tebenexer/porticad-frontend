@@ -153,21 +153,23 @@
       min-height: 0;
     }
     .view-area {
-      flex: 0 0 auto;
+      flex: 1 1 auto;
+      min-width: 0;
       padding: 12px;
-      overflow: auto;
     }
     .tab-panels { position: relative; }
     .tab-panel { display: none; padding: 0; }
     .tab-panel.active { display: block; }
 
-    /* Contenedores de vista: 1200 × 700 (fijos, canvas técnico siempre claro) */
+    /* Contenedores de vista: relación 1200×700, responsivos hasta ese ancho máximo
+       (canvas técnico siempre claro, independiente del tema de la app) */
     #view3d,
     .profile-canvas,
     .section-canvas {
-      width: 1200px;
-      height: 700px;
-      max-width: 100%;
+      width: 100%;
+      max-width: 1200px;
+      aspect-ratio: 1200 / 700;
+      height: auto;
       background: #fff;
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -178,10 +180,10 @@
     #view3d {
       background: linear-gradient(180deg, #e8eef5 0%, #d4dce8 100%);
     }
-    #view3d canvas { display: block; width: 1200px !important; height: 700px !important; }
+    #view3d canvas { display: block; width: 100% !important; height: 100% !important; }
     #profileSvg, #sectionSvg {
-      width: 1200px;
-      height: 700px;
+      width: 100%;
+      height: 100%;
       display: block;
     }
 
@@ -365,19 +367,20 @@
     .conn-box .section-title { color: var(--warning); }
 
     .sim-bar {
-      position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
-      display: flex; align-items: center; gap: 8px; z-index: 5;
-      background: rgba(255,255,255,.92); border: 1px solid #e2e8f0;
+      margin-top: 10px;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      background: var(--panel); border: 1px solid var(--border);
       border-radius: 10px; padding: 8px 12px; box-shadow: var(--shadow);
-      font-size: 0.78rem; white-space: nowrap;
+      font-size: 0.78rem; color: var(--text);
     }
     .sim-bar button {
-      border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 6px;
-      padding: 4px 10px; cursor: pointer; font-size: 0.78rem; color: #1e293b;
+      border: 1px solid var(--border); background: var(--panel-soft); border-radius: 6px;
+      padding: 4px 10px; cursor: pointer; font-size: 0.78rem; color: var(--text);
     }
     .sim-bar button.playing { background: var(--primary); color: #fff; border-color: var(--primary); }
     .sim-bar input[type=range] { width: 100px; accent-color: var(--primary); }
     .sim-bar .sim-time { font-weight: 700; color: var(--primary); min-width: 70px; }
+    .sim-bar #simInfo { color: var(--muted); }
   </style>
 </head>
 <body>
@@ -456,13 +459,13 @@
                 </div>
                 <div class="view3d-hint">Arrastra (1 dedo) para rotar · Rueda / pellizca con 2 dedos para zoom · clic de la rueda o arrastra con 2 dedos para desplazar · toca una tubería para ver sus datos</div>
                 <div class="pipe-tooltip" id="pipeTooltip" hidden></div>
-                <div class="sim-bar" id="simBar">
-                  <button type="button" id="btnSimPlay">▶ Simular</button>
-                  <button type="button" id="btnSimReset">↺</button>
-                  <label>Vel.× <input type="range" id="simSpeed" min="0.25" max="8" step="0.25" value="2" /></label>
-                  <span class="sim-time" id="simTime">t = 0.0 s</span>
-                  <span id="simInfo" style="color:#64748b">—</span>
-                </div>
+              </div>
+              <div class="sim-bar" id="simBar">
+                <button type="button" id="btnSimPlay">▶ Simular</button>
+                <button type="button" id="btnSimReset">↺</button>
+                <label>Vel.× <input type="range" id="simSpeed" min="0.25" max="8" step="0.25" value="2" /></label>
+                <span class="sim-time" id="simTime">t = 0.0 s</span>
+                <span id="simInfo">—</span>
               </div>
             </div>
             <div class="tab-panel" id="panel-perfil">
@@ -1018,8 +1021,15 @@
     let renderer, scene, camera, controls, pipeGroup = null, gridHelper = null;
     const VIEW = document.getElementById('view3d');
 
+    // tamaño real del contenedor (responsivo: hasta 1200×700, se achica en pantallas angostas)
+    function currentViewSize() {
+      var w = VIEW.clientWidth || 1200;
+      var h = VIEW.clientHeight || Math.round(w * 700 / 1200);
+      return { w: w, h: h };
+    }
+
     function init3D() {
-      const w = 1200, h = 700;
+      var sz0 = currentViewSize(), w = sz0.w, h = sz0.h;
       scene = new THREE.Scene();
       scene.background = new THREE.Color(0xe8eef5);
       scene.fog = new THREE.Fog(0xe8eef5, 28, 60);
@@ -1153,9 +1163,8 @@
 
     function onResize() {
       if (!renderer) return;
-      var w = 1200, h = 700;
-      camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h);
-      if (VIEW) { VIEW.style.width = w + 'px'; VIEW.style.height = h + 'px'; }
+      var sz = currentViewSize();
+      camera.aspect = sz.w / sz.h; camera.updateProjectionMatrix(); renderer.setSize(sz.w, sz.h);
     }
 
     function disposeObject(obj) {
