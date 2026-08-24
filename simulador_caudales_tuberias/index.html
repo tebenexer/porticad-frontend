@@ -454,7 +454,7 @@
                   <div class="view3d-label" id="labelT1">Tubería 1</div>
                   <div class="view3d-label" id="labelT2">Tubería 2</div>
                 </div>
-                <div class="view3d-hint">Arrastra para rotar · Rueda para zoom · clic de la rueda + arrastrar para desplazar · pasa el cursor o haz clic en una tubería para ver sus datos</div>
+                <div class="view3d-hint">Arrastra (1 dedo) para rotar · Rueda / pellizca con 2 dedos para zoom · clic de la rueda o arrastra con 2 dedos para desplazar · toca una tubería para ver sus datos</div>
                 <div class="pipe-tooltip" id="pipeTooltip" hidden></div>
                 <div class="sim-bar" id="simBar">
                   <button type="button" id="btnSimPlay">▶ Simular</button>
@@ -1029,6 +1029,9 @@
       renderer.setSize(w, h);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.shadowMap.enabled = true;
+      // evita que el navegador capture el gesto para hacer scroll/zoom de la página
+      // en vez de dejarlo llegar a nuestro control de cámara (clave para móvil/táctil)
+      renderer.domElement.style.touchAction = 'none';
       VIEW.appendChild(renderer.domElement);
 
       if (typeof THREE.OrbitControls === 'function') {
@@ -1043,36 +1046,71 @@
         controls.screenSpacePanning = true;
       } else {
         controls = { update: function(){}, target: new THREE.Vector3(4, 0.5, 0) };
-        var dragging = false, panning = false, px, py;
-        renderer.domElement.addEventListener('pointerdown', function(e) {
-          if (e.button === 1) { panning = true; e.preventDefault(); }
-          else if (e.button === 0) { dragging = true; }
-          px = e.clientX; py = e.clientY;
-        });
-        window.addEventListener('pointerup', function() { dragging = false; panning = false; });
-        window.addEventListener('pointermove', function(e) {
-          var dx = e.clientX - px, dy = e.clientY - py; px = e.clientX; py = e.clientY;
-          if (panning) {
-            var dist = camera.position.distanceTo(controls.target);
-            var panSpeed = dist * 0.0018;
-            var right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).multiplyScalar(-dx * panSpeed);
-            var up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion).multiplyScalar(dy * panSpeed);
-            camera.position.add(right).add(up);
-            controls.target.add(right).add(up);
-            camera.lookAt(controls.target);
-            return;
-          }
-          if (!dragging) return;
+
+        // Un solo puntero (mouse izq. o un dedo) = rotar · botón central = pan ·
+        // dos dedos = pan (con el punto medio) + zoom (con la distancia entre dedos, pellizcar)
+        var activePointers = {}; // pointerId -> {x, y}
+        var panning = false;     // pan con botón central del mouse
+        var pinchLastMid = null, pinchLastDist = null;
+
+        function rotateBy(dx, dy) {
           var sph = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
           sph.theta -= dx * 0.01;
           sph.phi = Math.max(0.15, Math.min(Math.PI - 0.15, sph.phi - dy * 0.01));
           camera.position.setFromSpherical(sph).add(controls.target);
           camera.lookAt(controls.target);
+        }
+        function panBy(dx, dy) {
+          var dist = camera.position.distanceTo(controls.target);
+          var panSpeed = dist * 0.0018;
+          var right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).multiplyScalar(-dx * panSpeed);
+          var up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion).multiplyScalar(dy * panSpeed);
+          camera.position.add(right).add(up);
+          controls.target.add(right).add(up);
+          camera.lookAt(controls.target);
+        }
+        function dollyBy(delta) {
+          var dir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+          camera.position.addScaledVector(dir, delta);
+        }
+
+        renderer.domElement.addEventListener('pointerdown', function(e) {
+          if (e.button === 1) { panning = true; e.preventDefault(); }
+          activePointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+          pinchLastMid = null; pinchLastDist = null;
+        });
+        function releasePointer(e) {
+          panning = false;
+          delete activePointers[e.pointerId];
+          pinchLastMid = null; pinchLastDist = null;
+        }
+        window.addEventListener('pointerup', releasePointer);
+        window.addEventListener('pointercancel', releasePointer);
+        window.addEventListener('pointermove', function(e) {
+          if (!activePointers[e.pointerId]) return;
+          var prev = activePointers[e.pointerId];
+          var dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+          activePointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+
+          var ids = Object.keys(activePointers);
+          if (ids.length >= 2) {
+            // gesto de dos dedos: pellizcar para zoom + arrastrar para pan
+            var a = activePointers[ids[0]], b = activePointers[ids[1]];
+            var midX = (a.x + b.x) / 2, midY = (a.y + b.y) / 2;
+            var dist = Math.hypot(a.x - b.x, a.y - b.y);
+            if (pinchLastMid) panBy(midX - pinchLastMid.x, midY - pinchLastMid.y);
+            if (pinchLastDist != null) dollyBy((pinchLastDist - dist) * 0.02);
+            pinchLastMid = { x: midX, y: midY };
+            pinchLastDist = dist;
+          } else if (panning) {
+            panBy(dx, dy);
+          } else if (ids.length === 1) {
+            rotateBy(dx, dy);
+          }
         });
         renderer.domElement.addEventListener('wheel', function(e) {
           e.preventDefault();
-          var dir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
-          camera.position.addScaledVector(dir, e.deltaY * 0.012);
+          dollyBy(e.deltaY * 0.012);
         }, { passive: false });
       }
 
