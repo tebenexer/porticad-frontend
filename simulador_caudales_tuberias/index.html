@@ -17,6 +17,7 @@
       align-items: center;
       padding: 8px 16px;
       gap: 8px;
+      flex: 0 0 auto;
       position: sticky; top: 0; z-index: 100;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }
@@ -67,14 +68,17 @@
       --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -8px rgba(0,0,0,.6);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
     body {
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.45;
+      background: var(--bg); color: var(--text); line-height: 1.45;
+      display: flex; flex-direction: column; overflow: hidden;
     }
     header {
       background: var(--panel); border-bottom: 1px solid var(--border);
       padding: 12px 24px; display: flex; align-items: center; flex-wrap: wrap;
       gap: 10px 20px;
+      flex: 0 0 auto;
       box-shadow: var(--shadow);
     }
     .logo { display: flex; align-items: center; gap: 12px; flex: 1 1 0; }
@@ -100,14 +104,15 @@
     .themebtn button.active { background: var(--primary); color: #fff; }
     .main {
       display: grid; grid-template-columns: 300px 1fr;
-      align-items: start;
-      min-height: calc(100vh - 65px);
+      align-items: stretch;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
     }
     .sidebar {
       background: var(--panel); border-right: 1px solid var(--border);
       padding: 16px 14px;
-      position: sticky; top: 50px;
-      height: calc(100vh - 50px);
+      height: 100%;
       overflow-y: auto;
     }
     .sidebar h2 { font-size: 0.95rem; font-weight: 700; color: var(--primary); margin-bottom: 12px; }
@@ -136,7 +141,7 @@
     }
     .actions { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
     .actions .btn { justify-content: center; width: 100%; padding: 10px; }
-    .content { display: flex; flex-direction: column; overflow: hidden; }
+    .content { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
     .tabs {
       display: flex; background: var(--panel);
       border-bottom: 1px solid var(--border); padding: 0 16px;
@@ -301,11 +306,18 @@
       }
     }
     @media (max-width: 900px) {
-      .main { grid-template-columns: 1fr; }
+      /* en móvil no hay "shell" fijo: la página entera se desplaza normalmente,
+         apilando sidebar y contenido en flujo de documento */
+      body { display: block; overflow: visible; height: auto; }
+      .main {
+        grid-template-columns: 1fr;
+        flex: none; min-height: 0; overflow: visible;
+      }
       .sidebar {
         border-right: none; border-bottom: 1px solid var(--border);
-        position: static; height: auto; overflow-y: visible;
+        height: auto; overflow-y: visible;
       }
+      .content { height: auto; overflow: visible; }
     }
 
     .seg-tabs {
