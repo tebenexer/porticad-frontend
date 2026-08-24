@@ -1456,6 +1456,15 @@
       return null;
     }
 
+    // Desplazamiento (dx, dy) del nivel de agua respecto al eje central de una tubería
+    // inclinada `rad` radianes, para una tubería de radio `radius` llena en fracción `yFrac`
+    // (0 = vacía, 1 = llena hasta el techo). Así la boya de la simulación flota sobre la
+    // superficie real del agua en vez de quedar fija en el eje del tubo.
+    function waterSurfaceOffset(radius, yFrac, rad) {
+      var ySurfLocal = radius * (2 * Math.max(0, Math.min(1, yFrac)) - 1); // -radius (vacío) .. +radius (lleno = techo)
+      return { dx: ySurfLocal * Math.sin(rad), dy: ySurfLocal * Math.cos(rad) };
+    }
+
     function updateScene3D() {
       if (!pipeGroup || !lastResults) return;
       while (pipeGroup.children.length) {
@@ -1535,7 +1544,10 @@
           pipe.userData.pipeInfo = { segIndex: si, pipeIndex: j, seg: segments[si], detail: details[j] };
           pipeGroup.add(pipe);
 
-          // Marcador de frente de onda / partícula de caudal
+          // Marcador de frente de onda / partícula de caudal: flota sobre el nivel de agua
+          // real de esta tubería (no en su eje central), así se ve pegado al techo cuando
+          // la tubería va llena y a media altura cuando va parcialmente llena.
+          var wOff = waterSurfaceOffset(radii[j], (details[j].y_pct || 0) / 100, rad);
           var marker = new THREE.Mesh(
             new THREE.SphereGeometry(Math.max(0.12, radii[j] * 0.35), 16, 16),
             new THREE.MeshStandardMaterial({
@@ -1543,14 +1555,14 @@
               metalness: 0.2, roughness: 0.3
             })
           );
-          marker.position.set(startX, startY, zOff[j] || 0);
+          marker.position.set(startX + wOff.dx, startY + wOff.dy, zOff[j] || 0);
           marker.visible = false;
           pipeGroup.add(marker);
 
           var Vj = (details[j].V && details[j].V > 0.05) ? details[j].V : Vrep;
           sim.paths.push({
-            start: new THREE.Vector3(startX, startY, zOff[j] || 0),
-            end: new THREE.Vector3(endX, endY, zOff[j] || 0),
+            start: new THREE.Vector3(startX + wOff.dx, startY + wOff.dy, zOff[j] || 0),
+            end: new THREE.Vector3(endX + wOff.dx, endY + wOff.dy, zOff[j] || 0),
             V: Vj,
             L: Lreal,
             t0: t0,
@@ -1626,9 +1638,11 @@
           );
           regMark.visible = false;
           pipeGroup.add(regMark);
+          // el nivel de agua libre en el registro es el mismo `yFree` con el que ya se
+          // dibujó regWater arriba: la boya cae a esa altura, no al eje de las tuberías
           sim.paths.push({
-            start: new THREE.Vector3(endX, endY, 0),
-            end: new THREE.Vector3(endX + gap, startNextY, 0),
+            start: new THREE.Vector3(endX, yFree, 0),
+            end: new THREE.Vector3(endX + gap, yFree, 0),
             V: gap / tReg,
             L: gap / scaleLen,
             t0: t1,
