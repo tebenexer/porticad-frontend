@@ -1492,6 +1492,16 @@
       var scaleLen = 12 / maxL; // el tramo más largo ≈ 12 unidades
       var scaleR = 1.9, EXAG = 8;
 
+      // radio único de la boya para todo el recorrido (tuberías y registros): evita que
+      // "encoja" al pasar de un tramo a otro o al cruzar el registro entre ambos
+      var allRadii = [];
+      segs.forEach(function(s, si0) {
+        var prPre = segResults[si0];
+        var detailsPre = prPre.details || [{ D: prPre.D }];
+        detailsPre.forEach(function(d) { allRadii.push(Math.max(0.18, d.D * scaleR)); });
+      });
+      var markerRadius = Math.max(0.15, Math.min(0.5, Math.max.apply(null, allRadii) * 0.3));
+
       var cursorX = 0, cursorY = 2.2;
       var tCursor = 0; // tiempo acumulado al inicio de cada tramo
 
@@ -1549,7 +1559,7 @@
           // la tubería va llena y a media altura cuando va parcialmente llena.
           var wOff = waterSurfaceOffset(radii[j], (details[j].y_pct || 0) / 100, rad);
           var marker = new THREE.Mesh(
-            new THREE.SphereGeometry(Math.max(0.12, radii[j] * 0.35), 16, 16),
+            new THREE.SphereGeometry(markerRadius, 16, 16),
             new THREE.MeshStandardMaterial({
               color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 0.4,
               metalness: 0.2, roughness: 0.3
@@ -1633,7 +1643,7 @@
           var tReg = Math.max(0.5, Math.sqrt(2 * Math.max(drop, 0.1) / 9.81) * 3);
           // Marcador vertical en el registro
           var regMark = new THREE.Mesh(
-            new THREE.SphereGeometry(0.14, 12, 12),
+            new THREE.SphereGeometry(markerRadius, 16, 16),
             new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xf59e0b, emissiveIntensity: 0.5 })
           );
           regMark.visible = false;
