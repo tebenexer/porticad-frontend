@@ -96,6 +96,13 @@
   .iconbtn:hover { background: #21262d; }
   .iconbtn.active { background: var(--primary); color: #1a1300; border-color: var(--primary); }
 
+  #gpBadge {
+    background: var(--panel-translucent); border: 1px solid var(--border); color: var(--muted);
+    border-radius: 10px; padding: 6px 12px; font-size: 0.7rem; font-weight: 600;
+    box-shadow: var(--shadow); backdrop-filter: blur(6px);
+  }
+  #gpBadge.on { color: var(--success); border-color: var(--success); }
+
   #legend {
     background: var(--panel-translucent); border: 1px solid var(--border); border-radius: var(--radius);
     padding: 10px 12px; font-size: 0.7rem; color: var(--muted); max-width: 210px; box-shadow: var(--shadow);
@@ -195,19 +202,26 @@
     </div>
 
     <div id="topRight">
+      <div id="gpBadge">🎮 Sin control</div>
       <button class="iconbtn active" id="btnCamExt" type="button">🌐 Vista externa</button>
       <button class="iconbtn" id="btnCamCab" type="button">🚜 Vista cabina</button>
       <div id="legend">
         <div class="lgrow"><b>Palanca izq.</b><span>giro / pluma</span></div>
         <div class="lgrow"><span>teclado</span><span><kbd>←</kbd><kbd>→</kbd> giro</span></div>
         <div class="lgrow"><span></span><span><kbd>↑</kbd><kbd>↓</kbd> pluma</span></div>
+        <div class="lgrow"><span>PS4</span><span>stick izq.</span></div>
         <div class="lgrow" style="margin-top:6px"><b>Palanca der.</b><span>brazo / cuchara</span></div>
         <div class="lgrow"><span>teclado</span><span><kbd>A</kbd><kbd>D</kbd> brazo</span></div>
         <div class="lgrow"><span></span><span><kbd>W</kbd><kbd>S</kbd> cuchara</span></div>
+        <div class="lgrow"><span>PS4</span><span>stick der.</span></div>
         <div class="lgrow" style="margin-top:6px"><b>Extensor</b><span>brazo telescópico</span></div>
         <div class="lgrow"><span>teclado</span><span><kbd>Q</kbd> retrae · <kbd>E</kbd> extiende</span></div>
+        <div class="lgrow"><span>PS4</span><span>L1 retrae · R1 extiende</span></div>
         <div class="lgrow" style="margin-top:6px"><b>Orugas</b><span>avanzar / girar</span></div>
         <div class="lgrow"><span>teclado</span><span><kbd>I</kbd><kbd>K</kbd><kbd>J</kbd><kbd>L</kbd></span></div>
+        <div class="lgrow"><span>PS4</span><span>D-pad</span></div>
+        <div class="lgrow" style="margin-top:6px"><b>Cámara</b><span>externa / cabina</span></div>
+        <div class="lgrow"><span>PS4</span><span>Options</span></div>
         <div class="lgrow" style="margin-top:6px"><b>Camión</b><span>volcá encima de la batea</span></div>
       </div>
     </div>
@@ -328,6 +342,45 @@
     var stickL = { x: 0, y: 0 }, stickR = { x: 0, y: 0 };
     var trackBtn = { f: false, b: false, l: false, r: false };
     var extBtn = { out: false, in: false };
+
+    // ---------- control PS4 / gamepad (API estándar del navegador) ----------
+    // palanca izq. = giro·pluma, palanca der. = brazo·cuchara, D-pad = orugas,
+    // L1/R1 = retraer/extender, Options = cambiar de cámara.
+    var gamepadIndex = null;
+    var gp = { swing: 0, boom: 0, arm: 0, bucket: 0, f: false, b: false, l: false, r: false, extOut: false, extIn: false };
+    var gpOptionsPrev = false;
+    function gpDeadzone(v) { return Math.abs(v) < 0.15 ? 0 : v; }
+    window.addEventListener('gamepadconnected', function (e) {
+      gamepadIndex = e.gamepad.index;
+      var badge = document.getElementById('gpBadge');
+      if (badge) { badge.textContent = '🎮 ' + (e.gamepad.id || 'Control conectado'); badge.classList.add('on'); }
+    });
+    window.addEventListener('gamepaddisconnected', function (e) {
+      if (e.gamepad.index === gamepadIndex) gamepadIndex = null;
+      var badge = document.getElementById('gpBadge');
+      if (badge) { badge.textContent = '🎮 Sin control'; badge.classList.remove('on'); }
+    });
+    function pollGamepad() {
+      gp.swing = 0; gp.boom = 0; gp.arm = 0; gp.bucket = 0;
+      gp.f = false; gp.b = false; gp.l = false; gp.r = false; gp.extOut = false; gp.extIn = false;
+      if (gamepadIndex === null || !navigator.getGamepads) return;
+      var pad = navigator.getGamepads()[gamepadIndex];
+      if (!pad) return;
+      gp.swing = gpDeadzone(pad.axes[0] || 0);
+      gp.boom = -gpDeadzone(pad.axes[1] || 0);
+      gp.arm = gpDeadzone(pad.axes[2] || 0);
+      gp.bucket = -gpDeadzone(pad.axes[3] || 0);
+      var b = pad.buttons;
+      gp.f = !!(b[12] && b[12].pressed);
+      gp.b = !!(b[13] && b[13].pressed);
+      gp.l = !!(b[14] && b[14].pressed);
+      gp.r = !!(b[15] && b[15].pressed);
+      gp.extIn = !!(b[4] && b[4].pressed);
+      gp.extOut = !!(b[5] && b[5].pressed);
+      var optionsNow = !!(b[9] && b[9].pressed);
+      if (optionsNow && !gpOptionsPrev) setCam(activeCam === camExternal ? 'cabin' : 'external');
+      gpOptionsPrev = optionsNow;
+    }
 
     window.addEventListener('keydown', function (e) {
       keys[e.key.toLowerCase()] = true;
@@ -945,13 +998,14 @@
     function axis(neg, pos) { return (keys[neg] ? -1 : 0) + (keys[pos] ? 1 : 0); }
 
     function tick(dt) {
-      var swingAxis = clamp(axis('arrowleft', 'arrowright') + stickL.x, -1, 1);
-      var boomAxis = clamp(axis('arrowdown', 'arrowup') + (-stickL.y), -1, 1);
-      var armAxis = clamp(axis('a', 'd') + stickR.x, -1, 1);
-      var bucketAxis = clamp(axis('s', 'w') + (-stickR.y), -1, 1);
-      var extAxis = clamp(axis('q', 'e') + (extBtn.out ? 1 : 0) + (extBtn.in ? -1 : 0), -1, 1);
-      var tF = trackBtn.f || keys['i'], tB = trackBtn.b || keys['k'];
-      var tL = trackBtn.l || keys['j'], tR = trackBtn.r || keys['l'];
+      pollGamepad();
+      var swingAxis = clamp(axis('arrowleft', 'arrowright') + stickL.x + gp.swing, -1, 1);
+      var boomAxis = clamp(axis('arrowdown', 'arrowup') + (-stickL.y) + gp.boom, -1, 1);
+      var armAxis = clamp(axis('a', 'd') + stickR.x + gp.arm, -1, 1);
+      var bucketAxis = clamp(axis('s', 'w') + (-stickR.y) + gp.bucket, -1, 1);
+      var extAxis = clamp(axis('q', 'e') + (extBtn.out || gp.extOut ? 1 : 0) + (extBtn.in || gp.extIn ? -1 : 0), -1, 1);
+      var tF = trackBtn.f || keys['i'] || gp.f, tB = trackBtn.b || keys['k'] || gp.b;
+      var tL = trackBtn.l || keys['j'] || gp.l, tR = trackBtn.r || keys['l'] || gp.r;
 
       ctrl.swing += swingAxis * SWING_SPEED * dt;
       ctrl.boom = clamp(ctrl.boom + boomAxis * BOOM_SPEED * dt, BOOM_MIN, BOOM_MAX);
@@ -1008,16 +1062,13 @@
     }
 
     // ---------- toggle de cámara ----------
-    document.getElementById('btnCamExt').addEventListener('click', function () {
-      activeCam = camExternal;
-      this.classList.add('active');
-      document.getElementById('btnCamCab').classList.remove('active');
-    });
-    document.getElementById('btnCamCab').addEventListener('click', function () {
-      activeCam = camCabin;
-      this.classList.add('active');
-      document.getElementById('btnCamExt').classList.remove('active');
-    });
+    function setCam(which) {
+      activeCam = which === 'cabin' ? camCabin : camExternal;
+      document.getElementById('btnCamExt').classList.toggle('active', which !== 'cabin');
+      document.getElementById('btnCamCab').classList.toggle('active', which === 'cabin');
+    }
+    document.getElementById('btnCamExt').addEventListener('click', function () { setCam('external'); });
+    document.getElementById('btnCamCab').addEventListener('click', function () { setCam('cabin'); });
     document.getElementById('btnReset').addEventListener('click', resetTerrain);
     document.getElementById('btnEmptyTruck').addEventListener('click', emptyTruck);
 
