@@ -307,11 +307,14 @@
     // cuchara real: piezas del Group43 que forman la cuchara de fábrica (identificadas por
     // posición+material). Se reenganchan al pivote de MI cuchara articulada en vez de
     // descartarse junto con la pluma/brazo de fábrica.
-    var BUCKET_MESH_NAMES = ['Mesh372', 'Mesh371', 'Mesh373', 'Mesh375', 'Mesh374', 'Mesh376'];
-    var BUCKET_PIVOT_X = -3583, BUCKET_PIVOT_Y = 2354, BUCKET_PIVOT_Z = -1854; // mm, crudo
-    // la cuchara, a diferencia del resto del vehículo, fue modelada apuntando derecho por
-    // el eje crudo -X (sin el sesgo de 30° del chasis) así que usa 90°, no MODEL_ROTATE_Y.
-    var BUCKET_ROTATE_Y = Math.PI / 2;
+    var BUCKET_MESH_NAMES = ['Mesh372', 'Mesh371', 'Mesh373', 'Mesh375', 'Mesh374', 'Mesh376', 'Mesh365', 'Mesh366'];
+    // pivote real: confirmado por distancia mínima entre vértices (Mesh365/366 tocan al
+    // brazo en Y~4000-4500 y a Mesh372 en su extremo X~-5140 — el "oído"/eslabón sube
+    // desde ahí, NO desde el otro extremo como se había asumido antes).
+    var BUCKET_PIVOT_X = -5146, BUCKET_PIVOT_Y = 2070, BUCKET_PIVOT_Z = -1854; // mm, crudo
+    // con el pivote en este extremo, el diente/filo queda hacia +X crudo, así que la
+    // rotación va en sentido contrario (-90°) para que ese lado termine en +Z (adelante).
+    var BUCKET_ROTATE_Y = -Math.PI / 2;
 
     function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
     function lerp(a, b, t) { return a + (b - a) * t; }
@@ -856,8 +859,8 @@
       if (bucketFound > 0) {
         // la cuchara real reemplaza a la de referencia: reubica el punto de excavación
         // (bucketTip) y el indicador de carga sobre la geometría real recién agregada.
-        bucketTip.position.set(0, -1.31, 1.56);
-        dirtMound.position.set(0, -0.9, 0.9);
+        bucketTip.position.set(0, -1.03, 1.56);
+        dirtMound.position.set(0, -0.5, 0.8);
         bucketPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
         bucketPlaceholderParts.length = 0;
       } else {
