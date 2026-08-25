@@ -318,21 +318,29 @@
     // dirección de manejo (machine.heading), en vez de quedar cruzadas en diagonal.
     var MODEL_ROTATE_Y = Math.PI * 2 / 3;
 
-    // cuchara real: piezas del Group43 que forman la cuchara de fábrica (identificadas por
-    // posición+material). Se reenganchan al pivote de MI cuchara articulada en vez de
-    // descartarse junto con la pluma/brazo de fábrica.
-    var BUCKET_MESH_NAMES = ['Mesh372', 'Mesh371', 'Mesh373', 'Mesh375', 'Mesh374', 'Mesh376', 'Mesh365', 'Mesh366'];
-    // pivote real: confirmado por distancia mínima entre vértices (Mesh365/366 tocan al
-    // brazo en Y~4000-4500 y a Mesh372 en su extremo X~-5140 — el "oído"/eslabón sube
-    // desde ahí, NO desde el otro extremo como se había asumido antes).
+    // cuchara real: SOLO Mesh372 (confirmado por el usuario probando el inspector de
+    // piezas — todo lo demás del cluster es el brazo y su mecanismo, no la cuchara).
+    var BUCKET_MESH_NAMES = ['Mesh372'];
     var BUCKET_PIVOT_X = -5146, BUCKET_PIVOT_Y = 2070, BUCKET_PIVOT_Z = -1854; // mm, crudo
-    // con el pivote en este extremo, el diente/filo queda hacia +X crudo, así que la
-    // rotación va en sentido contrario (-90°) para que ese lado termine en +Z (adelante).
     var BUCKET_ROTATE_Y = -Math.PI / 2;
-    // la pluma+brazo+cuchara del .obj quedaron congeladas en una pose con la cuchara
-    // curvada "boca arriba" (posición de traslado/reposo), no lista para cavar. Esta
-    // rotación extra en X corrige el asiento para que en reposo quede boca abajo.
-    var BUCKET_PITCH_FIX = Math.PI;
+    // valores encontrados por el usuario con el panel de ajuste en vivo (?debug=1)
+    var BUCKET_PITCH_FIX = -2.4260; // -139°
+    var BUCKET_ROLL_FIX = Math.PI; // 180°
+
+    // brazo real: el resto del cluster (Mesh365 = brazo, Mesh366 = hidráulico del brazo,
+    // y el resto son piezas del mecanismo — pines, bulones, eslabones) que se mueven
+    // todas juntas, rígidas, con el brazo (ctrl.arm). Se reenganchan a armSeg en vez de
+    // a la cuchara. Pivote y giros son un primer valor de partida: ajustar con el panel
+    // de ajuste en vivo (?debug=1) igual que se hizo con la cuchara.
+    var ARM_MESH_NAMES = [
+      'Mesh365', 'Mesh366', 'Mesh371', 'Mesh373', 'Mesh374', 'Mesh375', 'Mesh376',
+      'Mesh363', 'Mesh364', 'Mesh377', 'Mesh378', 'Mesh379', 'Mesh380', 'Mesh381', 'Mesh382',
+      'Mesh384', 'Mesh385', 'Mesh386', 'Mesh387', 'Mesh388', 'Mesh389', 'Mesh390', 'Mesh391', 'Mesh392'
+    ];
+    var ARM_PIVOT_X = -150, ARM_PIVOT_Y = 1300, ARM_PIVOT_Z = -1854; // mm, crudo — punto de partida
+    var ARM_ROTATE_Y = -Math.PI / 2;
+    var ARM_PITCH_FIX = 0;
+    var ARM_ROLL_FIX = 0;
 
     function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
     function lerp(a, b, t) { return a + (b - a) * t; }
@@ -451,14 +459,15 @@
     var turretPivot, boomSeg, armSeg, extender, bucketTip, dirtMound, machineRoot, bucketGroup, truckFill;
     var placeholderParts = [];
     var bucketPlaceholderParts = []; // cuchara de referencia: solo se retira si aparece la real
+    var armPlaceholderParts = []; // brazo de referencia: solo se retira si aparece el real
     var bucketRawMeshes = []; // {mesh, raw}: geometría SIN transformar, para poder re-aplicar en vivo desde el panel de ajuste
     var DEBUG_MODE = location.search.indexOf('debug=1') >= 0;
     // piezas cargadas del modelo real, agrupadas para el inspector del panel de debug
-    var debugParts = { cuchara: [], brazoDescartado: [], porGrupo: {} };
+    var debugParts = { cuchara: [], brazo: [], sinIdentificar: [], porGrupo: {} };
     var bucketTune = {
       yawDeg: BUCKET_ROTATE_Y * 180 / Math.PI,
       pitchDeg: BUCKET_PITCH_FIX * 180 / Math.PI,
-      rollDeg: 0,
+      rollDeg: BUCKET_ROLL_FIX * 180 / Math.PI,
       dX: 0, dY: 0, dZ: 0
     };
     function applyBucketTransform() {
@@ -469,6 +478,27 @@
         g.rotateY(bucketTune.yawDeg * Math.PI / 180);
         g.rotateX(bucketTune.pitchDeg * Math.PI / 180);
         g.rotateZ(bucketTune.rollDeg * Math.PI / 180);
+        g.scale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
+        item.mesh.geometry = g;
+      });
+    }
+
+    var armRawMeshes = []; // {mesh, raw}: mismo mecanismo que bucketRawMeshes, para el brazo real
+    var armRealGroup = null; // group colgado de armSeg.root que aloja las piezas reales del brazo
+    var armTune = {
+      yawDeg: ARM_ROTATE_Y * 180 / Math.PI,
+      pitchDeg: ARM_PITCH_FIX * 180 / Math.PI,
+      rollDeg: ARM_ROLL_FIX * 180 / Math.PI,
+      dX: 0, dY: 0, dZ: 0
+    };
+    function applyArmTransform() {
+      armRawMeshes.forEach(function (item) {
+        item.mesh.geometry.dispose();
+        var g = item.raw.clone();
+        g.translate(-(ARM_PIVOT_X + armTune.dX), -(ARM_PIVOT_Y + armTune.dY), -(ARM_PIVOT_Z + armTune.dZ));
+        g.rotateY(armTune.yawDeg * Math.PI / 180);
+        g.rotateX(armTune.pitchDeg * Math.PI / 180);
+        g.rotateZ(armTune.rollDeg * Math.PI / 180);
         g.scale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
         item.mesh.geometry = g;
       });
@@ -702,6 +732,11 @@
       armSeg = makeSegment(2.05, 0.27, 0.3, YELLOW_DK);
       armSeg.root.rotation.x = -ctrl.arm;
       boomSeg.end.add(armSeg.root);
+      armPlaceholderParts.push(armSeg.mesh); // se oculta si el brazo real carga bien
+
+      // grupo que aloja las piezas reales del brazo (Mesh365 + mecanismo + hidráulico)
+      armRealGroup = new THREE.Group();
+      armSeg.root.add(armRealGroup);
 
       // extensor tipo boom (brazo telescópico)
       extender = buildExtender(armSeg.end, 0.22, 0.24);
@@ -905,7 +940,7 @@
 
       // 2) clasificar y recién ahí transformar/reparentar/descartar
       var box = new THREE.Box3();
-      var bucketFound = 0;
+      var bucketFound = 0, armFound = 0;
       meshes.forEach(function (o) {
         var toks = (o.name || '').trim().split(/\s+/);
         var meshId = toks[0];
@@ -924,12 +959,24 @@
           return;
         }
 
+        if (isUpperWorks && ARM_MESH_NAMES.indexOf(meshId) >= 0) {
+          // pieza real del brazo (Mesh365 = brazo, Mesh366 = hidráulico, resto = mecanismo):
+          // se reengancha rígida al pivote del brazo propio (armSeg), no a la cuchara.
+          o.castShadow = true; o.receiveShadow = true;
+          o.position.set(0, 0, 0); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1);
+          armRawMeshes.push({ mesh: o, raw: o.geometry.clone() });
+          armRealGroup.add(o);
+          armFound++;
+          debugParts.brazo.push({ id: meshId, mesh: o });
+          return;
+        }
+
         box.setFromObject(o);
         var cx = (box.min.x + box.max.x) / 2;
         if (isUpperWorks && cx < MODEL_ARM_CUT_X) {
-          // pluma/brazo de fábrica: descartados (queda la propia, articulada). En modo
-          // debug se conservan ocultos (misma transformación que la torreta) para poder
-          // prenderlos uno por uno y ver qué pieza es cada cual.
+          // lo que queda acá (si algo queda) no se identificó todavía. En modo debug se
+          // conserva oculto (misma transformación que la torreta) para poder prenderlo y
+          // ver qué es; en uso normal se descarta.
           if (!DEBUG_MODE) { if (o.geometry) o.geometry.dispose(); return; }
           o.castShadow = true; o.receiveShadow = true;
           o.geometry.translate(-MODEL_CHASSIS_X, -MODEL_TURRET_BASE_Y, -MODEL_CHASSIS_Z);
@@ -938,7 +985,7 @@
           o.position.set(0, 0, 0); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1);
           o.visible = false;
           turretPivot.add(o);
-          debugParts.brazoDescartado.push({ id: meshId, mesh: o });
+          debugParts.sinIdentificar.push({ id: meshId, mesh: o });
           return;
         }
         o.castShadow = true; o.receiveShadow = true;
@@ -970,10 +1017,19 @@
         dirtMound.position.set(0, -0.28, 0.45);
         bucketPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
         bucketPlaceholderParts.length = 0;
-        if (DEBUG_MODE) setupDebugPanel();
       } else {
         console.warn('No se identificaron las piezas de la cuchara real; se mantiene la cuchara de referencia.');
       }
+
+      if (armFound > 0) {
+        applyArmTransform();
+        armPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
+        armPlaceholderParts.length = 0;
+      } else {
+        console.warn('No se identificaron las piezas del brazo real; se mantiene el brazo de referencia.');
+      }
+
+      if (DEBUG_MODE) setupDebugPanel();
     }
 
     // ---------- panel de ajuste en vivo (?debug=1) ----------
@@ -1010,7 +1066,8 @@
       }
       var sections = [
         { title: 'Cuchara', items: toItems(debugParts.cuchara, 'cuchara', true) },
-        { title: 'Pluma / Brazo (descartados)', items: toItems(debugParts.brazoDescartado, 'brazo', false) },
+        { title: 'Brazo (Mesh365 + mecanismo + hidráulico)', items: toItems(debugParts.brazo, 'brazo', true) },
+        { title: 'Sin identificar todavía', items: toItems(debugParts.sinIdentificar, 'sinid', false) },
         { title: 'Torreta + Cabina', items: groupItems('torreta', true) },
         { title: 'Chasis + Orugas', items: groupItems('chasis', true) }
       ];
@@ -1030,22 +1087,27 @@
           '</details>';
       }).join('');
 
+      // ---- bloque de sliders de giro/pivote, genérico (se usa 2 veces: cuchara y brazo) ----
+      function tuneBlockHtml(prefix, title, tune) {
+        return '<div style="font-weight:bold;color:#eab308;margin:12px 0 8px">' + title + '</div>' +
+          row(prefix + 'Yaw', 'Giro Y (yaw)', -180, 180, 1, tune.yawDeg.toFixed(0)) +
+          row(prefix + 'Pitch', 'Inclinación X (pitch)', -180, 180, 1, tune.pitchDeg.toFixed(0)) +
+          row(prefix + 'Roll', 'Rolido Z (roll)', -180, 180, 1, tune.rollDeg.toFixed(0)) +
+          '<div style="border-top:1px solid #30363d;margin:8px 0;padding-top:8px;color:#8b949e">Pivote (mm, ajuste fino)</div>' +
+          row(prefix + 'PX', 'X pivote', -1500, 1500, 5, tune.dX) +
+          row(prefix + 'PY', 'Y pivote', -1500, 1500, 5, tune.dY) +
+          row(prefix + 'PZ', 'Z pivote', -1500, 1500, 5, tune.dZ) +
+          '<pre id="' + prefix + 'Readout" style="white-space:pre-wrap;background:#161b22;padding:8px;border-radius:6px;border:1px solid #30363d;color:#7ee787;margin:8px 0"></pre>' +
+          '<button id="' + prefix + 'Copy" type="button" style="width:100%;padding:6px;background:#eab308;color:#1a1300;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-family:inherit">Copiar valores</button>';
+      }
+
       wrap.innerHTML =
-        '<div style="font-weight:bold;color:#eab308;margin-bottom:8px">🔧 Ajuste cuchara (debug)</div>' +
-        row('dbgYaw', 'Giro Y (yaw)', -180, 180, 1, bucketTune.yawDeg.toFixed(0)) +
-        row('dbgPitch', 'Inclinación X (pitch)', -180, 180, 1, bucketTune.pitchDeg.toFixed(0)) +
-        row('dbgRoll', 'Rolido Z (roll)', -180, 180, 1, bucketTune.rollDeg.toFixed(0)) +
-        '<div style="border-top:1px solid #30363d;margin:8px 0;padding-top:8px;color:#8b949e">Pivote (mm, ajuste fino)</div>' +
-        row('dbgPX', 'X pivote', -1500, 1500, 5, bucketTune.dX) +
-        row('dbgPY', 'Y pivote', -1500, 1500, 5, bucketTune.dY) +
-        row('dbgPZ', 'Z pivote', -1500, 1500, 5, bucketTune.dZ) +
-        '<div style="border-top:1px solid #30363d;margin:8px 0;padding-top:8px;color:#8b949e">Pose (para ver desde otro ángulo)</div>' +
+        tuneBlockHtml('dbgB', '🔧 Ajuste cuchara (Mesh372)', bucketTune) +
+        tuneBlockHtml('dbgA', '🔧 Ajuste brazo (Mesh365 + mecanismo)', armTune) +
+        '<div style="border-top:1px solid #30363d;margin:12px 0 8px;padding-top:8px;color:#8b949e">Pose (para ver desde otro ángulo)</div>' +
         row('dbgBoom', 'Pluma', BOOM_MIN.toFixed(2), BOOM_MAX.toFixed(2), 0.01, ctrl.boom.toFixed(2)) +
-        row('dbgArm', 'Brazo', ARM_MIN.toFixed(2), ARM_MAX.toFixed(2), 0.01, ctrl.arm.toFixed(2)) +
+        row('dbgArmPose', 'Brazo', ARM_MIN.toFixed(2), ARM_MAX.toFixed(2), 0.01, ctrl.arm.toFixed(2)) +
         row('dbgExt', 'Extensor', 0, 1, 0.01, ctrl.ext.toFixed(2)) +
-        '<div style="border-top:1px solid #30363d;margin:8px 0;padding-top:8px"></div>' +
-        '<pre id="dbgReadout" style="white-space:pre-wrap;background:#161b22;padding:8px;border-radius:6px;border:1px solid #30363d;color:#7ee787;margin:0 0 8px"></pre>' +
-        '<button id="dbgCopy" type="button" style="width:100%;padding:6px;background:#eab308;color:#1a1300;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-family:inherit">Copiar valores</button>' +
         '<div style="border-top:1px solid #30363d;margin:10px 0 8px;padding-top:8px;font-weight:bold;color:#eab308">👁️ Piezas (mostrar / ocultar)</div>' +
         sectionsHtml;
 
@@ -1068,32 +1130,46 @@
         });
       });
 
-      function updateReadout() {
-        var t = document.getElementById('dbgReadout');
-        t.textContent =
-          'BUCKET_ROTATE_Y = ' + (bucketTune.yawDeg * Math.PI / 180).toFixed(4) + ';  // ' + bucketTune.yawDeg.toFixed(0) + '°\n' +
-          'BUCKET_PITCH_FIX = ' + (bucketTune.pitchDeg * Math.PI / 180).toFixed(4) + ';  // ' + bucketTune.pitchDeg.toFixed(0) + '°\n' +
-          'BUCKET_ROLL_FIX = ' + (bucketTune.rollDeg * Math.PI / 180).toFixed(4) + ';  // ' + bucketTune.rollDeg.toFixed(0) + '°\n' +
-          'BUCKET_PIVOT_X = ' + (BUCKET_PIVOT_X + bucketTune.dX).toFixed(0) + ';\n' +
-          'BUCKET_PIVOT_Y = ' + (BUCKET_PIVOT_Y + bucketTune.dY).toFixed(0) + ';\n' +
-          'BUCKET_PIVOT_Z = ' + (BUCKET_PIVOT_Z + bucketTune.dZ).toFixed(0) + ';';
-      }
-
-      function bindSlider(id, valId, onChange) {
-        var el = document.getElementById(id), valEl = document.getElementById(valId);
-        el.addEventListener('input', function () {
-          valEl.textContent = el.value;
-          onChange(parseFloat(el.value));
-          applyBucketTransform();
-          updateReadout();
+      // ---- conecta un bloque de sliders a su objeto "tune", su función de re-bake y
+      // los nombres de las constantes (para armar el cuadro de valores a copiar) ----
+      function wireTuneBlock(prefix, tune, names, baseX, baseY, baseZ, applyFn) {
+        function updateReadout() {
+          document.getElementById(prefix + 'Readout').textContent =
+            names[0] + ' = ' + (tune.yawDeg * Math.PI / 180).toFixed(4) + ';  // ' + tune.yawDeg.toFixed(0) + '°\n' +
+            names[1] + ' = ' + (tune.pitchDeg * Math.PI / 180).toFixed(4) + ';  // ' + tune.pitchDeg.toFixed(0) + '°\n' +
+            names[2] + ' = ' + (tune.rollDeg * Math.PI / 180).toFixed(4) + ';  // ' + tune.rollDeg.toFixed(0) + '°\n' +
+            names[3] + ' = ' + (baseX + tune.dX).toFixed(0) + ';\n' +
+            names[4] + ' = ' + (baseY + tune.dY).toFixed(0) + ';\n' +
+            names[5] + ' = ' + (baseZ + tune.dZ).toFixed(0) + ';';
+        }
+        function bindSlider(suffix, field) {
+          var el = document.getElementById(prefix + suffix), valEl = document.getElementById(prefix + suffix + 'Val');
+          el.addEventListener('input', function () {
+            valEl.textContent = el.value;
+            tune[field] = parseFloat(el.value);
+            applyFn();
+            updateReadout();
+          });
+        }
+        bindSlider('Yaw', 'yawDeg'); bindSlider('Pitch', 'pitchDeg'); bindSlider('Roll', 'rollDeg');
+        bindSlider('PX', 'dX'); bindSlider('PY', 'dY'); bindSlider('PZ', 'dZ');
+        document.getElementById(prefix + 'Copy').addEventListener('click', function () {
+          var text = document.getElementById(prefix + 'Readout').textContent;
+          var btn = document.getElementById(prefix + 'Copy');
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(function () {
+              var prev = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(function () { btn.textContent = prev; }, 1200);
+            }).catch(function () { window.prompt('Copiá manualmente:', text); });
+          } else {
+            window.prompt('Copiá manualmente:', text);
+          }
         });
+        updateReadout();
       }
-      bindSlider('dbgYaw', 'dbgYawVal', function (v) { bucketTune.yawDeg = v; });
-      bindSlider('dbgPitch', 'dbgPitchVal', function (v) { bucketTune.pitchDeg = v; });
-      bindSlider('dbgRoll', 'dbgRollVal', function (v) { bucketTune.rollDeg = v; });
-      bindSlider('dbgPX', 'dbgPXVal', function (v) { bucketTune.dX = v; });
-      bindSlider('dbgPY', 'dbgPYVal', function (v) { bucketTune.dY = v; });
-      bindSlider('dbgPZ', 'dbgPZVal', function (v) { bucketTune.dZ = v; });
+      wireTuneBlock('dbgB', bucketTune, ['BUCKET_ROTATE_Y', 'BUCKET_PITCH_FIX', 'BUCKET_ROLL_FIX', 'BUCKET_PIVOT_X', 'BUCKET_PIVOT_Y', 'BUCKET_PIVOT_Z'],
+        BUCKET_PIVOT_X, BUCKET_PIVOT_Y, BUCKET_PIVOT_Z, applyBucketTransform);
+      wireTuneBlock('dbgA', armTune, ['ARM_ROTATE_Y', 'ARM_PITCH_FIX', 'ARM_ROLL_FIX', 'ARM_PIVOT_X', 'ARM_PIVOT_Y', 'ARM_PIVOT_Z'],
+        ARM_PIVOT_X, ARM_PIVOT_Y, ARM_PIVOT_Z, applyArmTransform);
 
       function bindPoseSlider(id, valId, setter) {
         var el = document.getElementById(id), valEl = document.getElementById(valId);
@@ -1103,22 +1179,8 @@
         });
       }
       bindPoseSlider('dbgBoom', 'dbgBoomVal', function (v) { ctrl.boom = v; });
-      bindPoseSlider('dbgArm', 'dbgArmVal', function (v) { ctrl.arm = v; });
+      bindPoseSlider('dbgArmPose', 'dbgArmPoseVal', function (v) { ctrl.arm = v; });
       bindPoseSlider('dbgExt', 'dbgExtVal', function (v) { ctrl.ext = v; });
-
-      document.getElementById('dbgCopy').addEventListener('click', function () {
-        var text = document.getElementById('dbgReadout').textContent;
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(text).then(function () {
-            var btn = document.getElementById('dbgCopy');
-            var prev = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(function () { btn.textContent = prev; }, 1200);
-          }).catch(function () { window.prompt('Copiá manualmente:', text); });
-        } else {
-          window.prompt('Copiá manualmente:', text);
-        }
-      });
-
-      updateReadout();
     }
 
     // ---------- cámara externa (orbit manual) ----------
