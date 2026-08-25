@@ -329,6 +329,10 @@
     // con el pivote en este extremo, el diente/filo queda hacia +X crudo, así que la
     // rotación va en sentido contrario (-90°) para que ese lado termine en +Z (adelante).
     var BUCKET_ROTATE_Y = -Math.PI / 2;
+    // la pluma+brazo+cuchara del .obj quedaron congeladas en una pose con la cuchara
+    // curvada "boca arriba" (posición de traslado/reposo), no lista para cavar. Esta
+    // rotación extra en X corrige el asiento para que en reposo quede boca abajo.
+    var BUCKET_PITCH_FIX = Math.PI;
 
     function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
     function lerp(a, b, t) { return a + (b - a) * t; }
@@ -878,6 +882,7 @@
           o.castShadow = true; o.receiveShadow = true;
           o.geometry.translate(-BUCKET_PIVOT_X, -BUCKET_PIVOT_Y, -BUCKET_PIVOT_Z);
           o.geometry.rotateY(BUCKET_ROTATE_Y);
+          o.geometry.rotateX(BUCKET_PITCH_FIX);
           o.geometry.scale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
           o.position.set(0, 0, 0); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1);
           bucketGroup.add(o);
@@ -912,8 +917,8 @@
       if (bucketFound > 0) {
         // la cuchara real reemplaza a la de referencia: reubica el punto de excavación
         // (bucketTip) y el indicador de carga sobre la geometría real recién agregada.
-        bucketTip.position.set(0, -1.03, 1.56);
-        dirtMound.position.set(0, -0.5, 0.8);
+        bucketTip.position.set(0, -0.5, 0.8);
+        dirtMound.position.set(0, -0.28, 0.45);
         bucketPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
         bucketPlaceholderParts.length = 0;
       } else {
