@@ -453,6 +453,8 @@
     var bucketPlaceholderParts = []; // cuchara de referencia: solo se retira si aparece la real
     var bucketRawMeshes = []; // {mesh, raw}: geometría SIN transformar, para poder re-aplicar en vivo desde el panel de ajuste
     var DEBUG_MODE = location.search.indexOf('debug=1') >= 0;
+    // piezas cargadas del modelo real, agrupadas para el inspector del panel de debug
+    var debugParts = { cuchara: [], brazoDescartado: [], porGrupo: {} };
     var bucketTune = {
       yawDeg: BUCKET_ROTATE_Y * 180 / Math.PI,
       pitchDeg: BUCKET_PITCH_FIX * 180 / Math.PI,
@@ -881,6 +883,20 @@
       });
     }
 
+    // token de "g ..." -> id del grupo de más alto nivel (el que cuelga directo de
+    // Group1/Model) al que pertenece esa malla. Se usa solo para el panel de debug.
+    function topGroupOf(toks) {
+      var i = toks.indexOf('Group1');
+      return i > 0 ? toks[i - 1] : toks[toks.length - 2];
+    }
+    // dentro de Group43 (torreta+cabina) TODO cuelga del mismo grupo de nivel superior
+    // (el propio "Group43"), así que para separar piezas ahí hace falta un nivel más
+    // profundo: el token justo antes de "Group43".
+    function subGroupOf(toks) {
+      var i = toks.indexOf('Group43');
+      return i > 0 ? toks[i - 1] : toks[0];
+    }
+
     function onRealModelLoaded(obj) {
       // 1) recolectar todas las mallas SIN tocar el árbol todavía (reparentar durante
       // el traverse corrompe la recorrida, porque add() saca al hijo de su padre actual)
@@ -904,14 +920,26 @@
           bucketRawMeshes.push({ mesh: o, raw: o.geometry.clone() });
           bucketGroup.add(o);
           bucketFound++;
+          debugParts.cuchara.push({ id: meshId, mesh: o });
           return;
         }
 
         box.setFromObject(o);
         var cx = (box.min.x + box.max.x) / 2;
         if (isUpperWorks && cx < MODEL_ARM_CUT_X) {
-          if (o.geometry) o.geometry.dispose();
-          return; // pluma/brazo de fábrica: descartados (queda la propia, articulada)
+          // pluma/brazo de fábrica: descartados (queda la propia, articulada). En modo
+          // debug se conservan ocultos (misma transformación que la torreta) para poder
+          // prenderlos uno por uno y ver qué pieza es cada cual.
+          if (!DEBUG_MODE) { if (o.geometry) o.geometry.dispose(); return; }
+          o.castShadow = true; o.receiveShadow = true;
+          o.geometry.translate(-MODEL_CHASSIS_X, -MODEL_TURRET_BASE_Y, -MODEL_CHASSIS_Z);
+          o.geometry.rotateY(MODEL_ROTATE_Y);
+          o.geometry.scale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
+          o.position.set(0, 0, 0); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1);
+          o.visible = false;
+          turretPivot.add(o);
+          debugParts.brazoDescartado.push({ id: meshId, mesh: o });
+          return;
         }
         o.castShadow = true; o.receiveShadow = true;
         // recentra en el eje de giro (y, para la torreta, en su base) y pasa a metros;
@@ -925,6 +953,9 @@
         o.rotation.set(0, 0, 0);
         o.scale.set(1, 1, 1);
         if (isUpperWorks) turretPivot.add(o); else machineRoot.add(o);
+
+        var gid = isUpperWorks ? ('torreta:' + subGroupOf(toks)) : ('chasis:' + topGroupOf(toks));
+        (debugParts.porGrupo[gid] = debugParts.porGrupo[gid] || []).push(o);
       });
 
       turretPivot.position.set(0, MODEL_TURRET_BASE_Y * MODEL_SCALE, 0);
@@ -962,6 +993,43 @@
           '</div>';
       }
 
+      // ---- inspector de piezas: una sección colapsable por categoría, con un
+      // checkbox por pieza (o por grupo, para torreta/chasis donde hay demasiadas
+      // mallas sueltas como para listarlas una por una con sentido) ----
+      function toItems(list, prefix, defaultVisible) {
+        return list.map(function (p) { return { label: p.id, meshes: [p.mesh], defaultVisible: defaultVisible }; });
+      }
+      function groupItems(prefix, defaultVisible) {
+        return Object.keys(debugParts.porGrupo)
+          .filter(function (k) { return k.indexOf(prefix + ':') === 0; })
+          .sort()
+          .map(function (k) {
+            var ms = debugParts.porGrupo[k];
+            return { label: k.slice(prefix.length + 1) + ' (' + ms.length + ' mallas)', meshes: ms, defaultVisible: defaultVisible };
+          });
+      }
+      var sections = [
+        { title: 'Cuchara', items: toItems(debugParts.cuchara, 'cuchara', true) },
+        { title: 'Pluma / Brazo (descartados)', items: toItems(debugParts.brazoDescartado, 'brazo', false) },
+        { title: 'Torreta + Cabina', items: groupItems('torreta', true) },
+        { title: 'Chasis + Orugas', items: groupItems('chasis', true) }
+      ];
+      var sectionsHtml = sections.map(function (sec, si) {
+        var rows = sec.items.map(function (it, ii) {
+          return '<label style="display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer">' +
+            '<input type="checkbox" data-sec="' + si + '" data-item="' + ii + '"' + (it.defaultVisible ? ' checked' : '') + '>' +
+            '<span>' + it.label + '</span></label>';
+        }).join('') || '<div style="color:#8b949e;padding:2px 0">(vacío)</div>';
+        return '<details' + (si === 0 ? ' open' : '') + ' style="margin-bottom:6px">' +
+          '<summary style="cursor:pointer">' + sec.title + ' (' + sec.items.length + ')</summary>' +
+          '<div style="display:flex;gap:6px;margin:5px 0">' +
+          '<button type="button" class="dbgShowAll" data-sec="' + si + '" style="flex:1;font-size:10px;padding:3px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:4px;cursor:pointer">Mostrar todo</button>' +
+          '<button type="button" class="dbgHideAll" data-sec="' + si + '" style="flex:1;font-size:10px;padding:3px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:4px;cursor:pointer">Ocultar todo</button>' +
+          '</div>' +
+          '<div style="max-height:150px;overflow:auto;border:1px solid #30363d;border-radius:6px;padding:4px 6px">' + rows + '</div>' +
+          '</details>';
+      }).join('');
+
       wrap.innerHTML =
         '<div style="font-weight:bold;color:#eab308;margin-bottom:8px">🔧 Ajuste cuchara (debug)</div>' +
         row('dbgYaw', 'Giro Y (yaw)', -180, 180, 1, bucketTune.yawDeg.toFixed(0)) +
@@ -977,9 +1045,28 @@
         row('dbgExt', 'Extensor', 0, 1, 0.01, ctrl.ext.toFixed(2)) +
         '<div style="border-top:1px solid #30363d;margin:8px 0;padding-top:8px"></div>' +
         '<pre id="dbgReadout" style="white-space:pre-wrap;background:#161b22;padding:8px;border-radius:6px;border:1px solid #30363d;color:#7ee787;margin:0 0 8px"></pre>' +
-        '<button id="dbgCopy" type="button" style="width:100%;padding:6px;background:#eab308;color:#1a1300;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-family:inherit">Copiar valores</button>';
+        '<button id="dbgCopy" type="button" style="width:100%;padding:6px;background:#eab308;color:#1a1300;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-family:inherit">Copiar valores</button>' +
+        '<div style="border-top:1px solid #30363d;margin:10px 0 8px;padding-top:8px;font-weight:bold;color:#eab308">👁️ Piezas (mostrar / ocultar)</div>' +
+        sectionsHtml;
 
       document.body.appendChild(wrap);
+
+      wrap.querySelectorAll('input[type="checkbox"][data-sec]').forEach(function (chk) {
+        chk.addEventListener('change', function () {
+          var it = sections[+chk.dataset.sec].items[+chk.dataset.item];
+          it.meshes.forEach(function (m) { m.visible = chk.checked; });
+        });
+      });
+      wrap.querySelectorAll('.dbgShowAll, .dbgHideAll').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var vis = btn.classList.contains('dbgShowAll');
+          var sec = +btn.dataset.sec;
+          wrap.querySelectorAll('input[type="checkbox"][data-sec="' + sec + '"]').forEach(function (chk) {
+            chk.checked = vis;
+            sections[sec].items[+chk.dataset.item].meshes.forEach(function (m) { m.visible = vis; });
+          });
+        });
+      });
 
       function updateReadout() {
         var t = document.getElementById('dbgReadout');
