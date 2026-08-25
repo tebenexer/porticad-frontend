@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Simulador de Retroexcavadora — PortiCAD Multi-Tools</title>
+<link rel="icon" href="/favicon.png" type="image/png" />
+<link rel="shortcut icon" href="/favicon.png" />
+<style>
+  /* ---- topbar del sitio (PortiCAD Multi-Tools) ---- */
+  .topbar {
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    min-height: 50px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 8px 16px;
+    gap: 8px;
+    flex: 0 0 auto;
+    position: sticky; top: 0; z-index: 100;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  .topbar-logo { font-size: 16px; font-weight: 700; color: #58a6ff; text-decoration: none; }
+  .topbar-sep  { color: #30363d; font-size: 18px; }
+  .topbar-crumb { font-size: 14px; color: #8b949e; display: flex; align-items: center; gap: 6px; }
+  .topbar-title { font-size: 15px; font-weight: 600; color: #e6edf3; }
+  .topbar .badge {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 20px;
+    text-transform: none; letter-spacing: normal;
+  }
+
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel-translucent: rgba(22,27,34,.90); --border: #30363d;
+    --primary: #eab308; --primary-hover: #facc15;
+    --text: #e6edf3; --muted: #8b949e;
+    --success: #3fb950; --danger: #f85149;
+    --shadow: 0 2px 10px rgba(0,0,0,.45);
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.4;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  header {
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 10px 18px; display: flex; align-items: center; flex-wrap: wrap;
+    gap: 8px 16px; flex: 0 0 auto;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 200px; }
+  .logo-icon {
+    width: 34px; height: 34px; border-radius: 8px;
+    background: linear-gradient(135deg, #f2b632, #d97706);
+    display: flex; align-items: center; justify-content: center; font-size: 17px;
+  }
+  .logo h1 { font-size: 1.02rem; font-weight: 700; }
+  .logo p { font-size: 0.72rem; color: var(--muted); }
+  .header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .btn {
+    padding: 7px 13px; border-radius: 8px; border: 1px solid var(--border);
+    background: #21262d; cursor: pointer; display: inline-flex;
+    align-items: center; gap: 6px; transition: all .15s; color: var(--text);
+    font-size: 0.8rem; font-weight: 600; font-family: inherit;
+  }
+  .btn:hover { background: #2d333b; }
+  .btn-primary { background: var(--primary); color: #1a1300; border-color: var(--primary); }
+  .btn-primary:hover { background: var(--primary-hover); }
+
+  .main { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; background: #b9d7e8; }
+  #view3d { position: absolute; inset: 0; }
+  #view3d canvas { display: block; touch-action: none; }
+
+  /* ---- HUD ---- */
+  #hud {
+    position: absolute; top: 10px; left: 10px; z-index: 20;
+    background: var(--panel-translucent); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 10px 14px; font-size: 0.78rem; color: var(--text); box-shadow: var(--shadow);
+    backdrop-filter: blur(6px); min-width: 168px;
+  }
+  #hud .row { display: flex; justify-content: space-between; gap: 14px; padding: 2px 0; }
+  #hud .row b { color: var(--primary); }
+  #hud .bar-outer { background: #30363d; border-radius: 6px; height: 7px; margin-top: 4px; overflow: hidden; }
+  #hud .bar-inner { background: var(--primary); height: 100%; width: 0%; transition: width .1s linear; }
+
+  #topRight { position: absolute; top: 10px; right: 10px; z-index: 20; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+  .iconbtn {
+    background: var(--panel-translucent); border: 1px solid var(--border); color: var(--text);
+    border-radius: 10px; padding: 8px 12px; font-size: 0.78rem; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: var(--shadow);
+    backdrop-filter: blur(6px); font-family: inherit;
+  }
+  .iconbtn:hover { background: #21262d; }
+  .iconbtn.active { background: var(--primary); color: #1a1300; border-color: var(--primary); }
+
+  #legend {
+    background: var(--panel-translucent); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 10px 12px; font-size: 0.7rem; color: var(--muted); max-width: 210px; box-shadow: var(--shadow);
+    backdrop-filter: blur(6px); display: none;
+  }
+  #legend.open { display: block; }
+  #legend b { color: var(--text); }
+  #legend .lgrow { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+  #legend kbd { background: #30363d; border-radius: 4px; padding: 1px 5px; font-family: monospace; color: var(--text); }
+
+  /* ---- controles inferiores ---- */
+  #controls {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 20;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    padding: 10px 14px 14px; pointer-events: none;
+  }
+  .stickblock { pointer-events: auto; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .stickblock .lbl { font-size: 0.62rem; font-weight: 700; color: var(--text); background: var(--panel-translucent); padding: 2px 8px; border-radius: 6px; letter-spacing: .04em; }
+  .stick-base {
+    width: 108px; height: 108px; border-radius: 50%;
+    background: rgba(22,27,34,.55); border: 2px solid rgba(230,237,243,.25);
+    position: relative; touch-action: none; backdrop-filter: blur(3px);
+  }
+  .stick-base::before, .stick-base::after {
+    content: ''; position: absolute; background: rgba(230,237,243,.15);
+  }
+  .stick-base::before { left: 50%; top: 8px; bottom: 8px; width: 1px; transform: translateX(-50%); }
+  .stick-base::after { top: 50%; left: 8px; right: 8px; height: 1px; transform: translateY(-50%); }
+  .stick-knob {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #facc15, #b45309);
+    border: 2px solid #1a1300; position: absolute; left: 50%; top: 50%;
+    margin-left: -22px; margin-top: -22px; box-shadow: 0 2px 6px rgba(0,0,0,.5);
+    touch-action: none; cursor: grab;
+  }
+
+  .extrow { display: flex; gap: 4px; }
+  .extbtn {
+    background: rgba(22,27,34,.6); border: 1px solid rgba(230,237,243,.25); border-radius: 6px;
+    color: var(--text); font-size: 0.58rem; font-weight: 700; padding: 4px 6px;
+    touch-action: none; cursor: pointer; font-family: inherit; white-space: nowrap;
+  }
+  .extbtn:active, .extbtn.pressed { background: var(--primary); color: #1a1300; }
+
+  #trackpad { pointer-events: auto; display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 4px; }
+  #trackpad .lbl { font-size: 0.62rem; font-weight: 700; color: var(--text); background: var(--panel-translucent); padding: 2px 8px; border-radius: 6px; letter-spacing: .04em; }
+  .tgrid { display: grid; grid-template-columns: repeat(3, 38px); grid-template-rows: repeat(2, 34px); gap: 4px; }
+  .tbtn {
+    background: rgba(22,27,34,.6); border: 1px solid rgba(230,237,243,.25); border-radius: 8px;
+    color: var(--text); display: flex; align-items: center; justify-content: center;
+    font-size: 15px; user-select: none; touch-action: none; cursor: pointer;
+  }
+  .tbtn:active, .tbtn.pressed { background: var(--primary); color: #1a1300; }
+  .tbtn.empty { visibility: hidden; }
+
+  @media (max-width: 640px) {
+    .stick-base { width: 86px; height: 86px; }
+    .stick-knob { width: 36px; height: 36px; margin-left: -18px; margin-top: -18px; }
+    #legend { max-width: 160px; font-size: 0.64rem; }
+    .logo p { display: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <a class="topbar-logo" href="/">PortiCAD</a>
+    <span class="topbar-sep">›</span>
+    <div class="topbar-crumb"><span>Multi-Tools</span><span>›</span><span class="topbar-title">Simulador de Retroexcavadora</span></div>
+    <span class="badge" style="background:#eab30822;border:1px solid #eab30855;color:#eab308;">Maquinaria</span>
+    <span class="badge" style="background:#f0b42922;border:1px solid #f0b42955;color:#f0b429;">🧪 Beta</span>
+  </div>
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🚜</div>
+      <div>
+        <h1>Simulador de Retroexcavadora</h1>
+        <p>Controles de cabina · giro, pluma, brazo extensible, cuchara y orugas · excavación de terreno y carga de camión</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn" id="btnLegend" type="button">❔ Controles</button>
+      <button class="btn" id="btnReset" type="button">↺ Reiniciar terreno</button>
+      <button class="btn" id="btnEmptyTruck" type="button">🚛 Vaciar camión</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <div id="view3d"></div>
+
+    <div id="hud">
+      <div class="row"><span>Excavado</span><b id="hudVol">0.00 m³</b></div>
+      <div class="row"><span>Carga cuchara</span><b id="hudLoad">0%</b></div>
+      <div class="bar-outer"><div class="bar-inner" id="hudLoadBar"></div></div>
+      <div class="row" style="margin-top:8px"><span>Camión (17 m³)</span><b id="hudTruck">0.00 / 17.00 m³</b></div>
+      <div class="bar-outer"><div class="bar-inner" id="hudTruckBar" style="background:#f97316"></div></div>
+    </div>
+
+    <div id="topRight">
+      <button class="iconbtn active" id="btnCamExt" type="button">🌐 Vista externa</button>
+      <button class="iconbtn" id="btnCamCab" type="button">🚜 Vista cabina</button>
+      <div id="legend">
+        <div class="lgrow"><b>Palanca izq.</b><span>giro / pluma</span></div>
+        <div class="lgrow"><span>teclado</span><span><kbd>←</kbd><kbd>→</kbd> giro</span></div>
+        <div class="lgrow"><span></span><span><kbd>↑</kbd><kbd>↓</kbd> pluma</span></div>
+        <div class="lgrow" style="margin-top:6px"><b>Palanca der.</b><span>brazo / cuchara</span></div>
+        <div class="lgrow"><span>teclado</span><span><kbd>A</kbd><kbd>D</kbd> brazo</span></div>
+        <div class="lgrow"><span></span><span><kbd>W</kbd><kbd>S</kbd> cuchara</span></div>
+        <div class="lgrow" style="margin-top:6px"><b>Extensor</b><span>brazo telescópico</span></div>
+        <div class="lgrow"><span>teclado</span><span><kbd>Q</kbd> retrae · <kbd>E</kbd> extiende</span></div>
+        <div class="lgrow" style="margin-top:6px"><b>Orugas</b><span>avanzar / girar</span></div>
+        <div class="lgrow"><span>teclado</span><span><kbd>I</kbd><kbd>K</kbd><kbd>J</kbd><kbd>L</kbd></span></div>
+        <div class="lgrow" style="margin-top:6px"><b>Camión</b><span>volcá encima de la batea</span></div>
+      </div>
+    </div>
+
+    <div id="controls">
+      <div class="stickblock">
+        <div class="stick-base" id="stickL"><div class="stick-knob" id="knobL"></div></div>
+        <div class="lbl">GIRO · PLUMA</div>
+      </div>
+
+      <div id="trackpad">
+        <div class="tgrid">
+          <div class="tbtn empty"></div>
+          <div class="tbtn" id="tF">▲</div>
+          <div class="tbtn empty"></div>
+          <div class="tbtn" id="tL">◀</div>
+          <div class="tbtn empty"></div>
+          <div class="tbtn" id="tR">▶</div>
+          <div class="tbtn empty"></div>
+          <div class="tbtn" id="tB">▼</div>
+          <div class="tbtn empty"></div>
+        </div>
+        <div class="lbl">ORUGAS</div>
+      </div>
+
+      <div class="stickblock">
+        <div class="extrow">
+          <button class="extbtn" id="extIn" type="button" title="Retraer (Q)">◄▮ RET</button>
+          <button class="extbtn" id="extOut" type="button" title="Extender (E)">▮► EXT</button>
+        </div>
+        <div class="stick-base" id="stickR"><div class="stick-knob" id="knobR"></div></div>
+        <div class="lbl">BRAZO · CUCHARA</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/MTLLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+  <script>
+  (function () {
+    'use strict';
+
+    // ========================= CONFIG =========================
+    var TERRAIN_W = 22, TERRAIN_D = 18, SEG_X = 66, SEG_Z = 54;
+    var CELL_W = TERRAIN_W / SEG_X, CELL_D = TERRAIN_D / SEG_Z, CELL_AREA = CELL_W * CELL_D;
+    var MIN_DEPTH = -2.4, MAX_PILE = 1.6;
+    var DIG_RADIUS = 0.55, PILE_RADIUS = 0.65;
+    var BUCKET_CAPACITY = 0.55; // m3 aprox
+
+    var SWING_SPEED = 0.9, BOOM_SPEED = 0.7, ARM_SPEED = 0.8, BUCKET_SPEED = 1.1;
+    var BOOM_MIN = -0.10, BOOM_MAX = 1.05;
+    var ARM_MIN = -2.35, ARM_MAX = -0.25;
+    var BUCKET_MIN = -0.35, BUCKET_MAX = 2.05;
+    var DUMP_ANGLE = 1.35; // curl por encima de esto + arriba del terreno = vuelca
+    var DRIVE_SPEED = 1.6, TURN_SPEED = 0.55;
+    var EXT_SPEED = 0.7, EXT_MIN = 0, EXT_MAX = 1, EXT_STROKE = 0.85; // brazo telescópico (0=retraído, 1=extendido)
+    var EXT_SLEEVE_LEN = 0.55, EXT_ROD_LEN = 0.9;
+
+    var YELLOW = 0xffca08, YELLOW_DK = 0xe0a800, STEEL = 0x2d333b, DARK = 0x1c2128, GLASS = 0x8ecdf0; // amarillo calibrado con el modelo real
+
+    // perfil curvo del cucharón (z=profundidad hacia adelante, y=altura) — pivote en (0,0)
+    var BUCKET_W = 0.52;
+    var BK = [
+      { z: 0.00, y: 0.08 },
+      { z: 0.02, y: -0.48 },
+      { z: 0.14, y: -0.66 },
+      { z: 0.32, y: -0.70 },
+      { z: 0.50, y: -0.60 },
+      { z: 0.64, y: -0.40 }
+    ];
+
+    // camión de 17 m³ que se puede cargar con la cuchara
+    var TRUCK_CAPACITY = 17;
+    var TRUCK_POS = { x: 6.4, z: -2.5 };
+    var BED_W = 2.1, BED_L = 4.3, BED_FLOOR_Y = 1.15, BED_WALL_H = 0.85;
+    var CAB_OFF = -(BED_L / 2 + 0.65);
+    var TRUCK_BED = {
+      minX: TRUCK_POS.x - BED_W / 2, maxX: TRUCK_POS.x + BED_W / 2,
+      minZ: TRUCK_POS.z - BED_L / 2, maxZ: TRUCK_POS.z + BED_L / 2
+    };
+
+    // modelo real (SketchUp -> OBJ) de la máquina: reemplaza chasis/orugas/torreta/cabina
+    // "de fábrica" (queda la pluma-brazo-cuchara propia, articulada, salvo la cuchara real
+    // que también se reengancha). Datos de calibración obtenidos analizando el .obj
+    // (unidades = milímetros, eje Y = arriba).
+    var MODEL_SCALE = 0.001;
+    var MODEL_CHASSIS_X = 1121.5, MODEL_CHASSIS_Z = -1724.5; // centro del chasis (mm, crudo)
+    var MODEL_TURRET_BASE_Y = 875; // altura donde arranca la torreta (mm, crudo)
+    var MODEL_ARM_CUT_X = 0; // piezas de la torreta (Group43) con centro X < esto = pluma/brazo de fábrica (se descartan)
+    // el chasis+orugas del .obj NO están alineados con los ejes crudos (están ~30° en
+    // diagonal, confirmado por PCA de los vértices de las orugas: eje principal a -150°/+30°
+    // respecto a +X). Con 120° en vez de 90° las orugas quedan realmente paralelas a la
+    // dirección de manejo (machine.heading), en vez de quedar cruzadas en diagonal.
+    var MODEL_ROTATE_Y = Math.PI * 2 / 3;
+
+    // cuchara real: piezas del Group43 que forman la cuchara de fábrica (identificadas por
+    // posición+material). Se reenganchan al pivote de MI cuchara articulada en vez de
+    // descartarse junto con la pluma/brazo de fábrica.
+    var BUCKET_MESH_NAMES = ['Mesh372', 'Mesh371', 'Mesh373', 'Mesh375', 'Mesh374', 'Mesh376'];
+    var BUCKET_PIVOT_X = -3583, BUCKET_PIVOT_Y = 2354, BUCKET_PIVOT_Z = -1854; // mm, crudo
+    // la cuchara, a diferencia del resto del vehículo, fue modelada apuntando derecho por
+    // el eje crudo -X (sin el sesgo de 30° del chasis) así que usa 90°, no MODEL_ROTATE_Y.
+    var BUCKET_ROTATE_Y = Math.PI / 2;
+
+    function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+    function lerp(a, b, t) { return a + (b - a) * t; }
+
+    // ========================= ESTADO =========================
+    var ctrl = { swing: 0.35, boom: 0.7, arm: -1.0, bucket: 0.5, ext: 0 }; // pose inicial: cuchara despejada del suelo
+    var machine = { x: 0, z: -6, heading: 0 };
+    var bucketLoad = 0, totalExcavated = 0, truckLoad = 0;
+
+    var keys = {};
+    var stickL = { x: 0, y: 0 }, stickR = { x: 0, y: 0 };
+    var trackBtn = { f: false, b: false, l: false, r: false };
+    var extBtn = { out: false, in: false };
+
+    window.addEventListener('keydown', function (e) {
+      keys[e.key.toLowerCase()] = true;
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.key) >= 0) e.preventDefault();
+    });
+    window.addEventListener('keyup', function (e) {
+      keys[e.key.toLowerCase()] = false;
+    });
+
+    function setupStick(baseId, knobId, out) {
+      var base = document.getElementById(baseId), knob = document.getElementById(knobId);
+      var active = false, pid = null;
+      function apply(e) {
+        var rect = base.getBoundingClientRect();
+        var cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+        var dx = e.clientX - cx, dy = e.clientY - cy;
+        var maxR = rect.width / 2 - 14;
+        var dist = Math.hypot(dx, dy);
+        if (dist > maxR) { dx *= maxR / dist; dy *= maxR / dist; }
+        knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+        out.x = dx / maxR; out.y = dy / maxR;
+      }
+      base.addEventListener('pointerdown', function (e) {
+        active = true; pid = e.pointerId;
+        try { base.setPointerCapture(pid); } catch (err) {}
+        apply(e);
+      });
+      base.addEventListener('pointermove', function (e) { if (active && e.pointerId === pid) apply(e); });
+      function release(e) {
+        if (e.pointerId !== pid) return;
+        active = false; knob.style.transform = 'translate(0,0)'; out.x = 0; out.y = 0;
+      }
+      base.addEventListener('pointerup', release);
+      base.addEventListener('pointercancel', release);
+      window.addEventListener('pointerup', release);
+    }
+    setupStick('stickL', 'knobL', stickL);
+    setupStick('stickR', 'knobR', stickR);
+
+    function setupHold(id, flagObj, key) {
+      var el = document.getElementById(id);
+      function on(e) { e.preventDefault(); flagObj[key] = true; el.classList.add('pressed'); }
+      function off() { flagObj[key] = false; el.classList.remove('pressed'); }
+      el.addEventListener('pointerdown', on);
+      el.addEventListener('pointerup', off);
+      el.addEventListener('pointercancel', off);
+      el.addEventListener('pointerleave', off);
+    }
+    setupHold('tF', trackBtn, 'f');
+    setupHold('tB', trackBtn, 'b');
+    setupHold('tL', trackBtn, 'l');
+    setupHold('tR', trackBtn, 'r');
+    setupHold('extOut', extBtn, 'out');
+    setupHold('extIn', extBtn, 'in');
+
+    document.getElementById('btnLegend').addEventListener('click', function () {
+      document.getElementById('legend').classList.toggle('open');
+    });
+
+    // ========================= THREE.JS =========================
+    var VIEW = document.getElementById('view3d');
+    var renderer, scene, camExternal, camCabin, activeCam;
+    var terrainMesh, terrainGeo, heights, colors;
+    var turretPivot, boomSeg, armSeg, extender, bucketTip, dirtMound, machineRoot, bucketGroup, truckFill;
+    var placeholderParts = [];
+    var bucketPlaceholderParts = []; // cuchara de referencia: solo se retira si aparece la real
+
+    function currentSize() { return { w: VIEW.clientWidth || 800, h: VIEW.clientHeight || 500 }; }
+
+    function initThree() {
+      var sz = currentSize();
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xbcd7e8);
+      scene.fog = new THREE.Fog(0xbcd7e8, 26, 55);
+
+      camExternal = new THREE.PerspectiveCamera(45, sz.w / sz.h, 0.1, 200);
+      camExternal.position.set(11, 9, 14);
+      camCabin = new THREE.PerspectiveCamera(62, sz.w / sz.h, 0.05, 200);
+      activeCam = camExternal;
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(sz.w, sz.h);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.domElement.style.touchAction = 'none';
+      VIEW.appendChild(renderer.domElement);
+
+      scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+      var sun = new THREE.DirectionalLight(0xffffff, 0.95);
+      sun.position.set(14, 20, 8); sun.castShadow = true;
+      sun.shadow.camera.left = -20; sun.shadow.camera.right = 20;
+      sun.shadow.camera.top = 20; sun.shadow.camera.bottom = -20;
+      sun.shadow.mapSize.set(1024, 1024);
+      scene.add(sun);
+      var fill = new THREE.DirectionalLight(0xaad4ff, 0.35);
+      fill.position.set(-10, 8, -6); scene.add(fill);
+
+      buildTerrain();
+      buildMachine();
+      buildTruck();
+      loadRealModel();
+      setupExternalOrbit();
+      window.addEventListener('resize', onResize);
+      // el contenedor puede reportar tamaño 0 en el primer tick antes de que
+      // el layout flex termine de calcularse; se corrige apenas hay un frame listo.
+      requestAnimationFrame(function () { onResize(); requestAnimationFrame(animate); });
+    }
+
+    // ---------- terreno deformable ----------
+    function buildTerrain() {
+      terrainGeo = new THREE.PlaneGeometry(TERRAIN_W, TERRAIN_D, SEG_X, SEG_Z);
+      terrainGeo.rotateX(-Math.PI / 2);
+      var n = (SEG_X + 1) * (SEG_Z + 1);
+      heights = new Float32Array(n);
+      colors = new Float32Array(n * 3);
+      paintAllColors();
+      terrainGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      var mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0.02 });
+      terrainMesh = new THREE.Mesh(terrainGeo, mat);
+      terrainMesh.receiveShadow = true;
+      scene.add(terrainMesh);
+    }
+    function vIndex(ix, iz) { return iz * (SEG_X + 1) + ix; }
+    function colorForHeight(h, out, offset) {
+      var c1 = [0.36, 0.60, 0.30], c2 = [0.42, 0.30, 0.18]; // pasto -> tierra
+      var t = h < 0 ? clamp(-h / 0.45, 0, 1) : clamp(h / 0.18, 0, 1);
+      out[offset] = lerp(c1[0], c2[0], t);
+      out[offset + 1] = lerp(c1[1], c2[1], t);
+      out[offset + 2] = lerp(c1[2], c2[2], t);
+    }
+    function paintAllColors() {
+      for (var iz = 0; iz <= SEG_Z; iz++) {
+        for (var ix = 0; ix <= SEG_X; ix++) {
+          var i = vIndex(ix, iz);
+          colorForHeight(heights[i], colors, i * 3);
+        }
+      }
+    }
+    function resetTerrain() {
+      heights.fill(0);
+      var pos = terrainGeo.attributes.position;
+      for (var i = 0; i < heights.length; i++) pos.setY(i, 0);
+      paintAllColors();
+      terrainGeo.attributes.color.needsUpdate = true;
+      pos.needsUpdate = true;
+      terrainGeo.computeVertexNormals();
+      totalExcavated = 0; bucketLoad = 0;
+    }
+    function heightAtGrid(ix, iz) {
+      ix = clamp(ix, 0, SEG_X); iz = clamp(iz, 0, SEG_Z);
+      return heights[vIndex(ix, iz)];
+    }
+    function worldToGrid(x, z) {
+      return { gx: (x + TERRAIN_W / 2) / CELL_W, gz: (z + TERRAIN_D / 2) / CELL_D };
+    }
+    function heightAtWorld(x, z) {
+      var g = worldToGrid(x, z);
+      var ix0 = Math.floor(g.gx), iz0 = Math.floor(g.gz);
+      var fx = g.gx - ix0, fz = g.gz - iz0;
+      var h00 = heightAtGrid(ix0, iz0), h10 = heightAtGrid(ix0 + 1, iz0);
+      var h01 = heightAtGrid(ix0, iz0 + 1), h11 = heightAtGrid(ix0 + 1, iz0 + 1);
+      return lerp(lerp(h00, h10, fx), lerp(h01, h11, fx), fz);
+    }
+    var terrainDirty = false;
+    function deformAt(x, z, radius, targetFn) {
+      var g = worldToGrid(x, z);
+      var rCells = Math.ceil(radius / Math.min(CELL_W, CELL_D)) + 1;
+      var ixc = Math.round(g.gx), izc = Math.round(g.gz);
+      var pos = terrainGeo.attributes.position;
+      for (var iz = izc - rCells; iz <= izc + rCells; iz++) {
+        if (iz < 0 || iz > SEG_Z) continue;
+        for (var ix = ixc - rCells; ix <= ixc + rCells; ix++) {
+          if (ix < 0 || ix > SEG_X) continue;
+          var wx = ix * CELL_W - TERRAIN_W / 2, wz = iz * CELL_D - TERRAIN_D / 2;
+          var d = Math.hypot(wx - x, wz - z);
+          if (d > radius) continue;
+          var falloff = 1 - d / radius;
+          var idx = vIndex(ix, iz);
+          var changed = targetFn(idx, falloff);
+          if (changed) {
+            colorForHeight(heights[idx], colors, idx * 3);
+            pos.setY(idx, heights[idx]);
+            terrainDirty = true;
+          }
+        }
+      }
+    }
+    function digAt(x, z, tipY) {
+      var target = Math.max(tipY, MIN_DEPTH);
+      deformAt(x, z, DIG_RADIUS, function (idx, falloff) {
+        var h = heights[idx];
+        var newH = lerp(h, target, falloff * 0.35);
+        if (newH < h - 0.0004) {
+          var removed = (h - newH) * CELL_AREA;
+          totalExcavated += removed;
+          bucketLoad = clamp(bucketLoad + removed, 0, BUCKET_CAPACITY);
+          heights[idx] = newH;
+          return true;
+        }
+        return false;
+      });
+    }
+    function pileAt(x, z, amountPerSec, dt) {
+      var give = amountPerSec * dt;
+      deformAt(x, z, PILE_RADIUS, function (idx, falloff) {
+        var h = heights[idx];
+        var add = give * falloff * 0.6;
+        var newH = Math.min(h + add, MAX_PILE);
+        if (newH > h + 0.0002) { heights[idx] = newH; return true; }
+        return false;
+      });
+      bucketLoad = clamp(bucketLoad - give, 0, BUCKET_CAPACITY);
+    }
+
+    // ---------- máquina ----------
+    function makeSegment(length, width, height, color) {
+      var g = new THREE.Group();
+      var geo = new THREE.BoxGeometry(width, height, length);
+      geo.translate(0, 0, length / 2);
+      var mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: color, roughness: 0.55, metalness: 0.35 }));
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      g.add(mesh);
+      var end = new THREE.Group(); end.position.set(0, 0, length);
+      g.add(end);
+      return { root: g, end: end, mesh: mesh };
+    }
+
+    function buildMachine() {
+      var mroot = new THREE.Group();
+      mroot.position.set(machine.x, 0, machine.z);
+      scene.add(mroot);
+      machineRoot = mroot;
+
+      // chasis/orugas/torreta/cabina "de referencia": se ven mientras carga el modelo
+      // real (OBJ de SketchUp) y se ocultan apenas ese modelo está listo.
+      // orugas
+      var trackMat = new THREE.MeshStandardMaterial({ color: DARK, roughness: 0.8 });
+      [-1, 1].forEach(function (side) {
+        var tr = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.5, 3.7), trackMat);
+        tr.position.set(side * 1.05, 0.28, 0);
+        tr.castShadow = true; tr.receiveShadow = true;
+        mroot.add(tr);
+        placeholderParts.push(tr);
+      });
+      // chasis inferior
+      var chassis = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.55, 2.9), new THREE.MeshStandardMaterial({ color: STEEL, roughness: 0.6, metalness: 0.4 }));
+      chassis.position.set(0, 0.75, 0); chassis.castShadow = true; chassis.receiveShadow = true;
+      mroot.add(chassis);
+      placeholderParts.push(chassis);
+
+      // torreta (gira = swing)
+      turretPivot = new THREE.Group();
+      turretPivot.position.set(0, 1.05, 0.1);
+      mroot.add(turretPivot);
+
+      var turretBody = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.1, 0.5, 16), new THREE.MeshStandardMaterial({ color: YELLOW, roughness: 0.5, metalness: 0.3 }));
+      turretBody.position.y = 0.25; turretBody.castShadow = true; turretBody.receiveShadow = true;
+      turretPivot.add(turretBody);
+      placeholderParts.push(turretBody);
+
+      // cabina (desplazada del eje del brazo para tener visión)
+      var cabinGroup = new THREE.Group();
+      cabinGroup.position.set(-0.75, 0.5, -0.35);
+      turretPivot.add(cabinGroup);
+      placeholderParts.push(cabinGroup);
+      var cabinBody = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.25, 1.25), new THREE.MeshStandardMaterial({ color: YELLOW_DK, roughness: 0.5, metalness: 0.3 }));
+      cabinBody.position.y = 0.62; cabinBody.castShadow = true;
+      cabinGroup.add(cabinBody);
+      var glassFront = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.85, 0.06), new THREE.MeshStandardMaterial({ color: GLASS, roughness: 0.1, metalness: 0.6, transparent: true, opacity: 0.55 }));
+      glassFront.position.set(0, 0.75, 0.66);
+      cabinGroup.add(glassFront);
+
+      // cámara de cabina: montada en la torreta (sigue el giro, no la pluma).
+      // Posición calibrada dentro de la cabina real (modelo SketchUp) una vez cargado;
+      // este valor es el de referencia mientras se usa el chasis provisorio.
+      camCabin.position.set(-0.13, 1.55, 1.1);
+      camCabin.rotation.y = Math.PI; // mirar hacia +Z (donde está la pluma)
+      turretPivot.add(camCabin);
+
+      // contrapeso
+      var cw = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.6, 0.5), new THREE.MeshStandardMaterial({ color: DARK, roughness: 0.6 }));
+      cw.position.set(0, 0.55, -1.05); cw.castShadow = true;
+      turretPivot.add(cw);
+      placeholderParts.push(cw);
+
+      // pluma (boom)
+      boomSeg = makeSegment(2.7, 0.34, 0.4, YELLOW);
+      boomSeg.root.position.set(0.32, 0.55, 0.55);
+      boomSeg.root.rotation.x = -ctrl.boom;
+      turretPivot.add(boomSeg.root);
+
+      // brazo (arm / stick)
+      armSeg = makeSegment(2.05, 0.27, 0.3, YELLOW_DK);
+      armSeg.root.rotation.x = -ctrl.arm;
+      boomSeg.end.add(armSeg.root);
+
+      // extensor tipo boom (brazo telescópico)
+      extender = buildExtender(armSeg.end, 0.22, 0.24);
+
+      // cuchara (bucket) — perfil curvo de referencia (BK); se reemplaza por la cuchara
+      // real del modelo SketchUp apenas termina de cargar (ver onRealModelLoaded).
+      bucketGroup = new THREE.Group();
+      bucketGroup.rotation.x = -ctrl.bucket;
+      extender.end.add(bucketGroup);
+      var bmat = new THREE.MeshStandardMaterial({ color: STEEL, roughness: 0.5, metalness: 0.5 });
+
+      for (var bi = 0; bi < BK.length - 1; bi++) {
+        var pA = BK[bi], pB = BK[bi + 1];
+        var dz = pB.z - pA.z, dy = pB.y - pA.y;
+        var segLen = Math.hypot(dz, dy);
+        var plateGeo = new THREE.BoxGeometry(BUCKET_W, 0.05, segLen);
+        plateGeo.translate(0, 0, segLen / 2);
+        var plate = new THREE.Mesh(plateGeo, bmat);
+        plate.position.set(0, pA.y, pA.z);
+        plate.rotation.x = Math.atan2(-dy, dz);
+        plate.castShadow = true; plate.receiveShadow = true;
+        bucketGroup.add(plate);
+        bucketPlaceholderParts.push(plate);
+      }
+      [-1, 1].forEach(function (side) {
+        var sideShape = new THREE.Shape();
+        sideShape.moveTo(BK[0].z, BK[0].y);
+        for (var si = 1; si < BK.length; si++) sideShape.lineTo(BK[si].z, BK[si].y);
+        sideShape.lineTo(BK[BK.length - 1].z, BK[0].y + 0.02);
+        sideShape.lineTo(BK[0].z, BK[0].y);
+        var sideGeo = new THREE.ExtrudeGeometry(sideShape, { depth: 0.035, bevelEnabled: false });
+        var sm = new THREE.Mesh(sideGeo, bmat);
+        sm.position.set(side * (BUCKET_W / 2), 0, 0);
+        sm.rotation.y = side > 0 ? Math.PI / 2 : -Math.PI / 2;
+        sm.castShadow = true;
+        bucketGroup.add(sm);
+        bucketPlaceholderParts.push(sm);
+      });
+      var tipP = BK[BK.length - 1], prevP = BK[BK.length - 2];
+      var toothAngle = Math.atan2(-(tipP.y - prevP.y), tipP.z - prevP.z);
+      for (var t = -2; t <= 2; t++) {
+        var tooth = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.17, 6), bmat);
+        tooth.position.set(t * (BUCKET_W / 5.2), tipP.y, tipP.z);
+        tooth.rotation.x = Math.PI / 2 - toothAngle;
+        tooth.castShadow = true;
+        bucketGroup.add(tooth);
+        bucketPlaceholderParts.push(tooth);
+      }
+      bucketTip = new THREE.Object3D();
+      bucketTip.position.set(0, tipP.y, tipP.z);
+      bucketGroup.add(bucketTip);
+
+      dirtMound = new THREE.Mesh(new THREE.SphereGeometry(0.001, 8, 6), new THREE.MeshStandardMaterial({ color: 0x5a4326, roughness: 1 }));
+      dirtMound.position.set(0, (BK[1].y + BK[3].y) / 2 + 0.12, (BK[1].z + BK[3].z) / 2);
+      bucketGroup.add(dirtMound);
+    }
+
+    // ---------- extensor tipo boom (telescópico) ----------
+    function buildExtender(parent, width, height) {
+      var extRoot = new THREE.Group();
+      parent.add(extRoot);
+      var mat = new THREE.MeshStandardMaterial({ color: YELLOW_DK, roughness: 0.5, metalness: 0.35 });
+
+      var sleeveGeo = new THREE.BoxGeometry(width, height, EXT_SLEEVE_LEN);
+      sleeveGeo.translate(0, 0, EXT_SLEEVE_LEN / 2);
+      var sleeve = new THREE.Mesh(sleeveGeo, mat);
+      sleeve.castShadow = true; sleeve.receiveShadow = true;
+      extRoot.add(sleeve);
+
+      var rodGroup = new THREE.Group();
+      extRoot.add(rodGroup);
+      var rodMat = new THREE.MeshStandardMaterial({ color: STEEL, roughness: 0.4, metalness: 0.55 });
+      var rodGeo = new THREE.BoxGeometry(width * 0.72, height * 0.72, EXT_ROD_LEN);
+      rodGeo.translate(0, 0, EXT_ROD_LEN / 2);
+      var rod = new THREE.Mesh(rodGeo, rodMat);
+      rod.castShadow = true;
+      rodGroup.add(rod);
+
+      var end = new THREE.Group();
+      end.position.set(0, 0, EXT_ROD_LEN);
+      rodGroup.add(end);
+
+      return { root: extRoot, rodGroup: rodGroup, end: end };
+    }
+
+    // ---------- camión de 17 m³ ----------
+    function buildTruck() {
+      var root = new THREE.Group();
+      root.position.set(TRUCK_POS.x, 0, TRUCK_POS.z);
+      scene.add(root);
+
+      var cabinMat = new THREE.MeshStandardMaterial({ color: 0xd64545, roughness: 0.5, metalness: 0.3 });
+      var chassisMat = new THREE.MeshStandardMaterial({ color: DARK, roughness: 0.7 });
+      var bedMat = new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.6, metalness: 0.35 });
+      var wheelMat = new THREE.MeshStandardMaterial({ color: 0x111418, roughness: 0.9 });
+
+      var frame = new THREE.Mesh(new THREE.BoxGeometry(BED_W + 0.15, 0.3, BED_L + 2.0), chassisMat);
+      frame.position.set(0, 0.68, CAB_OFF / 2);
+      frame.castShadow = true; frame.receiveShadow = true;
+      root.add(frame);
+
+      var cab = new THREE.Mesh(new THREE.BoxGeometry(BED_W - 0.1, 1.15, 1.3), cabinMat);
+      cab.position.set(0, 1.28, CAB_OFF); cab.castShadow = true;
+      root.add(cab);
+      var cabGlass = new THREE.Mesh(new THREE.BoxGeometry(BED_W - 0.3, 0.5, 0.06),
+        new THREE.MeshStandardMaterial({ color: GLASS, roughness: 0.1, metalness: 0.6, transparent: true, opacity: 0.55 }));
+      cabGlass.position.set(0, 1.45, CAB_OFF + 0.66);
+      root.add(cabGlass);
+
+      var floor = new THREE.Mesh(new THREE.BoxGeometry(BED_W, 0.1, BED_L), bedMat);
+      floor.position.set(0, BED_FLOOR_Y - 0.05, 0);
+      floor.castShadow = true; floor.receiveShadow = true;
+      root.add(floor);
+
+      [-1, 1].forEach(function (side) {
+        var wall = new THREE.Mesh(new THREE.BoxGeometry(0.08, BED_WALL_H, BED_L), bedMat);
+        wall.position.set(side * (BED_W / 2), BED_FLOOR_Y + BED_WALL_H / 2, 0);
+        wall.castShadow = true;
+        root.add(wall);
+      });
+      var frontWall = new THREE.Mesh(new THREE.BoxGeometry(BED_W, BED_WALL_H, 0.08), bedMat);
+      frontWall.position.set(0, BED_FLOOR_Y + BED_WALL_H / 2, -BED_L / 2);
+      root.add(frontWall);
+      var backWall = new THREE.Mesh(new THREE.BoxGeometry(BED_W, BED_WALL_H * 0.55, 0.08), bedMat);
+      backWall.position.set(0, BED_FLOOR_Y + BED_WALL_H * 0.275, BED_L / 2);
+      root.add(backWall);
+
+      var wheelZs = [CAB_OFF + 0.35, BED_L / 2 - 0.9, BED_L / 2 - 0.1];
+      wheelZs.forEach(function (wz) {
+        [-1, 1].forEach(function (side) {
+          var wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.32, 14), wheelMat);
+          wheel.rotation.z = Math.PI / 2;
+          wheel.position.set(side * (BED_W / 2 + 0.12), 0.42, wz);
+          wheel.castShadow = true;
+          root.add(wheel);
+        });
+      });
+
+      var fillGeo = new THREE.BoxGeometry(BED_W - 0.28, BED_WALL_H + 0.2, BED_L - 0.28);
+      fillGeo.translate(0, (BED_WALL_H + 0.2) / 2, 0);
+      truckFill = new THREE.Mesh(fillGeo, new THREE.MeshStandardMaterial({ color: 0x5a4326, roughness: 1 }));
+      truckFill.position.set(0, BED_FLOOR_Y, 0);
+      truckFill.scale.y = 0.001;
+      root.add(truckFill);
+    }
+    function isOverTruckBed(x, z) {
+      return x > TRUCK_BED.minX && x < TRUCK_BED.maxX && z > TRUCK_BED.minZ && z < TRUCK_BED.maxZ;
+    }
+    function fillTruck(amountPerSec, dt) {
+      var give = Math.min(amountPerSec * dt, bucketLoad, TRUCK_CAPACITY - truckLoad);
+      if (give <= 0) return;
+      truckLoad += give; bucketLoad -= give;
+      truckFill.scale.y = Math.max(0.001, truckLoad / TRUCK_CAPACITY);
+    }
+    function emptyTruck() {
+      truckLoad = 0;
+      if (truckFill) truckFill.scale.y = 0.001;
+    }
+
+    // ---------- modelo real (SketchUp -> OBJ) ----------
+    // Reemplaza el chasis/orugas/torreta/cabina "de referencia" por el modelo real del
+    // usuario. La torreta (Group43 en el .obj) viene soldada de fábrica con pluma+brazo+
+    // cuchara incluidos; pluma y brazo se descartan (queda la propia, articulada), pero la
+    // cuchara real (BUCKET_MESH_NAMES) se reengancha al pivote de la cuchara propia.
+    function loadRealModel() {
+      if (typeof THREE.MTLLoader !== 'function' || typeof THREE.OBJLoader !== 'function') return;
+      var mtlLoader = new THREE.MTLLoader();
+      mtlLoader.setPath('modelo/');
+      mtlLoader.load('excavadora.mtl', function (materials) {
+        materials.preload();
+        var objLoader = new THREE.OBJLoader();
+        objLoader.setMaterials(materials);
+        objLoader.setPath('modelo/');
+        objLoader.load('excavadora.obj', onRealModelLoaded, undefined, function (err) {
+          console.warn('No se pudo cargar excavadora.obj, se mantiene la máquina de referencia.', err);
+        });
+      }, undefined, function (err) {
+        console.warn('No se pudo cargar excavadora.mtl, se mantiene la máquina de referencia.', err);
+      });
+    }
+
+    function onRealModelLoaded(obj) {
+      // 1) recolectar todas las mallas SIN tocar el árbol todavía (reparentar durante
+      // el traverse corrompe la recorrida, porque add() saca al hijo de su padre actual)
+      var meshes = [];
+      obj.traverse(function (o) { if (o.isMesh) meshes.push(o); });
+
+      // 2) clasificar y recién ahí transformar/reparentar/descartar
+      var box = new THREE.Box3();
+      var bucketFound = 0;
+      meshes.forEach(function (o) {
+        var toks = (o.name || '').trim().split(/\s+/);
+        var meshId = toks[0];
+        var isUpperWorks = toks.indexOf('Group43') >= 0;
+
+        if (isUpperWorks && BUCKET_MESH_NAMES.indexOf(meshId) >= 0) {
+          // pieza real de la cuchara: se reengancha al pivote de la cuchara articulada
+          // propia. Usa su propio eje (90°) en vez de MODEL_ROTATE_Y: en el .obj la
+          // cuchara quedó posada derecho sobre -X, sin el sesgo de 30° del chasis.
+          o.castShadow = true; o.receiveShadow = true;
+          o.geometry.translate(-BUCKET_PIVOT_X, -BUCKET_PIVOT_Y, -BUCKET_PIVOT_Z);
+          o.geometry.rotateY(BUCKET_ROTATE_Y);
+          o.geometry.scale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
+          o.position.set(0, 0, 0); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1);
+          bucketGroup.add(o);
+          bucketFound++;
+          return;
+        }
+
+        box.setFromObject(o);
+        var cx = (box.min.x + box.max.x) / 2;
+        if (isUpperWorks && cx < MODEL_ARM_CUT_X) {
+          if (o.geometry) o.geometry.dispose();
+          return; // pluma/brazo de fábrica: descartados (queda la propia, articulada)
+        }
+        o.castShadow = true; o.receiveShadow = true;
+        // recentra en el eje de giro (y, para la torreta, en su base) y pasa a metros;
+        // MODEL_ROTATE_Y corrige el sesgo de ~30° con el que quedó modelado el chasis
+        // (confirmado por PCA de las orugas) para que la dirección de manejo coincida
+        // con hacia dónde apuntan realmente las orugas.
+        o.geometry.translate(-MODEL_CHASSIS_X, isUpperWorks ? -MODEL_TURRET_BASE_Y : 0, -MODEL_CHASSIS_Z);
+        o.geometry.rotateY(MODEL_ROTATE_Y);
+        o.geometry.scale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
+        o.position.set(0, 0, 0);
+        o.rotation.set(0, 0, 0);
+        o.scale.set(1, 1, 1);
+        if (isUpperWorks) turretPivot.add(o); else machineRoot.add(o);
+      });
+
+      turretPivot.position.set(0, MODEL_TURRET_BASE_Y * MODEL_SCALE, 0);
+      placeholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
+      placeholderParts.length = 0;
+
+      if (bucketFound > 0) {
+        // la cuchara real reemplaza a la de referencia: reubica el punto de excavación
+        // (bucketTip) y el indicador de carga sobre la geometría real recién agregada.
+        bucketTip.position.set(0, -1.31, 1.56);
+        dirtMound.position.set(0, -0.9, 0.9);
+        bucketPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
+        bucketPlaceholderParts.length = 0;
+      } else {
+        console.warn('No se identificaron las piezas de la cuchara real; se mantiene la cuchara de referencia.');
+      }
+    }
+
+    // ---------- cámara externa (orbit manual) ----------
+    var orbitTarget = new THREE.Vector3(0, 1, -3);
+    function setupExternalOrbit() {
+      var dom = renderer.domElement;
+      var pointers = {}, panning = false, pinchDist = null, pinchMid = null;
+      function rotateBy(dx, dy) {
+        var sph = new THREE.Spherical().setFromVector3(camExternal.position.clone().sub(orbitTarget));
+        sph.theta -= dx * 0.01;
+        sph.phi = clamp(sph.phi - dy * 0.01, 0.15, Math.PI - 0.1);
+        camExternal.position.setFromSpherical(sph).add(orbitTarget);
+        camExternal.lookAt(orbitTarget);
+      }
+      function panBy(dx, dy) {
+        var dist = camExternal.position.distanceTo(orbitTarget);
+        var sp = dist * 0.0016;
+        var right = new THREE.Vector3(1, 0, 0).applyQuaternion(camExternal.quaternion).multiplyScalar(-dx * sp);
+        var up = new THREE.Vector3(0, 1, 0).applyQuaternion(camExternal.quaternion).multiplyScalar(dy * sp);
+        camExternal.position.add(right).add(up); orbitTarget.add(right).add(up);
+        camExternal.lookAt(orbitTarget);
+      }
+      function dollyBy(delta) {
+        var dir = new THREE.Vector3().subVectors(camExternal.position, orbitTarget).normalize();
+        var d = camExternal.position.distanceTo(orbitTarget);
+        if (d + delta < 3 || d + delta > 45) return;
+        camExternal.position.addScaledVector(dir, delta);
+      }
+      dom.addEventListener('pointerdown', function (e) {
+        if (activeCam !== camExternal) return;
+        if (e.button === 1) panning = true;
+        pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+      });
+      function up(e) { panning = false; delete pointers[e.pointerId]; pinchDist = null; pinchMid = null; }
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
+      window.addEventListener('pointermove', function (e) {
+        if (activeCam !== camExternal || !pointers[e.pointerId]) return;
+        var prev = pointers[e.pointerId];
+        var dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+        pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+        var ids = Object.keys(pointers);
+        if (ids.length >= 2) {
+          var a = pointers[ids[0]], b = pointers[ids[1]];
+          var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+          var dist = Math.hypot(a.x - b.x, a.y - b.y);
+          if (pinchMid) panBy(mx - pinchMid.x, my - pinchMid.y);
+          if (pinchDist != null) dollyBy((pinchDist - dist) * 0.02);
+          pinchMid = { x: mx, y: my }; pinchDist = dist;
+        } else if (panning) { panBy(dx, dy); }
+        else { rotateBy(dx, dy); }
+      });
+      dom.addEventListener('wheel', function (e) {
+        if (activeCam !== camExternal) return;
+        e.preventDefault(); dollyBy(e.deltaY * 0.012);
+      }, { passive: false });
+      camExternal.lookAt(orbitTarget);
+    }
+
+    function onResize() {
+      var sz = currentSize();
+      camExternal.aspect = sz.w / sz.h; camExternal.updateProjectionMatrix();
+      camCabin.aspect = sz.w / sz.h; camCabin.updateProjectionMatrix();
+      renderer.setSize(sz.w, sz.h);
+    }
+
+    // ========================= LOOP =========================
+    var last = 0;
+    function animate(ts) {
+      requestAnimationFrame(animate);
+      var dt = Math.min(0.05, (ts - last) / 1000 || 0);
+      last = ts;
+      tick(dt);
+      renderer.render(scene, activeCam);
+    }
+
+    function axis(neg, pos) { return (keys[neg] ? -1 : 0) + (keys[pos] ? 1 : 0); }
+
+    function tick(dt) {
+      var swingAxis = clamp(axis('arrowleft', 'arrowright') + stickL.x, -1, 1);
+      var boomAxis = clamp(axis('arrowdown', 'arrowup') + (-stickL.y), -1, 1);
+      var armAxis = clamp(axis('a', 'd') + stickR.x, -1, 1);
+      var bucketAxis = clamp(axis('s', 'w') + (-stickR.y), -1, 1);
+      var extAxis = clamp(axis('q', 'e') + (extBtn.out ? 1 : 0) + (extBtn.in ? -1 : 0), -1, 1);
+      var tF = trackBtn.f || keys['i'], tB = trackBtn.b || keys['k'];
+      var tL = trackBtn.l || keys['j'], tR = trackBtn.r || keys['l'];
+
+      ctrl.swing += swingAxis * SWING_SPEED * dt;
+      ctrl.boom = clamp(ctrl.boom + boomAxis * BOOM_SPEED * dt, BOOM_MIN, BOOM_MAX);
+      ctrl.arm = clamp(ctrl.arm + armAxis * ARM_SPEED * dt, ARM_MIN, ARM_MAX);
+      ctrl.bucket = clamp(ctrl.bucket + bucketAxis * BUCKET_SPEED * dt, BUCKET_MIN, BUCKET_MAX);
+      ctrl.ext = clamp(ctrl.ext + extAxis * EXT_SPEED * dt, EXT_MIN, EXT_MAX);
+
+      if (tF) { machine.x += Math.sin(machine.heading) * DRIVE_SPEED * dt; machine.z += Math.cos(machine.heading) * DRIVE_SPEED * dt; }
+      if (tB) { machine.x -= Math.sin(machine.heading) * DRIVE_SPEED * dt; machine.z -= Math.cos(machine.heading) * DRIVE_SPEED * dt; }
+      if (tL) machine.heading += TURN_SPEED * dt;
+      if (tR) machine.heading -= TURN_SPEED * dt;
+
+      machineRoot.position.set(machine.x, 0, machine.z);
+      machineRoot.rotation.y = machine.heading;
+
+      turretPivot.rotation.y = ctrl.swing;
+      boomSeg.root.rotation.x = -ctrl.boom;
+      armSeg.root.rotation.x = -ctrl.arm;
+      extender.rodGroup.position.z = ctrl.ext * EXT_STROKE;
+      bucketGroup.rotation.x = -ctrl.bucket;
+
+      // excavación
+      terrainDirty = false;
+      var tipPos = new THREE.Vector3();
+      bucketTip.getWorldPosition(tipPos);
+      var groundH = heightAtWorld(tipPos.x, tipPos.z);
+      var inBounds = Math.abs(tipPos.x) < TERRAIN_W / 2 - 0.3 && (tipPos.z) > -TERRAIN_D / 2 + 0.3 && (tipPos.z) < TERRAIN_D / 2 - 0.3;
+
+      if (inBounds && tipPos.y < groundH - 0.02 && bucketLoad < BUCKET_CAPACITY - 0.001) {
+        digAt(tipPos.x, tipPos.z, tipPos.y);
+      } else if (inBounds && tipPos.y > groundH + 0.22 && ctrl.bucket > DUMP_ANGLE && bucketLoad > 0.001) {
+        if (isOverTruckBed(tipPos.x, tipPos.z)) fillTruck(0.9, dt);
+        else pileAt(tipPos.x, tipPos.z, 0.9, dt);
+      }
+      if (terrainDirty) {
+        terrainGeo.attributes.position.needsUpdate = true;
+        terrainGeo.attributes.color.needsUpdate = true;
+        terrainGeo.computeVertexNormals();
+      }
+
+      var loadPct = bucketLoad / BUCKET_CAPACITY;
+      dirtMound.scale.setScalar(0.001 + loadPct * 6.5);
+      dirtMound.visible = loadPct > 0.02;
+
+      document.getElementById('hudVol').textContent = totalExcavated.toFixed(2) + ' m³';
+      document.getElementById('hudLoad').textContent = Math.round(loadPct * 100) + '%';
+      document.getElementById('hudLoadBar').style.width = (loadPct * 100) + '%';
+      document.getElementById('hudTruck').textContent = truckLoad.toFixed(2) + ' / ' + TRUCK_CAPACITY.toFixed(2) + ' m³';
+      document.getElementById('hudTruckBar').style.width = (truckLoad / TRUCK_CAPACITY * 100) + '%';
+
+      if (activeCam === camExternal) {
+        orbitTarget.lerp(new THREE.Vector3(machine.x, 1, machine.z - 1), 0.02);
+      }
+    }
+
+    // ---------- toggle de cámara ----------
+    document.getElementById('btnCamExt').addEventListener('click', function () {
+      activeCam = camExternal;
+      this.classList.add('active');
+      document.getElementById('btnCamCab').classList.remove('active');
+    });
+    document.getElementById('btnCamCab').addEventListener('click', function () {
+      activeCam = camCabin;
+      this.classList.add('active');
+      document.getElementById('btnCamExt').classList.remove('active');
+    });
+    document.getElementById('btnReset').addEventListener('click', resetTerrain);
+    document.getElementById('btnEmptyTruck').addEventListener('click', emptyTruck);
+
+    initThree();
+  })();
+  </script>
+</body>
+</html>
