@@ -451,6 +451,26 @@
     var turretPivot, boomSeg, armSeg, extender, bucketTip, dirtMound, machineRoot, bucketGroup, truckFill;
     var placeholderParts = [];
     var bucketPlaceholderParts = []; // cuchara de referencia: solo se retira si aparece la real
+    var bucketRawMeshes = []; // {mesh, raw}: geometría SIN transformar, para poder re-aplicar en vivo desde el panel de ajuste
+    var DEBUG_MODE = location.search.indexOf('debug=1') >= 0;
+    var bucketTune = {
+      yawDeg: BUCKET_ROTATE_Y * 180 / Math.PI,
+      pitchDeg: BUCKET_PITCH_FIX * 180 / Math.PI,
+      rollDeg: 0,
+      dX: 0, dY: 0, dZ: 0
+    };
+    function applyBucketTransform() {
+      bucketRawMeshes.forEach(function (item) {
+        item.mesh.geometry.dispose();
+        var g = item.raw.clone();
+        g.translate(-(BUCKET_PIVOT_X + bucketTune.dX), -(BUCKET_PIVOT_Y + bucketTune.dY), -(BUCKET_PIVOT_Z + bucketTune.dZ));
+        g.rotateY(bucketTune.yawDeg * Math.PI / 180);
+        g.rotateX(bucketTune.pitchDeg * Math.PI / 180);
+        g.rotateZ(bucketTune.rollDeg * Math.PI / 180);
+        g.scale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
+        item.mesh.geometry = g;
+      });
+    }
 
     function currentSize() { return { w: VIEW.clientWidth || 800, h: VIEW.clientHeight || 500 }; }
 
@@ -880,11 +900,8 @@
           // propia. Usa su propio eje (90°) en vez de MODEL_ROTATE_Y: en el .obj la
           // cuchara quedó posada derecho sobre -X, sin el sesgo de 30° del chasis.
           o.castShadow = true; o.receiveShadow = true;
-          o.geometry.translate(-BUCKET_PIVOT_X, -BUCKET_PIVOT_Y, -BUCKET_PIVOT_Z);
-          o.geometry.rotateY(BUCKET_ROTATE_Y);
-          o.geometry.rotateX(BUCKET_PITCH_FIX);
-          o.geometry.scale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
           o.position.set(0, 0, 0); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1);
+          bucketRawMeshes.push({ mesh: o, raw: o.geometry.clone() });
           bucketGroup.add(o);
           bucketFound++;
           return;
@@ -915,15 +932,106 @@
       placeholderParts.length = 0;
 
       if (bucketFound > 0) {
+        applyBucketTransform();
         // la cuchara real reemplaza a la de referencia: reubica el punto de excavación
         // (bucketTip) y el indicador de carga sobre la geometría real recién agregada.
         bucketTip.position.set(0, -0.5, 0.8);
         dirtMound.position.set(0, -0.28, 0.45);
         bucketPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
         bucketPlaceholderParts.length = 0;
+        if (DEBUG_MODE) setupDebugPanel();
       } else {
         console.warn('No se identificaron las piezas de la cuchara real; se mantiene la cuchara de referencia.');
       }
+    }
+
+    // ---------- panel de ajuste en vivo (?debug=1) ----------
+    // Sliders para probar giro/inclinación/pivote de la cuchara real a ojo, con un
+    // cuadro de valores listo para copiar y pasarme. No aparece en el uso normal.
+    function setupDebugPanel() {
+      var wrap = document.createElement('div');
+      wrap.id = 'debugPanel';
+      wrap.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:999;background:rgba(13,17,23,.95);' +
+        'border:1px solid #30363d;border-radius:10px;padding:12px 14px;width:300px;max-height:82vh;overflow:auto;' +
+        'font-family:monospace;font-size:11px;color:#e6edf3;box-shadow:0 4px 20px rgba(0,0,0,.5);';
+
+      function row(id, label, min, max, step, val) {
+        return '<div style="margin-bottom:8px">' +
+          '<div style="display:flex;justify-content:space-between;color:#8b949e"><span>' + label + '</span><span id="' + id + 'Val">' + val + '</span></div>' +
+          '<input type="range" id="' + id + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + val + '" style="width:100%">' +
+          '</div>';
+      }
+
+      wrap.innerHTML =
+        '<div style="font-weight:bold;color:#eab308;margin-bottom:8px">🔧 Ajuste cuchara (debug)</div>' +
+        row('dbgYaw', 'Giro Y (yaw)', -180, 180, 1, bucketTune.yawDeg.toFixed(0)) +
+        row('dbgPitch', 'Inclinación X (pitch)', -180, 180, 1, bucketTune.pitchDeg.toFixed(0)) +
+        row('dbgRoll', 'Rolido Z (roll)', -180, 180, 1, bucketTune.rollDeg.toFixed(0)) +
+        '<div style="border-top:1px solid #30363d;margin:8px 0;padding-top:8px;color:#8b949e">Pivote (mm, ajuste fino)</div>' +
+        row('dbgPX', 'X pivote', -1500, 1500, 5, bucketTune.dX) +
+        row('dbgPY', 'Y pivote', -1500, 1500, 5, bucketTune.dY) +
+        row('dbgPZ', 'Z pivote', -1500, 1500, 5, bucketTune.dZ) +
+        '<div style="border-top:1px solid #30363d;margin:8px 0;padding-top:8px;color:#8b949e">Pose (para ver desde otro ángulo)</div>' +
+        row('dbgBoom', 'Pluma', BOOM_MIN.toFixed(2), BOOM_MAX.toFixed(2), 0.01, ctrl.boom.toFixed(2)) +
+        row('dbgArm', 'Brazo', ARM_MIN.toFixed(2), ARM_MAX.toFixed(2), 0.01, ctrl.arm.toFixed(2)) +
+        row('dbgExt', 'Extensor', 0, 1, 0.01, ctrl.ext.toFixed(2)) +
+        '<div style="border-top:1px solid #30363d;margin:8px 0;padding-top:8px"></div>' +
+        '<pre id="dbgReadout" style="white-space:pre-wrap;background:#161b22;padding:8px;border-radius:6px;border:1px solid #30363d;color:#7ee787;margin:0 0 8px"></pre>' +
+        '<button id="dbgCopy" type="button" style="width:100%;padding:6px;background:#eab308;color:#1a1300;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-family:inherit">Copiar valores</button>';
+
+      document.body.appendChild(wrap);
+
+      function updateReadout() {
+        var t = document.getElementById('dbgReadout');
+        t.textContent =
+          'BUCKET_ROTATE_Y = ' + (bucketTune.yawDeg * Math.PI / 180).toFixed(4) + ';  // ' + bucketTune.yawDeg.toFixed(0) + '°\n' +
+          'BUCKET_PITCH_FIX = ' + (bucketTune.pitchDeg * Math.PI / 180).toFixed(4) + ';  // ' + bucketTune.pitchDeg.toFixed(0) + '°\n' +
+          'BUCKET_ROLL_FIX = ' + (bucketTune.rollDeg * Math.PI / 180).toFixed(4) + ';  // ' + bucketTune.rollDeg.toFixed(0) + '°\n' +
+          'BUCKET_PIVOT_X = ' + (BUCKET_PIVOT_X + bucketTune.dX).toFixed(0) + ';\n' +
+          'BUCKET_PIVOT_Y = ' + (BUCKET_PIVOT_Y + bucketTune.dY).toFixed(0) + ';\n' +
+          'BUCKET_PIVOT_Z = ' + (BUCKET_PIVOT_Z + bucketTune.dZ).toFixed(0) + ';';
+      }
+
+      function bindSlider(id, valId, onChange) {
+        var el = document.getElementById(id), valEl = document.getElementById(valId);
+        el.addEventListener('input', function () {
+          valEl.textContent = el.value;
+          onChange(parseFloat(el.value));
+          applyBucketTransform();
+          updateReadout();
+        });
+      }
+      bindSlider('dbgYaw', 'dbgYawVal', function (v) { bucketTune.yawDeg = v; });
+      bindSlider('dbgPitch', 'dbgPitchVal', function (v) { bucketTune.pitchDeg = v; });
+      bindSlider('dbgRoll', 'dbgRollVal', function (v) { bucketTune.rollDeg = v; });
+      bindSlider('dbgPX', 'dbgPXVal', function (v) { bucketTune.dX = v; });
+      bindSlider('dbgPY', 'dbgPYVal', function (v) { bucketTune.dY = v; });
+      bindSlider('dbgPZ', 'dbgPZVal', function (v) { bucketTune.dZ = v; });
+
+      function bindPoseSlider(id, valId, setter) {
+        var el = document.getElementById(id), valEl = document.getElementById(valId);
+        el.addEventListener('input', function () {
+          valEl.textContent = el.value;
+          setter(parseFloat(el.value));
+        });
+      }
+      bindPoseSlider('dbgBoom', 'dbgBoomVal', function (v) { ctrl.boom = v; });
+      bindPoseSlider('dbgArm', 'dbgArmVal', function (v) { ctrl.arm = v; });
+      bindPoseSlider('dbgExt', 'dbgExtVal', function (v) { ctrl.ext = v; });
+
+      document.getElementById('dbgCopy').addEventListener('click', function () {
+        var text = document.getElementById('dbgReadout').textContent;
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(text).then(function () {
+            var btn = document.getElementById('dbgCopy');
+            var prev = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(function () { btn.textContent = prev; }, 1200);
+          }).catch(function () { window.prompt('Copiá manualmente:', text); });
+        } else {
+          window.prompt('Copiá manualmente:', text);
+        }
+      });
+
+      updateReadout();
     }
 
     // ---------- cámara externa (orbit manual) ----------
