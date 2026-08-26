@@ -733,8 +733,11 @@
       antebrazoSeg.end.add(armSeg.root);
       armPlaceholderParts.push(armSeg.mesh); // se oculta si el brazo real carga bien
 
-      // extensor tipo boom (brazo telescópico)
+      // extensor tipo boom (brazo telescópico): el modelo real no tiene telescopio
+      // identificado, es puramente del esqueleto procedural — se oculta junto con el
+      // resto de ese esqueleto en cuanto carga el brazo real (ver armPlaceholderParts).
       extender = buildExtender(armSeg.end, 0.22, 0.24);
+      armPlaceholderParts.push(extender.sleeve, extender.rod);
 
       // cuchara (bucket) — perfil curvo de referencia (BK); se reemplaza por la cuchara
       // real del modelo SketchUp apenas termina de cargar (ver onRealModelLoaded).
@@ -814,7 +817,7 @@
       end.position.set(0, 0, EXT_ROD_LEN);
       rodGroup.add(end);
 
-      return { root: extRoot, rodGroup: rodGroup, end: end };
+      return { root: extRoot, rodGroup: rodGroup, end: end, sleeve: sleeve, rod: rod };
     }
 
     // ---------- camión de 17 m³ ----------
@@ -1186,7 +1189,16 @@
             '</div>' +
             '</div>';
         }).join('') +
-        '<button type="button" id="dbgLimCopy" style="width:100%;margin-top:4px;font-size:10px;padding:5px;background:#58a6ff;color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">Copiar límites</button>';
+        '<button type="button" id="dbgLimCopy" style="width:100%;margin-top:4px;font-size:10px;padding:5px;background:#58a6ff;color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">Copiar límites</button>' +
+        '<div style="font-weight:bold;color:#58a6ff;margin:10px 0 6px;border-top:1px solid #30363d;padding-top:10px">📏 Regla de alcance</div>' +
+        '<div style="color:#8b949e;margin-bottom:8px">Con "Modo regla" activo, un clic sobre el terreno (o cualquier pieza) marca un punto y muestra su posición respecto a la máquina, el alcance horizontal desde el eje de giro, y la distancia al diente de la cuchara ahora mismo.</div>' +
+        '<label style="display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer">' +
+        '<input type="checkbox" id="dbgRulerActive"><span>Modo regla activado</span></label>' +
+        '<div style="display:flex;gap:6px;margin:8px 0">' +
+        '<button type="button" id="dbgRulerClear" style="flex:1;font-size:10px;padding:5px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:4px;cursor:pointer">Borrar todos</button>' +
+        '<button type="button" id="dbgRulerCopy" style="flex:1;font-size:10px;padding:5px;background:#58a6ff;color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">Copiar todo</button>' +
+        '</div>' +
+        '<div id="dbgRulerList"></div>';
 
       document.body.appendChild(wrap);
 
@@ -1335,6 +1347,114 @@
         } else {
           window.prompt('Copiá manualmente:', text);
         }
+      });
+
+      // ---- regla de alcance: clic sobre lo que sea (terreno, máquina) marca un punto
+      // y reporta su posición relativa a la máquina (X lateral, Z adelante/atrás según
+      // el rumbo, Y altura) + alcance horizontal desde el eje de giro + distancia al
+      // diente de la cuchara en ese instante — para chequear a qué llega realmente la
+      // cuchara sobre el terreno. ----
+      var rulerActive = false;
+      var rulerPoints = [];
+      var rulerCounter = 0;
+      function renderRulerList() {
+        var list = document.getElementById('dbgRulerList');
+        if (!rulerPoints.length) {
+          list.innerHTML = '<div style="color:#8b949e;padding:6px 0">(sin puntos todavía)</div>';
+          return;
+        }
+        list.innerHTML = rulerPoints.map(function (p) {
+          return '<div style="border-left:4px solid ' + p.color + ';padding:5px 8px;margin-bottom:6px;background:#161b22;border-radius:4px">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center">' +
+            '<strong style="color:' + p.color + '">' + p.id + '</strong>' +
+            '<button type="button" data-delruler="' + p.id + '" style="background:none;border:none;color:#f85149;cursor:pointer;font-size:13px;line-height:1">✕</button>' +
+            '</div>' +
+            '<div style="color:#8b949e;margin-top:3px">respecto a máquina (m): x=' + p.local.x.toFixed(2) + ', y=' + p.local.y.toFixed(2) + ', z=' + p.local.z.toFixed(2) + '</div>' +
+            '<div style="color:#7ee787">alcance horizontal: ' + p.reach.toFixed(2) + ' m &nbsp; · &nbsp; a la cuchara: ' + p.distToBucket.toFixed(2) + ' m</div>' +
+            '</div>';
+        }).join('');
+      }
+      renderRulerList();
+      document.getElementById('dbgRulerActive').addEventListener('change', function (e) {
+        rulerActive = e.target.checked;
+      });
+      document.getElementById('dbgRulerClear').addEventListener('click', function () {
+        rulerPoints.forEach(function (p) { if (p.marker.parent) p.marker.parent.remove(p.marker); });
+        rulerPoints.length = 0;
+        renderRulerList();
+      });
+      document.getElementById('dbgRulerList').addEventListener('click', function (e) {
+        var id = e.target.getAttribute('data-delruler');
+        if (!id) return;
+        var idx = rulerPoints.findIndex(function (p) { return p.id === id; });
+        if (idx < 0) return;
+        if (rulerPoints[idx].marker.parent) rulerPoints[idx].marker.parent.remove(rulerPoints[idx].marker);
+        rulerPoints.splice(idx, 1);
+        renderRulerList();
+      });
+      document.getElementById('dbgRulerCopy').addEventListener('click', function () {
+        var text = rulerPoints.map(function (p) {
+          return p.id + '\n' +
+            '  respecto a máquina (m): x=' + p.local.x.toFixed(2) + ', y=' + p.local.y.toFixed(2) + ', z=' + p.local.z.toFixed(2) + '\n' +
+            '  alcance horizontal: ' + p.reach.toFixed(2) + ' m\n' +
+            '  distancia a la cuchara: ' + p.distToBucket.toFixed(2) + ' m';
+        }).join('\n\n') || '(sin puntos)';
+        var btn = document.getElementById('dbgRulerCopy');
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(text).then(function () {
+            var prev = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(function () { btn.textContent = prev; }, 1200);
+          }).catch(function () { window.prompt('Copiá manualmente:', text); });
+        } else {
+          window.prompt('Copiá manualmente:', text);
+        }
+      });
+
+      function makeRulerMarker(parent, hexColor) {
+        var mat = new THREE.MeshBasicMaterial({ color: hexColor, depthTest: false });
+        var m = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8), mat);
+        m.renderOrder = 999;
+        parent.add(m);
+        return m;
+      }
+      var rulerPointerDown = null;
+      var rulerRaycaster = new THREE.Raycaster();
+      var tipWorld = new THREE.Vector3();
+      dom.addEventListener('pointerdown', function (e) {
+        if (!rulerActive) return;
+        rulerPointerDown = { x: e.clientX, y: e.clientY, t: performance.now() };
+      });
+      dom.addEventListener('pointerup', function (e) {
+        if (!rulerActive || !rulerPointerDown) return;
+        var moved = Math.hypot(e.clientX - rulerPointerDown.x, e.clientY - rulerPointerDown.y);
+        var dt = performance.now() - rulerPointerDown.t;
+        rulerPointerDown = null;
+        if (moved > 6 || dt > 600) return;
+        var rect = dom.getBoundingClientRect();
+        var ndc = new THREE.Vector2(
+          ((e.clientX - rect.left) / rect.width) * 2 - 1,
+          -((e.clientY - rect.top) / rect.height) * 2 + 1
+        );
+        rulerRaycaster.setFromCamera(ndc, activeCam);
+        var hits = rulerRaycaster.intersectObjects([terrainMesh, turretPivot, machineRoot], true).filter(function (h) {
+          return h.object.visible && !h.object.userData.isPickMarker;
+        });
+        if (!hits.length) return;
+        var worldPt = hits[0].point;
+        var local = machineRoot.worldToLocal(worldPt.clone());
+        bucketTip.getWorldPosition(tipWorld);
+        rulerCounter++;
+        var color = 'hsl(' + ((rulerCounter * 61) % 360) + ', 85%, 58%)';
+        var marker = makeRulerMarker(scene, color);
+        marker.userData.isPickMarker = true;
+        marker.position.copy(worldPt);
+        rulerPoints.push({
+          id: 'R' + rulerCounter, color: color,
+          local: { x: local.x, y: local.y, z: local.z },
+          reach: Math.hypot(local.x, local.z),
+          distToBucket: worldPt.distanceTo(tipWorld),
+          marker: marker
+        });
+        renderRulerList();
       });
     }
 
