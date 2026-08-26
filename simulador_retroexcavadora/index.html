@@ -347,14 +347,14 @@
     // las 4 articulaciones reales, cada una definida como un pasador (cilindro
     // pasante): un punto de origen sobre el eje + la dirección de ese eje (vector
     // unitario) — no un simple punto girando siempre en X, para que cada pieza gire
-    // alrededor de su eje de bisagra REAL y no quede torsionada. Se miden marcando 2
-    // clics (entrada/salida del pasador) por articulación con el panel de picking
-    // (?debug=1). En metros, mismo espacio "local" (turretPivot) que usan las mallas
-    // reales ya reensambladas. Pendientes de remedir — placeholder con eje neutro.
-    var REAL_JOINT_A = { origin: { x: 0, y: 0, z: 0 }, axis: { x: 1, y: 0, z: 0 } }; // torreta -> pluma
-    var REAL_JOINT_B = { origin: { x: 0, y: 0, z: 0 }, axis: { x: 1, y: 0, z: 0 } }; // pluma -> antebrazo
-    var REAL_JOINT_C = { origin: { x: 0, y: 0, z: 0 }, axis: { x: 1, y: 0, z: 0 } }; // antebrazo -> brazo
-    var REAL_JOINT_D = { origin: { x: 0, y: 0, z: 0 }, axis: { x: 1, y: 0, z: 0 } }; // brazo -> cuchara
+    // alrededor de su eje de bisagra REAL y no quede torsionada. Medidas por el
+    // usuario marcando 2 clics (entrada/salida del pasador) por articulación con el
+    // panel de picking (?debug=1) y confirmadas con "Aplicar y probar". En metros,
+    // mismo espacio "local" (turretPivot) que usan las mallas reales ya reensambladas.
+    var REAL_JOINT_A = { origin: { x: -0.349, y: 0.773, z: 0.384 }, axis: { x: 0.878, y: 0.023, z: -0.477 } }; // torreta -> pluma
+    var REAL_JOINT_B = { origin: { x: 0.363, y: 2.748, z: 1.277 }, axis: { x: 0.847, y: -0.031, z: -0.531 } }; // pluma -> antebrazo
+    var REAL_JOINT_C = { origin: { x: 2.114, y: 3.137, z: 4.231 }, axis: { x: 0.875, y: 0.003, z: -0.484 } }; // antebrazo -> brazo
+    var REAL_JOINT_D = { origin: { x: 2.828, y: 1.153, z: 5.507 }, axis: { x: 0.875, y: -0.010, z: -0.484 } }; // brazo -> cuchara
 
     function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
     function lerp(a, b, t) { return a + (b - a) * t; }
@@ -973,11 +973,11 @@
       placeholderParts.length = 0;
 
       if (DEBUG_MODE && armAssemblyMeshes.filter(function (e) { return e.piece !== 'sin_identificar'; }).length > 0) {
-        // el brazo real reemplaza VISUALMENTE al procedural, SOLO en ?debug=1, tal
-        // cual salió de SketchUp — todavía SIN articular (eso es a propósito: recién
-        // se arma con buildRealArmChain cuando el panel de picking tiene los 4
-        // pasadores medidos y se toca "Aplicar y probar", para no mostrar una
-        // articulación a medio calibrar).
+        // el brazo real reemplaza al procedural, SOLO en ?debug=1 por ahora (hasta
+        // confirmar que los 4 pasadores medidos quedan bien también fuera del panel):
+        // se cuelga de ellos ya articulado con buildRealArmChain, usando el eje real
+        // de cada uno (no una rotación fija en X) para que no quede torsionado.
+        buildRealArmChain(REAL_JOINT_A, REAL_JOINT_B, REAL_JOINT_C, REAL_JOINT_D);
         bucketPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
         bucketPlaceholderParts.length = 0;
         armPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
