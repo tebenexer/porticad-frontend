@@ -931,10 +931,8 @@
       // (pluma+antebrazo+brazo+cuchara) se reensambla con la MISMA transformación que
       // el resto de la torreta — nada de ángulos "de ajuste" por pieza — y después
       // buildRealArmChain() la cuelga de los 4 pivotes reales (REAL_JOINT_A/B/C/D,
-      // encontrados con el panel de picking, ?debug=1) para que quede articulada.
-      // Mientras esos 4 puntos se están recalibrando, solo se muestra en ?debug=1 —
-      // en uso normal se mantiene el brazo procedural (funciona bien) para no mostrar
-      // el brazo real torcido a los visitantes.
+      // medidos y confirmados con el panel de picking, ?debug=1) para que quede
+      // articulada. Ya validado: se muestra en uso normal también, no solo en debug.
       var box = new THREE.Box3();
       meshes.forEach(function (o) {
         var toks = (o.name || '').trim().split(/\s+/);
@@ -945,7 +943,10 @@
         box.setFromObject(o);
         var cx = (box.min.x + box.max.x) / 2;
         var isArmSide = isUpperWorks && (piece || cx < MODEL_ARM_CUT_X);
-        if (isArmSide && !DEBUG_MODE) {
+        if (isArmSide && !piece && !DEBUG_MODE) {
+          // pieza del lado del brazo pero todavía sin identificar (no es ninguna de
+          // las 20 mallas de Group44): en uso normal se descarta; en ?debug=1 se
+          // conserva colgada de la torreta para poder marcarla con el panel.
           if (o.geometry) o.geometry.dispose();
           return;
         }
@@ -974,11 +975,10 @@
       placeholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
       placeholderParts.length = 0;
 
-      if (DEBUG_MODE && armAssemblyMeshes.filter(function (e) { return e.piece !== 'sin_identificar'; }).length > 0) {
-        // el brazo real reemplaza al procedural, SOLO en ?debug=1 por ahora (hasta
-        // confirmar que los 4 pasadores medidos quedan bien también fuera del panel):
-        // se cuelga de ellos ya articulado con buildRealArmChain, usando el eje real
-        // de cada uno (no una rotación fija en X) para que no quede torsionado.
+      if (armAssemblyMeshes.filter(function (e) { return e.piece !== 'sin_identificar'; }).length > 0) {
+        // el brazo real reemplaza al procedural: se cuelga de los 4 pasadores reales
+        // ya articulado con buildRealArmChain, usando el eje real de cada uno (no una
+        // rotación fija en X) para que no quede torsionado.
         buildRealArmChain(REAL_JOINT_A, REAL_JOINT_B, REAL_JOINT_C, REAL_JOINT_D);
         bucketPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
         bucketPlaceholderParts.length = 0;
