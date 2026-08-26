@@ -280,10 +280,12 @@
     var BUCKET_CAPACITY = 0.55; // m3 aprox
 
     var SWING_SPEED = 0.9, BOOM_SPEED = 0.7, ARM_SPEED = 0.8, BUCKET_SPEED = 1.1;
-    var BOOM_MIN = -0.10, BOOM_MAX = 1.05;
-    var ANTEBRAZO_SPEED = 0.7, ANTEBRAZO_MIN = -1.1, ANTEBRAZO_MAX = 0.6; // articulación pluma-antebrazo
-    var ARM_MIN = -2.35, ARM_MAX = -0.25;
-    var BUCKET_MIN = -0.35, BUCKET_MAX = 2.05;
+    // límites reales, medidos con el panel de "sin límite" (?debug=1) sobre el brazo
+    // ya articulado con sus pasadores reales.
+    var BOOM_MIN = -0.760, BOOM_MAX = 0.440;
+    var ANTEBRAZO_SPEED = 0.7, ANTEBRAZO_MIN = -1.220, ANTEBRAZO_MAX = 0.760; // articulación pluma-antebrazo
+    var ARM_MIN = -1.250, ARM_MAX = 0.470;
+    var BUCKET_MIN = -0.350, BUCKET_MAX = 2.930;
     var DUMP_ANGLE = 1.35; // curl por encima de esto + arriba del terreno = vuelca
     var DRIVE_SPEED = 1.6, TURN_SPEED = 0.55;
     var EXT_SPEED = 0.7, EXT_MIN = 0, EXT_MAX = 1, EXT_STROKE = 0.85; // brazo telescópico (0=retraído, 1=extendido)
@@ -360,7 +362,7 @@
     function lerp(a, b, t) { return a + (b - a) * t; }
 
     // ========================= ESTADO =========================
-    var ctrl = { swing: 0.35, boom: 0.7, antebrazo: -0.3, arm: -1.0, bucket: 0.5, ext: 0 }; // pose inicial: cuchara despejada del suelo
+    var ctrl = { swing: 0.35, boom: 0.4, antebrazo: -0.3, arm: -1.0, bucket: 0.5, ext: 0 }; // pose inicial: cuchara despejada del suelo (boom dentro de BOOM_MAX real)
     var machine = { x: 0, z: -6, heading: 0 };
     var bucketLoad = 0, totalExcavated = 0, truckLoad = 0;
 
