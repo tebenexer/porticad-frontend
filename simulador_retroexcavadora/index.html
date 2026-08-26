@@ -278,9 +278,9 @@
     'use strict';
 
     // ========================= CONFIG =========================
-    var TERRAIN_W = 22, TERRAIN_D = 18, SEG_X = 66, SEG_Z = 54;
+    var TERRAIN_W = 32, TERRAIN_D = 26, SEG_X = 96, SEG_Z = 78; // terreno más amplio (antes 22x18)
     var CELL_W = TERRAIN_W / SEG_X, CELL_D = TERRAIN_D / SEG_Z, CELL_AREA = CELL_W * CELL_D;
-    var MIN_DEPTH = -2.4, MAX_PILE = 1.6;
+    var MIN_DEPTH = -2.4, MAX_PILE = 2.4;
     // radio de excavación y capacidad, recalculados a partir de las medidas reales de
     // la cuchara (panel de regla en modo "cuchara", ?debug=1): boca ~0.93x0.70 m,
     // fondo ~0.72x0.41 m, profundidad boca->fondo ~0.81 m. Capacidad estimada como un
@@ -559,8 +559,55 @@
       terrainMesh = new THREE.Mesh(terrainGeo, mat);
       terrainMesh.receiveShadow = true;
       scene.add(terrainMesh);
+      buildTerrainSkirt();
     }
     function vIndex(ix, iz) { return iz * (SEG_X + 1) + ix; }
+    // ---------- relleno visual debajo del terreno ----------
+    // el plano del terreno no tiene espesor: mirado desde el costado o por debajo
+    // (cámara orbital, bordes del mapa) se veía una lámina flotando en el aire. Esto
+    // cuelga "tierra" sólida desde el borde de cada vértice del perímetro hasta una
+    // base fija bien por debajo del pozo más profundo posible (MIN_DEPTH), más una
+    // tapa inferior — para que el terreno se vea como un bloque real, no una hoja.
+    var TERRAIN_BASE_Y = -3.2;
+    var terrainSkirt = null;
+    function buildTerrainSkirt() {
+      if (terrainSkirt) {
+        scene.remove(terrainSkirt);
+        terrainSkirt.geometry.dispose();
+      }
+      var pos = [];
+      function pushQuad(a, b, c, d) {
+        pos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+        pos.push(a.x, a.y, a.z, c.x, c.y, c.z, d.x, d.y, d.z);
+      }
+      function edgePoint(ix, iz) {
+        return { x: ix * CELL_W - TERRAIN_W / 2, y: heights[vIndex(ix, iz)], z: iz * CELL_D - TERRAIN_D / 2 };
+      }
+      function addEdge(points) {
+        for (var i = 0; i < points.length - 1; i++) {
+          var top1 = points[i], top2 = points[i + 1];
+          var bot1 = { x: top1.x, y: TERRAIN_BASE_Y, z: top1.z };
+          var bot2 = { x: top2.x, y: TERRAIN_BASE_Y, z: top2.z };
+          pushQuad(top1, top2, bot2, bot1);
+        }
+      }
+      var south = [], north = [], west = [], east = [];
+      for (var ix = 0; ix <= SEG_X; ix++) { south.push(edgePoint(ix, 0)); north.push(edgePoint(ix, SEG_Z)); }
+      for (var iz = 0; iz <= SEG_Z; iz++) { west.push(edgePoint(0, iz)); east.push(edgePoint(SEG_X, iz)); }
+      addEdge(south); addEdge(north); addEdge(west); addEdge(east);
+      // tapa inferior, para que tampoco se vea hueco mirando desde abajo
+      var bw = TERRAIN_W / 2, bd = TERRAIN_D / 2, by = TERRAIN_BASE_Y;
+      pos.push(-bw, by, -bd, bw, by, -bd, bw, by, bd);
+      pos.push(-bw, by, -bd, bw, by, bd, -bw, by, bd);
+
+      var geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.computeVertexNormals();
+      var mat = new THREE.MeshStandardMaterial({ color: 0x5a4326, roughness: 1, side: THREE.DoubleSide });
+      terrainSkirt = new THREE.Mesh(geo, mat);
+      terrainSkirt.receiveShadow = true;
+      scene.add(terrainSkirt);
+    }
     function colorForHeight(h, out, offset) {
       var c1 = [0.36, 0.60, 0.30], c2 = [0.42, 0.30, 0.18]; // pasto -> tierra
       var t = h < 0 ? clamp(-h / 0.45, 0, 1) : clamp(h / 0.18, 0, 1);
@@ -578,11 +625,13 @@
     }
     // ---------- tipos de terreno ----------
     // formas iniciales, además del llano de siempre: montañita (loma redondeada,
-    // gaussiana) y talud (rampa suave entre dos planos a distinta altura). Ubicadas
-    // delante del punto de arranque de la máquina (machine.x=0, machine.z=-6) para
-    // que se lleguen manejando derecho hacia adelante.
-    var HILL_CENTER = { x: 0, z: 2 }, HILL_HEIGHT = 1.2, HILL_RADIUS = 3.2;
-    var TALUD_Z0 = -1, TALUD_RUN = 4, TALUD_HEIGHT = 1.3;
+    // gaussiana) y talud. Ubicadas delante del punto de arranque de la máquina
+    // (machine.x=0, machine.z=-6) para que se lleguen manejando derecho hacia
+    // adelante. El talud es una rampa LINEAL (no suavizada): a propósito queda con
+    // el quiebre filoso arriba y abajo, como un banco de tierra recién amontonado
+    // y sin formar — para practicar tallarlo hasta dejarlo con la pendiente pareja.
+    var HILL_CENTER = { x: 0, z: 3 }, HILL_HEIGHT = 2.2, HILL_RADIUS = 4;
+    var TALUD_Z0 = -1, TALUD_RUN = 2, TALUD_HEIGHT = 2.2;
     function heightForShape(shape, wx, wz) {
       if (shape === 'hill') {
         var dx = wx - HILL_CENTER.x, dz = wz - HILL_CENTER.z;
@@ -590,8 +639,7 @@
       }
       if (shape === 'talud') {
         var t = clamp((wz - TALUD_Z0) / TALUD_RUN, 0, 1);
-        var s = t * t * (3 - 2 * t); // smoothstep: sin quiebre filoso en los bordes
-        return TALUD_HEIGHT * s;
+        return TALUD_HEIGHT * t; // rampa lineal, sin formar todavía
       }
       return 0;
     }
@@ -612,6 +660,7 @@
       terrainGeo.attributes.color.needsUpdate = true;
       pos.needsUpdate = true;
       terrainGeo.computeVertexNormals();
+      buildTerrainSkirt(); // el perímetro cambió de altura, el relleno de abajo tiene que seguirlo
       totalExcavated = 0; bucketLoad = 0;
     }
     function heightAtGrid(ix, iz) {
