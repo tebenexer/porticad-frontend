@@ -1082,6 +1082,19 @@
     var pickRaycaster = new THREE.Raycaster();
     var pickPointerDown = null;
 
+    // límites de giro reales, uno por control (mismo mapeo que las articulaciones:
+    // boom=A, antebrazo=B, arm=C, bucket=D). limitTestMode[key] en true le dice a
+    // tick() que NO clampee ni sume el eje de esa articulación — así el panel puede
+    // llevarla más allá de los límites actuales para encontrar los nuevos, sin que se
+    // trabe de vuelta cada frame.
+    var limitDefs = [
+      { key: 'boom', label: 'A · Pluma', color: '#ff3b30' },
+      { key: 'antebrazo', label: 'B · Antebrazo', color: '#34c759' },
+      { key: 'arm', label: 'C · Brazo', color: '#0a84ff' },
+      { key: 'bucket', label: 'D · Cuchara', color: '#ff2d92' }
+    ];
+    var limitTestMode = { boom: false, antebrazo: false, arm: false, bucket: false };
+
     // cilindro fino orientable: geometría unitaria (radio fijo, largo 1 a lo largo de
     // Z desde el origen), se reorienta con quaternion + se escala en Z para estirarlo
     // entre 2 puntos cualesquiera — el "pasador" visible de cada articulación.
@@ -1153,7 +1166,25 @@
         '<div style="display:flex;gap:6px;margin:8px 0">' +
         '<button type="button" id="dbgPickApply" style="flex:1;font-size:10px;padding:5px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:4px;cursor:pointer">Aplicar y probar</button>' +
         '<button type="button" id="dbgPickCopy" style="flex:1;font-size:10px;padding:5px;background:#58a6ff;color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">Copiar los 4 valores</button>' +
-        '</div>';
+        '</div>' +
+        '<div style="font-weight:bold;color:#58a6ff;margin:10px 0 6px;border-top:1px solid #30363d;padding-top:10px">🎚️ Límites de giro reales</div>' +
+        '<div style="color:#8b949e;margin-bottom:8px">Activá "sin límite" en la articulación que querés probar, movela con el slider hasta el punto justo antes de que se vea mal (se clave en otra pieza, se estire de más), y tocá "Marcar mínimo/máximo" ahí. Con "sin límite" desactivado vuelve a mandar el límite ya guardado.</div>' +
+        limitDefs.map(function (ld) {
+          return '<div style="border-left:4px solid ' + ld.color + ';padding:5px 8px;margin-bottom:6px;background:#161b22;border-radius:4px">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center">' +
+            '<strong style="color:' + ld.color + '">' + ld.label + '</strong>' +
+            '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:10px">' +
+            '<input type="checkbox" id="dbgLim' + ld.key + 'Free">sin límite</label>' +
+            '</div>' +
+            '<input type="range" id="dbgLim' + ld.key + 'Slider" min="-3.2" max="3.2" step="0.01" style="width:100%" disabled>' +
+            '<div id="dbgLim' + ld.key + 'Val" style="color:#8b949e;margin:2px 0"></div>' +
+            '<div style="display:flex;gap:6px">' +
+            '<button type="button" id="dbgLim' + ld.key + 'SetMin" style="flex:1;font-size:10px;padding:3px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:4px;cursor:pointer">Marcar mínimo</button>' +
+            '<button type="button" id="dbgLim' + ld.key + 'SetMax" style="flex:1;font-size:10px;padding:3px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:4px;cursor:pointer">Marcar máximo</button>' +
+            '</div>' +
+            '</div>';
+        }).join('') +
+        '<button type="button" id="dbgLimCopy" style="width:100%;margin-top:4px;font-size:10px;padding:5px;background:#58a6ff;color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">Copiar límites</button>';
 
       document.body.appendChild(wrap);
 
@@ -1250,6 +1281,59 @@
         renderVal(key);
         setArmed(null);
       });
+
+      // ---- límites de giro reales: "sin límite" saca esa articulación del clamp de
+      // tick() y la deja solo bajo el slider; "Marcar mínimo/máximo" graba el ángulo
+      // actual. "Copiar límites" arma el texto con las 4 constantes _MIN/_MAX. ----
+      var limitVal = {
+        boom: { min: BOOM_MIN, max: BOOM_MAX },
+        antebrazo: { min: ANTEBRAZO_MIN, max: ANTEBRAZO_MAX },
+        arm: { min: ARM_MIN, max: ARM_MAX },
+        bucket: { min: BUCKET_MIN, max: BUCKET_MAX }
+      };
+      function renderLimitVal(key) {
+        var lv = limitVal[key];
+        document.getElementById('dbgLim' + key + 'Val').textContent =
+          'actual=' + ctrl[key].toFixed(3) + '   mín=' + lv.min.toFixed(3) + '   máx=' + lv.max.toFixed(3);
+      }
+      limitDefs.forEach(function (ld) {
+        var slider = document.getElementById('dbgLim' + ld.key + 'Slider');
+        slider.value = ctrl[ld.key];
+        renderLimitVal(ld.key);
+        document.getElementById('dbgLim' + ld.key + 'Free').addEventListener('change', function (e) {
+          limitTestMode[ld.key] = e.target.checked;
+          slider.disabled = !e.target.checked;
+          slider.value = ctrl[ld.key];
+        });
+        slider.addEventListener('input', function () {
+          ctrl[ld.key] = parseFloat(slider.value);
+          renderLimitVal(ld.key);
+        });
+        document.getElementById('dbgLim' + ld.key + 'SetMin').addEventListener('click', function () {
+          limitVal[ld.key].min = ctrl[ld.key];
+          renderLimitVal(ld.key);
+        });
+        document.getElementById('dbgLim' + ld.key + 'SetMax').addEventListener('click', function () {
+          limitVal[ld.key].max = ctrl[ld.key];
+          renderLimitVal(ld.key);
+        });
+      });
+
+      document.getElementById('dbgLimCopy').addEventListener('click', function () {
+        var names = { boom: 'BOOM', antebrazo: 'ANTEBRAZO', arm: 'ARM', bucket: 'BUCKET' };
+        var text = limitDefs.map(function (ld) {
+          var lv = limitVal[ld.key], n = names[ld.key];
+          return 'var ' + n + '_MIN = ' + lv.min.toFixed(3) + ', ' + n + '_MAX = ' + lv.max.toFixed(3) + '; // ' + ld.label;
+        }).join('\n');
+        var btn = document.getElementById('dbgLimCopy');
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(text).then(function () {
+            var prev = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(function () { btn.textContent = prev; }, 1200);
+          }).catch(function () { window.prompt('Copiá manualmente:', text); });
+        } else {
+          window.prompt('Copiá manualmente:', text);
+        }
+      });
     }
 
     // ---------- cámara externa (orbit manual) ----------
@@ -1340,10 +1424,10 @@
       var tL = trackBtn.l || keys['j'] || gp.l, tR = trackBtn.r || keys['l'] || gp.r;
 
       ctrl.swing += swingAxis * SWING_SPEED * dt;
-      ctrl.boom = clamp(ctrl.boom + boomAxis * BOOM_SPEED * dt, BOOM_MIN, BOOM_MAX);
-      ctrl.antebrazo = clamp(ctrl.antebrazo + antebrazoAxis * ANTEBRAZO_SPEED * dt, ANTEBRAZO_MIN, ANTEBRAZO_MAX);
-      ctrl.arm = clamp(ctrl.arm + armAxis * ARM_SPEED * dt, ARM_MIN, ARM_MAX);
-      ctrl.bucket = clamp(ctrl.bucket + bucketAxis * BUCKET_SPEED * dt, BUCKET_MIN, BUCKET_MAX);
+      if (!limitTestMode.boom) ctrl.boom = clamp(ctrl.boom + boomAxis * BOOM_SPEED * dt, BOOM_MIN, BOOM_MAX);
+      if (!limitTestMode.antebrazo) ctrl.antebrazo = clamp(ctrl.antebrazo + antebrazoAxis * ANTEBRAZO_SPEED * dt, ANTEBRAZO_MIN, ANTEBRAZO_MAX);
+      if (!limitTestMode.arm) ctrl.arm = clamp(ctrl.arm + armAxis * ARM_SPEED * dt, ARM_MIN, ARM_MAX);
+      if (!limitTestMode.bucket) ctrl.bucket = clamp(ctrl.bucket + bucketAxis * BUCKET_SPEED * dt, BUCKET_MIN, BUCKET_MAX);
       ctrl.ext = clamp(ctrl.ext + extAxis * EXT_SPEED * dt, EXT_MIN, EXT_MAX);
 
       if (tF) { machine.x += Math.sin(machine.heading) * DRIVE_SPEED * dt; machine.z += Math.cos(machine.heading) * DRIVE_SPEED * dt; }
