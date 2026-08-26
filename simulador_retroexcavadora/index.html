@@ -1190,14 +1190,19 @@
             '</div>';
         }).join('') +
         '<button type="button" id="dbgLimCopy" style="width:100%;margin-top:4px;font-size:10px;padding:5px;background:#58a6ff;color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">Copiar límites</button>' +
-        '<div style="font-weight:bold;color:#58a6ff;margin:10px 0 6px;border-top:1px solid #30363d;padding-top:10px">📏 Regla de alcance</div>' +
-        '<div style="color:#8b949e;margin-bottom:8px">Con "Modo regla" activo, un clic sobre el terreno (o cualquier pieza) marca un punto y muestra su posición respecto a la máquina, el alcance horizontal desde el eje de giro, y la distancia al diente de la cuchara ahora mismo.</div>' +
+        '<div style="font-weight:bold;color:#58a6ff;margin:10px 0 6px;border-top:1px solid #30363d;padding-top:10px">📏 Regla</div>' +
+        '<div style="color:#8b949e;margin-bottom:8px">Con "Modo regla" activo, un clic marca un punto. En referencia "Cuchara" los puntos quedan en el espacio propio de la cuchara (no cambian aunque muevas el brazo), para medir su ancho/alto/profundidad marcando sus esquinas; el panel calcula esas 3 medidas solo. En "Máquina" mide alcance sobre el terreno.</div>' +
+        '<div style="display:flex;gap:10px;margin-bottom:6px;font-size:10px">' +
+        '<label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="dbgRulerFrame" value="bucket" checked>🪣 Cuchara</label>' +
+        '<label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="dbgRulerFrame" value="machine">🚜 Máquina</label>' +
+        '</div>' +
         '<label style="display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer">' +
         '<input type="checkbox" id="dbgRulerActive"><span>Modo regla activado</span></label>' +
         '<div style="display:flex;gap:6px;margin:8px 0">' +
         '<button type="button" id="dbgRulerClear" style="flex:1;font-size:10px;padding:5px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:4px;cursor:pointer">Borrar todos</button>' +
         '<button type="button" id="dbgRulerCopy" style="flex:1;font-size:10px;padding:5px;background:#58a6ff;color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">Copiar todo</button>' +
         '</div>' +
+        '<div id="dbgRulerDims" style="color:#7ee787;margin-bottom:6px"></div>' +
         '<div id="dbgRulerList"></div>';
 
       document.body.appendChild(wrap);
@@ -1349,28 +1354,50 @@
         }
       });
 
-      // ---- regla de alcance: clic sobre lo que sea (terreno, máquina) marca un punto
-      // y reporta su posición relativa a la máquina (X lateral, Z adelante/atrás según
-      // el rumbo, Y altura) + alcance horizontal desde el eje de giro + distancia al
-      // diente de la cuchara en ese instante — para chequear a qué llega realmente la
-      // cuchara sobre el terreno. ----
+      // ---- regla: clic marca un punto. En referencia "cuchara" el punto se guarda en
+      // el espacio propio de armPivotD (el pivote D, rígido con la malla real de la
+      // cuchara) — esas coordenadas NO cambian aunque después muevas el brazo, así que
+      // marcando las esquinas de la cuchara se puede medir su ancho/alto/profundidad
+      // reales sin que la posición/pose de la máquina lo arruine. En "máquina" mide
+      // alcance sobre el terreno respecto al eje de giro, como antes. ----
       var rulerActive = false;
       var rulerPoints = [];
       var rulerCounter = 0;
+      function currentRulerFrame() {
+        var el = wrap.querySelector('input[name="dbgRulerFrame"]:checked');
+        return el ? el.value : 'bucket';
+      }
+      function renderDims() {
+        var pts = rulerPoints.filter(function (p) { return p.frame === 'bucket'; });
+        var dims = document.getElementById('dbgRulerDims');
+        if (pts.length < 2) { dims.textContent = ''; return; }
+        var xs = pts.map(function (p) { return p.local.x; });
+        var ys = pts.map(function (p) { return p.local.y; });
+        var zs = pts.map(function (p) { return p.local.z; });
+        dims.textContent =
+          'medidas de la cuchara (' + pts.length + ' puntos) — ' +
+          'X: ' + (Math.max.apply(null, xs) - Math.min.apply(null, xs)).toFixed(3) + ' m, ' +
+          'Y: ' + (Math.max.apply(null, ys) - Math.min.apply(null, ys)).toFixed(3) + ' m, ' +
+          'Z: ' + (Math.max.apply(null, zs) - Math.min.apply(null, zs)).toFixed(3) + ' m';
+      }
       function renderRulerList() {
         var list = document.getElementById('dbgRulerList');
+        renderDims();
         if (!rulerPoints.length) {
           list.innerHTML = '<div style="color:#8b949e;padding:6px 0">(sin puntos todavía)</div>';
           return;
         }
         list.innerHTML = rulerPoints.map(function (p) {
+          var extra = p.frame === 'bucket'
+            ? ''
+            : '<div style="color:#7ee787">alcance horizontal: ' + p.reach.toFixed(2) + ' m &nbsp; · &nbsp; a la cuchara: ' + p.distToBucket.toFixed(2) + ' m</div>';
           return '<div style="border-left:4px solid ' + p.color + ';padding:5px 8px;margin-bottom:6px;background:#161b22;border-radius:4px">' +
             '<div style="display:flex;justify-content:space-between;align-items:center">' +
-            '<strong style="color:' + p.color + '">' + p.id + '</strong>' +
+            '<strong style="color:' + p.color + '">' + p.id + ' · ' + (p.frame === 'bucket' ? '🪣 cuchara' : '🚜 máquina') + '</strong>' +
             '<button type="button" data-delruler="' + p.id + '" style="background:none;border:none;color:#f85149;cursor:pointer;font-size:13px;line-height:1">✕</button>' +
             '</div>' +
-            '<div style="color:#8b949e;margin-top:3px">respecto a máquina (m): x=' + p.local.x.toFixed(2) + ', y=' + p.local.y.toFixed(2) + ', z=' + p.local.z.toFixed(2) + '</div>' +
-            '<div style="color:#7ee787">alcance horizontal: ' + p.reach.toFixed(2) + ' m &nbsp; · &nbsp; a la cuchara: ' + p.distToBucket.toFixed(2) + ' m</div>' +
+            '<div style="color:#8b949e;margin-top:3px">x=' + p.local.x.toFixed(3) + ', y=' + p.local.y.toFixed(3) + ', z=' + p.local.z.toFixed(3) + '</div>' +
+            extra +
             '</div>';
         }).join('');
       }
@@ -1394,10 +1421,10 @@
       });
       document.getElementById('dbgRulerCopy').addEventListener('click', function () {
         var text = rulerPoints.map(function (p) {
-          return p.id + '\n' +
-            '  respecto a máquina (m): x=' + p.local.x.toFixed(2) + ', y=' + p.local.y.toFixed(2) + ', z=' + p.local.z.toFixed(2) + '\n' +
-            '  alcance horizontal: ' + p.reach.toFixed(2) + ' m\n' +
-            '  distancia a la cuchara: ' + p.distToBucket.toFixed(2) + ' m';
+          var extra = p.frame === 'bucket' ? '' :
+            '\n  alcance horizontal: ' + p.reach.toFixed(2) + ' m\n  distancia a la cuchara: ' + p.distToBucket.toFixed(2) + ' m';
+          return p.id + ' · ' + (p.frame === 'bucket' ? 'cuchara' : 'máquina') + '\n' +
+            '  x=' + p.local.x.toFixed(3) + ', y=' + p.local.y.toFixed(3) + ', z=' + p.local.z.toFixed(3) + extra;
         }).join('\n\n') || '(sin puntos)';
         var btn = document.getElementById('dbgRulerCopy');
         if (navigator.clipboard) {
@@ -1440,20 +1467,31 @@
         });
         if (!hits.length) return;
         var worldPt = hits[0].point;
-        var local = machineRoot.worldToLocal(worldPt.clone());
-        bucketTip.getWorldPosition(tipWorld);
+        var frame = currentRulerFrame();
         rulerCounter++;
         var color = 'hsl(' + ((rulerCounter * 61) % 360) + ', 85%, 58%)';
-        var marker = makeRulerMarker(scene, color);
-        marker.userData.isPickMarker = true;
-        marker.position.copy(worldPt);
-        rulerPoints.push({
-          id: 'R' + rulerCounter, color: color,
-          local: { x: local.x, y: local.y, z: local.z },
-          reach: Math.hypot(local.x, local.z),
-          distToBucket: worldPt.distanceTo(tipWorld),
-          marker: marker
-        });
+        var point = { id: 'R' + rulerCounter, color: color, frame: frame };
+        if (frame === 'bucket' && armPivotD) {
+          // espacio propio del pivote D: rígido con la cuchara real, independiente de
+          // en qué pose esté el brazo en este momento.
+          var localB = armPivotD.worldToLocal(worldPt.clone());
+          point.local = { x: localB.x, y: localB.y, z: localB.z };
+          var marker = makeRulerMarker(armPivotD, color);
+          marker.userData.isPickMarker = true;
+          marker.position.copy(localB);
+          point.marker = marker;
+        } else {
+          var localM = machineRoot.worldToLocal(worldPt.clone());
+          bucketTip.getWorldPosition(tipWorld);
+          point.local = { x: localM.x, y: localM.y, z: localM.z };
+          point.reach = Math.hypot(localM.x, localM.z);
+          point.distToBucket = worldPt.distanceTo(tipWorld);
+          var marker2 = makeRulerMarker(scene, color);
+          marker2.userData.isPickMarker = true;
+          marker2.position.copy(worldPt);
+          point.marker = marker2;
+        }
+        rulerPoints.push(point);
         renderRulerList();
       });
     }
