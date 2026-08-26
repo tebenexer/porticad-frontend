@@ -344,28 +344,17 @@
     var ANTEBRAZO_MESH_NAMES = ['Mesh363', 'Mesh364', 'Mesh377', 'Mesh378', 'Mesh379', 'Mesh380', 'Mesh381', 'Mesh382'];
     var PLUMA_MESH_NAMES = ['Mesh367', 'Mesh368', 'Mesh369', 'Mesh370'];
 
-    // inversa de la transformación de arriba: dado un punto ya en metros/local (el
-    // mismo espacio en el que quedan las mallas reales tras el bake), devuelve el
-    // punto equivalente en mm crudos del .obj original — para comparar directo
-    // contra SketchUp. La usa el panel de picking (?debug=1).
-    function localMetersToRawMM(local) {
-      var mmX = local.x / MODEL_SCALE, mmY = local.y / MODEL_SCALE, mmZ = local.z / MODEL_SCALE;
-      var c = Math.cos(MODEL_ROTATE_Y), s = Math.sin(MODEL_ROTATE_Y);
-      return {
-        x: mmX * c - mmZ * s + MODEL_CHASSIS_X,
-        y: mmY + MODEL_TURRET_BASE_Y,
-        z: mmX * s + mmZ * c + MODEL_CHASSIS_Z
-      };
-    }
-
-    // las 4 articulaciones reales, encontradas por el usuario con el panel de picking
-    // (?debug=1): cada una es el promedio de varios clics hechos sobre las dos piezas
-    // que se tocan justo ahí, para triangular el centro real del pasador. En metros,
-    // mismo espacio "local" (turretPivot) que usan las mallas reales ya reensambladas.
-    var REAL_JOINT_A = { x: -0.129, y: 0.569, z: 0.532 }; // torreta -> pluma
-    var REAL_JOINT_B = { x: 0.640, y: 2.522, z: 1.420 }; // pluma -> antebrazo
-    var REAL_JOINT_C = { x: 2.289, y: 3.315, z: 4.253 }; // antebrazo -> brazo
-    var REAL_JOINT_D = { x: 2.980, y: 1.148, z: 5.455 }; // brazo -> cuchara
+    // las 4 articulaciones reales, cada una definida como un pasador (cilindro
+    // pasante): un punto de origen sobre el eje + la dirección de ese eje (vector
+    // unitario) — no un simple punto girando siempre en X, para que cada pieza gire
+    // alrededor de su eje de bisagra REAL y no quede torsionada. Se miden marcando 2
+    // clics (entrada/salida del pasador) por articulación con el panel de picking
+    // (?debug=1). En metros, mismo espacio "local" (turretPivot) que usan las mallas
+    // reales ya reensambladas. Pendientes de remedir — placeholder con eje neutro.
+    var REAL_JOINT_A = { origin: { x: 0, y: 0, z: 0 }, axis: { x: 1, y: 0, z: 0 } }; // torreta -> pluma
+    var REAL_JOINT_B = { origin: { x: 0, y: 0, z: 0 }, axis: { x: 1, y: 0, z: 0 } }; // pluma -> antebrazo
+    var REAL_JOINT_C = { origin: { x: 0, y: 0, z: 0 }, axis: { x: 1, y: 0, z: 0 } }; // antebrazo -> brazo
+    var REAL_JOINT_D = { origin: { x: 0, y: 0, z: 0 }, axis: { x: 1, y: 0, z: 0 } }; // brazo -> cuchara
 
     function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
     function lerp(a, b, t) { return a + (b - a) * t; }
@@ -663,16 +652,6 @@
       var end = new THREE.Group(); end.position.set(0, 0, length);
       g.add(end);
       return { root: g, end: end, mesh: mesh, width: width, height: height, length: length };
-    }
-    // marcador visible en un punto (esfera de color, siempre "encima" de todo, útil
-    // tanto para las articulaciones del esqueleto procedural como para los puntos que
-    // marca el usuario con el panel de picking)
-    function makeJointMarker(parent, hexColor) {
-      var mat = new THREE.MeshBasicMaterial({ color: hexColor, depthTest: false });
-      var m = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 8), mat);
-      m.renderOrder = 999;
-      parent.add(m);
-      return m;
     }
 
     function buildMachine() {
@@ -994,11 +973,11 @@
       placeholderParts.length = 0;
 
       if (DEBUG_MODE && armAssemblyMeshes.filter(function (e) { return e.piece !== 'sin_identificar'; }).length > 0) {
-        // el brazo real reemplaza al procedural SOLO en ?debug=1 mientras se
-        // recalibran los 4 pivotes (ver comentario más arriba); se cuelga de los 4
-        // pivotes reales (articulado de verdad, ver buildRealArmChain) y se ocultan
-        // las piezas de referencia.
-        buildRealArmChain(REAL_JOINT_A, REAL_JOINT_B, REAL_JOINT_C, REAL_JOINT_D);
+        // el brazo real reemplaza VISUALMENTE al procedural, SOLO en ?debug=1, tal
+        // cual salió de SketchUp — todavía SIN articular (eso es a propósito: recién
+        // se arma con buildRealArmChain cuando el panel de picking tiene los 4
+        // pasadores medidos y se toca "Aplicar y probar", para no mostrar una
+        // articulación a medio calibrar).
         bucketPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
         bucketPlaceholderParts.length = 0;
         armPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
@@ -1015,13 +994,16 @@
     // ---------- cuelga el brazo/cuchara real de los 4 pivotes reales, articulado ----------
     // A cada pieza (pluma/antebrazo/brazo/cuchara) le corresponde un pivote propio,
     // anidado dentro del anterior (A dentro de turretPivot, B dentro de A, C dentro de
-    // B, D dentro de C) y ubicado exactamente en el punto A/B/C/D dado. Cada malla real
-    // solo se traslada (mesh.position = -origen del pivote) para que, con el pivote en
-    // rotación cero, quede en la MISMA posición donde ya estaba (nada de re-orientarla):
-    // al rotar el pivote, toda la pieza gira rígida alrededor de su articulación real.
-    // Admite volver a llamarse (el panel de picking la reinvoca al tocar "Aplicar y
+    // B, D dentro de C), ubicado en el ORIGEN del pasador y con su EJE propio guardado
+    // en userData.axis (vector unitario, medido con el panel de picking marcando 2
+    // puntos por articulación — entrada y salida del pasador). Al girar cada pivote se
+    // usa quaternion.setFromAxisAngle sobre ESE eje, no una rotación fija en X: así
+    // cada pieza gira alrededor de su bisagra real y no queda torsionada. Cada malla
+    // real solo se traslada (mesh.position = -origen del pivote) para que, con el
+    // pivote sin girar, quede en la MISMA posición donde ya estaba (nada de re-
+    // orientarla). Admite volver a llamarse (el panel la reinvoca al tocar "Aplicar y
     // probar"): si ya había una cadena armada, primero la deshace.
-    function buildRealArmChain(A, B, C, D) {
+    function buildRealArmChain(jointA, jointB, jointC, jointD) {
       if (armPivotA) {
         armAssemblyMeshes.forEach(function (entry) {
           if (entry.piece === 'sin_identificar') return;
@@ -1038,20 +1020,26 @@
         armPivotA = armPivotB = armPivotC = armPivotD = null;
       }
 
+      var A = jointA.origin, B = jointB.origin, C = jointC.origin, D = jointD.origin;
+
       armPivotA = new THREE.Group();
       armPivotA.position.set(A.x, A.y, A.z);
+      armPivotA.userData.axis = new THREE.Vector3(jointA.axis.x, jointA.axis.y, jointA.axis.z).normalize();
       turretPivot.add(armPivotA);
 
       armPivotB = new THREE.Group();
       armPivotB.position.set(B.x - A.x, B.y - A.y, B.z - A.z);
+      armPivotB.userData.axis = new THREE.Vector3(jointB.axis.x, jointB.axis.y, jointB.axis.z).normalize();
       armPivotA.add(armPivotB);
 
       armPivotC = new THREE.Group();
       armPivotC.position.set(C.x - B.x, C.y - B.y, C.z - B.z);
+      armPivotC.userData.axis = new THREE.Vector3(jointC.axis.x, jointC.axis.y, jointC.axis.z).normalize();
       armPivotB.add(armPivotC);
 
       armPivotD = new THREE.Group();
       armPivotD.position.set(D.x - C.x, D.y - C.y, D.z - C.z);
+      armPivotD.userData.axis = new THREE.Vector3(jointD.axis.x, jointD.axis.y, jointD.axis.z).normalize();
       armPivotC.add(armPivotD);
 
       var pivotByPiece = { pluma: armPivotA, antebrazo: armPivotB, brazo: armPivotC, cuchara: armPivotD };
@@ -1076,14 +1064,15 @@
       dirtMound.position.set(0, 0.1, 0);
     }
 
-    // ---------- panel de picking: 4 pivotes, uno por articulación (?debug=1) ----------
-    // Un botón "Marcar" por articulación (A/B/C/D); tocás el botón y después un solo
-    // clic sobre el modelo fija ESE pivote — nada de acumular decenas de puntos sueltos
-    // para promediar. "Aplicar y probar" reconstruye la cadena en vivo con los 4
-    // valores actuales para ver el resultado ahí mismo; "Copiar los 4 valores" arma el
-    // texto listo para pasar. Mientras el panel está abierto, el brazo se congela en
-    // pose de descanso (todo en 0) para que lo que clickeás sea comparable a los
-    // REAL_JOINT_A/B/C/D del código. No aparece en el uso normal.
+    // ---------- panel de picking: 4 pasadores, como cilindro pasante (?debug=1) ----------
+    // Cada articulación se define con 2 clics (entrada y salida del pasador), no un
+    // punto suelto: así se mide también la DIRECCIÓN real del eje de giro, y cada
+    // pieza rota alrededor de su bisagra real en vez de girar siempre en X — que era
+    // lo que la torsionaba. Se ve como un cilindro fino atravesando el modelo, no una
+    // esfera. "Aplicar y probar" reconstruye la cadena en vivo; "Copiar los 4
+    // valores" arma el texto listo para pasar. Mientras el panel está abierto, el
+    // brazo se congela en pose de descanso (todo en 0) para que lo medido sea
+    // comparable a REAL_JOINT_A/B/C/D. No aparece en el uso normal.
     var jointDefs = [
       { key: 'A', label: 'A · torreta → pluma', color: '#ff3b30' },
       { key: 'B', label: 'B · pluma → antebrazo', color: '#34c759' },
@@ -1093,6 +1082,28 @@
     var pickRaycaster = new THREE.Raycaster();
     var pickPointerDown = null;
 
+    // cilindro fino orientable: geometría unitaria (radio fijo, largo 1 a lo largo de
+    // Z desde el origen), se reorienta con quaternion + se escala en Z para estirarlo
+    // entre 2 puntos cualesquiera — el "pasador" visible de cada articulación.
+    function makeAxisCylinder(parent, hexColor) {
+      var geo = new THREE.CylinderGeometry(0.025, 0.025, 1, 12);
+      geo.rotateX(Math.PI / 2);
+      geo.translate(0, 0, 0.5);
+      var mat = new THREE.MeshBasicMaterial({ color: hexColor, depthTest: false, transparent: true, opacity: 0.85 });
+      var mesh = new THREE.Mesh(geo, mat);
+      mesh.renderOrder = 999;
+      parent.add(mesh);
+      return mesh;
+    }
+    var UNIT_Z = new THREE.Vector3(0, 0, 1);
+    function setAxisCylinderEnds(mesh, p1, p2) {
+      var dir = new THREE.Vector3(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z);
+      var len = Math.max(0.03, dir.length());
+      mesh.position.set(p1.x, p1.y, p1.z);
+      mesh.quaternion.setFromUnitVectors(UNIT_Z, dir.clone().normalize());
+      mesh.scale.set(1, 1, len);
+    }
+
     function setupPointPickerPanel() {
       // congela el brazo en pose de descanso: lo que se clickea tiene que quedar
       // comparable a REAL_JOINT_A/B/C/D (medidos con todo en 0), no a la pose de
@@ -1101,18 +1112,22 @@
       boomSeg.root.rotation.x = 0; antebrazoSeg.root.rotation.x = 0;
       armSeg.root.rotation.x = 0; bucketGroup.rotation.x = 0;
       if (armPivotA) {
-        armPivotA.rotation.x = 0; armPivotB.rotation.x = 0;
-        armPivotC.rotation.x = 0; armPivotD.rotation.x = 0;
+        armPivotA.quaternion.identity(); armPivotB.quaternion.identity();
+        armPivotC.quaternion.identity(); armPivotD.quaternion.identity();
       }
 
-      var jointVal = {
-        A: { x: REAL_JOINT_A.x, y: REAL_JOINT_A.y, z: REAL_JOINT_A.z },
-        B: { x: REAL_JOINT_B.x, y: REAL_JOINT_B.y, z: REAL_JOINT_B.z },
-        C: { x: REAL_JOINT_C.x, y: REAL_JOINT_C.y, z: REAL_JOINT_C.z },
-        D: { x: REAL_JOINT_D.x, y: REAL_JOINT_D.y, z: REAL_JOINT_D.z }
-      };
+      var realJointDefaults = { A: REAL_JOINT_A, B: REAL_JOINT_B, C: REAL_JOINT_C, D: REAL_JOINT_D };
+      var jointVal = {};
+      jointDefs.forEach(function (jd) {
+        var src = realJointDefaults[jd.key];
+        var o = src.origin, ax = src.axis;
+        jointVal[jd.key] = {
+          p1: { x: o.x, y: o.y, z: o.z },
+          p2: { x: o.x + ax.x * 0.3, y: o.y + ax.y * 0.3, z: o.z + ax.z * 0.3 }
+        };
+      });
       var jointMarker = {};
-      var armedKey = null;
+      var armed = null; // { key, point: 1|2 }
 
       var wrap = document.createElement('div');
       wrap.id = 'debugPanel';
@@ -1121,16 +1136,18 @@
         'font-family:monospace;font-size:11px;color:#e6edf3;box-shadow:0 4px 20px rgba(0,0,0,.5);';
 
       wrap.innerHTML =
-        '<div style="font-weight:bold;color:#58a6ff;margin-bottom:6px">🧩 4 pivotes reales</div>' +
-        '<div style="color:#8b949e;margin-bottom:8px">Tocá "Marcar" en la articulación que querés fijar y después un solo clic sobre el modelo, justo en el centro del pasador. El brazo queda congelado en pose de descanso mientras marcás — no lo muevas con los controles.</div>' +
+        '<div style="font-weight:bold;color:#58a6ff;margin-bottom:6px">🧩 4 pasadores reales</div>' +
+        '<div style="color:#8b949e;margin-bottom:8px">Por cada articulación, marcá 2 puntos sobre el mismo eje del pasador (entrada y salida, mirándolo desde cualquier ángulo) — el panel arma un cilindro entre los dos y calcula el eje de giro real. El brazo queda congelado en pose de descanso mientras marcás.</div>' +
         '<div id="dbgArmStatus" style="min-height:14px;color:#f0b429;margin-bottom:6px"></div>' +
         jointDefs.map(function (jd) {
           return '<div style="border-left:4px solid ' + jd.color + ';padding:5px 8px;margin-bottom:6px;background:#161b22;border-radius:4px">' +
             '<div style="display:flex;justify-content:space-between;align-items:center">' +
             '<strong style="color:' + jd.color + '">' + jd.label + '</strong>' +
-            '<button type="button" data-arm="' + jd.key + '" id="dbgArm' + jd.key + '" style="font-size:10px;padding:3px 8px;background:' + jd.color + ';color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">Marcar</button>' +
-            '</div>' +
-            '<div id="dbgVal' + jd.key + '" style="color:#8b949e;margin-top:3px"></div>' +
+            '<span style="display:flex;gap:4px">' +
+            '<button type="button" data-arm="' + jd.key + '" data-pt="1" id="dbgArm' + jd.key + '1" style="font-size:10px;padding:3px 6px;background:' + jd.color + ';color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">① </button>' +
+            '<button type="button" data-arm="' + jd.key + '" data-pt="2" id="dbgArm' + jd.key + '2" style="font-size:10px;padding:3px 6px;background:' + jd.color + ';color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">② </button>' +
+            '</span></div>' +
+            '<div id="dbgVal' + jd.key + '" style="color:#8b949e;margin-top:3px;white-space:pre-line"></div>' +
             '</div>';
         }).join('') +
         '<div style="display:flex;gap:6px;margin:8px 0">' +
@@ -1140,38 +1157,56 @@
 
       document.body.appendChild(wrap);
 
-      function renderVal(key) {
+      function axisOf(key) {
         var v = jointVal[key];
+        var dir = new THREE.Vector3(v.p2.x - v.p1.x, v.p2.y - v.p1.y, v.p2.z - v.p1.z);
+        if (dir.lengthSq() < 1e-8) dir.set(1, 0, 0); else dir.normalize();
+        return dir;
+      }
+      function renderVal(key) {
+        var v = jointVal[key], ax = axisOf(key);
         document.getElementById('dbgVal' + key).textContent =
-          'x=' + v.x.toFixed(3) + ', y=' + v.y.toFixed(3) + ', z=' + v.z.toFixed(3);
+          '① x=' + v.p1.x.toFixed(3) + ', y=' + v.p1.y.toFixed(3) + ', z=' + v.p1.z.toFixed(3) + '\n' +
+          '② x=' + v.p2.x.toFixed(3) + ', y=' + v.p2.y.toFixed(3) + ', z=' + v.p2.z.toFixed(3) + '\n' +
+          'eje: x=' + ax.x.toFixed(3) + ', y=' + ax.y.toFixed(3) + ', z=' + ax.z.toFixed(3);
+        setAxisCylinderEnds(jointMarker[key], v.p1, v.p2);
       }
       jointDefs.forEach(function (jd) {
+        jointMarker[jd.key] = makeAxisCylinder(turretPivot, jd.color);
+        jointMarker[jd.key].userData.isPickMarker = true;
         renderVal(jd.key);
-        var m = makeJointMarker(turretPivot, jd.color);
-        m.userData.isPickMarker = true;
-        m.position.set(jointVal[jd.key].x, jointVal[jd.key].y, jointVal[jd.key].z);
-        jointMarker[jd.key] = m;
       });
 
-      function setArmed(key) {
-        armedKey = key;
+      function setArmed(next) {
+        armed = next;
         jointDefs.forEach(function (jd) {
-          document.getElementById('dbgArm' + jd.key).textContent = jd.key === key ? 'Tocá el modelo…' : 'Marcar';
+          [1, 2].forEach(function (pt) {
+            var btn = document.getElementById('dbgArm' + jd.key + pt);
+            var isArmed = armed && armed.key === jd.key && armed.point === pt;
+            btn.textContent = (isArmed ? '● ' : (pt === 1 ? '① ' : '② '));
+          });
         });
-        document.getElementById('dbgArmStatus').textContent = key ? 'Haciendo clic sobre el modelo fija ' + key + '.' : '';
+        document.getElementById('dbgArmStatus').textContent = armed ? 'Tocá el modelo para fijar el punto ' + armed.point + ' de ' + armed.key + '.' : '';
       }
+      setArmed(null);
       jointDefs.forEach(function (jd) {
-        document.getElementById('dbgArm' + jd.key).addEventListener('click', function () { setArmed(jd.key); });
+        [1, 2].forEach(function (pt) {
+          document.getElementById('dbgArm' + jd.key + pt).addEventListener('click', function () {
+            setArmed({ key: jd.key, point: pt });
+          });
+        });
       });
 
       document.getElementById('dbgPickApply').addEventListener('click', function () {
-        buildRealArmChain(jointVal.A, jointVal.B, jointVal.C, jointVal.D);
+        function toJoint(key) { return { origin: jointVal[key].p1, axis: axisOf(key) }; }
+        buildRealArmChain(toJoint('A'), toJoint('B'), toJoint('C'), toJoint('D'));
       });
 
       document.getElementById('dbgPickCopy').addEventListener('click', function () {
         var text = jointDefs.map(function (jd) {
-          var v = jointVal[jd.key];
-          return 'var REAL_JOINT_' + jd.key + ' = { x: ' + v.x.toFixed(3) + ', y: ' + v.y.toFixed(3) + ', z: ' + v.z.toFixed(3) + ' }; // ' + jd.label;
+          var ax = axisOf(jd.key), p1 = jointVal[jd.key].p1;
+          return 'var REAL_JOINT_' + jd.key + ' = { origin: { x: ' + p1.x.toFixed(3) + ', y: ' + p1.y.toFixed(3) + ', z: ' + p1.z.toFixed(3) +
+            ' }, axis: { x: ' + ax.x.toFixed(3) + ', y: ' + ax.y.toFixed(3) + ', z: ' + ax.z.toFixed(3) + ' } }; // ' + jd.label;
         }).join('\n');
         var btn = document.getElementById('dbgPickCopy');
         if (navigator.clipboard) {
@@ -1185,11 +1220,11 @@
 
       var dom = renderer.domElement;
       dom.addEventListener('pointerdown', function (e) {
-        if (!armedKey) return;
+        if (!armed) return;
         pickPointerDown = { x: e.clientX, y: e.clientY, t: performance.now() };
       });
       dom.addEventListener('pointerup', function (e) {
-        if (!armedKey || !pickPointerDown) return;
+        if (!armed || !pickPointerDown) return;
         var moved = Math.hypot(e.clientX - pickPointerDown.x, e.clientY - pickPointerDown.y);
         var dt = performance.now() - pickPointerDown.t;
         pickPointerDown = null;
@@ -1210,9 +1245,9 @@
         // en ESE marco rotado — turretPivot.worldToLocal() da siempre la coordenada de
         // reposo correcta, sea cual sea la pose actual.
         var local = turretPivot.worldToLocal(hits[0].point.clone());
-        jointVal[armedKey] = { x: local.x, y: local.y, z: local.z };
-        jointMarker[armedKey].position.set(local.x, local.y, local.z);
-        renderVal(armedKey);
+        var key = armed.key, pointField = armed.point === 1 ? 'p1' : 'p2';
+        jointVal[key][pointField] = { x: local.x, y: local.y, z: local.z };
+        renderVal(key);
         setArmed(null);
       });
     }
@@ -1330,10 +1365,10 @@
       // pero queda oculto detrás. No hay telescopio identificado en el modelo real,
       // así que ctrl.ext no tiene efecto acá (el brazo real es rígido entre C y D).
       if (armPivotA) {
-        armPivotA.rotation.x = -ctrl.boom;
-        armPivotB.rotation.x = -ctrl.antebrazo;
-        armPivotC.rotation.x = -ctrl.arm;
-        armPivotD.rotation.x = -ctrl.bucket;
+        armPivotA.quaternion.setFromAxisAngle(armPivotA.userData.axis, -ctrl.boom);
+        armPivotB.quaternion.setFromAxisAngle(armPivotB.userData.axis, -ctrl.antebrazo);
+        armPivotC.quaternion.setFromAxisAngle(armPivotC.userData.axis, -ctrl.arm);
+        armPivotD.quaternion.setFromAxisAngle(armPivotD.userData.axis, -ctrl.bucket);
       }
 
       // excavación
