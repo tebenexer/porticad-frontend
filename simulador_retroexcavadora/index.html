@@ -495,7 +495,18 @@
     var DEBUG_MODE = location.search.indexOf('debug=1') >= 0;
     // piezas cargadas del modelo real, agrupadas para el inspector del panel de debug
     var debugParts = { cuchara: [], brazo: [], antebrazo: [], pluma: [], sinIdentificar: [], porGrupo: {} };
-    var jointMarkers = {}; // esferas de color en cada articulación (solo si DEBUG_MODE)
+    var jointMarkers = {}; // esferas A/B/C/D: las articulaciones de la cadena propia (solo si DEBUG_MODE)
+    // esferas "cerca"/"lejos" propias de cada pieza (pluma/antebrazo/brazo), en el mismo
+    // espacio local que la malla real de esa pieza (metros, origen = la articulación de
+    // esa pieza) — para marcar a ojo, sobre la malla ya cargada, dónde se ve cada
+    // extremo, sin depender de que ya esté bien orientada. Puramente visual/de
+    // referencia; no mueve nada por sí sola.
+    var pieceRefTune = {
+      pluma: { near: { x: 0, y: 0, z: 0 }, far: { x: 0, y: 0, z: 1.6 } },
+      antebrazo: { near: { x: 0, y: 0, z: 0 }, far: { x: 0, y: 0, z: 1.4 } },
+      brazo: { near: { x: 0, y: 0, z: 0 }, far: { x: 0, y: 0, z: 2.05 } }
+    };
+    var pieceRefMarkers = {}; // { pluma: {near, far}, antebrazo: {...}, brazo: {...} }
     var bucketTune = {
       yawDeg: BUCKET_ROTATE_Y * 180 / Math.PI,
       pitchDeg: BUCKET_PITCH_FIX * 180 / Math.PI,
@@ -845,6 +856,14 @@
       // grupo que aloja las piezas reales de la pluma (Mesh367-370)
       plumaRealGroup = new THREE.Group();
       boomSeg.root.add(plumaRealGroup);
+      if (DEBUG_MODE) {
+        pieceRefMarkers.pluma = {
+          near: makeJointMarker(plumaRealGroup, 0xff9500), // naranja
+          far: makeJointMarker(plumaRealGroup, 0xffd60a) // amarillo
+        };
+        pieceRefMarkers.pluma.near.position.set(pieceRefTune.pluma.near.x, pieceRefTune.pluma.near.y, pieceRefTune.pluma.near.z);
+        pieceRefMarkers.pluma.far.position.set(pieceRefTune.pluma.far.x, pieceRefTune.pluma.far.y, pieceRefTune.pluma.far.z);
+      }
 
       // antebrazo — articulación pluma-antebrazo (segunda sección del brazo articulado)
       antebrazoSeg = makeSegment(1.4, 0.30, 0.34, YELLOW);
@@ -856,6 +875,14 @@
       // grupo que aloja las piezas reales del antebrazo (Mesh363-364 + letreros)
       antebrazoRealGroup = new THREE.Group();
       antebrazoSeg.root.add(antebrazoRealGroup);
+      if (DEBUG_MODE) {
+        pieceRefMarkers.antebrazo = {
+          near: makeJointMarker(antebrazoRealGroup, 0x30d5c8), // verde azulado
+          far: makeJointMarker(antebrazoRealGroup, 0x64d2ff) // celeste
+        };
+        pieceRefMarkers.antebrazo.near.position.set(pieceRefTune.antebrazo.near.x, pieceRefTune.antebrazo.near.y, pieceRefTune.antebrazo.near.z);
+        pieceRefMarkers.antebrazo.far.position.set(pieceRefTune.antebrazo.far.x, pieceRefTune.antebrazo.far.y, pieceRefTune.antebrazo.far.z);
+      }
 
       // brazo (arm / stick) — articulación antebrazo-brazo
       armSeg = makeSegment(2.05, 0.27, 0.3, YELLOW_DK);
@@ -867,6 +894,14 @@
       // grupo que aloja las piezas reales del brazo (Mesh365 + mecanismo + hidráulico)
       armRealGroup = new THREE.Group();
       armSeg.root.add(armRealGroup);
+      if (DEBUG_MODE) {
+        pieceRefMarkers.brazo = {
+          near: makeJointMarker(armRealGroup, 0xbf5af2), // púrpura
+          far: makeJointMarker(armRealGroup, 0xff375f) // rosa
+        };
+        pieceRefMarkers.brazo.near.position.set(pieceRefTune.brazo.near.x, pieceRefTune.brazo.near.y, pieceRefTune.brazo.near.z);
+        pieceRefMarkers.brazo.far.position.set(pieceRefTune.brazo.far.x, pieceRefTune.brazo.far.y, pieceRefTune.brazo.far.z);
+      }
 
       // extensor tipo boom (brazo telescópico)
       extender = buildExtender(armSeg.end, 0.22, 0.24);
@@ -1312,8 +1347,36 @@
         '<button id="dbgChCopy" type="button" style="width:100%;padding:6px;background:#58a6ff;color:#0d1117;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-family:inherit">Copiar valores</button>' +
         '</div></details>';
 
+      // ---- puntos de referencia propios de cada pieza (pluma/antebrazo/brazo): 2
+      // esferas por pieza (cerca/lejos), en el mismo espacio local que su malla real —
+      // para marcar a ojo, sobre la malla ya cargada, dónde se ve cada extremo. Son
+      // puramente visuales: no mueven la malla ni la articulación, son una guía. ----
+      var pieceRefs = [
+        { key: 'pluma', label: 'Pluma', nearColor: '#ff9500', farColor: '#ffd60a' },
+        { key: 'antebrazo', label: 'Antebrazo', nearColor: '#30d5c8', farColor: '#64d2ff' },
+        { key: 'brazo', label: 'Brazo', nearColor: '#bf5af2', farColor: '#ff375f' }
+      ];
+      var pieceRefHtml = '<details style="margin-bottom:6px">' +
+        '<summary style="cursor:pointer;font-weight:bold;color:#f0b429">🎯 Puntos de referencia por pieza</summary>' +
+        '<div style="margin-top:8px;color:#8b949e;font-size:10px;margin-bottom:6px">Solo guías visuales — marcá a ojo dónde ves cada extremo sobre la malla real, y después ajustá el pivote/giro de esa pieza (arriba) hasta que coincida.</div>' +
+        '<label style="display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer">' +
+        '<input type="checkbox" id="dbgShowPieceRefs" checked><span>Mostrar esferas de referencia</span></label>' +
+        pieceRefs.map(function (pr) {
+          return '<div style="border-top:1px solid #30363d;margin:8px 0;padding-top:8px;font-weight:bold">' + pr.label + '</div>' +
+            '<div style="color:' + pr.nearColor + '">● cerca (une con la pieza anterior)</div>' +
+            row('dbgR' + pr.key + 'NearX', 'X', -3, 3, 0.01, pieceRefTune[pr.key].near.x) +
+            row('dbgR' + pr.key + 'NearY', 'Y', -3, 3, 0.01, pieceRefTune[pr.key].near.y) +
+            row('dbgR' + pr.key + 'NearZ', 'Z', -3, 3, 0.01, pieceRefTune[pr.key].near.z) +
+            '<div style="color:' + pr.farColor + ';margin-top:4px">● lejos (une con la pieza siguiente)</div>' +
+            row('dbgR' + pr.key + 'FarX', 'X', -3, 3, 0.01, pieceRefTune[pr.key].far.x) +
+            row('dbgR' + pr.key + 'FarY', 'Y', -3, 3, 0.01, pieceRefTune[pr.key].far.y) +
+            row('dbgR' + pr.key + 'FarZ', 'Z', -3, 3, 0.01, pieceRefTune[pr.key].far.z);
+        }).join('') +
+        '</div></details>';
+
       wrap.innerHTML =
         chainHtml +
+        pieceRefHtml +
         tuneBlockHtml('dbgP', 'Ajuste pluma (Mesh367-370)', plumaTune, false) +
         tuneBlockHtml('dbgN', 'Ajuste antebrazo (Mesh363 + letreros)', antebrazoTune, false) +
         tuneBlockHtml('dbgA', 'Ajuste brazo (Mesh365 + mecanismo)', armTune, false) +
@@ -1450,6 +1513,38 @@
       bindJointPoint('B', function () { setSegmentEnd(boomSeg, chainTune.B.x, chainTune.B.y, chainTune.B.z); });
       bindJointPoint('C', function () { setSegmentEnd(antebrazoSeg, chainTune.C.x, chainTune.C.y, chainTune.C.z); });
       bindJointPoint('D', function () { setSegmentEnd(armSeg, chainTune.D.x, chainTune.D.y, chainTune.D.z); });
+
+      // ---- esferas cerca/lejos propias de pluma/antebrazo/brazo: solo mueven la
+      // esfera guía, no la malla ni la articulación real (A/B/C/D siguen mandando ahí). ----
+      function bindPieceRefPoint(pieceKey, pointKey) {
+        ['X', 'Y', 'Z'].forEach(function (axis) {
+          var field = axis.toLowerCase();
+          var id = 'dbgR' + pieceKey + pointKey + axis;
+          var el = document.getElementById(id), numEl = document.getElementById(id + 'Num');
+          function apply(v) {
+            pieceRefTune[pieceKey][pointKey.toLowerCase()][field] = v; el.value = v; numEl.value = v;
+            var pt = pieceRefTune[pieceKey][pointKey.toLowerCase()];
+            pieceRefMarkers[pieceKey][pointKey.toLowerCase()].position.set(pt.x, pt.y, pt.z);
+          }
+          el.addEventListener('input', function () { apply(parseFloat(el.value)); });
+          numEl.addEventListener('change', function () {
+            var v = parseFloat(numEl.value);
+            if (isNaN(v)) { numEl.value = pieceRefTune[pieceKey][pointKey.toLowerCase()][field]; return; }
+            apply(v);
+          });
+        });
+      }
+      pieceRefs.forEach(function (pr) {
+        bindPieceRefPoint(pr.key, 'Near');
+        bindPieceRefPoint(pr.key, 'Far');
+      });
+      document.getElementById('dbgShowPieceRefs').addEventListener('change', function (e) {
+        Object.keys(pieceRefMarkers).forEach(function (k) {
+          pieceRefMarkers[k].near.visible = e.target.checked;
+          pieceRefMarkers[k].far.visible = e.target.checked;
+        });
+      });
+
       document.getElementById('dbgChCopy').addEventListener('click', function () {
         var text = document.getElementById('dbgChReadout').textContent;
         var btn = document.getElementById('dbgChCopy');
