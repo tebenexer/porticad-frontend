@@ -1169,12 +1169,18 @@
       var wrap = document.createElement('div');
       wrap.id = 'debugPanel';
       wrap.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:999;background:rgba(13,17,23,.95);' +
-        'border:1px solid #30363d;border-radius:10px;padding:12px 14px;width:300px;max-height:82vh;overflow:auto;' +
+        'border:1px solid #30363d;border-radius:10px;padding:12px 14px;width:320px;max-height:82vh;overflow:auto;' +
         'font-family:monospace;font-size:11px;color:#e6edf3;box-shadow:0 4px 20px rgba(0,0,0,.5);';
 
+      // cada fila = label + campo numérico editable (valor exacto) + slider (ajuste
+      // rápido a ojo). Los dos quedan sincronizados: tocar cualquiera actualiza el otro.
       function row(id, label, min, max, step, val) {
         return '<div style="margin-bottom:8px">' +
-          '<div style="display:flex;justify-content:space-between;color:#8b949e"><span>' + label + '</span><span id="' + id + 'Val">' + val + '</span></div>' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;color:#8b949e">' +
+          '<span>' + label + '</span>' +
+          '<input type="number" id="' + id + 'Num" step="any" value="' + val + '" ' +
+          'style="width:70px;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:4px;padding:2px 4px;font-family:inherit;font-size:11px;text-align:right">' +
+          '</div>' +
           '<input type="range" id="' + id + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + val + '" style="width:100%">' +
           '</div>';
       }
@@ -1282,12 +1288,19 @@
             names[5] + ' = ' + (baseZ + tune.dZ).toFixed(0) + ';';
         }
         function bindSlider(suffix, field) {
-          var el = document.getElementById(prefix + suffix), valEl = document.getElementById(prefix + suffix + 'Val');
-          el.addEventListener('input', function () {
-            valEl.textContent = el.value;
-            tune[field] = parseFloat(el.value);
+          var el = document.getElementById(prefix + suffix), numEl = document.getElementById(prefix + suffix + 'Num');
+          function apply(v) {
+            tune[field] = v;
+            el.value = v; // el rango se clampea solo a su min/max si el valor tipeado se pasa (es normal)
+            numEl.value = v;
             applyFn();
             updateReadout();
+          }
+          el.addEventListener('input', function () { apply(parseFloat(el.value)); });
+          numEl.addEventListener('change', function () {
+            var v = parseFloat(numEl.value);
+            if (isNaN(v)) { numEl.value = tune[field]; return; }
+            apply(v);
           });
         }
         bindSlider('Yaw', 'yawDeg'); bindSlider('Pitch', 'pitchDeg'); bindSlider('Roll', 'rollDeg');
@@ -1314,17 +1327,20 @@
       wireTuneBlock('dbgP', plumaTune, ['PLUMA_ROTATE_Y', 'PLUMA_PITCH_FIX', 'PLUMA_ROLL_FIX', 'PLUMA_PIVOT_X', 'PLUMA_PIVOT_Y', 'PLUMA_PIVOT_Z'],
         PLUMA_PIVOT_X, PLUMA_PIVOT_Y, PLUMA_PIVOT_Z, applyPlumaTransform);
 
-      function bindPoseSlider(id, valId, setter) {
-        var el = document.getElementById(id), valEl = document.getElementById(valId);
-        el.addEventListener('input', function () {
-          valEl.textContent = el.value;
-          setter(parseFloat(el.value));
+      function bindPoseSlider(id, numId, setter) {
+        var el = document.getElementById(id), numEl = document.getElementById(numId);
+        function apply(v) { el.value = v; numEl.value = v; setter(v); }
+        el.addEventListener('input', function () { apply(parseFloat(el.value)); });
+        numEl.addEventListener('change', function () {
+          var v = parseFloat(numEl.value);
+          if (isNaN(v)) { numEl.value = el.value; return; }
+          apply(v);
         });
       }
-      bindPoseSlider('dbgBoom', 'dbgBoomVal', function (v) { ctrl.boom = v; });
-      bindPoseSlider('dbgAntebrazoPose', 'dbgAntebrazoPoseVal', function (v) { ctrl.antebrazo = v; });
-      bindPoseSlider('dbgArmPose', 'dbgArmPoseVal', function (v) { ctrl.arm = v; });
-      bindPoseSlider('dbgExt', 'dbgExtVal', function (v) { ctrl.ext = v; });
+      bindPoseSlider('dbgBoom', 'dbgBoomNum', function (v) { ctrl.boom = v; });
+      bindPoseSlider('dbgAntebrazoPose', 'dbgAntebrazoPoseNum', function (v) { ctrl.antebrazo = v; });
+      bindPoseSlider('dbgArmPose', 'dbgArmPoseNum', function (v) { ctrl.arm = v; });
+      bindPoseSlider('dbgExt', 'dbgExtNum', function (v) { ctrl.ext = v; });
     }
 
     // ---------- cámara externa (orbit manual) ----------
