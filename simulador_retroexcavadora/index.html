@@ -276,8 +276,12 @@
     var TERRAIN_W = 22, TERRAIN_D = 18, SEG_X = 66, SEG_Z = 54;
     var CELL_W = TERRAIN_W / SEG_X, CELL_D = TERRAIN_D / SEG_Z, CELL_AREA = CELL_W * CELL_D;
     var MIN_DEPTH = -2.4, MAX_PILE = 1.6;
-    var DIG_RADIUS = 0.55, PILE_RADIUS = 0.65;
-    var BUCKET_CAPACITY = 0.55; // m3 aprox
+    // radio de excavación y capacidad, recalculados a partir de las medidas reales de
+    // la cuchara (panel de regla en modo "cuchara", ?debug=1): boca ~0.93x0.70 m,
+    // fondo ~0.72x0.41 m, profundidad boca->fondo ~0.81 m. Capacidad estimada como un
+    // tronco de pirámide entre boca y fondo.
+    var DIG_RADIUS = 0.8, PILE_RADIUS = 0.95;
+    var BUCKET_CAPACITY = 0.35; // m3, estimado real (antes 0.55, con la cuchara de referencia)
 
     var SWING_SPEED = 0.9, BOOM_SPEED = 0.7, ARM_SPEED = 0.8, BUCKET_SPEED = 1.1;
     // límites reales, medidos con el panel de "sin límite" (?debug=1) sobre el brazo
@@ -294,7 +298,7 @@
     var YELLOW = 0xffca08, YELLOW_DK = 0xe0a800, STEEL = 0x2d333b, DARK = 0x1c2128, GLASS = 0x8ecdf0; // amarillo calibrado con el modelo real
 
     // perfil curvo del cucharón (z=profundidad hacia adelante, y=altura) — pivote en (0,0)
-    var BUCKET_W = 0.52;
+    var BUCKET_W = 0.8; // ancho real medido con la regla (promedio boca/fondo, ver DIG_RADIUS arriba)
     var BK = [
       { z: 0.00, y: 0.08 },
       { z: 0.02, y: -0.48 },
