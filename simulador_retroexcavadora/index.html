@@ -210,6 +210,9 @@
         <div class="lgrow"><span>teclado</span><span><kbd>←</kbd><kbd>→</kbd> giro</span></div>
         <div class="lgrow"><span></span><span><kbd>↑</kbd><kbd>↓</kbd> pluma</span></div>
         <div class="lgrow"><span>PS4</span><span>stick izq.</span></div>
+        <div class="lgrow" style="margin-top:6px"><b>Antebrazo</b><span>2da sección del brazo</span></div>
+        <div class="lgrow"><span>teclado</span><span><kbd>Z</kbd> baja · <kbd>X</kbd> sube</span></div>
+        <div class="lgrow"><span>PS4</span><span>L2 baja · R2 sube</span></div>
         <div class="lgrow" style="margin-top:6px"><b>Palanca der.</b><span>brazo / cuchara</span></div>
         <div class="lgrow"><span>teclado</span><span><kbd>A</kbd><kbd>D</kbd> brazo</span></div>
         <div class="lgrow"><span></span><span><kbd>W</kbd><kbd>S</kbd> cuchara</span></div>
@@ -228,6 +231,10 @@
 
     <div id="controls">
       <div class="stickblock">
+        <div class="extrow">
+          <button class="extbtn" id="antebrazoDown" type="button" title="Bajar antebrazo (Z)">▼ ANTEBR.</button>
+          <button class="extbtn" id="antebrazoUp" type="button" title="Subir antebrazo (X)">▲ ANTEBR.</button>
+        </div>
         <div class="stick-base" id="stickL"><div class="stick-knob" id="knobL"></div></div>
         <div class="lbl">GIRO · PLUMA</div>
       </div>
@@ -274,6 +281,7 @@
 
     var SWING_SPEED = 0.9, BOOM_SPEED = 0.7, ARM_SPEED = 0.8, BUCKET_SPEED = 1.1;
     var BOOM_MIN = -0.10, BOOM_MAX = 1.05;
+    var ANTEBRAZO_SPEED = 0.7, ANTEBRAZO_MIN = -1.1, ANTEBRAZO_MAX = 0.6; // articulación pluma-antebrazo
     var ARM_MIN = -2.35, ARM_MAX = -0.25;
     var BUCKET_MIN = -0.35, BUCKET_MAX = 2.05;
     var DUMP_ANGLE = 1.35; // curl por encima de esto + arriba del terreno = vuelca
@@ -318,8 +326,19 @@
     // dirección de manejo (machine.heading), en vez de quedar cruzadas en diagonal.
     var MODEL_ROTATE_Y = Math.PI * 2 / 3;
 
-    // cuchara real: SOLO Mesh372 (confirmado por el usuario probando el inspector de
-    // piezas — todo lo demás del cluster es el brazo y su mecanismo, no la cuchara).
+    // Toda la cadena pluma->antebrazo->brazo->cuchara vive dentro de "Group44" en el
+    // .obj (20 mallas: Mesh363..Mesh382), identificada pieza por pieza por el usuario
+    // mirando el modelo real en SketchUp:
+    //   pluma      = Mesh367, Mesh368, Mesh369, Mesh370  (por descarte — únicas sin
+    //                identificar dentro de Group44; par simétrico + pieza que las une,
+    //                justo en la transición con la torreta — a confirmar con el panel)
+    //   antebrazo  = Mesh363 (antebrazo) + Mesh364 (botella hidráulica) + Mesh377..382 (letreros)
+    //   brazo      = Mesh365 (brazo) + Mesh366 (botella hidráulica) + Mesh371,373,374,375,376 (mecanismo cuchara)
+    //   cuchara    = Mesh372
+    // Hay articulación real turret-pluma, pluma-antebrazo y antebrazo-brazo (además de
+    // brazo-cuchara). Cada tramo tiene su propio pivote/giro, todos con un primer valor
+    // de partida para ajustar con el panel de ajuste en vivo (?debug=1).
+
     var BUCKET_MESH_NAMES = ['Mesh372'];
     var BUCKET_PIVOT_X = -5146, BUCKET_PIVOT_Y = 2070, BUCKET_PIVOT_Z = -1854; // mm, crudo
     var BUCKET_ROTATE_Y = -Math.PI / 2;
@@ -327,26 +346,29 @@
     var BUCKET_PITCH_FIX = -2.4260; // -139°
     var BUCKET_ROLL_FIX = Math.PI; // 180°
 
-    // brazo real: el resto del cluster (Mesh365 = brazo, Mesh366 = hidráulico del brazo,
-    // y el resto son piezas del mecanismo — pines, bulones, eslabones) que se mueven
-    // todas juntas, rígidas, con el brazo (ctrl.arm). Se reenganchan a armSeg en vez de
-    // a la cuchara. Pivote y giros son un primer valor de partida: ajustar con el panel
-    // de ajuste en vivo (?debug=1) igual que se hizo con la cuchara.
-    var ARM_MESH_NAMES = [
-      'Mesh365', 'Mesh366', 'Mesh371', 'Mesh373', 'Mesh374', 'Mesh375', 'Mesh376',
-      'Mesh363', 'Mesh364', 'Mesh377', 'Mesh378', 'Mesh379', 'Mesh380', 'Mesh381', 'Mesh382',
-      'Mesh384', 'Mesh385', 'Mesh386', 'Mesh387', 'Mesh388', 'Mesh389', 'Mesh390', 'Mesh391', 'Mesh392'
-    ];
+    var ARM_MESH_NAMES = ['Mesh365', 'Mesh366', 'Mesh371', 'Mesh373', 'Mesh374', 'Mesh375', 'Mesh376'];
     var ARM_PIVOT_X = -150, ARM_PIVOT_Y = 1300, ARM_PIVOT_Z = -1854; // mm, crudo — punto de partida
     var ARM_ROTATE_Y = -Math.PI / 2;
     var ARM_PITCH_FIX = 0;
     var ARM_ROLL_FIX = 0;
 
+    var ANTEBRAZO_MESH_NAMES = ['Mesh363', 'Mesh364', 'Mesh377', 'Mesh378', 'Mesh379', 'Mesh380', 'Mesh381', 'Mesh382'];
+    var ANTEBRAZO_PIVOT_X = 50, ANTEBRAZO_PIVOT_Y = 2200, ANTEBRAZO_PIVOT_Z = -1854; // mm, crudo — punto de partida
+    var ANTEBRAZO_ROTATE_Y = -Math.PI / 2;
+    var ANTEBRAZO_PITCH_FIX = 0;
+    var ANTEBRAZO_ROLL_FIX = 0;
+
+    var PLUMA_MESH_NAMES = ['Mesh367', 'Mesh368', 'Mesh369', 'Mesh370'];
+    var PLUMA_PIVOT_X = 50, PLUMA_PIVOT_Y = 1050, PLUMA_PIVOT_Z = -1854; // mm, crudo — punto de partida
+    var PLUMA_ROTATE_Y = -Math.PI / 2;
+    var PLUMA_PITCH_FIX = 0;
+    var PLUMA_ROLL_FIX = 0;
+
     function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
     function lerp(a, b, t) { return a + (b - a) * t; }
 
     // ========================= ESTADO =========================
-    var ctrl = { swing: 0.35, boom: 0.7, arm: -1.0, bucket: 0.5, ext: 0 }; // pose inicial: cuchara despejada del suelo
+    var ctrl = { swing: 0.35, boom: 0.7, antebrazo: -0.3, arm: -1.0, bucket: 0.5, ext: 0 }; // pose inicial: cuchara despejada del suelo
     var machine = { x: 0, z: -6, heading: 0 };
     var bucketLoad = 0, totalExcavated = 0, truckLoad = 0;
 
@@ -354,12 +376,13 @@
     var stickL = { x: 0, y: 0 }, stickR = { x: 0, y: 0 };
     var trackBtn = { f: false, b: false, l: false, r: false };
     var extBtn = { out: false, in: false };
+    var antebrazoBtn = { up: false, down: false };
 
     // ---------- control PS4 / gamepad (API estándar del navegador) ----------
     // palanca izq. = giro·pluma, palanca der. = brazo·cuchara, D-pad = orugas,
     // L1/R1 = retraer/extender, Options = cambiar de cámara.
     var gamepadIndex = null;
-    var gp = { swing: 0, boom: 0, arm: 0, bucket: 0, f: false, b: false, l: false, r: false, extOut: false, extIn: false };
+    var gp = { swing: 0, boom: 0, arm: 0, bucket: 0, f: false, b: false, l: false, r: false, extOut: false, extIn: false, antebrazoUp: false, antebrazoDown: false };
     var gpOptionsPrev = false;
     function gpDeadzone(v) { return Math.abs(v) < 0.15 ? 0 : v; }
     window.addEventListener('gamepadconnected', function (e) {
@@ -375,6 +398,7 @@
     function pollGamepad() {
       gp.swing = 0; gp.boom = 0; gp.arm = 0; gp.bucket = 0;
       gp.f = false; gp.b = false; gp.l = false; gp.r = false; gp.extOut = false; gp.extIn = false;
+      gp.antebrazoUp = false; gp.antebrazoDown = false;
       if (gamepadIndex === null || !navigator.getGamepads) return;
       var pad = navigator.getGamepads()[gamepadIndex];
       if (!pad) return;
@@ -387,6 +411,8 @@
       gp.b = !!(b[13] && b[13].pressed);
       gp.l = !!(b[14] && b[14].pressed);
       gp.r = !!(b[15] && b[15].pressed);
+      gp.antebrazoDown = !!(b[6] && b[6].pressed); // L2
+      gp.antebrazoUp = !!(b[7] && b[7].pressed); // R2
       gp.extIn = !!(b[4] && b[4].pressed);
       gp.extOut = !!(b[5] && b[5].pressed);
       var optionsNow = !!(b[9] && b[9].pressed);
@@ -447,6 +473,8 @@
     setupHold('tR', trackBtn, 'r');
     setupHold('extOut', extBtn, 'out');
     setupHold('extIn', extBtn, 'in');
+    setupHold('antebrazoUp', antebrazoBtn, 'up');
+    setupHold('antebrazoDown', antebrazoBtn, 'down');
 
     document.getElementById('btnLegend').addEventListener('click', function () {
       document.getElementById('legend').classList.toggle('open');
@@ -456,14 +484,16 @@
     var VIEW = document.getElementById('view3d');
     var renderer, scene, camExternal, camCabin, activeCam;
     var terrainMesh, terrainGeo, heights, colors;
-    var turretPivot, boomSeg, armSeg, extender, bucketTip, dirtMound, machineRoot, bucketGroup, truckFill;
+    var turretPivot, boomSeg, antebrazoSeg, armSeg, extender, bucketTip, dirtMound, machineRoot, bucketGroup, truckFill;
     var placeholderParts = [];
     var bucketPlaceholderParts = []; // cuchara de referencia: solo se retira si aparece la real
+    var plumaPlaceholderParts = []; // pluma de referencia: solo se retira si aparece la real
+    var antebrazoPlaceholderParts = []; // antebrazo de referencia: solo se retira si aparece el real
     var armPlaceholderParts = []; // brazo de referencia: solo se retira si aparece el real
     var bucketRawMeshes = []; // {mesh, raw}: geometría SIN transformar, para poder re-aplicar en vivo desde el panel de ajuste
     var DEBUG_MODE = location.search.indexOf('debug=1') >= 0;
     // piezas cargadas del modelo real, agrupadas para el inspector del panel de debug
-    var debugParts = { cuchara: [], brazo: [], sinIdentificar: [], porGrupo: {} };
+    var debugParts = { cuchara: [], brazo: [], antebrazo: [], pluma: [], sinIdentificar: [], porGrupo: {} };
     var bucketTune = {
       yawDeg: BUCKET_ROTATE_Y * 180 / Math.PI,
       pitchDeg: BUCKET_PITCH_FIX * 180 / Math.PI,
@@ -499,6 +529,48 @@
         g.rotateY(armTune.yawDeg * Math.PI / 180);
         g.rotateX(armTune.pitchDeg * Math.PI / 180);
         g.rotateZ(armTune.rollDeg * Math.PI / 180);
+        g.scale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
+        item.mesh.geometry = g;
+      });
+    }
+
+    var antebrazoRawMeshes = []; // {mesh, raw}: mismo mecanismo que bucketRawMeshes, para el antebrazo real
+    var antebrazoRealGroup = null; // group colgado de antebrazoSeg.root
+    var antebrazoTune = {
+      yawDeg: ANTEBRAZO_ROTATE_Y * 180 / Math.PI,
+      pitchDeg: ANTEBRAZO_PITCH_FIX * 180 / Math.PI,
+      rollDeg: ANTEBRAZO_ROLL_FIX * 180 / Math.PI,
+      dX: 0, dY: 0, dZ: 0
+    };
+    function applyAntebrazoTransform() {
+      antebrazoRawMeshes.forEach(function (item) {
+        item.mesh.geometry.dispose();
+        var g = item.raw.clone();
+        g.translate(-(ANTEBRAZO_PIVOT_X + antebrazoTune.dX), -(ANTEBRAZO_PIVOT_Y + antebrazoTune.dY), -(ANTEBRAZO_PIVOT_Z + antebrazoTune.dZ));
+        g.rotateY(antebrazoTune.yawDeg * Math.PI / 180);
+        g.rotateX(antebrazoTune.pitchDeg * Math.PI / 180);
+        g.rotateZ(antebrazoTune.rollDeg * Math.PI / 180);
+        g.scale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
+        item.mesh.geometry = g;
+      });
+    }
+
+    var plumaRawMeshes = []; // {mesh, raw}: mismo mecanismo que bucketRawMeshes, para la pluma real
+    var plumaRealGroup = null; // group colgado de boomSeg.root
+    var plumaTune = {
+      yawDeg: PLUMA_ROTATE_Y * 180 / Math.PI,
+      pitchDeg: PLUMA_PITCH_FIX * 180 / Math.PI,
+      rollDeg: PLUMA_ROLL_FIX * 180 / Math.PI,
+      dX: 0, dY: 0, dZ: 0
+    };
+    function applyPlumaTransform() {
+      plumaRawMeshes.forEach(function (item) {
+        item.mesh.geometry.dispose();
+        var g = item.raw.clone();
+        g.translate(-(PLUMA_PIVOT_X + plumaTune.dX), -(PLUMA_PIVOT_Y + plumaTune.dY), -(PLUMA_PIVOT_Z + plumaTune.dZ));
+        g.rotateY(plumaTune.yawDeg * Math.PI / 180);
+        g.rotateX(plumaTune.pitchDeg * Math.PI / 180);
+        g.rotateZ(plumaTune.rollDeg * Math.PI / 180);
         g.scale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
         item.mesh.geometry = g;
       });
@@ -722,16 +794,31 @@
       turretPivot.add(cw);
       placeholderParts.push(cw);
 
-      // pluma (boom)
-      boomSeg = makeSegment(2.7, 0.34, 0.4, YELLOW);
+      // pluma (boom) — articulación torreta-pluma
+      boomSeg = makeSegment(1.6, 0.34, 0.4, YELLOW);
       boomSeg.root.position.set(0.32, 0.55, 0.55);
       boomSeg.root.rotation.x = -ctrl.boom;
       turretPivot.add(boomSeg.root);
+      plumaPlaceholderParts.push(boomSeg.mesh); // se oculta si la pluma real carga bien
 
-      // brazo (arm / stick)
+      // grupo que aloja las piezas reales de la pluma (Mesh367-370)
+      plumaRealGroup = new THREE.Group();
+      boomSeg.root.add(plumaRealGroup);
+
+      // antebrazo — articulación pluma-antebrazo (segunda sección del brazo articulado)
+      antebrazoSeg = makeSegment(1.4, 0.30, 0.34, YELLOW);
+      antebrazoSeg.root.rotation.x = -ctrl.antebrazo;
+      boomSeg.end.add(antebrazoSeg.root);
+      antebrazoPlaceholderParts.push(antebrazoSeg.mesh); // se oculta si el antebrazo real carga bien
+
+      // grupo que aloja las piezas reales del antebrazo (Mesh363-364 + letreros)
+      antebrazoRealGroup = new THREE.Group();
+      antebrazoSeg.root.add(antebrazoRealGroup);
+
+      // brazo (arm / stick) — articulación antebrazo-brazo
       armSeg = makeSegment(2.05, 0.27, 0.3, YELLOW_DK);
       armSeg.root.rotation.x = -ctrl.arm;
-      boomSeg.end.add(armSeg.root);
+      antebrazoSeg.end.add(armSeg.root);
       armPlaceholderParts.push(armSeg.mesh); // se oculta si el brazo real carga bien
 
       // grupo que aloja las piezas reales del brazo (Mesh365 + mecanismo + hidráulico)
@@ -940,7 +1027,7 @@
 
       // 2) clasificar y recién ahí transformar/reparentar/descartar
       var box = new THREE.Box3();
-      var bucketFound = 0, armFound = 0;
+      var bucketFound = 0, armFound = 0, antebrazoFound = 0, plumaFound = 0;
       meshes.forEach(function (o) {
         var toks = (o.name || '').trim().split(/\s+/);
         var meshId = toks[0];
@@ -968,6 +1055,33 @@
           armRealGroup.add(o);
           armFound++;
           debugParts.brazo.push({ id: meshId, mesh: o });
+          return;
+        }
+
+        if (isUpperWorks && ANTEBRAZO_MESH_NAMES.indexOf(meshId) >= 0) {
+          // pieza real del antebrazo (Mesh363 = antebrazo, Mesh364 = hidráulico,
+          // Mesh377-382 = letreros pegados al antebrazo): se reengancha al pivote
+          // del antebrazo propio (antebrazoSeg).
+          o.castShadow = true; o.receiveShadow = true;
+          o.position.set(0, 0, 0); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1);
+          antebrazoRawMeshes.push({ mesh: o, raw: o.geometry.clone() });
+          antebrazoRealGroup.add(o);
+          antebrazoFound++;
+          debugParts.antebrazo.push({ id: meshId, mesh: o });
+          return;
+        }
+
+        if (isUpperWorks && PLUMA_MESH_NAMES.indexOf(meshId) >= 0) {
+          // pieza real de la pluma (Mesh367-370: identificadas por descarte, a
+          // confirmar con el panel): se reengancha al pivote de la pluma propia
+          // (boomSeg). Tiene X>=0 (cerca de la torreta), así que hay que
+          // interceptarla ACÁ, antes de que caiga en la rama de "torreta" de abajo.
+          o.castShadow = true; o.receiveShadow = true;
+          o.position.set(0, 0, 0); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1);
+          plumaRawMeshes.push({ mesh: o, raw: o.geometry.clone() });
+          plumaRealGroup.add(o);
+          plumaFound++;
+          debugParts.pluma.push({ id: meshId, mesh: o });
           return;
         }
 
@@ -1029,6 +1143,22 @@
         console.warn('No se identificaron las piezas del brazo real; se mantiene el brazo de referencia.');
       }
 
+      if (antebrazoFound > 0) {
+        applyAntebrazoTransform();
+        antebrazoPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
+        antebrazoPlaceholderParts.length = 0;
+      } else {
+        console.warn('No se identificaron las piezas del antebrazo real; se mantiene el antebrazo de referencia.');
+      }
+
+      if (plumaFound > 0) {
+        applyPlumaTransform();
+        plumaPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
+        plumaPlaceholderParts.length = 0;
+      } else {
+        console.warn('No se identificaron las piezas de la pluma real; se mantiene la pluma de referencia.');
+      }
+
       if (DEBUG_MODE) setupDebugPanel();
     }
 
@@ -1065,8 +1195,10 @@
           });
       }
       var sections = [
-        { title: 'Cuchara', items: toItems(debugParts.cuchara, 'cuchara', true) },
+        { title: 'Cuchara (Mesh372)', items: toItems(debugParts.cuchara, 'cuchara', true) },
         { title: 'Brazo (Mesh365 + mecanismo + hidráulico)', items: toItems(debugParts.brazo, 'brazo', true) },
+        { title: 'Antebrazo (Mesh363 + hidráulico + letreros)', items: toItems(debugParts.antebrazo, 'antebrazo', true) },
+        { title: 'Pluma (Mesh367-370, a confirmar)', items: toItems(debugParts.pluma, 'pluma', true) },
         { title: 'Sin identificar todavía', items: toItems(debugParts.sinIdentificar, 'sinid', false) },
         { title: 'Torreta + Cabina', items: groupItems('torreta', true) },
         { title: 'Chasis + Orugas', items: groupItems('chasis', true) }
@@ -1087,9 +1219,12 @@
           '</details>';
       }).join('');
 
-      // ---- bloque de sliders de giro/pivote, genérico (se usa 2 veces: cuchara y brazo) ----
-      function tuneBlockHtml(prefix, title, tune) {
-        return '<div style="font-weight:bold;color:#eab308;margin:12px 0 8px">' + title + '</div>' +
+      // ---- bloque de sliders de giro/pivote, genérico (se usa 4 veces: cuchara, brazo,
+      // antebrazo, pluma). Colapsado en <details> para que el panel no quede eterno. ----
+      function tuneBlockHtml(prefix, title, tune, open) {
+        return '<details' + (open ? ' open' : '') + ' style="margin-bottom:6px">' +
+          '<summary style="cursor:pointer;font-weight:bold;color:#eab308">🔧 ' + title + '</summary>' +
+          '<div style="margin-top:8px">' +
           row(prefix + 'Yaw', 'Giro Y (yaw)', -180, 180, 1, tune.yawDeg.toFixed(0)) +
           row(prefix + 'Pitch', 'Inclinación X (pitch)', -180, 180, 1, tune.pitchDeg.toFixed(0)) +
           row(prefix + 'Roll', 'Rolido Z (roll)', -180, 180, 1, tune.rollDeg.toFixed(0)) +
@@ -1098,14 +1233,18 @@
           row(prefix + 'PY', 'Y pivote', -1500, 1500, 5, tune.dY) +
           row(prefix + 'PZ', 'Z pivote', -1500, 1500, 5, tune.dZ) +
           '<pre id="' + prefix + 'Readout" style="white-space:pre-wrap;background:#161b22;padding:8px;border-radius:6px;border:1px solid #30363d;color:#7ee787;margin:8px 0"></pre>' +
-          '<button id="' + prefix + 'Copy" type="button" style="width:100%;padding:6px;background:#eab308;color:#1a1300;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-family:inherit">Copiar valores</button>';
+          '<button id="' + prefix + 'Copy" type="button" style="width:100%;padding:6px;background:#eab308;color:#1a1300;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-family:inherit">Copiar valores</button>' +
+          '</div></details>';
       }
 
       wrap.innerHTML =
-        tuneBlockHtml('dbgB', '🔧 Ajuste cuchara (Mesh372)', bucketTune) +
-        tuneBlockHtml('dbgA', '🔧 Ajuste brazo (Mesh365 + mecanismo)', armTune) +
+        tuneBlockHtml('dbgP', 'Ajuste pluma (Mesh367-370)', plumaTune, false) +
+        tuneBlockHtml('dbgN', 'Ajuste antebrazo (Mesh363 + letreros)', antebrazoTune, false) +
+        tuneBlockHtml('dbgA', 'Ajuste brazo (Mesh365 + mecanismo)', armTune, false) +
+        tuneBlockHtml('dbgB', 'Ajuste cuchara (Mesh372)', bucketTune, true) +
         '<div style="border-top:1px solid #30363d;margin:12px 0 8px;padding-top:8px;color:#8b949e">Pose (para ver desde otro ángulo)</div>' +
         row('dbgBoom', 'Pluma', BOOM_MIN.toFixed(2), BOOM_MAX.toFixed(2), 0.01, ctrl.boom.toFixed(2)) +
+        row('dbgAntebrazoPose', 'Antebrazo', ANTEBRAZO_MIN.toFixed(2), ANTEBRAZO_MAX.toFixed(2), 0.01, ctrl.antebrazo.toFixed(2)) +
         row('dbgArmPose', 'Brazo', ARM_MIN.toFixed(2), ARM_MAX.toFixed(2), 0.01, ctrl.arm.toFixed(2)) +
         row('dbgExt', 'Extensor', 0, 1, 0.01, ctrl.ext.toFixed(2)) +
         '<div style="border-top:1px solid #30363d;margin:10px 0 8px;padding-top:8px;font-weight:bold;color:#eab308">👁️ Piezas (mostrar / ocultar)</div>' +
@@ -1170,6 +1309,10 @@
         BUCKET_PIVOT_X, BUCKET_PIVOT_Y, BUCKET_PIVOT_Z, applyBucketTransform);
       wireTuneBlock('dbgA', armTune, ['ARM_ROTATE_Y', 'ARM_PITCH_FIX', 'ARM_ROLL_FIX', 'ARM_PIVOT_X', 'ARM_PIVOT_Y', 'ARM_PIVOT_Z'],
         ARM_PIVOT_X, ARM_PIVOT_Y, ARM_PIVOT_Z, applyArmTransform);
+      wireTuneBlock('dbgN', antebrazoTune, ['ANTEBRAZO_ROTATE_Y', 'ANTEBRAZO_PITCH_FIX', 'ANTEBRAZO_ROLL_FIX', 'ANTEBRAZO_PIVOT_X', 'ANTEBRAZO_PIVOT_Y', 'ANTEBRAZO_PIVOT_Z'],
+        ANTEBRAZO_PIVOT_X, ANTEBRAZO_PIVOT_Y, ANTEBRAZO_PIVOT_Z, applyAntebrazoTransform);
+      wireTuneBlock('dbgP', plumaTune, ['PLUMA_ROTATE_Y', 'PLUMA_PITCH_FIX', 'PLUMA_ROLL_FIX', 'PLUMA_PIVOT_X', 'PLUMA_PIVOT_Y', 'PLUMA_PIVOT_Z'],
+        PLUMA_PIVOT_X, PLUMA_PIVOT_Y, PLUMA_PIVOT_Z, applyPlumaTransform);
 
       function bindPoseSlider(id, valId, setter) {
         var el = document.getElementById(id), valEl = document.getElementById(valId);
@@ -1179,6 +1322,7 @@
         });
       }
       bindPoseSlider('dbgBoom', 'dbgBoomVal', function (v) { ctrl.boom = v; });
+      bindPoseSlider('dbgAntebrazoPose', 'dbgAntebrazoPoseVal', function (v) { ctrl.antebrazo = v; });
       bindPoseSlider('dbgArmPose', 'dbgArmPoseVal', function (v) { ctrl.arm = v; });
       bindPoseSlider('dbgExt', 'dbgExtVal', function (v) { ctrl.ext = v; });
     }
@@ -1263,6 +1407,7 @@
       pollGamepad();
       var swingAxis = clamp(axis('arrowleft', 'arrowright') + stickL.x + gp.swing, -1, 1);
       var boomAxis = clamp(axis('arrowdown', 'arrowup') + (-stickL.y) + gp.boom, -1, 1);
+      var antebrazoAxis = clamp(axis('z', 'x') + (antebrazoBtn.down || gp.antebrazoDown ? -1 : 0) + (antebrazoBtn.up || gp.antebrazoUp ? 1 : 0), -1, 1);
       var armAxis = clamp(axis('a', 'd') + stickR.x + gp.arm, -1, 1);
       var bucketAxis = clamp(axis('s', 'w') + (-stickR.y) + gp.bucket, -1, 1);
       var extAxis = clamp(axis('q', 'e') + (extBtn.out || gp.extOut ? 1 : 0) + (extBtn.in || gp.extIn ? -1 : 0), -1, 1);
@@ -1271,6 +1416,7 @@
 
       ctrl.swing += swingAxis * SWING_SPEED * dt;
       ctrl.boom = clamp(ctrl.boom + boomAxis * BOOM_SPEED * dt, BOOM_MIN, BOOM_MAX);
+      ctrl.antebrazo = clamp(ctrl.antebrazo + antebrazoAxis * ANTEBRAZO_SPEED * dt, ANTEBRAZO_MIN, ANTEBRAZO_MAX);
       ctrl.arm = clamp(ctrl.arm + armAxis * ARM_SPEED * dt, ARM_MIN, ARM_MAX);
       ctrl.bucket = clamp(ctrl.bucket + bucketAxis * BUCKET_SPEED * dt, BUCKET_MIN, BUCKET_MAX);
       ctrl.ext = clamp(ctrl.ext + extAxis * EXT_SPEED * dt, EXT_MIN, EXT_MAX);
@@ -1285,6 +1431,7 @@
 
       turretPivot.rotation.y = ctrl.swing;
       boomSeg.root.rotation.x = -ctrl.boom;
+      antebrazoSeg.root.rotation.x = -ctrl.antebrazo;
       armSeg.root.rotation.x = -ctrl.arm;
       extender.rodGroup.position.z = ctrl.ext * EXT_STROKE;
       bucketGroup.rotation.x = -ctrl.bucket;
