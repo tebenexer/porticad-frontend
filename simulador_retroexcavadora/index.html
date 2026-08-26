@@ -358,6 +358,15 @@
       };
     }
 
+    // las 4 articulaciones reales, encontradas por el usuario con el panel de picking
+    // (?debug=1): cada una es el promedio de varios clics hechos sobre las dos piezas
+    // que se tocan justo ahí, para triangular el centro real del pasador. En metros,
+    // mismo espacio "local" (turretPivot) que usan las mallas reales ya reensambladas.
+    var REAL_JOINT_A = { x: -0.129, y: 0.569, z: 0.532 }; // torreta -> pluma
+    var REAL_JOINT_B = { x: 0.640, y: 2.522, z: 1.420 }; // pluma -> antebrazo
+    var REAL_JOINT_C = { x: 2.289, y: 3.315, z: 4.253 }; // antebrazo -> brazo
+    var REAL_JOINT_D = { x: 2.980, y: 1.148, z: 5.455 }; // brazo -> cuchara
+
     function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
     function lerp(a, b, t) { return a + (b - a) * t; }
 
@@ -486,10 +495,15 @@
     var armPlaceholderParts = []; // brazo de referencia: solo se retira si aparece el real
     var DEBUG_MODE = location.search.indexOf('debug=1') >= 0;
     // todas las mallas de Group44 (pluma+antebrazo+brazo+cuchara) ya reensambladas
-    // como una sola pieza rígida: {mesh, meshId, piece}. Solo se llena en DEBUG_MODE
-    // (en uso normal se mantiene el brazo procedural, articulado). La usa el panel
-    // de picking (?debug=1) para saber qué pieza tocó cada clic.
+    // como una sola pieza rígida: {mesh, meshId, piece}. La usa el panel de picking
+    // (?debug=1) para saber qué pieza tocó cada clic, y buildRealArmChain() para
+    // repartir cada malla en su pivote real.
     var armAssemblyMeshes = [];
+    // los 4 pivotes reales (torreta->pluma->antebrazo->brazo->cuchara), anidados uno
+    // dentro del otro en REAL_JOINT_A/B/C/D — null hasta que buildRealArmChain() los
+    // arma (cuando se identificó al menos una pieza real). Si quedan null, sigue
+    // funcionando el esqueleto procedural (boomSeg/antebrazoSeg/armSeg/bucketGroup).
+    var armPivotA = null, armPivotB = null, armPivotC = null, armPivotD = null;
 
     function currentSize() { return { w: VIEW.clientWidth || 800, h: VIEW.clientHeight || 500 }; }
 
@@ -934,10 +948,9 @@
 
       // 2) clasificar y recién ahí transformar/reparentar/descartar. Group44 entero
       // (pluma+antebrazo+brazo+cuchara) se reensambla con la MISMA transformación que
-      // el resto de la torreta — nada de ángulos "de ajuste" por pieza — y solo se
-      // agrega a la escena en DEBUG_MODE (?debug=1), para marcar puntos de articulación
-      // encima con el panel de picking. En uso normal se descarta y sigue funcionando
-      // el brazo procedural, articulado.
+      // el resto de la torreta — nada de ángulos "de ajuste" por pieza — y después
+      // buildRealArmChain() la cuelga de los 4 pivotes reales (REAL_JOINT_A/B/C/D,
+      // encontrados con el panel de picking, ?debug=1) para que quede articulada.
       var box = new THREE.Box3();
       meshes.forEach(function (o) {
         var toks = (o.name || '').trim().split(/\s+/);
@@ -948,11 +961,11 @@
         box.setFromObject(o);
         var cx = (box.min.x + box.max.x) / 2;
         var isArmSide = isUpperWorks && (piece || cx < MODEL_ARM_CUT_X);
-        if (isArmSide && !DEBUG_MODE) {
-          // mecanismo pluma-antebrazo-brazo-cuchara: todavía no tiene articulaciones
-          // reales definidas (se están reensamblando y marcando desde cero, ver
-          // ?debug=1). En uso normal se descarta y se mantiene el brazo procedural,
-          // totalmente funcional.
+        if (isArmSide && !piece && !DEBUG_MODE) {
+          // pieza del lado del brazo pero todavía sin identificar (no es ninguna de
+          // las 20 mallas de Group44): en uso normal se descarta; en ?debug=1 se
+          // conserva colgada de la torreta para poder marcarla con el panel de picking
+          // y averiguar qué es.
           if (o.geometry) o.geometry.dispose();
           return;
         }
@@ -981,11 +994,11 @@
       placeholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
       placeholderParts.length = 0;
 
-      if (DEBUG_MODE && armAssemblyMeshes.length > 0) {
-        // el brazo real reensamblado reemplaza VISUALMENTE al procedural para poder
-        // marcar puntos sobre él; el procedural sigue existiendo debajo (oculto) y
-        // sigue siendo el que realmente excava/carga hasta que se definan las
-        // articulaciones reales con el panel de picking.
+      if (armAssemblyMeshes.filter(function (e) { return e.piece !== 'sin_identificar'; }).length > 0) {
+        // el brazo real reemplaza al procedural: se cuelga de los 4 pivotes reales
+        // (articulado de verdad, ver buildRealArmChain) y se ocultan las piezas de
+        // referencia.
+        buildRealArmChain();
         bucketPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
         bucketPlaceholderParts.length = 0;
         armPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
@@ -997,6 +1010,54 @@
       }
 
       if (DEBUG_MODE) setupPointPickerPanel();
+    }
+
+    // ---------- cuelga el brazo/cuchara real de los 4 pivotes reales, articulado ----------
+    // A cada pieza (pluma/antebrazo/brazo/cuchara) le corresponde un pivote propio,
+    // anidado dentro del anterior (A dentro de turretPivot, B dentro de A, C dentro de
+    // B, D dentro de C) y ubicado exactamente en el punto medido con el panel de
+    // picking. Cada malla real solo se traslada (mesh.position = -origen del pivote)
+    // para que, con el pivote en rotación cero, quede en la MISMA posición donde ya
+    // estaba (nada de re-orientarla): al rotar el pivote, toda la pieza gira rígida
+    // alrededor de su articulación real.
+    function buildRealArmChain() {
+      var A = REAL_JOINT_A, B = REAL_JOINT_B, C = REAL_JOINT_C, D = REAL_JOINT_D;
+      armPivotA = new THREE.Group();
+      armPivotA.position.set(A.x, A.y, A.z);
+      turretPivot.add(armPivotA);
+
+      armPivotB = new THREE.Group();
+      armPivotB.position.set(B.x - A.x, B.y - A.y, B.z - A.z);
+      armPivotA.add(armPivotB);
+
+      armPivotC = new THREE.Group();
+      armPivotC.position.set(C.x - B.x, C.y - B.y, C.z - B.z);
+      armPivotB.add(armPivotC);
+
+      armPivotD = new THREE.Group();
+      armPivotD.position.set(D.x - C.x, D.y - C.y, D.z - C.z);
+      armPivotC.add(armPivotD);
+
+      var pivotByPiece = { pluma: armPivotA, antebrazo: armPivotB, brazo: armPivotC, cuchara: armPivotD };
+      var originByPiece = { pluma: A, antebrazo: B, brazo: C, cuchara: D };
+      armAssemblyMeshes.forEach(function (entry) {
+        var pivot = pivotByPiece[entry.piece];
+        if (!pivot) return; // sin_identificar: se deja colgada de la torreta tal cual
+        var origin = originByPiece[entry.piece];
+        pivot.add(entry.mesh);
+        entry.mesh.position.set(-origin.x, -origin.y, -origin.z);
+      });
+
+      // la cuchara real pasa a mandar la excavación: el punto de referencia y el
+      // indicador de carga se mudan al pivote real D. De punto de partida quedan en
+      // el propio pivote (el pasador); si hace falta más precisión en el diente de la
+      // cuchara, se puede afinar marcando un punto más con el panel de picking.
+      bucketGroup.remove(bucketTip);
+      bucketGroup.remove(dirtMound);
+      armPivotD.add(bucketTip);
+      armPivotD.add(dirtMound);
+      bucketTip.position.set(0, 0, 0);
+      dirtMound.position.set(0, 0.1, 0);
     }
 
     // ---------- panel de picking: marcar puntos con clics (?debug=1) ----------
@@ -1244,6 +1305,16 @@
       armSeg.root.rotation.x = -ctrl.arm;
       extender.rodGroup.position.z = ctrl.ext * EXT_STROKE;
       bucketGroup.rotation.x = -ctrl.bucket;
+      // si ya se armó el brazo real (buildRealArmChain), son sus 4 pivotes los que
+      // realmente se ven y excavan; el esqueleto procedural de arriba sigue girando
+      // pero queda oculto detrás. No hay telescopio identificado en el modelo real,
+      // así que ctrl.ext no tiene efecto acá (el brazo real es rígido entre C y D).
+      if (armPivotA) {
+        armPivotA.rotation.x = -ctrl.boom;
+        armPivotB.rotation.x = -ctrl.antebrazo;
+        armPivotC.rotation.x = -ctrl.arm;
+        armPivotD.rotation.x = -ctrl.bucket;
+      }
 
       // excavación
       terrainDirty = false;
