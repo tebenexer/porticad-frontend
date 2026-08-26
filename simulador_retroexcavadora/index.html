@@ -998,7 +998,7 @@
         // el brazo real reemplaza al procedural: se cuelga de los 4 pivotes reales
         // (articulado de verdad, ver buildRealArmChain) y se ocultan las piezas de
         // referencia.
-        buildRealArmChain();
+        buildRealArmChain(REAL_JOINT_A, REAL_JOINT_B, REAL_JOINT_C, REAL_JOINT_D);
         bucketPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
         bucketPlaceholderParts.length = 0;
         armPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
@@ -1015,13 +1015,29 @@
     // ---------- cuelga el brazo/cuchara real de los 4 pivotes reales, articulado ----------
     // A cada pieza (pluma/antebrazo/brazo/cuchara) le corresponde un pivote propio,
     // anidado dentro del anterior (A dentro de turretPivot, B dentro de A, C dentro de
-    // B, D dentro de C) y ubicado exactamente en el punto medido con el panel de
-    // picking. Cada malla real solo se traslada (mesh.position = -origen del pivote)
-    // para que, con el pivote en rotación cero, quede en la MISMA posición donde ya
-    // estaba (nada de re-orientarla): al rotar el pivote, toda la pieza gira rígida
-    // alrededor de su articulación real.
-    function buildRealArmChain() {
-      var A = REAL_JOINT_A, B = REAL_JOINT_B, C = REAL_JOINT_C, D = REAL_JOINT_D;
+    // B, D dentro de C) y ubicado exactamente en el punto A/B/C/D dado. Cada malla real
+    // solo se traslada (mesh.position = -origen del pivote) para que, con el pivote en
+    // rotación cero, quede en la MISMA posición donde ya estaba (nada de re-orientarla):
+    // al rotar el pivote, toda la pieza gira rígida alrededor de su articulación real.
+    // Admite volver a llamarse (el panel de picking la reinvoca al tocar "Aplicar y
+    // probar"): si ya había una cadena armada, primero la deshace.
+    function buildRealArmChain(A, B, C, D) {
+      if (armPivotA) {
+        armAssemblyMeshes.forEach(function (entry) {
+          if (entry.piece === 'sin_identificar') return;
+          turretPivot.add(entry.mesh);
+          entry.mesh.position.set(0, 0, 0);
+        });
+        armPivotD.remove(bucketTip);
+        armPivotD.remove(dirtMound);
+        bucketGroup.add(bucketTip);
+        bucketGroup.add(dirtMound);
+        bucketTip.position.set(0, -0.5, 0.8);
+        dirtMound.position.set(0, -0.28, 0.45);
+        if (armPivotA.parent) armPivotA.parent.remove(armPivotA);
+        armPivotA = armPivotB = armPivotC = armPivotD = null;
+      }
+
       armPivotA = new THREE.Group();
       armPivotA.position.set(A.x, A.y, A.z);
       turretPivot.add(armPivotA);
@@ -1060,22 +1076,44 @@
       dirtMound.position.set(0, 0.1, 0);
     }
 
-    // ---------- panel de picking: marcar puntos con clics (?debug=1) ----------
-    // Reemplaza al viejo panel de sliders "a ojo": en vez de girar cada pieza a mano
-    // hasta que pareciera cuadrar, acá se hace clic directo sobre el modelo real ya
-    // reensamblado (Group44 completo, ver onRealModelLoaded) y el panel muestra la
-    // coordenada exacta de ese punto — en metros (el espacio que van a usar los
-    // pivotes de las articulaciones) y en mm crudos del .obj (para comparar directo
-    // contra SketchUp). Un clic normal marca un punto; arrastrar sigue orbitando la
-    // cámara como siempre. No aparece en el uso normal.
-    var pickedPoints = [];
-    var pickCounter = 0;
-    var pickerActive = true;
+    // ---------- panel de picking: 4 pivotes, uno por articulación (?debug=1) ----------
+    // Un botón "Marcar" por articulación (A/B/C/D); tocás el botón y después un solo
+    // clic sobre el modelo fija ESE pivote — nada de acumular decenas de puntos sueltos
+    // para promediar. "Aplicar y probar" reconstruye la cadena en vivo con los 4
+    // valores actuales para ver el resultado ahí mismo; "Copiar los 4 valores" arma el
+    // texto listo para pasar. Mientras el panel está abierto, el brazo se congela en
+    // pose de descanso (todo en 0) para que lo que clickeás sea comparable a los
+    // REAL_JOINT_A/B/C/D del código. No aparece en el uso normal.
+    var jointDefs = [
+      { key: 'A', label: 'A · torreta → pluma', color: '#ff3b30' },
+      { key: 'B', label: 'B · pluma → antebrazo', color: '#34c759' },
+      { key: 'C', label: 'C · antebrazo → brazo', color: '#0a84ff' },
+      { key: 'D', label: 'D · brazo → cuchara', color: '#ff2d92' }
+    ];
     var pickRaycaster = new THREE.Raycaster();
     var pickPointerDown = null;
-    function pickColorFor(n) { return 'hsl(' + ((n * 47) % 360) + ', 85%, 58%)'; }
 
     function setupPointPickerPanel() {
+      // congela el brazo en pose de descanso: lo que se clickea tiene que quedar
+      // comparable a REAL_JOINT_A/B/C/D (medidos con todo en 0), no a la pose de
+      // juego inicial (ctrl.boom/antebrazo/arm/bucket arrancan con valores != 0).
+      ctrl.boom = 0; ctrl.antebrazo = 0; ctrl.arm = 0; ctrl.bucket = 0;
+      boomSeg.root.rotation.x = 0; antebrazoSeg.root.rotation.x = 0;
+      armSeg.root.rotation.x = 0; bucketGroup.rotation.x = 0;
+      if (armPivotA) {
+        armPivotA.rotation.x = 0; armPivotB.rotation.x = 0;
+        armPivotC.rotation.x = 0; armPivotD.rotation.x = 0;
+      }
+
+      var jointVal = {
+        A: { x: REAL_JOINT_A.x, y: REAL_JOINT_A.y, z: REAL_JOINT_A.z },
+        B: { x: REAL_JOINT_B.x, y: REAL_JOINT_B.y, z: REAL_JOINT_B.z },
+        C: { x: REAL_JOINT_C.x, y: REAL_JOINT_C.y, z: REAL_JOINT_C.z },
+        D: { x: REAL_JOINT_D.x, y: REAL_JOINT_D.y, z: REAL_JOINT_D.z }
+      };
+      var jointMarker = {};
+      var armedKey = null;
+
       var wrap = document.createElement('div');
       wrap.id = 'debugPanel';
       wrap.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:999;background:rgba(13,17,23,.95);' +
@@ -1083,64 +1121,58 @@
         'font-family:monospace;font-size:11px;color:#e6edf3;box-shadow:0 4px 20px rgba(0,0,0,.5);';
 
       wrap.innerHTML =
-        '<div style="font-weight:bold;color:#58a6ff;margin-bottom:6px">🧩 Ensamblar articulaciones</div>' +
-        '<div style="color:#8b949e;margin-bottom:8px">Hacé clic directo sobre el modelo (pluma/antebrazo/brazo/cuchara, ya reensamblado tal cual el .obj) para marcar un punto y ver su coordenada. Arrastrar sigue orbitando la cámara normalmente.</div>' +
-        '<label style="display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer">' +
-        '<input type="checkbox" id="dbgPickActive" checked><span>Modo colocar puntos activado</span></label>' +
+        '<div style="font-weight:bold;color:#58a6ff;margin-bottom:6px">🧩 4 pivotes reales</div>' +
+        '<div style="color:#8b949e;margin-bottom:8px">Tocá "Marcar" en la articulación que querés fijar y después un solo clic sobre el modelo, justo en el centro del pasador. El brazo queda congelado en pose de descanso mientras marcás — no lo muevas con los controles.</div>' +
+        '<div id="dbgArmStatus" style="min-height:14px;color:#f0b429;margin-bottom:6px"></div>' +
+        jointDefs.map(function (jd) {
+          return '<div style="border-left:4px solid ' + jd.color + ';padding:5px 8px;margin-bottom:6px;background:#161b22;border-radius:4px">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center">' +
+            '<strong style="color:' + jd.color + '">' + jd.label + '</strong>' +
+            '<button type="button" data-arm="' + jd.key + '" id="dbgArm' + jd.key + '" style="font-size:10px;padding:3px 8px;background:' + jd.color + ';color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">Marcar</button>' +
+            '</div>' +
+            '<div id="dbgVal' + jd.key + '" style="color:#8b949e;margin-top:3px"></div>' +
+            '</div>';
+        }).join('') +
         '<div style="display:flex;gap:6px;margin:8px 0">' +
-        '<button type="button" id="dbgPickClear" style="flex:1;font-size:10px;padding:5px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:4px;cursor:pointer">Borrar todos</button>' +
-        '<button type="button" id="dbgPickCopy" style="flex:1;font-size:10px;padding:5px;background:#58a6ff;color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">Copiar todo</button>' +
-        '</div>' +
-        '<div id="dbgPickList"></div>';
+        '<button type="button" id="dbgPickApply" style="flex:1;font-size:10px;padding:5px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:4px;cursor:pointer">Aplicar y probar</button>' +
+        '<button type="button" id="dbgPickCopy" style="flex:1;font-size:10px;padding:5px;background:#58a6ff;color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">Copiar los 4 valores</button>' +
+        '</div>';
 
       document.body.appendChild(wrap);
 
-      function renderList() {
-        var list = document.getElementById('dbgPickList');
-        if (!pickedPoints.length) {
-          list.innerHTML = '<div style="color:#8b949e;padding:6px 0">(sin puntos todavía — hacé clic sobre el modelo)</div>';
-          return;
-        }
-        list.innerHTML = pickedPoints.map(function (p) {
-          return '<div style="border-left:4px solid ' + p.color + ';padding:5px 8px;margin-bottom:6px;background:#161b22;border-radius:4px">' +
-            '<div style="display:flex;justify-content:space-between;align-items:center">' +
-            '<strong style="color:' + p.color + '">' + p.id + ' · ' + p.pieceLabel + ' (' + p.meshId + ')</strong>' +
-            '<button type="button" data-del="' + p.id + '" style="background:none;border:none;color:#f85149;cursor:pointer;font-size:13px;line-height:1">✕</button>' +
-            '</div>' +
-            '<div style="color:#8b949e;margin-top:3px">local (m): x=' + p.local.x.toFixed(3) + ', y=' + p.local.y.toFixed(3) + ', z=' + p.local.z.toFixed(3) + '</div>' +
-            '<div style="color:#7ee787">OBJ crudo (mm): x=' + p.raw.x.toFixed(0) + ', y=' + p.raw.y.toFixed(0) + ', z=' + p.raw.z.toFixed(0) + '</div>' +
-            '</div>';
-        }).join('');
+      function renderVal(key) {
+        var v = jointVal[key];
+        document.getElementById('dbgVal' + key).textContent =
+          'x=' + v.x.toFixed(3) + ', y=' + v.y.toFixed(3) + ', z=' + v.z.toFixed(3);
       }
-      renderList();
-
-      document.getElementById('dbgPickActive').addEventListener('change', function (e) {
-        pickerActive = e.target.checked;
+      jointDefs.forEach(function (jd) {
+        renderVal(jd.key);
+        var m = makeJointMarker(turretPivot, jd.color);
+        m.userData.isPickMarker = true;
+        m.position.set(jointVal[jd.key].x, jointVal[jd.key].y, jointVal[jd.key].z);
+        jointMarker[jd.key] = m;
       });
 
-      document.getElementById('dbgPickList').addEventListener('click', function (e) {
-        var id = e.target.getAttribute('data-del');
-        if (!id) return;
-        var idx = pickedPoints.findIndex(function (p) { return p.id === id; });
-        if (idx < 0) return;
-        var p = pickedPoints[idx];
-        if (p.marker.parent) p.marker.parent.remove(p.marker);
-        pickedPoints.splice(idx, 1);
-        renderList();
+      function setArmed(key) {
+        armedKey = key;
+        jointDefs.forEach(function (jd) {
+          document.getElementById('dbgArm' + jd.key).textContent = jd.key === key ? 'Tocá el modelo…' : 'Marcar';
+        });
+        document.getElementById('dbgArmStatus').textContent = key ? 'Haciendo clic sobre el modelo fija ' + key + '.' : '';
+      }
+      jointDefs.forEach(function (jd) {
+        document.getElementById('dbgArm' + jd.key).addEventListener('click', function () { setArmed(jd.key); });
       });
 
-      document.getElementById('dbgPickClear').addEventListener('click', function () {
-        pickedPoints.forEach(function (p) { if (p.marker.parent) p.marker.parent.remove(p.marker); });
-        pickedPoints.length = 0;
-        renderList();
+      document.getElementById('dbgPickApply').addEventListener('click', function () {
+        buildRealArmChain(jointVal.A, jointVal.B, jointVal.C, jointVal.D);
       });
 
       document.getElementById('dbgPickCopy').addEventListener('click', function () {
-        var text = pickedPoints.map(function (p) {
-          return p.id + ' · ' + p.pieceLabel + ' (' + p.meshId + ')\n' +
-            '  local (m):  x=' + p.local.x.toFixed(3) + ', y=' + p.local.y.toFixed(3) + ', z=' + p.local.z.toFixed(3) + '\n' +
-            '  mm OBJ:     x=' + p.raw.x.toFixed(0) + ', y=' + p.raw.y.toFixed(0) + ', z=' + p.raw.z.toFixed(0);
-        }).join('\n\n') || '(sin puntos)';
+        var text = jointDefs.map(function (jd) {
+          var v = jointVal[jd.key];
+          return 'var REAL_JOINT_' + jd.key + ' = { x: ' + v.x.toFixed(3) + ', y: ' + v.y.toFixed(3) + ', z: ' + v.z.toFixed(3) + ' }; // ' + jd.label;
+        }).join('\n');
         var btn = document.getElementById('dbgPickCopy');
         if (navigator.clipboard) {
           navigator.clipboard.writeText(text).then(function () {
@@ -1151,35 +1183,13 @@
         }
       });
 
-      function addPickedPoint(hit) {
-        var obj = hit.object;
-        var local = obj.worldToLocal(hit.point.clone());
-        var raw = localMetersToRawMM(local);
-        var entry = null;
-        for (var i = 0; i < armAssemblyMeshes.length; i++) {
-          if (armAssemblyMeshes[i].mesh === obj) { entry = armAssemblyMeshes[i]; break; }
-        }
-        var meshId = entry ? entry.meshId : (obj.name || '').trim().split(/\s+/)[0];
-        var pieceLabel = entry ? entry.piece : (/^Mesh\d+$/.test(meshId) ? 'torreta/chasis' : 'referencia (procedural)');
-        pickCounter++;
-        var color = pickColorFor(pickCounter);
-        var marker = makeJointMarker(obj, color);
-        marker.userData.isPickMarker = true;
-        marker.position.copy(local);
-        pickedPoints.push({
-          id: 'P' + pickCounter, color: color, pieceLabel: pieceLabel, meshId: meshId,
-          local: { x: local.x, y: local.y, z: local.z }, raw: raw, marker: marker
-        });
-        renderList();
-      }
-
       var dom = renderer.domElement;
       dom.addEventListener('pointerdown', function (e) {
-        if (!pickerActive) return;
+        if (!armedKey) return;
         pickPointerDown = { x: e.clientX, y: e.clientY, t: performance.now() };
       });
       dom.addEventListener('pointerup', function (e) {
-        if (!pickerActive || !pickPointerDown) return;
+        if (!armedKey || !pickPointerDown) return;
         var moved = Math.hypot(e.clientX - pickPointerDown.x, e.clientY - pickPointerDown.y);
         var dt = performance.now() - pickPointerDown.t;
         pickPointerDown = null;
@@ -1193,7 +1203,17 @@
         var hits = pickRaycaster.intersectObjects([turretPivot, machineRoot], true).filter(function (h) {
           return h.object.visible && !h.object.userData.isPickMarker;
         });
-        if (hits.length) addPickedPoint(hits[0]);
+        if (!hits.length) return;
+        // se convierte al espacio local de turretPivot (no al del mesh tocado): si el
+        // brazo real ya está armado y con rotación aplicada, el mesh tocado puede
+        // colgar de un pivote rotado, y su propio worldToLocal daría una coordenada
+        // en ESE marco rotado — turretPivot.worldToLocal() da siempre la coordenada de
+        // reposo correcta, sea cual sea la pose actual.
+        var local = turretPivot.worldToLocal(hits[0].point.clone());
+        jointVal[armedKey] = { x: local.x, y: local.y, z: local.z };
+        jointMarker[armedKey].position.set(local.x, local.y, local.z);
+        renderVal(armedKey);
+        setArmed(null);
       });
     }
 
