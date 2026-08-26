@@ -339,30 +339,31 @@
     // brazo-cuchara). Cada tramo tiene su propio pivote/giro, todos con un primer valor
     // de partida para ajustar con el panel de ajuste en vivo (?debug=1).
 
+    // valores encontrados por el usuario con el panel de ajuste en vivo (?debug=1) —
+    // sesión en curso, la pluma todavía no quedó del todo bien orientada.
     var BUCKET_MESH_NAMES = ['Mesh372'];
-    var BUCKET_PIVOT_X = -5146, BUCKET_PIVOT_Y = 2070, BUCKET_PIVOT_Z = -1854; // mm, crudo
     var BUCKET_ROTATE_Y = -Math.PI / 2;
-    // valores encontrados por el usuario con el panel de ajuste en vivo (?debug=1)
     var BUCKET_PITCH_FIX = -2.4260; // -139°
     var BUCKET_ROLL_FIX = Math.PI; // 180°
+    var BUCKET_PIVOT_X = -5441, BUCKET_PIVOT_Y = 2770, BUCKET_PIVOT_Z = -1854; // mm, crudo
 
     var ARM_MESH_NAMES = ['Mesh365', 'Mesh366', 'Mesh371', 'Mesh373', 'Mesh374', 'Mesh375', 'Mesh376'];
-    var ARM_PIVOT_X = -150, ARM_PIVOT_Y = 1300, ARM_PIVOT_Z = -1854; // mm, crudo — punto de partida
-    var ARM_ROTATE_Y = -Math.PI / 2;
-    var ARM_PITCH_FIX = 0;
+    var ARM_ROTATE_Y = Math.PI / 2;
+    var ARM_PITCH_FIX = -0.4189; // -24°
     var ARM_ROLL_FIX = 0;
+    var ARM_PIVOT_X = -1650, ARM_PIVOT_Y = 2800, ARM_PIVOT_Z = -1854; // mm, crudo
 
     var ANTEBRAZO_MESH_NAMES = ['Mesh363', 'Mesh364', 'Mesh377', 'Mesh378', 'Mesh379', 'Mesh380', 'Mesh381', 'Mesh382'];
-    var ANTEBRAZO_PIVOT_X = 50, ANTEBRAZO_PIVOT_Y = 2200, ANTEBRAZO_PIVOT_Z = -1854; // mm, crudo — punto de partida
-    var ANTEBRAZO_ROTATE_Y = -Math.PI / 2;
+    var ANTEBRAZO_ROTATE_Y = Math.PI / 2;
     var ANTEBRAZO_PITCH_FIX = 0;
     var ANTEBRAZO_ROLL_FIX = 0;
+    var ANTEBRAZO_PIVOT_X = -105, ANTEBRAZO_PIVOT_Y = 2945, ANTEBRAZO_PIVOT_Z = -1854; // mm, crudo
 
     var PLUMA_MESH_NAMES = ['Mesh367', 'Mesh368', 'Mesh369', 'Mesh370'];
-    var PLUMA_PIVOT_X = 50, PLUMA_PIVOT_Y = 1050, PLUMA_PIVOT_Z = -1854; // mm, crudo — punto de partida
-    var PLUMA_ROTATE_Y = -Math.PI / 2;
-    var PLUMA_PITCH_FIX = 0;
+    var PLUMA_ROTATE_Y = Math.PI / 2;
+    var PLUMA_PITCH_FIX = 1.0297; // 59° — todavía no está bien, a seguir ajustando
     var PLUMA_ROLL_FIX = 0;
+    var PLUMA_PIVOT_X = 995, PLUMA_PIVOT_Y = 825, PLUMA_PIVOT_Z = -1409; // mm, crudo
 
     function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
     function lerp(a, b, t) { return a + (b - a) * t; }
@@ -494,6 +495,7 @@
     var DEBUG_MODE = location.search.indexOf('debug=1') >= 0;
     // piezas cargadas del modelo real, agrupadas para el inspector del panel de debug
     var debugParts = { cuchara: [], brazo: [], antebrazo: [], pluma: [], sinIdentificar: [], porGrupo: {} };
+    var jointMarkers = {}; // esferas de color en cada articulación (solo si DEBUG_MODE)
     var bucketTune = {
       yawDeg: BUCKET_ROTATE_Y * 180 / Math.PI,
       pitchDeg: BUCKET_PITCH_FIX * 180 / Math.PI,
@@ -554,6 +556,11 @@
         item.mesh.geometry = g;
       });
     }
+
+    // geometría base de la cadena propia (en metros, no mm): dónde arranca la pluma
+    // respecto a la torreta, y el largo de cada tramo (de eso depende dónde cae la
+    // articulación siguiente). Valores iniciales = los mismos que buildMachine() ya usa.
+    var chainTune = { boomX: 0.32, boomY: 0.55, boomZ: 0.55, boomLen: 1.6, antebrazoLen: 1.4, armLen: 2.05 };
 
     var plumaRawMeshes = []; // {mesh, raw}: mismo mecanismo que bucketRawMeshes, para la pluma real
     var plumaRealGroup = null; // group colgado de boomSeg.root
@@ -733,7 +740,25 @@
       g.add(mesh);
       var end = new THREE.Group(); end.position.set(0, 0, length);
       g.add(end);
-      return { root: g, end: end, mesh: mesh };
+      return { root: g, end: end, mesh: mesh, width: width, height: height, length: length };
+    }
+    // cambia el largo de un tramo (mueve dónde cae la articulación siguiente): reconstruye
+    // la geometría de la caja de referencia y reubica su grupo "end". Solo para debug.
+    function setSegmentLength(seg, newLength) {
+      seg.mesh.geometry.dispose();
+      var geo = new THREE.BoxGeometry(seg.width, seg.height, newLength);
+      geo.translate(0, 0, newLength / 2);
+      seg.mesh.geometry = geo;
+      seg.end.position.z = newLength;
+      seg.length = newLength;
+    }
+    // marcador visible en una articulación (esfera de color, siempre "encima" de todo)
+    function makeJointMarker(parent, hexColor) {
+      var mat = new THREE.MeshBasicMaterial({ color: hexColor, depthTest: false });
+      var m = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 8), mat);
+      m.renderOrder = 999;
+      parent.add(m);
+      return m;
     }
 
     function buildMachine() {
@@ -800,6 +825,7 @@
       boomSeg.root.rotation.x = -ctrl.boom;
       turretPivot.add(boomSeg.root);
       plumaPlaceholderParts.push(boomSeg.mesh); // se oculta si la pluma real carga bien
+      if (DEBUG_MODE) jointMarkers.torretaPluma = makeJointMarker(boomSeg.root, 0xff3b30); // rojo
 
       // grupo que aloja las piezas reales de la pluma (Mesh367-370)
       plumaRealGroup = new THREE.Group();
@@ -810,6 +836,7 @@
       antebrazoSeg.root.rotation.x = -ctrl.antebrazo;
       boomSeg.end.add(antebrazoSeg.root);
       antebrazoPlaceholderParts.push(antebrazoSeg.mesh); // se oculta si el antebrazo real carga bien
+      if (DEBUG_MODE) jointMarkers.plumaAntebrazo = makeJointMarker(antebrazoSeg.root, 0x34c759); // verde
 
       // grupo que aloja las piezas reales del antebrazo (Mesh363-364 + letreros)
       antebrazoRealGroup = new THREE.Group();
@@ -820,6 +847,7 @@
       armSeg.root.rotation.x = -ctrl.arm;
       antebrazoSeg.end.add(armSeg.root);
       armPlaceholderParts.push(armSeg.mesh); // se oculta si el brazo real carga bien
+      if (DEBUG_MODE) jointMarkers.antebrazoBrazo = makeJointMarker(armSeg.root, 0x0a84ff); // azul
 
       // grupo que aloja las piezas reales del brazo (Mesh365 + mecanismo + hidráulico)
       armRealGroup = new THREE.Group();
@@ -833,6 +861,7 @@
       bucketGroup = new THREE.Group();
       bucketGroup.rotation.x = -ctrl.bucket;
       extender.end.add(bucketGroup);
+      if (DEBUG_MODE) jointMarkers.brazoCuchara = makeJointMarker(bucketGroup, 0xff2d92); // magenta
       var bmat = new THREE.MeshStandardMaterial({ color: STEEL, roughness: 0.5, metalness: 0.5 });
 
       for (var bi = 0; bi < BK.length - 1; bi++) {
@@ -1243,7 +1272,29 @@
           '</div></details>';
       }
 
+      // ---- bloque de geometría de la cadena propia: dónde arranca la pluma y cuánto
+      // mide cada tramo (en metros) — esto es lo que corre las articulaciones en el
+      // espacio, a diferencia de los bloques de arriba que solo giran la malla
+      // alrededor de su propio pivote. ----
+      var chainHtml = '<details style="margin-bottom:6px">' +
+        '<summary style="cursor:pointer;font-weight:bold;color:#58a6ff">📐 Geometría de la cadena (metros)</summary>' +
+        '<div style="margin-top:8px">' +
+        '<label style="display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer">' +
+        '<input type="checkbox" id="dbgShowJoints" checked><span>Mostrar articulaciones (esferas de color)</span></label>' +
+        '<div style="border-top:1px solid #30363d;margin:8px 0;padding-top:8px;color:#8b949e">Posición pluma (torreta → pluma)</div>' +
+        row('dbgChBX', 'X', -2, 2, 0.01, chainTune.boomX) +
+        row('dbgChBY', 'Y', -1, 3, 0.01, chainTune.boomY) +
+        row('dbgChBZ', 'Z', -2, 2, 0.01, chainTune.boomZ) +
+        '<div style="border-top:1px solid #30363d;margin:8px 0;padding-top:8px;color:#8b949e">Largo de cada tramo</div>' +
+        row('dbgChBoomLen', 'Pluma', 0.3, 4, 0.01, chainTune.boomLen) +
+        row('dbgChAnteLen', 'Antebrazo', 0.3, 4, 0.01, chainTune.antebrazoLen) +
+        row('dbgChArmLen', 'Brazo', 0.3, 4, 0.01, chainTune.armLen) +
+        '<pre id="dbgChReadout" style="white-space:pre-wrap;background:#161b22;padding:8px;border-radius:6px;border:1px solid #30363d;color:#7ee787;margin:8px 0"></pre>' +
+        '<button id="dbgChCopy" type="button" style="width:100%;padding:6px;background:#58a6ff;color:#0d1117;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-family:inherit">Copiar valores</button>' +
+        '</div></details>';
+
       wrap.innerHTML =
+        chainHtml +
         tuneBlockHtml('dbgP', 'Ajuste pluma (Mesh367-370)', plumaTune, false) +
         tuneBlockHtml('dbgN', 'Ajuste antebrazo (Mesh363 + letreros)', antebrazoTune, false) +
         tuneBlockHtml('dbgA', 'Ajuste brazo (Mesh365 + mecanismo)', armTune, false) +
@@ -1341,6 +1392,49 @@
       bindPoseSlider('dbgAntebrazoPose', 'dbgAntebrazoPoseNum', function (v) { ctrl.antebrazo = v; });
       bindPoseSlider('dbgArmPose', 'dbgArmPoseNum', function (v) { ctrl.arm = v; });
       bindPoseSlider('dbgExt', 'dbgExtNum', function (v) { ctrl.ext = v; });
+
+      // ---- geometría de la cadena (posición de la pluma + largo de cada tramo) ----
+      document.getElementById('dbgShowJoints').addEventListener('change', function (e) {
+        Object.keys(jointMarkers).forEach(function (k) { jointMarkers[k].visible = e.target.checked; });
+      });
+      function updateChainReadout() {
+        document.getElementById('dbgChReadout').textContent =
+          'boomSeg.root.position.set(' + chainTune.boomX.toFixed(3) + ', ' + chainTune.boomY.toFixed(3) + ', ' + chainTune.boomZ.toFixed(3) + ');\n' +
+          'setSegmentLength(boomSeg, ' + chainTune.boomLen.toFixed(3) + ');\n' +
+          'setSegmentLength(antebrazoSeg, ' + chainTune.antebrazoLen.toFixed(3) + ');\n' +
+          'setSegmentLength(armSeg, ' + chainTune.armLen.toFixed(3) + ');';
+      }
+      function bindChainSlider(suffix, field, onApply) {
+        var el = document.getElementById('dbgCh' + suffix), numEl = document.getElementById('dbgCh' + suffix + 'Num');
+        function apply(v) {
+          chainTune[field] = v; el.value = v; numEl.value = v;
+          onApply(v); updateChainReadout();
+        }
+        el.addEventListener('input', function () { apply(parseFloat(el.value)); });
+        numEl.addEventListener('change', function () {
+          var v = parseFloat(numEl.value);
+          if (isNaN(v)) { numEl.value = chainTune[field]; return; }
+          apply(v);
+        });
+      }
+      bindChainSlider('BX', 'boomX', function () { boomSeg.root.position.set(chainTune.boomX, chainTune.boomY, chainTune.boomZ); });
+      bindChainSlider('BY', 'boomY', function () { boomSeg.root.position.set(chainTune.boomX, chainTune.boomY, chainTune.boomZ); });
+      bindChainSlider('BZ', 'boomZ', function () { boomSeg.root.position.set(chainTune.boomX, chainTune.boomY, chainTune.boomZ); });
+      bindChainSlider('BoomLen', 'boomLen', function (v) { setSegmentLength(boomSeg, v); });
+      bindChainSlider('AnteLen', 'antebrazoLen', function (v) { setSegmentLength(antebrazoSeg, v); });
+      bindChainSlider('ArmLen', 'armLen', function (v) { setSegmentLength(armSeg, v); });
+      document.getElementById('dbgChCopy').addEventListener('click', function () {
+        var text = document.getElementById('dbgChReadout').textContent;
+        var btn = document.getElementById('dbgChCopy');
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(text).then(function () {
+            var prev = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(function () { btn.textContent = prev; }, 1200);
+          }).catch(function () { window.prompt('Copiá manualmente:', text); });
+        } else {
+          window.prompt('Copiá manualmente:', text);
+        }
+      });
+      updateChainReadout();
     }
 
     // ---------- cámara externa (orbit manual) ----------
