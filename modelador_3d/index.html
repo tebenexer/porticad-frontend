@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Modelador 3D — PortiCAD Multi-Tools</title>
+<link rel="icon" href="/favicon.png" type="image/png" />
+<link rel="shortcut icon" href="/favicon.png" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 8px;
+    flex-shrink: 0;
+    z-index: 300;
+    position: relative;
+  }
+  .topbar-logo { font-size: 16px; font-weight: 700; color: #58a6ff; text-decoration: none; }
+  .topbar-sep  { color: #30363d; font-size: 18px; }
+  .topbar-crumb { font-size: 14px; color: #8b949e; display: flex; align-items: center; gap: 6px; }
+  .topbar-title { font-size: 15px; font-weight: 600; color: #e6edf3; }
+  .badge { background: #f0b42922; border: 1px solid #f0b42955; color: #f0b429;
+           font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 20px; margin-left: 6px; }
+
+  /* ── Menu bar ── */
+  .menubar {
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    gap: 2px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 250;
+  }
+  .menu-item { position: relative; }
+  .menu-btn {
+    background: none; border: none; color: #c9d1d9; font-size: 13px;
+    padding: 6px 12px; border-radius: 4px; cursor: pointer;
+  }
+  .menu-btn:hover, .menu-btn.open { background: #21262d; color: #e6edf3; }
+  .menu-dropdown {
+    position: absolute; top: 100%; left: 0; margin-top: 2px;
+    background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+    min-width: 190px; box-shadow: 0 8px 24px rgba(0,0,0,.5);
+    display: none; flex-direction: column; padding: 4px; z-index: 260;
+  }
+  .menu-dropdown.show { display: flex; }
+  .menu-dropdown button {
+    background: none; border: none; color: #e6edf3; text-align: left;
+    padding: 7px 10px; border-radius: 4px; font-size: 13px; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .menu-dropdown button:hover { background: #1f6feb22; }
+  .menu-dropdown .key { color: #8b949e; font-size: 11px; }
+
+  /* ── Layout ── */
+  .workspace { flex: 1; display: flex; min-height: 0; }
+
+  .toolbar {
+    width: 52px; background: #161b22; border-right: 1px solid #30363d;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 8px 0; flex-shrink: 0; overflow-y: auto;
+  }
+  .tool-btn {
+    width: 38px; height: 38px; border-radius: 6px; border: 1px solid transparent;
+    background: none; color: #8b949e; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; position: relative;
+  }
+  .tool-btn:hover { background: #21262d; color: #e6edf3; }
+  .tool-btn.active { background: #1f6feb22; border-color: #1f6feb55; color: #58a6ff; }
+  .tool-sep { width: 26px; height: 1px; background: #30363d; margin: 4px 0; }
+
+  .viewport { position: relative; flex: 1; min-width: 0; background: #0d1117; }
+  .viewport canvas { display: block; width: 100%; height: 100%; }
+
+  .hint {
+    position: absolute; top: 10px; left: 10px; background: #161b22ee;
+    border: 1px solid #30363d; border-radius: 6px; padding: 8px 12px;
+    font-size: 12px; color: #c9d1d9; max-width: 320px; pointer-events: none;
+  }
+  .hint b { color: #58a6ff; }
+
+  .marquee {
+    position: absolute; border: 1px solid #58a6ff; background: #58a6ff22;
+    pointer-events: none; display: none; z-index: 50;
+  }
+
+  .statusbar {
+    height: 26px; background: #161b22; border-top: 1px solid #30363d;
+    display: flex; align-items: center; padding: 0 12px; gap: 16px;
+    font-size: 11px; color: #8b949e; flex-shrink: 0;
+  }
+  .statusbar .tool-name { color: #58a6ff; font-weight: 600; }
+
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="topbar-logo" href="/">PortiCAD</a>
+  <span class="topbar-sep">›</span>
+  <div class="topbar-crumb">
+    <span>Multi-Tools</span><span>›</span>
+    <span class="topbar-title">Modelador 3D</span>
+  </div>
+  <span class="badge">🧪 Beta</span>
+</div>
+
+<div class="menubar">
+  <div class="menu-item">
+    <button class="menu-btn" id="fileMenuBtn">Archivo</button>
+    <div class="menu-dropdown" id="fileMenuDropdown">
+      <button id="btnNew">Nuevo <span class="key">Ctrl+N</span></button>
+      <button id="btnOpen">Abrir… <span class="key">Ctrl+O</span></button>
+      <button id="btnSave">Guardar <span class="key">Ctrl+S</span></button>
+      <button id="btnSaveAs">Guardar como…</button>
+    </div>
+  </div>
+</div>
+
+<div class="workspace">
+  <div class="toolbar" id="toolbar">
+    <button class="tool-btn active" data-tool="select" title="Seleccionar (S)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 3l7 17 2.5-7L20 10.5 4 3z"/></svg>
+    </button>
+    <div class="tool-sep"></div>
+    <button class="tool-btn" data-tool="line" title="Línea (L)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="4"/><circle cx="4" cy="20" r="1.5" fill="currentColor"/><circle cx="20" cy="4" r="1.5" fill="currentColor"/></svg>
+    </button>
+    <button class="tool-btn" data-tool="rect" title="Rectángulo (R)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="6" width="16" height="12"/></svg>
+    </button>
+    <button class="tool-btn" data-tool="circle" title="Círculo (C)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/></svg>
+    </button>
+    <div class="tool-sep"></div>
+    <button class="tool-btn" data-tool="erase" title="Borrador (E)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L9 19H5v-4L17 3z"/><line x1="13" y1="7" x2="17" y2="11"/></svg>
+    </button>
+    <button class="tool-btn" data-tool="extrude" title="Extruir (P)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v10"/><path d="M8 8l4-4 4 4"/><rect x="5" y="14" width="14" height="8"/></svg>
+    </button>
+    <button class="tool-btn" data-tool="move" title="Mover (M)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+    </button>
+  </div>
+
+  <div class="viewport" id="viewport">
+    <div class="hint" id="hint">Selecciona una herramienta para empezar.</div>
+    <div class="marquee" id="marquee"></div>
+  </div>
+</div>
+
+<div class="statusbar">
+  <span>Herramienta: <span class="tool-name" id="statusTool">Seleccionar</span></span>
+  <span id="statusCoords"></span>
+  <span id="statusCount" style="margin-left:auto"></span>
+</div>
+
+<input type="file" id="fileInput" accept="application/json,.json">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+  'use strict';
+
+  // ───────────────────────── Scene setup ─────────────────────────
+  const viewport = document.getElementById('viewport');
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0d1117);
+
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 2000);
+  camera.position.set(14, 12, 14);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio || 1);
+  viewport.appendChild(renderer.domElement);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 0, 0);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  // Left button is reserved for drawing tools (SketchUp-style); orbit/pan use middle/right.
+  controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.PAN };
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x30363d, 1.0));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.7);
+  sun.position.set(20, 30, 10);
+  scene.add(sun);
+
+  function resize() {
+    const w = viewport.clientWidth, h = viewport.clientHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ───────────────────────── Grid + axes ─────────────────────────
+  const GRID_SIZE = 40, GRID_DIV = 40;
+  const grid = new THREE.GridHelper(GRID_SIZE, GRID_DIV, 0x30363d, 0x21262d);
+  scene.add(grid);
+
+  function makeAxisLine(dir, color) {
+    const geo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0,0,0), dir.clone().multiplyScalar(GRID_SIZE/2)
+    ]);
+    const mat = new THREE.LineBasicMaterial({ color, linewidth: 2 });
+    return new THREE.Line(geo, mat);
+  }
+  scene.add(makeAxisLine(new THREE.Vector3(1,0,0), 0xf85149)); // X - red
+  scene.add(makeAxisLine(new THREE.Vector3(-1,0,0), 0xf85149));
+  scene.add(makeAxisLine(new THREE.Vector3(0,0,1), 0x3fb950)); // Z - green
+  scene.add(makeAxisLine(new THREE.Vector3(0,0,-1), 0x3fb950));
+  scene.add(makeAxisLine(new THREE.Vector3(0,1,0), 0x58a6ff)); // Y - blue (up)
+
+  const AXIS_COLOR_X = 0xf85149; // red
+  const AXIS_COLOR_Z = 0x3fb950; // green
+  const AXIS_COLOR_Y = 0x58a6ff; // blue
+  const AXIS_COLOR_NONE = 0xf0b429; // amber (no lock)
+  const AXIS_LOCK_PIXEL_RADIUS = 22;
+
+  // Closest point on the infinite line (linePoint + t*lineDir) to the ray (rayOrigin + s*rayDir).
+  function closestPointOnLineToRay(linePoint, lineDir, rayOrigin, rayDir) {
+    const w0 = new THREE.Vector3().subVectors(linePoint, rayOrigin);
+    const a = lineDir.dot(lineDir), b = lineDir.dot(rayDir), c = rayDir.dot(rayDir);
+    const d = lineDir.dot(w0), e = rayDir.dot(w0);
+    const denom = a * c - b * b;
+    const t = Math.abs(denom) < 1e-9 ? 0 : (b * e - c * d) / denom;
+    return linePoint.clone().addScaledVector(lineDir, t);
+  }
+
+  // SketchUp-style axis inference: while drawing/dragging from `anchor`, lock onto whichever
+  // of the red/green/blue axes (through anchor) the cursor's 3D ray currently passes closest to
+  // on screen. Works regardless of anchor's height, so it also catches the blue (vertical) axis.
+  const AXIS_X_DIR = new THREE.Vector3(1, 0, 0), AXIS_Y_DIR = new THREE.Vector3(0, 1, 0), AXIS_Z_DIR = new THREE.Vector3(0, 0, 1);
+  function resolveAxisSnap(anchor, clientX, clientY) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouseNDC, camera);
+    const rayOrigin = raycaster.ray.origin, rayDir = raycaster.ray.direction.clone().normalize();
+    const axes = [
+      { key: 'x', dir: AXIS_X_DIR, color: AXIS_COLOR_X, label: 'Eje rojo' },
+      { key: 'z', dir: AXIS_Z_DIR, color: AXIS_COLOR_Z, label: 'Eje verde' },
+      { key: 'y', dir: AXIS_Y_DIR, color: AXIS_COLOR_Y, label: 'Eje azul' },
+    ];
+    let best = null;
+    axes.forEach(ax => {
+      const candidate = closestPointOnLineToRay(anchor, ax.dir, rayOrigin, rayDir);
+      const d = screenDistToPoint(clientX, clientY, candidate);
+      if (d <= AXIS_LOCK_PIXEL_RADIUS && (!best || d < best.d)) best = { point: candidate, axis: ax.key, color: ax.color, label: ax.label, d };
+    });
+    return best;
+  }
+
+  // ───────────────────────── Model data ─────────────────────────
+  // objects[]: { id, type:'line'|'rect'|'circle'|'polyface', params:{...}, height, mesh }
+  let objects = [];
+  let nextId = 1;
+  let selectedObjects = [];
+
+  const COLOR_DEFAULT = 0x58a6ff;
+  const COLOR_SELECTED = 0xf0b429;
+
+  function applyColor(obj) {
+    const c = selectedObjects.includes(obj) ? COLOR_SELECTED : COLOR_DEFAULT;
+    obj.mesh.traverse(n => { if (n.material && !n.userData.isEdgeOverlay) n.material.color.setHex(c); });
+  }
+
+  function disposeMesh(mesh) {
+    mesh.traverse(n => {
+      if (n.geometry) n.geometry.dispose();
+      if (n.material) n.material.dispose();
+    });
+  }
+
+  // Adds SketchUp-style black edge lines along every border of a solid (top/bottom
+  // perimeter + verticals). Raycasting is disabled on it so it never steals picks/faces.
+  function attachEdges(mesh) {
+    const edges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(mesh.geometry),
+      new THREE.LineBasicMaterial({ color: 0x000000 })
+    );
+    edges.userData.isEdgeOverlay = true;
+    edges.raycast = () => {};
+    mesh.add(edges);
+  }
+
+  function buildLineMesh(a, b) {
+    const dir = new THREE.Vector3().subVectors(b, a);
+    const len = dir.length() || 0.001;
+    const geo = new THREE.CylinderGeometry(0.035, 0.035, len, 8);
+    geo.translate(0, len/2, 0);
+    const mat = new THREE.MeshStandardMaterial({ color: COLOR_DEFAULT });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(a);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+    return mesh;
+  }
+
+  function buildRectMesh(x1, z1, x2, z2, height, baseY) {
+    baseY = baseY || 0;
+    const w = Math.max(Math.abs(x2 - x1), 0.001);
+    const d = Math.max(Math.abs(z2 - z1), 0.001);
+    const cx = (x1 + x2) / 2, cz = (z1 + z2) / 2;
+    const mat = new THREE.MeshStandardMaterial({ color: COLOR_DEFAULT, side: THREE.DoubleSide });
+    let mesh;
+    if (height > 0) {
+      mesh = new THREE.Mesh(new THREE.BoxGeometry(w, height, d), mat);
+      mesh.position.set(cx, baseY + height/2, cz);
+    } else {
+      mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
+      mesh.rotation.x = -Math.PI/2;
+      mesh.position.set(cx, baseY + 0.002, cz);
+    }
+    attachEdges(mesh);
+    return mesh;
+  }
+
+  function buildCircleMesh(cx, cz, radius, height, baseY) {
+    baseY = baseY || 0;
+    radius = Math.max(radius, 0.001);
+    const mat = new THREE.MeshStandardMaterial({ color: COLOR_DEFAULT, side: THREE.DoubleSide });
+    let mesh;
+    if (height > 0) {
+      mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, 32), mat);
+      mesh.position.set(cx, baseY + height/2, cz);
+    } else {
+      mesh = new THREE.Mesh(new THREE.CircleGeometry(radius, 32), mat);
+      mesh.rotation.x = -Math.PI/2;
+      mesh.position.set(cx, baseY + 0.002, cz);
+    }
+    attachEdges(mesh);
+    return mesh;
+  }
+
+  // Arbitrary closed polygon (auto-created when a line chain closes back on itself).
+  // Shape() lives in local XY; mapping local (X,Y)->world (x,0,z) needs rotateX(+90deg).
+  // Extrude direction under that rotation maps local +Z -> world -Y, so depth is negated to go up.
+  function buildPolyfaceMesh(points, height, baseY) {
+    baseY = baseY || 0;
+    const shape = new THREE.Shape(points.map(p => new THREE.Vector2(p[0], p[1])));
+    const mat = new THREE.MeshStandardMaterial({ color: COLOR_DEFAULT, side: THREE.DoubleSide });
+    const geo = height > 0
+      ? new THREE.ExtrudeGeometry(shape, { depth: -height, bevelEnabled: false })
+      : new THREE.ShapeGeometry(shape);
+    geo.rotateX(Math.PI / 2);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.y += baseY + (height > 0 ? 0 : 0.002); // small nudge only when flat, avoids z-fighting with the grid
+    attachEdges(mesh);
+    return mesh;
+  }
+
+  function meshFor(obj) {
+    if (obj.type === 'line') return buildLineMesh(new THREE.Vector3(...obj.params.a), new THREE.Vector3(...obj.params.b));
+    if (obj.type === 'rect') return buildRectMesh(obj.params.x1, obj.params.z1, obj.params.x2, obj.params.z2, obj.height, obj.params.baseY);
+    if (obj.type === 'circle') return buildCircleMesh(obj.params.cx, obj.params.cz, obj.params.radius, obj.height, obj.params.baseY);
+    if (obj.type === 'polyface') return buildPolyfaceMesh(obj.params.points, obj.height, obj.params.baseY);
+  }
+
+  function addObject(type, params, height) {
+    const obj = { id: nextId++, type, params, height: height || 0 };
+    obj.mesh = meshFor(obj);
+    obj.mesh.userData.objRef = obj;
+    scene.add(obj.mesh);
+    obj.mesh.updateMatrixWorld(true);
+    objects.push(obj);
+    updateStatusCount();
+    return obj;
+  }
+
+  function rebuildMesh(obj) {
+    scene.remove(obj.mesh);
+    disposeMesh(obj.mesh);
+    obj.mesh = meshFor(obj);
+    obj.mesh.userData.objRef = obj;
+    scene.add(obj.mesh);
+    obj.mesh.updateMatrixWorld(true);
+    applyColor(obj);
+  }
+
+  function removeObject(obj) {
+    scene.remove(obj.mesh);
+    disposeMesh(obj.mesh);
+    objects = objects.filter(o => o !== obj);
+    selectedObjects = selectedObjects.filter(o => o !== obj);
+    updateStatusCount();
+  }
+
+  function clearAll() {
+    objects.forEach(o => { scene.remove(o.mesh); disposeMesh(o.mesh); });
+    objects = [];
+    selectedObjects = [];
+    updateStatusCount();
+  }
+
+  function setSelection(arr) {
+    const prev = selectedObjects;
+    selectedObjects = arr.slice();
+    prev.forEach(o => { if (!selectedObjects.includes(o)) applyColor(o); });
+    selectedObjects.forEach(o => applyColor(o));
+  }
+
+  function selectObject(obj) {
+    setSelection(obj ? [obj] : []);
+  }
+
+  // Face highlight for the Extrude tool — shows exactly which face will be pushed/pulled,
+  // not the whole solid, both while hovering and live while dragging it.
+  const FACE_HIGHLIGHT_COLOR = 0x79c0ff;
+  let faceHighlightMesh = null;
+  function showFaceHighlight(mesh) {
+    hideFaceHighlight();
+    if (!mesh) return;
+    mesh.raycast = () => {};
+    faceHighlightMesh = mesh;
+    scene.add(faceHighlightMesh);
+  }
+  function hideFaceHighlight() {
+    if (faceHighlightMesh) { scene.remove(faceHighlightMesh); disposeMesh(faceHighlightMesh); faceHighlightMesh = null; }
+  }
+
+  // Builds a thin overlay mesh matching exactly the geometry of one face of a solid,
+  // so the Extrude tool can highlight/track that single face instead of the whole object.
+  function buildFaceHighlightMesh(obj, faceKind) {
+    if (!faceKind) return null;
+    const mat = new THREE.MeshBasicMaterial({ color: FACE_HIGHLIGHT_COLOR, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false });
+    const baseY = (obj.params && obj.params.baseY) || 0;
+    const h = obj.height;
+    const topY = baseY + (h > 0 ? h : 0) + 0.01;
+
+    if (obj.type === 'rect') {
+      const { x1, z1, x2, z2 } = obj.params;
+      const xMin = Math.min(x1, x2), xMax = Math.max(x1, x2), zMin = Math.min(z1, z2), zMax = Math.max(z1, z2);
+      if (faceKind === 'top') {
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(xMax - xMin, zMax - zMin), mat);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.set((xMin + xMax) / 2, topY, (zMin + zMax) / 2);
+        return mesh;
+      }
+      if (faceKind === 'x+' || faceKind === 'x-') {
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(zMax - zMin, h), mat);
+        mesh.rotation.y = Math.PI / 2;
+        mesh.position.set(faceKind === 'x+' ? xMax : xMin, baseY + h / 2, (zMin + zMax) / 2);
+        return mesh;
+      }
+      if (faceKind === 'z+' || faceKind === 'z-') {
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(xMax - xMin, h), mat);
+        mesh.position.set((xMin + xMax) / 2, baseY + h / 2, faceKind === 'z+' ? zMax : zMin);
+        return mesh;
+      }
+    }
+    if (obj.type === 'circle') {
+      const { cx, cz, radius } = obj.params;
+      if (faceKind === 'top') {
+        const mesh = new THREE.Mesh(new THREE.CircleGeometry(radius, 32), mat);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.set(cx, topY, cz);
+        return mesh;
+      }
+      if (faceKind === 'radius') {
+        const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, h, 32, 1, true), mat);
+        mesh.position.set(cx, baseY + h / 2, cz);
+        return mesh;
+      }
+    }
+    if (obj.type === 'polyface') {
+      const pts = obj.params.points;
+      if (faceKind === 'top') {
+        const shape = new THREE.Shape(pts.map(p => new THREE.Vector2(p[0], p[1])));
+        const geo = new THREE.ShapeGeometry(shape);
+        geo.rotateX(Math.PI / 2);
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.y = topY;
+        return mesh;
+      }
+      const wallMatch = /^wall(\d+)$/.exec(faceKind);
+      if (wallMatch) {
+        const k = parseInt(wallMatch[1], 10);
+        const a = pts[k], b = pts[(k + 1) % pts.length];
+        const y0 = baseY, y1 = baseY + h;
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+          a[0], y0, a[1],  b[0], y0, b[1],  b[0], y1, b[1],
+          a[0], y0, a[1],  b[0], y1, b[1],  a[0], y1, a[1],
+        ]), 3));
+        geo.computeVertexNormals();
+        return new THREE.Mesh(geo, mat);
+      }
+    }
+    return null;
+  }
+
+  // ───────────────────────── Tools / interaction ─────────────────────────
+  let currentTool = 'select';
+  const raycaster = new THREE.Raycaster();
+  const mouseNDC = new THREE.Vector2();
+
+  const hintEl = document.getElementById('hint');
+  const statusToolEl = document.getElementById('statusTool');
+  const statusCoordsEl = document.getElementById('statusCoords');
+  const statusCountEl = document.getElementById('statusCount');
+
+  const TOOL_HINTS = {
+    select: 'Haz clic sobre una figura para seleccionarla.',
+    line: 'Clic para el primer punto, clic para el segundo (engancha a extremos/medios/aristas y esquinas de sólidos, incluido el eje azul). Escribe un número + Enter para una longitud exacta. Cierra sobre el punto de inicio para crear una cara. Esc para cancelar.',
+    rect: 'Clic en una esquina, clic en la esquina opuesta.',
+    circle: 'Clic en el centro, clic para fijar el radio.',
+    erase: 'Haz clic sobre una figura para borrarla.',
+    extrude: 'Pasa el cursor para ver resaltada la cara exacta. Clic y arrastra: la cara sigue al cursor en su dirección normal. Escribe un número + Enter para una distancia exacta.',
+    move: 'Clic sobre una figura y arrastra para reubicarla. Acércate a un eje rojo/verde/azul para moverla solo en esa dirección (incluye subir/bajar del plano).'
+  };
+
+  function updateStatusCount() {
+    statusCountEl.textContent = objects.length + ' objeto(s)';
+  }
+
+  function setTool(tool) {
+    cancelDraw();
+    currentTool = tool;
+    document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
+    const names = { select:'Seleccionar', line:'Línea', rect:'Rectángulo', circle:'Círculo', erase:'Borrador', extrude:'Extruir', move:'Mover' };
+    statusToolEl.textContent = names[tool];
+    hintEl.textContent = TOOL_HINTS[tool];
+  }
+
+  document.getElementById('toolbar').addEventListener('click', (e) => {
+    const btn = e.target.closest('.tool-btn');
+    if (btn) setTool(btn.dataset.tool);
+  });
+
+  // Intersects the cursor ray with the horizontal plane at height y (generalizes groundPoint
+  // to any elevation, so drawing can continue level with an already-elevated point).
+  function planePoint(clientX, clientY, y) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouseNDC, camera);
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -y);
+    const pt = new THREE.Vector3();
+    const hit = raycaster.ray.intersectPlane(plane, pt);
+    return hit ? pt : null;
+  }
+
+  function groundPoint(clientX, clientY) { return planePoint(clientX, clientY, 0); }
+
+  function pickObject(clientX, clientY) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouseNDC, camera);
+    const meshes = objects.map(o => o.mesh);
+    const hits = raycaster.intersectObjects(meshes, true);
+    if (!hits.length) return null;
+    let n = hits[0].object;
+    while (n && !n.userData.objRef) n = n.parent;
+    return n ? n.userData.objRef : null;
+  }
+
+  // Like pickObject, but also returns which face was hit (for per-face push/pull).
+  function pickObjectWithFace(clientX, clientY) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouseNDC, camera);
+    const meshes = objects.map(o => o.mesh);
+    const hits = raycaster.intersectObjects(meshes, true);
+    if (!hits.length) return null;
+    let n = hits[0].object;
+    while (n && !n.userData.objRef) n = n.parent;
+    if (!n) return null;
+    return { obj: n.userData.objRef, normal: hits[0].face ? hits[0].face.normal.clone() : null, point: hits[0].point.clone() };
+  }
+
+  // World-space outward normal for a given face kind (used to read the true push/pull
+  // direction off the screen, instead of assuming "up on screen" always means "outward").
+  function worldNormalForFace(obj, faceKind, hitPoint) {
+    if (faceKind === 'top') return new THREE.Vector3(0, 1, 0);
+    if (faceKind === 'x+') return new THREE.Vector3(1, 0, 0);
+    if (faceKind === 'x-') return new THREE.Vector3(-1, 0, 0);
+    if (faceKind === 'z+') return new THREE.Vector3(0, 0, 1);
+    if (faceKind === 'z-') return new THREE.Vector3(0, 0, -1);
+    if (faceKind === 'radius') {
+      const dir = new THREE.Vector3(hitPoint.x - obj.params.cx, 0, hitPoint.z - obj.params.cz);
+      return dir.lengthSq() > 1e-9 ? dir.normalize() : new THREE.Vector3(1, 0, 0);
+    }
+    return new THREE.Vector3(0, 1, 0);
+  }
+
+  // Exact push/pull amount: intersects the cursor ray with the infinite line through the
+  // original hit point along the face's outward normal, and returns the signed distance
+  // from the hit point to that intersection. The face then tracks precisely under the
+  // cursor along that one axis — no arbitrary pixel-to-world scale factor to get "backwards".
+  function computePushDelta(hitPoint, worldNormal, clientX, clientY) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouseNDC, camera);
+    const onAxis = closestPointOnLineToRay(hitPoint, worldNormal, raycaster.ray.origin, raycaster.ray.direction.clone().normalize());
+    return onAxis.clone().sub(hitPoint).dot(worldNormal);
+  }
+
+  // Outward-pointing 2D normal of polygon edge k (points[k] -> points[k+1]), in XZ.
+  // "Outward" is resolved as "away from the polygon's centroid" so it's correct
+  // regardless of the vertex winding order.
+  function polygonEdgeNormal(points, k) {
+    const n = points.length;
+    const a = points[k], b = points[(k + 1) % n];
+    const dx = b[0] - a[0], dz = b[1] - a[1];
+    const len = Math.hypot(dx, dz) || 1;
+    let nx = dz / len, nz = -dx / len;
+    let cx = 0, cz = 0;
+    points.forEach(p => { cx += p[0]; cz += p[1]; });
+    cx /= n; cz /= n;
+    const midX = (a[0] + b[0]) / 2 - cx, midZ = (a[1] + b[1]) / 2 - cz;
+    if (nx * midX + nz * midZ < 0) { nx = -nx; nz = -nz; }
+    return [nx, nz];
+  }
+
+  // Intersection of line1 (p1 + t*d1) and line2 (p2 + s*d2), or null if ~parallel.
+  function lineIntersect2D(p1, d1, p2, d2) {
+    const denom = d1[0] * d2[1] - d1[1] * d2[0];
+    if (Math.abs(denom) < 1e-9) return null;
+    const dx = p2[0] - p1[0], dz = p2[1] - p1[1];
+    const t = (dx * d2[1] - dz * d2[0]) / denom;
+    return [p1[0] + d1[0] * t, p1[1] + d1[1] * t];
+  }
+
+  // Pushes/pulls one wall of a closed polygon by `distance` along its outward normal,
+  // keeping it connected to its neighbors: only the shared edge's LINE shifts, and the
+  // two adjacent vertices are recomputed as intersections with the (unmoved) neighbor
+  // edges — so the rest of the polygon stays put, exactly like an independent wall push.
+  function offsetPolygonEdge(points, edgeIndex, distance) {
+    const n = points.length;
+    const [nx, nz] = polygonEdgeNormal(points, edgeIndex);
+    const a = points[edgeIndex], b = points[(edgeIndex + 1) % n];
+    const shiftedA = [a[0] + nx * distance, a[1] + nz * distance];
+    const dir = [b[0] - a[0], b[1] - a[1]];
+
+    const prevA = points[(edgeIndex - 1 + n) % n];
+    const prevDir = [a[0] - prevA[0], a[1] - prevA[1]];
+    const newA = lineIntersect2D(prevA, prevDir, shiftedA, dir) || shiftedA;
+
+    const nextB = points[(edgeIndex + 2) % n];
+    const nextDir = [nextB[0] - b[0], nextB[1] - b[1]];
+    const shiftedB = [b[0] + nx * distance, b[1] + nz * distance];
+    const newB = lineIntersect2D(shiftedA, dir, b, nextDir) || shiftedB;
+
+    const result = points.map(p => p.slice());
+    result[edgeIndex] = newA;
+    result[(edgeIndex + 1) % n] = newB;
+    return result;
+  }
+
+  // Our box/cylinder meshes carry no rotation, so a hit's local face normal equals its
+  // world normal directly — no matrix transform needed to read off which side was hit.
+  function determineFace(obj, normal) {
+    if (!normal || obj.height <= 0) return 'top'; // flat face: only "pull up to create height" applies
+    if (obj.type === 'rect') {
+      if (Math.abs(normal.y) > 0.5) return 'top';
+      return Math.abs(normal.x) > Math.abs(normal.z) ? (normal.x > 0 ? 'x+' : 'x-') : (normal.z > 0 ? 'z+' : 'z-');
+    }
+    if (obj.type === 'circle') return Math.abs(normal.y) > 0.5 ? 'top' : 'radius';
+    if (obj.type === 'polyface') {
+      if (Math.abs(normal.y) > 0.5) return 'top';
+      const pts = obj.params.points;
+      let bestIdx = 0, bestDot = -Infinity;
+      for (let k = 0; k < pts.length; k++) {
+        const [nx, nz] = polygonEdgeNormal(pts, k);
+        const dot = nx * normal.x + nz * normal.z;
+        if (dot > bestDot) { bestDot = dot; bestIdx = k; }
+      }
+      return 'wall' + bestIdx;
+    }
+    return 'top';
+  }
+
+  // Resolves a face kind to the exact param field to edit, the base value to drag from,
+  // and the sign that makes "drag away from the box" increase that field.
+  function faceInfo(obj, faceKind) {
+    if (faceKind === 'top') return { field: 'height', sign: 1, base: obj.height };
+    if (faceKind === 'radius') return { field: 'radius', sign: 1, base: obj.params.radius };
+    const p = obj.params;
+    if (faceKind === 'x+') { const f = p.x1 >= p.x2 ? 'x1' : 'x2'; return { field: f, sign: 1, base: p[f] }; }
+    if (faceKind === 'x-') { const f = p.x1 <= p.x2 ? 'x1' : 'x2'; return { field: f, sign: -1, base: p[f] }; }
+    if (faceKind === 'z+') { const f = p.z1 >= p.z2 ? 'z1' : 'z2'; return { field: f, sign: 1, base: p[f] }; }
+    { const f = p.z1 <= p.z2 ? 'z1' : 'z2'; return { field: f, sign: -1, base: p[f] }; } // 'z-'
+  }
+
+  const MIN_FACE_SIZE = 0.05;
+  function applyFaceDrag(obj, field, sign, baseValue, delta) {
+    const newValue = baseValue + sign * delta;
+    if (field === 'height') { obj.height = Math.max(MIN_FACE_SIZE, newValue); return; }
+    if (field === 'radius') { obj.params.radius = Math.max(MIN_FACE_SIZE, newValue); return; }
+    const otherField = { x1: 'x2', x2: 'x1', z1: 'z2', z2: 'z1' }[field];
+    const otherValue = obj.params[otherField];
+    obj.params[field] = sign > 0 ? Math.max(newValue, otherValue + MIN_FACE_SIZE) : Math.min(newValue, otherValue - MIN_FACE_SIZE);
+  }
+
+  // Applies the current push/pull (from the live cursor, or the typed VCB value if any),
+  // rebuilds the mesh, and keeps the face highlight tracking the exact face being pushed.
+  function refreshExtrudePreview(clientX, clientY) {
+    if (currentTool !== 'extrude' || !extrudeObj) return;
+    const delta = typedValue !== '' ? (parseFloat(typedValue) || 0) : computePushDelta(extrudeHitPoint, extrudeWorldNormal, clientX, clientY);
+    if (extrudeWallIndex !== null) {
+      extrudeObj.params.points = offsetPolygonEdge(extrudeBasePoints, extrudeWallIndex, delta);
+    } else {
+      applyFaceDrag(extrudeObj, extrudeField, extrudeSign, extrudeBaseValue, delta);
+    }
+    rebuildMesh(extrudeObj);
+    selectObject(extrudeObj);
+    showFaceHighlight(buildFaceHighlightMesh(extrudeObj, extrudeFaceKind));
+    let txt = 'distancia: ' + delta.toFixed(2);
+    if (typedValue !== '') txt += '  → ' + typedValue + ' [Enter]';
+    statusCoordsEl.textContent = txt;
+  }
+
+  function endExtrudeDrag() {
+    extrudeObj = null;
+    extrudeWallIndex = null;
+    extrudeBasePoints = null;
+    extrudeFaceKind = null;
+    extrudeHitPoint = null;
+    extrudeWorldNormal = null;
+    typedValue = '';
+    hideFaceHighlight();
+    controls.enabled = true;
+  }
+
+  // ── Box (marquee) select: drag with the Select tool to grab every object the rectangle touches ──
+  const marqueeEl = document.getElementById('marquee');
+  const BOX_SELECT_THRESHOLD_PX = 4;
+  let selectDragStart = null;   // {x,y} in client coords
+  let boxSelectActive = false;
+
+  function screenBoundsOf(obj, canvasRect) {
+    const box = new THREE.Box3().setFromObject(obj.mesh);
+    const corners = [
+      [box.min.x, box.min.y, box.min.z], [box.min.x, box.min.y, box.max.z],
+      [box.min.x, box.max.y, box.min.z], [box.min.x, box.max.y, box.max.z],
+      [box.max.x, box.min.y, box.min.z], [box.max.x, box.min.y, box.max.z],
+      [box.max.x, box.max.y, box.min.z], [box.max.x, box.max.y, box.max.z],
+    ];
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const v = new THREE.Vector3();
+    corners.forEach(c => {
+      v.set(c[0], c[1], c[2]).project(camera);
+      const sx = (v.x + 1) / 2 * canvasRect.width;
+      const sy = (1 - v.y) / 2 * canvasRect.height;
+      minX = Math.min(minX, sx); maxX = Math.max(maxX, sx);
+      minY = Math.min(minY, sy); maxY = Math.max(maxY, sy);
+    });
+    return { minX, minY, maxX, maxY };
+  }
+
+  function rectsIntersect(a, b) {
+    return !(a.maxX < b.minX || a.minX > b.maxX || a.maxY < b.minY || a.minY > b.maxY);
+  }
+
+  function projectToScreen(worldVec3, canvasRect) {
+    const v = worldVec3.clone().project(camera);
+    return { x: (v.x + 1) / 2 * canvasRect.width, y: (1 - v.y) / 2 * canvasRect.height };
+  }
+
+  // Exact 2D segment-vs-rectangle test — a diagonal line's own AABB is mostly empty
+  // space, so the loose bbox check used for solids would false-positive on it.
+  function segmentIntersectsRect(p1, p2, rect) {
+    if (p1.x < rect.minX && p2.x < rect.minX) return false;
+    if (p1.x > rect.maxX && p2.x > rect.maxX) return false;
+    if (p1.y < rect.minY && p2.y < rect.minY) return false;
+    if (p1.y > rect.maxY && p2.y > rect.maxY) return false;
+    const inside = (p) => p.x >= rect.minX && p.x <= rect.maxX && p.y >= rect.minY && p.y <= rect.maxY;
+    if (inside(p1) || inside(p2)) return true;
+    const ccw = (p, q, r) => (r.y - p.y) * (q.x - p.x) > (q.y - p.y) * (r.x - p.x);
+    const segsCross = (a, b, c, d) => ccw(a, c, d) !== ccw(b, c, d) && ccw(a, b, c) !== ccw(a, b, d);
+    const corners = [
+      { x: rect.minX, y: rect.minY }, { x: rect.maxX, y: rect.minY },
+      { x: rect.maxX, y: rect.maxY }, { x: rect.minX, y: rect.maxY },
+    ];
+    for (let i = 0; i < 4; i++) {
+      if (segsCross(p1, p2, corners[i], corners[(i + 1) % 4])) return true;
+    }
+    return false;
+  }
+
+  function updateMarquee(x1, y1, x2, y2) {
+    const vpRect = viewport.getBoundingClientRect();
+    marqueeEl.style.left = (Math.min(x1, x2) - vpRect.left) + 'px';
+    marqueeEl.style.top = (Math.min(y1, y2) - vpRect.top) + 'px';
+    marqueeEl.style.width = Math.abs(x2 - x1) + 'px';
+    marqueeEl.style.height = Math.abs(y2 - y1) + 'px';
+    marqueeEl.style.display = 'block';
+  }
+
+  function hideMarquee() { marqueeEl.style.display = 'none'; }
+
+  function finalizeBoxSelect(x1, y1, x2, y2) {
+    const canvasRect = dom.getBoundingClientRect();
+    const dragBox = {
+      minX: Math.min(x1, x2) - canvasRect.left, maxX: Math.max(x1, x2) - canvasRect.left,
+      minY: Math.min(y1, y2) - canvasRect.top, maxY: Math.max(y1, y2) - canvasRect.top,
+    };
+    const matches = objects.filter(o => {
+      if (o.type === 'line') {
+        const a = projectToScreen(new THREE.Vector3(...o.params.a), canvasRect);
+        const b = projectToScreen(new THREE.Vector3(...o.params.b), canvasRect);
+        return segmentIntersectsRect(a, b, dragBox);
+      }
+      return rectsIntersect(screenBoundsOf(o, canvasRect), dragBox);
+    });
+    setSelection(matches);
+  }
+
+  // ── Line-drawing inference: snap to existing endpoints / midpoints / on-edge points ──
+  const SNAP_PIXEL_RADIUS = 14;
+  const SNAP_COLOR_ENDPOINT = 0x2dd4bf; // teal
+  const SNAP_COLOR_MIDPOINT = 0xa78bfa; // violet
+  const SNAP_COLOR_ONEDGE = 0xf472b6;   // pink
+  const SNAP_LABEL = { endpoint: 'Punto final', midpoint: 'Punto medio', onedge: 'Sobre línea' };
+
+  function screenDistToPoint(clientX, clientY, worldPt) {
+    const canvasRect = dom.getBoundingClientRect();
+    const s = projectToScreen(worldPt, canvasRect);
+    return Math.hypot((clientX - canvasRect.left) - s.x, (clientY - canvasRect.top) - s.y);
+  }
+
+  function closestPointOnSegment(p, a, b) {
+    const ab = new THREE.Vector3().subVectors(b, a);
+    const lenSq = ab.lengthSq();
+    if (lenSq < 1e-9) return a.clone();
+    const t = THREE.MathUtils.clamp(new THREE.Vector3().subVectors(p, a).dot(ab) / lenSq, 0, 1);
+    return a.clone().addScaledVector(ab, t);
+  }
+
+  // Every vertex of an object worth snapping to — for a line that's just its two endpoints;
+  // for a solid it's every corner at its base AND (if extruded) at its top, so a line can
+  // connect down to the ground or up to any corner of a box/face, same as SketchUp.
+  function objectVertices(o) {
+    if (o.type === 'line') return [new THREE.Vector3(...o.params.a), new THREE.Vector3(...o.params.b)];
+    const baseY = o.params.baseY || 0;
+    const ys = o.height > 0 ? [baseY, baseY + o.height] : [baseY];
+    if (o.type === 'rect') {
+      const { x1, z1, x2, z2 } = o.params;
+      const pts = [];
+      ys.forEach(y => pts.push(
+        new THREE.Vector3(x1, y, z1), new THREE.Vector3(x1, y, z2),
+        new THREE.Vector3(x2, y, z1), new THREE.Vector3(x2, y, z2)
+      ));
+      return pts;
+    }
+    if (o.type === 'circle') return ys.map(y => new THREE.Vector3(o.params.cx, y, o.params.cz));
+    if (o.type === 'polyface') {
+      const pts = [];
+      ys.forEach(y => o.params.points.forEach(p => pts.push(new THREE.Vector3(p[0], y, p[1]))));
+      return pts;
+    }
+    return [];
+  }
+
+  // Priority: endpoint > midpoint > on-edge (matches SketchUp's inference order).
+  function resolveGeometrySnap(rawPoint, clientX, clientY) {
+    let best = null;
+    objects.forEach(o => {
+      objectVertices(o).forEach(v => {
+        const d = screenDistToPoint(clientX, clientY, v);
+        if (d <= SNAP_PIXEL_RADIUS && (!best || d < best.d)) best = { point: v, d, kind: 'endpoint' };
+      });
+    });
+    if (best) return { point: best.point.clone(), kind: best.kind };
+
+    objects.forEach(o => {
+      if (o.type !== 'line') return;
+      const a = new THREE.Vector3(...o.params.a), b = new THREE.Vector3(...o.params.b);
+      const mid = a.clone().add(b).multiplyScalar(0.5);
+      const d = screenDistToPoint(clientX, clientY, mid);
+      if (d <= SNAP_PIXEL_RADIUS && (!best || d < best.d)) best = { point: mid, d, kind: 'midpoint' };
+    });
+    if (best) return { point: best.point.clone(), kind: best.kind };
+
+    objects.forEach(o => {
+      if (o.type !== 'line') return;
+      const a = new THREE.Vector3(...o.params.a), b = new THREE.Vector3(...o.params.b);
+      const cp = closestPointOnSegment(rawPoint, a, b);
+      const d = screenDistToPoint(clientX, clientY, cp);
+      if (d <= SNAP_PIXEL_RADIUS && (!best || d < best.d)) best = { point: cp, d, kind: 'onedge' };
+    });
+    if (best) return { point: best.point.clone(), kind: best.kind };
+
+    return null;
+  }
+
+  let snapMarkerMesh = null;
+  function showSnapMarker(point, color) {
+    hideSnapMarker();
+    const geo = new THREE.SphereGeometry(0.09, 12, 12);
+    const mat = new THREE.MeshBasicMaterial({ color });
+    snapMarkerMesh = new THREE.Mesh(geo, mat);
+    snapMarkerMesh.position.copy(point);
+    scene.add(snapMarkerMesh);
+  }
+  function hideSnapMarker() {
+    if (snapMarkerMesh) { scene.remove(snapMarkerMesh); disposeMesh(snapMarkerMesh); snapMarkerMesh = null; }
+  }
+
+  // draw state
+  let drawStage = 0;       // 0 = idle, 1 = first point placed
+  let drawStart = null;    // THREE.Vector3
+  let previewMesh = null;
+  let extrudeObj = null;
+  let extrudeFaceKind = null;   // 'top' | 'radius' | 'x+' | 'x-' | 'z+' | 'z-' | 'wallN' — for the live highlight
+  let extrudeHitPoint = null;   // THREE.Vector3 — where the face was originally clicked
+  let extrudeWorldNormal = null; // THREE.Vector3 — that face's outward normal, the push axis
+  let extrudeField = null;   // 'height' | 'radius' | 'x1' | 'x2' | 'z1' | 'z2' — which param this drag edits
+  let extrudeSign = 1;
+  let extrudeBaseValue = 0;
+  let extrudeWallIndex = null;  // set instead of extrudeField when pushing one wall of a polyface
+  let extrudeBasePoints = null; // snapshot of polyface points at drag start, for extrudeWallIndex
+  let chainOrigin = null;  // first vertex of the active line chain (for auto-close detection)
+  let chainPoints = [];    // vertices placed so far in the active chain, in order
+  let chainLineObjs = [];  // the 'line' objects created for the active chain's segments
+  let moveObj = null;
+  let moveAnchor = null;      // THREE.Vector3 — world point clicked at drag start
+  let moveBaseParams = null;  // deep clone of obj.params at drag start, translated fresh each move
+
+  // Rewrites obj.params (from a snapshot) shifted by (dx,dy,dz) — used by the Move tool.
+  function translatedParams(type, baseParams, dx, dy, dz) {
+    const p = JSON.parse(JSON.stringify(baseParams));
+    if (type === 'line') {
+      p.a = [p.a[0] + dx, p.a[1] + dy, p.a[2] + dz];
+      p.b = [p.b[0] + dx, p.b[1] + dy, p.b[2] + dz];
+    } else if (type === 'rect') {
+      p.x1 += dx; p.x2 += dx; p.z1 += dz; p.z2 += dz;
+      p.baseY = (p.baseY || 0) + dy;
+    } else if (type === 'circle') {
+      p.cx += dx; p.cz += dz;
+      p.baseY = (p.baseY || 0) + dy;
+    } else if (type === 'polyface') {
+      p.points = p.points.map(pt => [pt[0] + dx, pt[1] + dz]);
+      p.baseY = (p.baseY || 0) + dy;
+    }
+    return p;
+  }
+
+  // ── SketchUp-style "type a length" (VCB): after clicking a point, typing a number and
+  // pressing Enter places the line's next point exactly that far along whatever direction
+  // (snap or axis-lock) is currently showing, instead of wherever the mouse happens to be.
+  let typedValue = '';
+  let lastLineEndPoint = null;
+
+  function resolveLineEndpoint(clientX, clientY) {
+    const raw = groundPoint(clientX, clientY) || drawStart.clone();
+    const geomSnap = resolveGeometrySnap(raw, clientX, clientY);
+    let endPoint, color, label;
+    if (geomSnap) {
+      endPoint = geomSnap.point;
+      color = geomSnap.kind === 'endpoint' ? SNAP_COLOR_ENDPOINT : geomSnap.kind === 'midpoint' ? SNAP_COLOR_MIDPOINT : SNAP_COLOR_ONEDGE;
+      label = SNAP_LABEL[geomSnap.kind];
+    } else {
+      const axisSnap = resolveAxisSnap(drawStart, clientX, clientY);
+      if (axisSnap) {
+        endPoint = axisSnap.point; color = axisSnap.color; label = axisSnap.label;
+      } else {
+        endPoint = planePoint(clientX, clientY, drawStart.y) || drawStart.clone();
+        color = AXIS_COLOR_NONE; label = null;
+      }
+    }
+    const direction = endPoint.clone().sub(drawStart);
+    if (direction.lengthSq() > 1e-9) direction.normalize(); else direction.set(1, 0, 0);
+    if (typedValue) {
+      const len = parseFloat(typedValue);
+      if (!isNaN(len)) endPoint = drawStart.clone().addScaledVector(direction, len);
+    }
+    return { point: endPoint, color, label, snapped: !!geomSnap };
+  }
+
+  function commitLineSegment(finalPt) {
+    const segment = addObject('line', { a: [drawStart.x, drawStart.y, drawStart.z], b: [finalPt.x, finalPt.y, finalPt.z] });
+    chainLineObjs.push(segment);
+    const closesLoop = chainOrigin && finalPt.distanceTo(chainOrigin) < 1e-6 && chainPoints.length >= 3;
+    if (closesLoop) {
+      addObject('polyface', { points: chainPoints.map(pt => [pt.x, pt.z]) }, 0);
+      // The polyface's own edges (attachEdges) already draw this outline, and once a wall
+      // gets pushed independently the old chain segments would desync from it — drop them.
+      chainLineObjs.forEach(o => removeObject(o));
+      cancelDraw();
+    } else {
+      chainPoints.push(finalPt.clone());
+      drawStart = finalPt.clone(); // chain to next segment
+      clearPreview();
+      hideSnapMarker();
+      typedValue = '';
+    }
+  }
+
+  let lastMouseX = 0, lastMouseY = 0;
+
+  // Re-renders the line preview at the last known mouse position — used so the preview
+  // (and the exact length) updates live as the user types, without needing to move the mouse.
+  function refreshLinePreview() {
+    if (currentTool !== 'line' || drawStage !== 1) return;
+    clearPreview();
+    const resolved = resolveLineEndpoint(lastMouseX, lastMouseY);
+    if (resolved.snapped && !typedValue) showSnapMarker(resolved.point, resolved.color); else hideSnapMarker();
+    previewMesh = buildLineMesh(drawStart, resolved.point);
+    previewMesh.traverse(n => { if (n.material) n.material = new THREE.MeshBasicMaterial({ color: resolved.color, wireframe: true, transparent: true, opacity: 0.85 }); });
+    scene.add(previewMesh);
+    let txt = 'x: ' + resolved.point.x.toFixed(2) + '  z: ' + resolved.point.z.toFixed(2);
+    if (resolved.label && !typedValue) txt += '  · ' + resolved.label;
+    if (typedValue) txt += '  → ' + typedValue + ' [Enter]';
+    statusCoordsEl.textContent = txt;
+    lastLineEndPoint = resolved.point.clone();
+  }
+
+  function clearPreview() {
+    if (previewMesh) { scene.remove(previewMesh); disposeMesh(previewMesh); previewMesh = null; }
+  }
+
+  function cancelDraw() {
+    drawStage = 0; drawStart = null;
+    clearPreview();
+    extrudeObj = null;
+    selectDragStart = null;
+    boxSelectActive = false;
+    hideMarquee();
+    hideSnapMarker();
+    chainOrigin = null;
+    chainPoints = [];
+    chainLineObjs = [];
+    hideFaceHighlight();
+    moveObj = null;
+    moveAnchor = null;
+    moveBaseParams = null;
+    typedValue = '';
+    lastLineEndPoint = null;
+    extrudeWallIndex = null;
+    extrudeBasePoints = null;
+    extrudeFaceKind = null;
+    extrudeHitPoint = null;
+    extrudeWorldNormal = null;
+  }
+
+  const dom = renderer.domElement;
+
+  dom.addEventListener('contextmenu', e => e.preventDefault());
+
+  dom.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+
+    if (currentTool === 'select') {
+      selectDragStart = { x: e.clientX, y: e.clientY };
+      boxSelectActive = false;
+      return;
+    }
+
+    if (currentTool === 'erase') {
+      const obj = pickObject(e.clientX, e.clientY);
+      if (obj) removeObject(obj);
+      return;
+    }
+
+    if (currentTool === 'line') {
+      if (drawStage === 0) {
+        const raw = groundPoint(e.clientX, e.clientY);
+        if (!raw) return;
+        const geomSnap = resolveGeometrySnap(raw, e.clientX, e.clientY);
+        const startPt = geomSnap ? geomSnap.point : raw;
+        drawStart = startPt.clone();
+        drawStage = 1;
+        chainOrigin = startPt.clone();
+        chainPoints = [startPt.clone()];
+        chainLineObjs = [];
+        typedValue = '';
+      } else {
+        const finalPt = lastLineEndPoint ? lastLineEndPoint.clone() : resolveLineEndpoint(e.clientX, e.clientY).point;
+        commitLineSegment(finalPt);
+      }
+      return;
+    }
+
+    if (currentTool === 'rect') {
+      const p = groundPoint(e.clientX, e.clientY);
+      if (!p) return;
+      if (drawStage === 0) {
+        drawStart = p.clone();
+        drawStage = 1;
+      } else {
+        addObject('rect', { x1: drawStart.x, z1: drawStart.z, x2: p.x, z2: p.z }, 0);
+        cancelDraw();
+      }
+      return;
+    }
+
+    if (currentTool === 'circle') {
+      const p = groundPoint(e.clientX, e.clientY);
+      if (!p) return;
+      if (drawStage === 0) {
+        drawStart = p.clone();
+        drawStage = 1;
+      } else {
+        const r = drawStart.distanceTo(p);
+        addObject('circle', { cx: drawStart.x, cz: drawStart.z, radius: r }, 0);
+        cancelDraw();
+      }
+      return;
+    }
+
+    if (currentTool === 'extrude') {
+      const hit = pickObjectWithFace(e.clientX, e.clientY);
+      if (!hit || hit.obj.type === 'line') return;
+      const faceKind = determineFace(hit.obj, hit.normal);
+      const wallMatch = /^wall(\d+)$/.exec(faceKind);
+      extrudeObj = hit.obj;
+      extrudeFaceKind = faceKind;
+      extrudeHitPoint = hit.point.clone();
+      typedValue = '';
+      if (wallMatch) {
+        extrudeWallIndex = parseInt(wallMatch[1], 10);
+        extrudeBasePoints = JSON.parse(JSON.stringify(hit.obj.params.points));
+        const [nx, nz] = polygonEdgeNormal(hit.obj.params.points, extrudeWallIndex);
+        extrudeWorldNormal = new THREE.Vector3(nx, 0, nz);
+      } else {
+        extrudeWallIndex = null;
+        extrudeBasePoints = null;
+        const info = faceInfo(hit.obj, faceKind);
+        extrudeField = info.field;
+        extrudeSign = info.sign;
+        extrudeBaseValue = info.base;
+        extrudeWorldNormal = worldNormalForFace(hit.obj, faceKind, hit.point);
+      }
+      controls.enabled = false;
+      return;
+    }
+
+    if (currentTool === 'move') {
+      const hit = pickObjectWithFace(e.clientX, e.clientY);
+      if (!hit) return;
+      moveObj = hit.obj;
+      moveAnchor = hit.point.clone();
+      moveBaseParams = JSON.parse(JSON.stringify(moveObj.params));
+      controls.enabled = false;
+      return;
+    }
+  });
+
+  dom.addEventListener('pointermove', (e) => {
+    lastMouseX = e.clientX; lastMouseY = e.clientY;
+
+    // coord readout
+    const p = groundPoint(e.clientX, e.clientY);
+    if (p) statusCoordsEl.textContent = 'x: ' + p.x.toFixed(2) + '  z: ' + p.z.toFixed(2);
+
+    if (currentTool === 'select' && selectDragStart) {
+      const dx = e.clientX - selectDragStart.x, dy = e.clientY - selectDragStart.y;
+      if (!boxSelectActive && Math.hypot(dx, dy) > BOX_SELECT_THRESHOLD_PX) boxSelectActive = true;
+      if (boxSelectActive) updateMarquee(selectDragStart.x, selectDragStart.y, e.clientX, e.clientY);
+      return;
+    }
+
+    if (currentTool === 'line' && drawStage === 0 && p) {
+      const geomSnap = resolveGeometrySnap(p, e.clientX, e.clientY);
+      if (geomSnap) {
+        const snapColor = geomSnap.kind === 'endpoint' ? SNAP_COLOR_ENDPOINT : geomSnap.kind === 'midpoint' ? SNAP_COLOR_MIDPOINT : SNAP_COLOR_ONEDGE;
+        showSnapMarker(geomSnap.point, snapColor);
+        statusCoordsEl.textContent += '  · ' + SNAP_LABEL[geomSnap.kind];
+      } else {
+        hideSnapMarker();
+      }
+    } else if (currentTool === 'line' && drawStage === 1 && p) {
+      clearPreview();
+      const resolved = resolveLineEndpoint(e.clientX, e.clientY);
+      if (resolved.snapped && !typedValue) showSnapMarker(resolved.point, resolved.color); else hideSnapMarker();
+      previewMesh = buildLineMesh(drawStart, resolved.point);
+      previewMesh.traverse(n => { if (n.material) n.material = new THREE.MeshBasicMaterial({ color: resolved.color, wireframe: true, transparent: true, opacity: 0.85 }); });
+      scene.add(previewMesh);
+      if (resolved.label && !typedValue) statusCoordsEl.textContent += '  · ' + resolved.label;
+      if (typedValue) statusCoordsEl.textContent += '  → ' + typedValue + ' [Enter]';
+      lastLineEndPoint = resolved.point.clone();
+    } else if ((currentTool === 'rect' || currentTool === 'circle') && drawStage === 1 && p) {
+      clearPreview();
+      const mat = new THREE.MeshBasicMaterial({ color: AXIS_COLOR_NONE, wireframe: true, transparent: true, opacity: 0.8 });
+      if (currentTool === 'rect') {
+        previewMesh = buildRectMesh(drawStart.x, drawStart.z, p.x, p.z, 0);
+      } else {
+        previewMesh = buildCircleMesh(drawStart.x, drawStart.z, drawStart.distanceTo(p), 0);
+      }
+      previewMesh.traverse(n => { if (n.material) n.material = mat; });
+      scene.add(previewMesh);
+    }
+
+    if (currentTool === 'extrude') {
+      if (extrudeObj) {
+        refreshExtrudePreview(e.clientX, e.clientY);
+      } else {
+        const hit = pickObjectWithFace(e.clientX, e.clientY);
+        if (hit && hit.obj.type !== 'line') {
+          showFaceHighlight(buildFaceHighlightMesh(hit.obj, determineFace(hit.obj, hit.normal)));
+        } else {
+          hideFaceHighlight();
+        }
+      }
+    }
+
+    if (currentTool === 'move' && moveObj) {
+      const axisSnap = resolveAxisSnap(moveAnchor, e.clientX, e.clientY);
+      let current;
+      if (axisSnap) {
+        current = axisSnap.point;
+        statusCoordsEl.textContent += '  · ' + axisSnap.label;
+      } else {
+        current = planePoint(e.clientX, e.clientY, moveAnchor.y) || moveAnchor;
+      }
+      const delta = current.clone().sub(moveAnchor);
+      moveObj.params = translatedParams(moveObj.type, moveBaseParams, delta.x, delta.y, delta.z);
+      rebuildMesh(moveObj);
+      selectObject(moveObj);
+    }
+  });
+
+  window.addEventListener('pointerup', (e) => {
+    if (extrudeObj) {
+      endExtrudeDrag();
+    }
+
+    if (moveObj) {
+      moveObj = null;
+      moveAnchor = null;
+      moveBaseParams = null;
+      controls.enabled = true;
+    }
+
+    if (currentTool === 'select' && selectDragStart) {
+      if (boxSelectActive) {
+        finalizeBoxSelect(selectDragStart.x, selectDragStart.y, e.clientX, e.clientY);
+        hideMarquee();
+      } else {
+        selectObject(pickObject(e.clientX, e.clientY));
+      }
+      selectDragStart = null;
+      boxSelectActive = false;
+    }
+  });
+
+  function isTypingTarget() {
+    const tag = document.activeElement && document.activeElement.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA';
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { cancelDraw(); selectObject(null); }
+
+    // VCB numeric entry: while placing a line's next point, or mid push/pull with Extrude,
+    // digits/Enter set an exact value instead of falling through to delete-selection etc.
+    const vcbLine = currentTool === 'line' && drawStage === 1;
+    const vcbExtrude = currentTool === 'extrude' && !!extrudeObj;
+    if ((vcbLine || vcbExtrude) && !isTypingTarget()) {
+      if (/^[0-9.]$/.test(e.key) || (e.key === '-' && typedValue === '')) {
+        typedValue += e.key;
+        if (vcbLine) refreshLinePreview(); else refreshExtrudePreview(lastMouseX, lastMouseY);
+        e.preventDefault();
+        return;
+      }
+      if (e.key === 'Backspace' && typedValue) {
+        typedValue = typedValue.slice(0, -1);
+        if (vcbLine) refreshLinePreview(); else refreshExtrudePreview(lastMouseX, lastMouseY);
+        e.preventDefault();
+        return;
+      }
+      if (e.key === 'Enter') {
+        if (vcbLine) {
+          if (typedValue && lastLineEndPoint) commitLineSegment(lastLineEndPoint.clone());
+        } else if (typedValue) {
+          endExtrudeDrag();
+        }
+        e.preventDefault();
+        return;
+      }
+    }
+
+    if ((e.key === 'Delete' || e.key === 'Backspace') && !isTypingTarget()) {
+      selectedObjects.slice().forEach(o => removeObject(o));
+    }
+    if (e.ctrlKey && e.key.toLowerCase() === 'n') { e.preventDefault(); doNew(); }
+    if (e.ctrlKey && e.key.toLowerCase() === 'o') { e.preventDefault(); doOpen(); }
+    if (e.ctrlKey && e.key.toLowerCase() === 's') { e.preventDefault(); doSave(); }
+    if (!e.ctrlKey && !e.metaKey && !isTypingTarget()) {
+      const map = { s:'select', l:'line', r:'rect', c:'circle', e:'erase', p:'extrude', m:'move' };
+      const t = map[e.key.toLowerCase()];
+      if (t) setTool(t);
+    }
+  });
+
+  // ───────────────────────── File menu ─────────────────────────
+  const fileMenuBtn = document.getElementById('fileMenuBtn');
+  const fileMenuDropdown = document.getElementById('fileMenuDropdown');
+  fileMenuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    fileMenuDropdown.classList.toggle('show');
+    fileMenuBtn.classList.toggle('open');
+  });
+  document.addEventListener('click', () => {
+    fileMenuDropdown.classList.remove('show');
+    fileMenuBtn.classList.remove('open');
+  });
+
+  function doNew() {
+    if (objects.length && !confirm('¿Descartar el dibujo actual y empezar uno nuevo?')) return;
+    clearAll();
+  }
+
+  function serialize() {
+    return JSON.stringify({
+      app: 'porticad-modelador-3d', version: 1,
+      objects: objects.map(o => ({ type: o.type, params: o.params, height: o.height }))
+    }, null, 2);
+  }
+
+  function downloadJSON(filename) {
+    const blob = new Blob([serialize()], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  let currentFilename = 'modelo.json';
+
+  function doSave() { downloadJSON(currentFilename); }
+
+  function doSaveAs() {
+    const name = prompt('Nombre del archivo:', currentFilename.replace(/\.json$/, ''));
+    if (!name) return;
+    currentFilename = name.endsWith('.json') ? name : name + '.json';
+    downloadJSON(currentFilename);
+  }
+
+  const fileInput = document.getElementById('fileInput');
+  function doOpen() { fileInput.click(); }
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (!Array.isArray(data.objects)) throw new Error('formato inválido');
+        clearAll();
+        data.objects.forEach(o => addObject(o.type, o.params, o.height || 0));
+        currentFilename = file.name;
+      } catch (err) {
+        alert('No se pudo abrir el archivo: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+    fileInput.value = '';
+  });
+
+  document.getElementById('btnNew').addEventListener('click', doNew);
+  document.getElementById('btnOpen').addEventListener('click', doOpen);
+  document.getElementById('btnSave').addEventListener('click', doSave);
+  document.getElementById('btnSaveAs').addEventListener('click', doSaveAs);
+
+  // ───────────────────────── Render loop ─────────────────────────
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  setTool('select');
+})();
+</script>
+</body>
+</html>
