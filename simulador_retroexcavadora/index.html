@@ -712,22 +712,34 @@
         }
       }
     }
-    // vuelca un volumen (m3) como un montículo chico alrededor de (x,z), sin tocar
-    // bucketLoad — la usa digAt para la parte que la cuchara empuja hacia adelante en
-    // vez de levantar, no para lo que efectivamente carga.
-    function pushMoundAt(x, z, amount) {
+    // reparte un volumen (m3) empujado hacia los COSTADOS de la dirección de avance
+    // (dirX,dirZ) — no adelante en un solo punto — para que la tierra se vea correrse
+    // a los lados como cuando una pala empuja, en vez de amontonarse en un pico alto.
+    // No toca bucketLoad: la usa digAt solo para la parte que se desplaza, no la que
+    // efectivamente carga.
+    function pushMoundAt(x, z, dirX, dirZ, amount) {
       if (amount <= 0) return;
-      deformAt(x, z, DIG_RADIUS * 0.7, function (idx, falloff) {
-        var h = heights[idx];
-        var add = (amount / CELL_AREA) * falloff * 1.2;
-        var newH = Math.min(h + add, MAX_PILE);
-        if (newH > h + 0.0002) { heights[idx] = newH; return true; }
-        return false;
+      var perpX = -dirZ, perpZ = dirX;
+      var spread = DIG_RADIUS * 0.85;
+      var radius = DIG_RADIUS * 1.1;
+      var points = [
+        { x: x + dirX * spread * 0.3, z: z + dirZ * spread * 0.3, share: 0.3 },
+        { x: x + perpX * spread, z: z + perpZ * spread, share: 0.35 },
+        { x: x - perpX * spread, z: z - perpZ * spread, share: 0.35 }
+      ];
+      points.forEach(function (p) {
+        deformAt(p.x, p.z, radius, function (idx, falloff) {
+          var h = heights[idx];
+          var add = amount * p.share * falloff * 1.4; // chato: amount ya es una porción chica, no volumen/área
+          var newH = Math.min(h + add, MAX_PILE);
+          if (newH > h + 0.0002) { heights[idx] = newH; return true; }
+          return false;
+        });
       });
     }
     // pushDir: {x,z} unitario con la dirección en la que se está moviendo la punta de
     // la cuchara este frame (o null si está quieta) — para que se "sienta" que empuja
-    // tierra hacia adelante en vez de simplemente hacerla desaparecer bajo el diente.
+    // tierra hacia los costados en vez de simplemente hacerla desaparecer bajo el diente.
     function digAt(x, z, tipY, pushDir) {
       var target = Math.max(tipY, MIN_DEPTH);
       var removedTotal = 0;
@@ -747,7 +759,7 @@
       var pushShare = pushDir ? removedTotal * 0.35 : 0;
       bucketLoad = clamp(bucketLoad + (removedTotal - pushShare), 0, BUCKET_CAPACITY);
       if (pushShare > 0) {
-        pushMoundAt(x + pushDir.x * DIG_RADIUS * 0.9, z + pushDir.z * DIG_RADIUS * 0.9, pushShare);
+        pushMoundAt(x, z, pushDir.x, pushDir.z, pushShare);
       }
     }
     function pileAt(x, z, amountPerSec, dt) {
