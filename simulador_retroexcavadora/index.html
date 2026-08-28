@@ -680,6 +680,7 @@
       return lerp(lerp(h00, h10, fx), lerp(h01, h11, fx), fz);
     }
     var terrainDirty = false;
+    var lastTipPos = null; // posición de bucketTip en el frame anterior, para calcular hacia dónde "empuja" al cavar
     // ruido determinístico por vértice (mismo valor siempre para el mismo idx, no se
     // acumula frame a frame) — rompe un poco la superficie matemáticamente perfecta
     // del cráter/montículo para que la tierra se vea menos "digital".
@@ -711,21 +712,43 @@
         }
       }
     }
-    function digAt(x, z, tipY) {
+    // vuelca un volumen (m3) como un montículo chico alrededor de (x,z), sin tocar
+    // bucketLoad — la usa digAt para la parte que la cuchara empuja hacia adelante en
+    // vez de levantar, no para lo que efectivamente carga.
+    function pushMoundAt(x, z, amount) {
+      if (amount <= 0) return;
+      deformAt(x, z, DIG_RADIUS * 0.7, function (idx, falloff) {
+        var h = heights[idx];
+        var add = (amount / CELL_AREA) * falloff * 1.2;
+        var newH = Math.min(h + add, MAX_PILE);
+        if (newH > h + 0.0002) { heights[idx] = newH; return true; }
+        return false;
+      });
+    }
+    // pushDir: {x,z} unitario con la dirección en la que se está moviendo la punta de
+    // la cuchara este frame (o null si está quieta) — para que se "sienta" que empuja
+    // tierra hacia adelante en vez de simplemente hacerla desaparecer bajo el diente.
+    function digAt(x, z, tipY, pushDir) {
       var target = Math.max(tipY, MIN_DEPTH);
+      var removedTotal = 0;
       deformAt(x, z, DIG_RADIUS, function (idx, falloff) {
         var h = heights[idx];
         var jitter = (vertexNoise(idx) - 0.5) * 0.05 * falloff;
         var newH = lerp(h, target + jitter, falloff * 0.4);
         if (newH < h - 0.0004) {
-          var removed = (h - newH) * CELL_AREA;
-          totalExcavated += removed;
-          bucketLoad = clamp(bucketLoad + removed, 0, BUCKET_CAPACITY);
+          removedTotal += (h - newH) * CELL_AREA;
           heights[idx] = newH;
           return true;
         }
         return false;
       });
+      if (removedTotal <= 0) return;
+      totalExcavated += removedTotal;
+      var pushShare = pushDir ? removedTotal * 0.35 : 0;
+      bucketLoad = clamp(bucketLoad + (removedTotal - pushShare), 0, BUCKET_CAPACITY);
+      if (pushShare > 0) {
+        pushMoundAt(x + pushDir.x * DIG_RADIUS * 0.9, z + pushDir.z * DIG_RADIUS * 0.9, pushShare);
+      }
     }
     function pileAt(x, z, amountPerSec, dt) {
       var give = amountPerSec * dt;
@@ -1872,8 +1895,21 @@
       var groundH = heightAtWorld(tipPos.x, tipPos.z) + groundContactOffset;
       var inBounds = Math.abs(tipPos.x) < TERRAIN_W / 2 - 0.3 && (tipPos.z) > -TERRAIN_D / 2 + 0.3 && (tipPos.z) < TERRAIN_D / 2 - 0.3;
 
+      // dirección (en el plano XZ) en la que se movió la punta este frame respecto al
+      // anterior — así digAt puede empujar tierra hacia adelante, no solo hacerla
+      // desaparecer bajo el diente quieto. lastTipPos arranca en null para no
+      // calcular un "empujón" gigante y falso en el primerísimo frame.
+      var pushDir = null;
+      if (lastTipPos) {
+        var mdx = tipPos.x - lastTipPos.x, mdz = tipPos.z - lastTipPos.z;
+        var mlen = Math.hypot(mdx, mdz);
+        if (mlen > 0.0015) pushDir = { x: mdx / mlen, z: mdz / mlen };
+      }
+      if (!lastTipPos) lastTipPos = new THREE.Vector3();
+      lastTipPos.copy(tipPos);
+
       if (inBounds && tipPos.y < groundH - 0.02 && bucketLoad < BUCKET_CAPACITY - 0.001) {
-        digAt(tipPos.x, tipPos.z, tipPos.y);
+        digAt(tipPos.x, tipPos.z, tipPos.y, pushDir);
       } else if (inBounds && tipPos.y > groundH + 0.22 && ctrl.bucket > DUMP_ANGLE && bucketLoad > 0.001) {
         if (isOverTruckBed(tipPos.x, tipPos.z)) fillTruck(0.9, dt);
         else pileAt(tipPos.x, tipPos.z, 0.9, dt);
