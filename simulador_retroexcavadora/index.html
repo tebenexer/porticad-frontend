@@ -1321,7 +1321,9 @@
         '<input type="range" id="dbgGroundOffset" min="-4" max="4" step="0.01" value="0" style="width:100%">' +
         '<label style="display:flex;align-items:center;gap:6px;padding:2px 0;margin-top:6px;cursor:pointer">' +
         '<input type="checkbox" id="dbgShowBucketRefPts" checked><span>Mostrar puntos de la cuchara (🟡 boca / 🩷 fondo)</span></label>' +
-        '<div style="color:#8b949e;margin:10px 0 4px;border-top:1px solid #30363d;padding-top:8px">🔴 Punta real de la cuchara (dónde corta) — moverla a mano, comparando contra las esferas de arriba:</div>' +
+        '<div style="color:#8b949e;margin:10px 0 4px;border-top:1px solid #30363d;padding-top:8px">🔴 Punta real de la cuchara (dónde corta)</div>' +
+        '<button type="button" id="dbgTipPick" style="width:100%;font-size:10px;padding:5px;margin-bottom:6px;background:#ff3b30;color:#fff;border:none;border-radius:4px;font-weight:bold;cursor:pointer">📍 Marcar con clic sobre el diente</button>' +
+        '<div style="color:#8b949e;margin-bottom:4px">O ajustá a mano, comparando contra las esferas de arriba:</div>' +
         ['X', 'Y', 'Z'].map(function (ax) {
           var lax = ax.toLowerCase();
           return '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;color:#8b949e;margin-bottom:2px">' +
@@ -1382,20 +1384,31 @@
       // ---- punta real de la cuchara: mueve bucketTip (el punto que de verdad usa el
       // juego para cavar/soltar) dentro del espacio de armPivotD, en vivo — sin
       // reconstruir la cadena. Una esfera roja la marca para compararla contra los
-      // puntos de referencia R1-R8. ----
+      // puntos de referencia R1-R8. Se puede ajustar con los sliders O marcando con
+      // un clic directo sobre el diente en el modelo (igual que los pasadores). ----
       var bucketTipMarker = armPivotD ? makeRulerMarker(armPivotD, '#ff3b30') : null;
       if (bucketTipMarker) {
         bucketTipMarker.userData.isPickMarker = true;
         bucketTipMarker.position.set(BUCKET_TIP_OFFSET.x, BUCKET_TIP_OFFSET.y, BUCKET_TIP_OFFSET.z);
       }
+      function setBucketTip(x, y, z) {
+        BUCKET_TIP_OFFSET.x = x; BUCKET_TIP_OFFSET.y = y; BUCKET_TIP_OFFSET.z = z;
+        bucketTip.position.set(x, y, z);
+        dirtMound.position.set(x, y + 0.1, z);
+        if (bucketTipMarker) bucketTipMarker.position.set(x, y, z);
+        ['X', 'Y', 'Z'].forEach(function (ax) {
+          var v = BUCKET_TIP_OFFSET[ax.toLowerCase()];
+          document.getElementById('dbgTip' + ax).value = v;
+          document.getElementById('dbgTip' + ax + 'Num').value = v;
+        });
+      }
       ['X', 'Y', 'Z'].forEach(function (ax) {
         var lax = ax.toLowerCase();
         var el = document.getElementById('dbgTip' + ax), numEl = document.getElementById('dbgTip' + ax + 'Num');
         function apply(v) {
-          BUCKET_TIP_OFFSET[lax] = v; el.value = v; numEl.value = v;
-          bucketTip.position[lax] = v;
-          dirtMound.position[lax] = lax === 'y' ? v + 0.1 : v;
-          if (bucketTipMarker) bucketTipMarker.position[lax] = v;
+          var next = { x: BUCKET_TIP_OFFSET.x, y: BUCKET_TIP_OFFSET.y, z: BUCKET_TIP_OFFSET.z };
+          next[lax] = v;
+          setBucketTip(next.x, next.y, next.z);
         }
         el.addEventListener('input', function () { apply(parseFloat(el.value)); });
         numEl.addEventListener('change', function () {
@@ -1403,6 +1416,42 @@
           if (isNaN(v)) { numEl.value = BUCKET_TIP_OFFSET[lax]; return; }
           apply(v);
         });
+      });
+
+      var tipArmed = false;
+      var tipPickerDown = null;
+      var tipRaycaster = new THREE.Raycaster();
+      var tipPickBtn = document.getElementById('dbgTipPick');
+      var tipDom = renderer.domElement; // declarado acá porque "dom" todavía no existe en este punto de la función
+      tipPickBtn.addEventListener('click', function () {
+        tipArmed = !tipArmed;
+        tipPickBtn.textContent = tipArmed ? '👉 Tocá el diente en el modelo…' : '📍 Marcar con clic sobre el diente';
+      });
+      tipDom.addEventListener('pointerdown', function (e) {
+        if (!tipArmed) return;
+        tipPickerDown = { x: e.clientX, y: e.clientY, t: performance.now() };
+      });
+      tipDom.addEventListener('pointerup', function (e) {
+        if (!tipArmed || !tipPickerDown) return;
+        var moved = Math.hypot(e.clientX - tipPickerDown.x, e.clientY - tipPickerDown.y);
+        var dt = performance.now() - tipPickerDown.t;
+        tipPickerDown = null;
+        if (moved > 6 || dt > 600) return; // fue drag/orbit, no un clic de marcar
+        if (!armPivotD) return;
+        var rect = tipDom.getBoundingClientRect();
+        var ndc = new THREE.Vector2(
+          ((e.clientX - rect.left) / rect.width) * 2 - 1,
+          -((e.clientY - rect.top) / rect.height) * 2 + 1
+        );
+        tipRaycaster.setFromCamera(ndc, activeCam);
+        var hits = tipRaycaster.intersectObjects([turretPivot, machineRoot], true).filter(function (h) {
+          return h.object.visible && !h.object.userData.isPickMarker;
+        });
+        if (!hits.length) return;
+        var local = armPivotD.worldToLocal(hits[0].point.clone());
+        setBucketTip(local.x, local.y, local.z);
+        tipArmed = false;
+        tipPickBtn.textContent = '📍 Marcar con clic sobre el diente';
       });
 
       function axisOf(key) {
