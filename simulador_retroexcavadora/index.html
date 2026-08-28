@@ -296,6 +296,7 @@
     var ARM_MIN = -1.250, ARM_MAX = 0.470;
     var BUCKET_MIN = -0.350, BUCKET_MAX = 2.930;
     var DUMP_ANGLE = 1.35; // curl por encima de esto + arriba del terreno = vuelca
+    var groundContactOffset = 0; // ajustable en ?debug=1: nivel virtual de contacto cuchara-suelo
     var DRIVE_SPEED = 1.6, TURN_SPEED = 0.55;
     var EXT_SPEED = 0.7, EXT_MIN = 0, EXT_MAX = 1, EXT_STROKE = 0.85; // brazo telescópico (0=retraído, 1=extendido)
     var EXT_SLEEVE_LEN = 0.55, EXT_ROD_LEN = 0.9;
@@ -679,6 +680,13 @@
       return lerp(lerp(h00, h10, fx), lerp(h01, h11, fx), fz);
     }
     var terrainDirty = false;
+    // ruido determinístico por vértice (mismo valor siempre para el mismo idx, no se
+    // acumula frame a frame) — rompe un poco la superficie matemáticamente perfecta
+    // del cráter/montículo para que la tierra se vea menos "digital".
+    function vertexNoise(idx) {
+      var s = Math.sin(idx * 12.9898) * 43758.5453;
+      return s - Math.floor(s); // 0..1
+    }
     function deformAt(x, z, radius, targetFn) {
       var g = worldToGrid(x, z);
       var rCells = Math.ceil(radius / Math.min(CELL_W, CELL_D)) + 1;
@@ -691,7 +699,8 @@
           var wx = ix * CELL_W - TERRAIN_W / 2, wz = iz * CELL_D - TERRAIN_D / 2;
           var d = Math.hypot(wx - x, wz - z);
           if (d > radius) continue;
-          var falloff = 1 - d / radius;
+          var t = 1 - d / radius;
+          var falloff = t * t * (3 - 2 * t); // smoothstep: borde redondeado, no un cono lineal
           var idx = vIndex(ix, iz);
           var changed = targetFn(idx, falloff);
           if (changed) {
@@ -706,7 +715,8 @@
       var target = Math.max(tipY, MIN_DEPTH);
       deformAt(x, z, DIG_RADIUS, function (idx, falloff) {
         var h = heights[idx];
-        var newH = lerp(h, target, falloff * 0.35);
+        var jitter = (vertexNoise(idx) - 0.5) * 0.05 * falloff;
+        var newH = lerp(h, target + jitter, falloff * 0.4);
         if (newH < h - 0.0004) {
           var removed = (h - newH) * CELL_AREA;
           totalExcavated += removed;
@@ -721,7 +731,8 @@
       var give = amountPerSec * dt;
       deformAt(x, z, PILE_RADIUS, function (idx, falloff) {
         var h = heights[idx];
-        var add = give * falloff * 0.6;
+        var jitter = vertexNoise(idx) * 0.04 * falloff;
+        var add = give * falloff * 0.7 + jitter * give;
         var newH = Math.min(h + add, MAX_PILE);
         if (newH > h + 0.0002) { heights[idx] = newH; return true; }
         return false;
@@ -1186,6 +1197,21 @@
     ];
     var limitTestMode = { boom: false, antebrazo: false, arm: false, bucket: false };
 
+    // 8 puntos de la cuchara medidos con la regla en su sesión anterior (espacio
+    // local de armPivotD): R1-R4 el perímetro de la boca, R5-R8 el del fondo. Se
+    // muestran como referencia fija en el panel de debug para calibrar el contacto
+    // cuchara-suelo contra la geometría real, sin tener que remedirlos cada vez.
+    var BUCKET_REF_POINTS = [
+      { id: 'R1', part: 'boca', x: -0.210, y: -0.089, z: -1.415 },
+      { id: 'R2', part: 'boca', x: 0.285, y: -0.073, z: -0.607 },
+      { id: 'R3', part: 'boca', x: -0.796, y: -0.107, z: -1.054 },
+      { id: 'R4', part: 'boca', x: -0.344, y: -0.086, z: -0.273 },
+      { id: 'R5', part: 'fondo', x: -0.469, y: -0.959, z: -0.442 },
+      { id: 'R6', part: 'fondo', x: 0.187, y: -0.964, z: -0.746 },
+      { id: 'R7', part: 'fondo', x: -0.017, y: -0.859, z: -1.100 },
+      { id: 'R8', part: 'fondo', x: -0.653, y: -0.832, z: -0.761 }
+    ];
+
     // cilindro fino orientable: geometría unitaria (radio fijo, largo 1 a lo largo de
     // Z desde el origen), se reorienta con quaternion + se escala en Z para estirarlo
     // entre 2 puntos cualesquiera — el "pasador" visible de cada articulación.
@@ -1276,6 +1302,15 @@
             '</div>';
         }).join('') +
         '<button type="button" id="dbgLimCopy" style="width:100%;margin-top:4px;font-size:10px;padding:5px;background:#58a6ff;color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">Copiar límites</button>' +
+        '<div style="font-weight:bold;color:#58a6ff;margin:10px 0 6px;border-top:1px solid #30363d;padding-top:10px">🪣 Contacto cuchara-suelo</div>' +
+        '<div style="color:#8b949e;margin-bottom:8px">Corre el nivel donde la cuchara "toca" el suelo SIN mover el terreno real — para calibrar el diente contra los puntos de la cuchara medidos (abajo, en amarillo/rosa). Positivo = hace contacto/tira antes (más arriba); negativo, más abajo.</div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;color:#8b949e;margin-bottom:2px">' +
+        '<span>Desfasaje (m)</span>' +
+        '<input type="number" id="dbgGroundOffsetNum" step="0.01" value="0" style="width:70px;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:4px;padding:2px 4px;font-family:inherit;font-size:11px;text-align:right">' +
+        '</div>' +
+        '<input type="range" id="dbgGroundOffset" min="-1" max="1" step="0.01" value="0" style="width:100%">' +
+        '<label style="display:flex;align-items:center;gap:6px;padding:2px 0;margin-top:6px;cursor:pointer">' +
+        '<input type="checkbox" id="dbgShowBucketRefPts" checked><span>Mostrar puntos de la cuchara (🟡 boca / 🩷 fondo)</span></label>' +
         '<div style="font-weight:bold;color:#58a6ff;margin:10px 0 6px;border-top:1px solid #30363d;padding-top:10px">📏 Regla</div>' +
         '<div style="color:#8b949e;margin-bottom:8px">Con "Modo regla" activo, un clic marca un punto. En referencia "Cuchara" los puntos quedan en el espacio propio de la cuchara (no cambian aunque muevas el brazo), para medir su ancho/alto/profundidad marcando sus esquinas; el panel calcula esas 3 medidas solo. En "Máquina" mide alcance sobre el terreno.</div>' +
         '<div style="display:flex;gap:10px;margin-bottom:6px;font-size:10px">' +
@@ -1292,6 +1327,38 @@
         '<div id="dbgRulerList"></div>';
 
       document.body.appendChild(wrap);
+
+      // ---- desfasaje de contacto cuchara-suelo: mueve solo el umbral que usa
+      // tick() para decidir cuándo la cuchara "toca" el terreno, nunca el heightmap
+      // real (ver groundContactOffset arriba). ----
+      var groundOffsetEl = document.getElementById('dbgGroundOffset');
+      var groundOffsetNumEl = document.getElementById('dbgGroundOffsetNum');
+      function applyGroundOffset(v) {
+        groundContactOffset = v;
+        groundOffsetEl.value = v;
+        groundOffsetNumEl.value = v;
+      }
+      groundOffsetEl.addEventListener('input', function () { applyGroundOffset(parseFloat(groundOffsetEl.value)); });
+      groundOffsetNumEl.addEventListener('change', function () {
+        var v = parseFloat(groundOffsetNumEl.value);
+        if (isNaN(v)) { groundOffsetNumEl.value = groundContactOffset; return; }
+        applyGroundOffset(v);
+      });
+
+      // ---- puntos de la cuchara medidos anteriormente: esferas fijas, colgadas de
+      // armPivotD (rígidas con la cuchara real, se mueven con ella). Si todavía no se
+      // armó la cadena real (no se identificó ninguna pieza), no hay de dónde
+      // colgarlas — se omiten sin romper el resto del panel. ----
+      var bucketRefMarkers = armPivotD ? BUCKET_REF_POINTS.map(function (p) {
+        var color = p.part === 'boca' ? '#ffd60a' : '#ff375f';
+        var m = makeRulerMarker(armPivotD, color);
+        m.userData.isPickMarker = true;
+        m.position.set(p.x, p.y, p.z);
+        return m;
+      }) : [];
+      document.getElementById('dbgShowBucketRefPts').addEventListener('change', function (e) {
+        bucketRefMarkers.forEach(function (m) { m.visible = e.target.checked; });
+      });
 
       function axisOf(key) {
         var v = jointVal[key];
@@ -1705,7 +1772,10 @@
       terrainDirty = false;
       var tipPos = new THREE.Vector3();
       bucketTip.getWorldPosition(tipPos);
-      var groundH = heightAtWorld(tipPos.x, tipPos.z);
+      // groundContactOffset: ajuste de debug (?debug=1) para el nivel donde la
+      // cuchara "toca" el suelo — no mueve el terreno real, solo corre el umbral de
+      // contacto para calibrar el diente contra el heightmap real.
+      var groundH = heightAtWorld(tipPos.x, tipPos.z) + groundContactOffset;
       var inBounds = Math.abs(tipPos.x) < TERRAIN_W / 2 - 0.3 && (tipPos.z) > -TERRAIN_D / 2 + 0.3 && (tipPos.z) < TERRAIN_D / 2 - 0.3;
 
       if (inBounds && tipPos.y < groundH - 0.02 && bucketLoad < BUCKET_CAPACITY - 0.001) {
