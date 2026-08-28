@@ -1157,13 +1157,16 @@
       // la cuchara real pasa a mandar la excavación: el punto de referencia y el
       // indicador de carga se mudan al pivote real D. De punto de partida quedan en
       // el propio pivote (el pasador); si hace falta más precisión en el diente de la
-      // cuchara, se puede afinar marcando un punto más con el panel de picking.
+      // cuchara: el diente/punta real NO está en el pasador D (eso es la articulación,
+      // no el filo) — BUCKET_TIP_OFFSET la ubica en el espacio propio de armPivotD,
+      // mismo sistema que los puntos de referencia R1-R8. Ajustable en vivo con el
+      // panel de picking (?debug=1).
       bucketGroup.remove(bucketTip);
       bucketGroup.remove(dirtMound);
       armPivotD.add(bucketTip);
       armPivotD.add(dirtMound);
-      bucketTip.position.set(0, 0, 0);
-      dirtMound.position.set(0, 0.1, 0);
+      bucketTip.position.set(BUCKET_TIP_OFFSET.x, BUCKET_TIP_OFFSET.y, BUCKET_TIP_OFFSET.z);
+      dirtMound.position.set(BUCKET_TIP_OFFSET.x, BUCKET_TIP_OFFSET.y + 0.1, BUCKET_TIP_OFFSET.z);
     }
 
     // ---------- panel de picking: 4 pasadores, como cilindro pasante (?debug=1) ----------
@@ -1211,6 +1214,13 @@
       { id: 'R7', part: 'fondo', x: -0.017, y: -0.859, z: -1.100 },
       { id: 'R8', part: 'fondo', x: -0.653, y: -0.832, z: -0.761 }
     ];
+
+    // punto real de contacto/corte de la cuchara (bucketTip): NO es el pasador D (esa
+    // es la articulación, no el filo) — arranca en R7, la esquina del fondo más lejos
+    // del pasador (candidata más razonable a diente), pero es ajustable a mano con el
+    // panel de picking mirando las esferas de referencia de arriba. Mismo espacio
+    // local que BUCKET_REF_POINTS (armPivotD).
+    var BUCKET_TIP_OFFSET = { x: -0.017, y: -0.859, z: -1.100 };
 
     // cilindro fino orientable: geometría unitaria (radio fijo, largo 1 a lo largo de
     // Z desde el origen), se reorienta con quaternion + se escala en Z para estirarlo
@@ -1311,6 +1321,15 @@
         '<input type="range" id="dbgGroundOffset" min="-4" max="4" step="0.01" value="0" style="width:100%">' +
         '<label style="display:flex;align-items:center;gap:6px;padding:2px 0;margin-top:6px;cursor:pointer">' +
         '<input type="checkbox" id="dbgShowBucketRefPts" checked><span>Mostrar puntos de la cuchara (🟡 boca / 🩷 fondo)</span></label>' +
+        '<div style="color:#8b949e;margin:10px 0 4px;border-top:1px solid #30363d;padding-top:8px">🔴 Punta real de la cuchara (dónde corta) — moverla a mano, comparando contra las esferas de arriba:</div>' +
+        ['X', 'Y', 'Z'].map(function (ax) {
+          var lax = ax.toLowerCase();
+          return '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;color:#8b949e;margin-bottom:2px">' +
+            '<span>' + ax + '</span>' +
+            '<input type="number" id="dbgTip' + ax + 'Num" step="0.01" value="' + BUCKET_TIP_OFFSET[lax] + '" style="width:70px;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:4px;padding:2px 4px;font-family:inherit;font-size:11px;text-align:right">' +
+            '</div>' +
+            '<input type="range" id="dbgTip' + ax + '" min="-2" max="2" step="0.01" value="' + BUCKET_TIP_OFFSET[lax] + '" style="width:100%">';
+        }).join('') +
         '<div style="font-weight:bold;color:#58a6ff;margin:10px 0 6px;border-top:1px solid #30363d;padding-top:10px">📏 Regla</div>' +
         '<div style="color:#8b949e;margin-bottom:8px">Con "Modo regla" activo, un clic marca un punto. En referencia "Cuchara" los puntos quedan en el espacio propio de la cuchara (no cambian aunque muevas el brazo), para medir su ancho/alto/profundidad marcando sus esquinas; el panel calcula esas 3 medidas solo. En "Máquina" mide alcance sobre el terreno.</div>' +
         '<div style="display:flex;gap:10px;margin-bottom:6px;font-size:10px">' +
@@ -1358,6 +1377,32 @@
       }) : [];
       document.getElementById('dbgShowBucketRefPts').addEventListener('change', function (e) {
         bucketRefMarkers.forEach(function (m) { m.visible = e.target.checked; });
+      });
+
+      // ---- punta real de la cuchara: mueve bucketTip (el punto que de verdad usa el
+      // juego para cavar/soltar) dentro del espacio de armPivotD, en vivo — sin
+      // reconstruir la cadena. Una esfera roja la marca para compararla contra los
+      // puntos de referencia R1-R8. ----
+      var bucketTipMarker = armPivotD ? makeRulerMarker(armPivotD, '#ff3b30') : null;
+      if (bucketTipMarker) {
+        bucketTipMarker.userData.isPickMarker = true;
+        bucketTipMarker.position.set(BUCKET_TIP_OFFSET.x, BUCKET_TIP_OFFSET.y, BUCKET_TIP_OFFSET.z);
+      }
+      ['X', 'Y', 'Z'].forEach(function (ax) {
+        var lax = ax.toLowerCase();
+        var el = document.getElementById('dbgTip' + ax), numEl = document.getElementById('dbgTip' + ax + 'Num');
+        function apply(v) {
+          BUCKET_TIP_OFFSET[lax] = v; el.value = v; numEl.value = v;
+          bucketTip.position[lax] = v;
+          dirtMound.position[lax] = lax === 'y' ? v + 0.1 : v;
+          if (bucketTipMarker) bucketTipMarker.position[lax] = v;
+        }
+        el.addEventListener('input', function () { apply(parseFloat(el.value)); });
+        numEl.addEventListener('change', function () {
+          var v = parseFloat(numEl.value);
+          if (isNaN(v)) { numEl.value = BUCKET_TIP_OFFSET[lax]; return; }
+          apply(v);
+        });
       });
 
       function axisOf(key) {
