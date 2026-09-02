@@ -135,6 +135,7 @@
       <button id="btnOpen">Abrir… <span class="key">Ctrl+O</span></button>
       <button id="btnSave">Guardar <span class="key">Ctrl+S</span></button>
       <button id="btnSaveAs">Guardar como…</button>
+      <button id="btnClearGuides">Limpiar guías</button>
     </div>
   </div>
 </div>
@@ -163,6 +164,10 @@
     </button>
     <button class="tool-btn" data-tool="move" title="Mover (M)">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+    </button>
+    <div class="tool-sep"></div>
+    <button class="tool-btn" data-tool="guide" title="Cinta métrica / guía (G)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="4" stroke-dasharray="3 3"/><circle cx="4" cy="20" r="1.5" fill="currentColor"/><circle cx="20" cy="4" r="1.5" fill="currentColor"/></svg>
     </button>
   </div>
 
@@ -278,17 +283,19 @@
   }
 
   // ───────────────────────── Model data ─────────────────────────
-  // objects[]: { id, type:'line'|'rect'|'circle'|'polyface', params:{...}, height, mesh }
+  // objects[]: { id, type:'line'|'guide'|'rect'|'circle'|'polyface', params:{...}, height, mesh }
   let objects = [];
   let nextId = 1;
   let selectedObjects = [];
 
   const COLOR_DEFAULT = 0x58a6ff;
   const COLOR_SELECTED = 0xf0b429;
+  const GUIDE_COLOR_DEFAULT = 0x8b949e; // muted gray, reads as "reference", not real geometry
 
   function applyColor(obj) {
-    const c = selectedObjects.includes(obj) ? COLOR_SELECTED : COLOR_DEFAULT;
-    obj.mesh.traverse(n => { if (n.material && !n.userData.isEdgeOverlay) n.material.color.setHex(c); });
+    const base = obj.type === 'guide' ? GUIDE_COLOR_DEFAULT : COLOR_DEFAULT;
+    const c = selectedObjects.includes(obj) ? COLOR_SELECTED : base;
+    obj.mesh.traverse(n => { if (n.material && n.material.color && !n.userData.isEdgeOverlay) n.material.color.setHex(c); });
   }
 
   function disposeMesh(mesh) {
@@ -319,6 +326,29 @@
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.copy(a);
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+    return mesh;
+  }
+
+  // Reference/guide line ("cinta métrica"): a dashed line other tools can still snap to
+  // (via objectVertices/resolveGeometrySnap) but that's excluded from extrude and never
+  // forms a face. Picking uses an invisible cylinder (reliable raycasting, like buildLineMesh)
+  // with the visible dashed THREE.Line as a non-raycasting child on top of it.
+  function buildGuideMesh(a, b) {
+    const dir = new THREE.Vector3().subVectors(b, a);
+    const len = dir.length() || 0.001;
+    const geo = new THREE.CylinderGeometry(0.05, 0.05, len, 6);
+    geo.translate(0, len/2, 0);
+    const mat = new THREE.MeshBasicMaterial({ visible: false });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(a);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+
+    const dashGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,len,0)]);
+    const dashMat = new THREE.LineDashedMaterial({ color: GUIDE_COLOR_DEFAULT, dashSize: 0.25, gapSize: 0.18 });
+    const dashedLine = new THREE.Line(dashGeo, dashMat);
+    dashedLine.computeLineDistances();
+    dashedLine.raycast = () => {};
+    mesh.add(dashedLine);
     return mesh;
   }
 
@@ -431,6 +461,7 @@
 
   function meshFor(obj) {
     if (obj.type === 'line') return buildLineMesh(new THREE.Vector3(...obj.params.a), new THREE.Vector3(...obj.params.b));
+    if (obj.type === 'guide') return buildGuideMesh(new THREE.Vector3(...obj.params.a), new THREE.Vector3(...obj.params.b));
     if (obj.type === 'rect') return buildRectMesh(obj.params.x1, obj.params.z1, obj.params.x2, obj.params.z2, obj.height, obj.params.baseY);
     if (obj.type === 'circle') return buildCircleMesh(obj.params.cx, obj.params.cz, obj.params.radius, obj.height, obj.params.baseY);
     if (obj.type === 'polyface') return buildPolyfaceMesh(obj.params.points, obj.height, obj.params.orientation, obj.params.base);
@@ -591,7 +622,8 @@
     circle: 'Clic en el centro, clic para fijar el radio.',
     erase: 'Haz clic sobre una figura para borrarla.',
     extrude: 'Pasa el cursor para ver resaltada la cara exacta. Clic para agarrarla, mueve el mouse (la cara sigue al cursor), clic de nuevo para soltar — o escribe un número + Enter. Esc cancela.',
-    move: 'Clic sobre una figura y arrastra para reubicarla. Acércate a un eje rojo/verde/azul para moverla solo en esa dirección (incluye subir/bajar del plano).'
+    move: 'Clic sobre una figura y arrastra para reubicarla. Acércate a un eje rojo/verde/azul para moverla solo en esa dirección (incluye subir/bajar del plano).',
+    guide: 'Cinta métrica: clic en vacío para trazar una guía punto a punto (como la Línea). Clic sobre una línea o guía existente para crear una paralela a ella — mueve el mouse o escribe un número + Enter para fijar el offset. Archivo › Limpiar guías las borra todas.'
   };
 
   function updateStatusCount() {
@@ -602,7 +634,7 @@
     cancelDraw();
     currentTool = tool;
     document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
-    const names = { select:'Seleccionar', line:'Línea', rect:'Rectángulo', circle:'Círculo', erase:'Borrador', extrude:'Extruir', move:'Mover' };
+    const names = { select:'Seleccionar', line:'Línea', rect:'Rectángulo', circle:'Círculo', erase:'Borrador', extrude:'Extruir', move:'Mover', guide:'Cinta métrica' };
     statusToolEl.textContent = names[tool];
     hintEl.textContent = TOOL_HINTS[tool];
   }
@@ -919,7 +951,7 @@
       minY: Math.min(y1, y2) - canvasRect.top, maxY: Math.max(y1, y2) - canvasRect.top,
     };
     const matches = objects.filter(o => {
-      if (o.type === 'line') {
+      if (o.type === 'line' || o.type === 'guide') {
         const a = projectToScreen(new THREE.Vector3(...o.params.a), canvasRect);
         const b = projectToScreen(new THREE.Vector3(...o.params.b), canvasRect);
         return segmentIntersectsRect(a, b, dragBox);
@@ -954,7 +986,7 @@
   // for a solid it's every corner at its base AND (if extruded) at its top, so a line can
   // connect down to the ground or up to any corner of a box/face, same as SketchUp.
   function objectVertices(o) {
-    if (o.type === 'line') return [new THREE.Vector3(...o.params.a), new THREE.Vector3(...o.params.b)];
+    if (o.type === 'line' || o.type === 'guide') return [new THREE.Vector3(...o.params.a), new THREE.Vector3(...o.params.b)];
     const baseY = o.params.baseY || 0;
     const ys = o.height > 0 ? [baseY, baseY + o.height] : [baseY];
     if (o.type === 'rect') {
@@ -990,7 +1022,7 @@
     if (best) return { point: best.point.clone(), kind: best.kind };
 
     objects.forEach(o => {
-      if (o.type !== 'line') return;
+      if (o.type !== 'line' && o.type !== 'guide') return;
       const a = new THREE.Vector3(...o.params.a), b = new THREE.Vector3(...o.params.b);
       const mid = a.clone().add(b).multiplyScalar(0.5);
       const d = screenDistToPoint(clientX, clientY, mid);
@@ -999,7 +1031,7 @@
     if (best) return { point: best.point.clone(), kind: best.kind };
 
     objects.forEach(o => {
-      if (o.type !== 'line') return;
+      if (o.type !== 'line' && o.type !== 'guide') return;
       const a = new THREE.Vector3(...o.params.a), b = new THREE.Vector3(...o.params.b);
       const cp = closestPointOnSegment(rawPoint, a, b);
       const d = screenDistToPoint(clientX, clientY, cp);
@@ -1048,7 +1080,7 @@
   // Rewrites obj.params (from a snapshot) shifted by (dx,dy,dz) — used by the Move tool.
   function translatedParams(type, baseParams, dx, dy, dz) {
     const p = JSON.parse(JSON.stringify(baseParams));
-    if (type === 'line') {
+    if (type === 'line' || type === 'guide') {
       p.a = [p.a[0] + dx, p.a[1] + dy, p.a[2] + dz];
       p.b = [p.b[0] + dx, p.b[1] + dy, p.b[2] + dz];
     } else if (type === 'rect') {
@@ -1071,9 +1103,64 @@
   // (snap or axis-lock) is currently showing, instead of wherever the mouse happens to be.
   let typedValue = '';
   let lastLineEndPoint = null;
+  let guideChainStart = null; // anchor for the Guide tool's current segment (continues like Line)
+  let lastGuideEndPoint = null;
 
-  function resolveLineEndpoint(clientX, clientY) {
-    const raw = groundPoint(clientX, clientY) || drawStart.clone();
+  // Guide tool, offset mode: click an existing line/guide, move the mouse (or type a
+  // value + Enter) to lay a new guide parallel to it at that perpendicular distance —
+  // same idea as SketchUp's Tape Measure offset.
+  let offsetSourceObj = null;
+  let offsetBaseA = null, offsetBaseB = null; // snapshot of the source line's endpoints
+  let lastOffsetVec = null;
+
+  // The perpendicular vector from the source line to wherever the cursor currently points:
+  // finds the mutual closest points between the (infinite) line and the cursor's 3D ray —
+  // the segment connecting them is, by construction, perpendicular to the line.
+  function computeOffsetVec(clientX, clientY) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouseNDC, camera);
+    const rayOrigin = raycaster.ray.origin, rayDir = raycaster.ray.direction.clone().normalize();
+    const lineDir = offsetBaseB.clone().sub(offsetBaseA).normalize();
+    const closestOnLine = closestPointOnLineToRay(offsetBaseA, lineDir, rayOrigin, rayDir);
+    const t = closestOnLine.clone().sub(rayOrigin).dot(rayDir);
+    const closestOnRay = rayOrigin.clone().addScaledVector(rayDir, t);
+    return closestOnRay.clone().sub(closestOnLine);
+  }
+
+  function refreshOffsetPreview() {
+    if (currentTool !== 'guide' || !offsetSourceObj) return;
+    clearPreview();
+    let offsetVec = computeOffsetVec(lastMouseX, lastMouseY);
+    if (offsetVec.lengthSq() < 1e-9) offsetVec = new THREE.Vector3(0.001, 0, 0);
+    if (typedValue) {
+      const len = parseFloat(typedValue);
+      if (!isNaN(len)) offsetVec = offsetVec.clone().normalize().multiplyScalar(len);
+    }
+    lastOffsetVec = offsetVec.clone();
+    const newA = offsetBaseA.clone().add(offsetVec), newB = offsetBaseB.clone().add(offsetVec);
+    previewMesh = buildGuideMesh(newA, newB);
+    previewMesh.traverse(n => { if (n.material && n.material.color) n.material.color.setHex(AXIS_COLOR_NONE); });
+    scene.add(previewMesh);
+    let txt = 'offset: ' + offsetVec.length().toFixed(2);
+    if (typedValue) txt += '  → ' + typedValue + ' [Enter]';
+    statusCoordsEl.textContent = txt;
+  }
+
+  function commitOffset() {
+    if (offsetSourceObj && lastOffsetVec) {
+      const newA = offsetBaseA.clone().add(lastOffsetVec), newB = offsetBaseB.clone().add(lastOffsetVec);
+      addObject('guide', { a: [newA.x, newA.y, newA.z], b: [newB.x, newB.y, newB.z] });
+    }
+    cancelDraw();
+  }
+
+  // Shared by the Line and Guide tools: resolves where the "next point" should land —
+  // geometry snap first, then axis lock, then a free point on the plane through `anchor`
+  // — and overrides it with the typed VCB length along that same direction if one is set.
+  function resolveDirectedEndpoint(anchor, clientX, clientY) {
+    const raw = groundPoint(clientX, clientY) || anchor.clone();
     const geomSnap = resolveGeometrySnap(raw, clientX, clientY);
     let endPoint, color, label;
     if (geomSnap) {
@@ -1081,22 +1168,24 @@
       color = geomSnap.kind === 'endpoint' ? SNAP_COLOR_ENDPOINT : geomSnap.kind === 'midpoint' ? SNAP_COLOR_MIDPOINT : SNAP_COLOR_ONEDGE;
       label = SNAP_LABEL[geomSnap.kind];
     } else {
-      const axisSnap = resolveAxisSnap(drawStart, clientX, clientY);
+      const axisSnap = resolveAxisSnap(anchor, clientX, clientY);
       if (axisSnap) {
         endPoint = axisSnap.point; color = axisSnap.color; label = axisSnap.label;
       } else {
-        endPoint = planePoint(clientX, clientY, drawStart.y) || drawStart.clone();
+        endPoint = planePoint(clientX, clientY, anchor.y) || anchor.clone();
         color = AXIS_COLOR_NONE; label = null;
       }
     }
-    const direction = endPoint.clone().sub(drawStart);
+    const direction = endPoint.clone().sub(anchor);
     if (direction.lengthSq() > 1e-9) direction.normalize(); else direction.set(1, 0, 0);
     if (typedValue) {
       const len = parseFloat(typedValue);
-      if (!isNaN(len)) endPoint = drawStart.clone().addScaledVector(direction, len);
+      if (!isNaN(len)) endPoint = anchor.clone().addScaledVector(direction, len);
     }
     return { point: endPoint, color, label, snapped: !!geomSnap };
   }
+
+  function resolveLineEndpoint(clientX, clientY) { return resolveDirectedEndpoint(drawStart, clientX, clientY); }
 
   function commitLineSegment(finalPt) {
     const segment = addObject('line', { a: [drawStart.x, drawStart.y, drawStart.z], b: [finalPt.x, finalPt.y, finalPt.z] });
@@ -1141,6 +1230,32 @@
     lastLineEndPoint = resolved.point.clone();
   }
 
+  // Guide ("cinta métrica"): same click-move-click-to-place-next-point flow as Line, but
+  // no auto-close-to-face — it's purely a reference/measuring aid.
+  function commitGuideSegment(finalPt) {
+    addObject('guide', { a: [guideChainStart.x, guideChainStart.y, guideChainStart.z], b: [finalPt.x, finalPt.y, finalPt.z] });
+    guideChainStart = finalPt.clone(); // continue chaining, like Line
+    clearPreview();
+    hideSnapMarker();
+    typedValue = '';
+  }
+
+  function refreshGuidePreview() {
+    if (currentTool !== 'guide' || !guideChainStart) return;
+    clearPreview();
+    const resolved = resolveDirectedEndpoint(guideChainStart, lastMouseX, lastMouseY);
+    if (resolved.snapped && !typedValue) showSnapMarker(resolved.point, resolved.color); else hideSnapMarker();
+    previewMesh = buildGuideMesh(guideChainStart, resolved.point);
+    previewMesh.traverse(n => { if (n.material && n.material.color) n.material.color.setHex(resolved.color); });
+    scene.add(previewMesh);
+    const len = guideChainStart.distanceTo(resolved.point);
+    let txt = 'longitud: ' + len.toFixed(2);
+    if (resolved.label && !typedValue) txt += '  · ' + resolved.label;
+    if (typedValue) txt += '  → ' + typedValue + ' [Enter]';
+    statusCoordsEl.textContent = txt;
+    lastGuideEndPoint = resolved.point.clone();
+  }
+
   function clearPreview() {
     if (previewMesh) { scene.remove(previewMesh); disposeMesh(previewMesh); previewMesh = null; }
   }
@@ -1171,6 +1286,12 @@
     moveBaseParams = null;
     typedValue = '';
     lastLineEndPoint = null;
+    guideChainStart = null;
+    lastGuideEndPoint = null;
+    offsetSourceObj = null;
+    offsetBaseA = null;
+    offsetBaseB = null;
+    lastOffsetVec = null;
     extrudeWallIndex = null;
     extrudeBasePoints = null;
     extrudeFaceKind = null;
@@ -1216,6 +1337,34 @@
       return;
     }
 
+    if (currentTool === 'guide') {
+      if (offsetSourceObj) {
+        // Second click: confirm the offset guide at whatever distance is currently showing.
+        commitOffset();
+        return;
+      }
+      if (!guideChainStart) {
+        // Clicking an existing line/guide starts an offset instead of a fresh 2-point guide.
+        const hit = pickObject(e.clientX, e.clientY);
+        if (hit && (hit.type === 'line' || hit.type === 'guide')) {
+          offsetSourceObj = hit;
+          offsetBaseA = new THREE.Vector3(...hit.params.a);
+          offsetBaseB = new THREE.Vector3(...hit.params.b);
+          typedValue = '';
+          return;
+        }
+        const raw = groundPoint(e.clientX, e.clientY);
+        if (!raw) return;
+        const geomSnap = resolveGeometrySnap(raw, e.clientX, e.clientY);
+        guideChainStart = (geomSnap ? geomSnap.point : raw).clone();
+        typedValue = '';
+      } else {
+        const finalPt = lastGuideEndPoint ? lastGuideEndPoint.clone() : resolveDirectedEndpoint(guideChainStart, e.clientX, e.clientY).point;
+        commitGuideSegment(finalPt);
+      }
+      return;
+    }
+
     if (currentTool === 'rect') {
       const p = groundPoint(e.clientX, e.clientY);
       if (!p) return;
@@ -1251,7 +1400,7 @@
         return;
       }
       const hit = pickObjectWithFace(e.clientX, e.clientY);
-      if (!hit || hit.obj.type === 'line') return;
+      if (!hit || hit.obj.type === 'line' || hit.obj.type === 'guide') return;
       const faceKind = determineFace(hit.obj, hit.point);
       const wallMatch = /^wall(\d+)$/.exec(faceKind);
       extrudeObj = hit.obj;
@@ -1322,6 +1471,19 @@
       if (resolved.label && !typedValue) statusCoordsEl.textContent += '  · ' + resolved.label;
       if (typedValue) statusCoordsEl.textContent += '  → ' + typedValue + ' [Enter]';
       lastLineEndPoint = resolved.point.clone();
+    } else if (currentTool === 'guide' && offsetSourceObj) {
+      refreshOffsetPreview();
+    } else if (currentTool === 'guide' && !guideChainStart && p) {
+      const geomSnap = resolveGeometrySnap(p, e.clientX, e.clientY);
+      if (geomSnap) {
+        const snapColor = geomSnap.kind === 'endpoint' ? SNAP_COLOR_ENDPOINT : geomSnap.kind === 'midpoint' ? SNAP_COLOR_MIDPOINT : SNAP_COLOR_ONEDGE;
+        showSnapMarker(geomSnap.point, snapColor);
+        statusCoordsEl.textContent += '  · ' + SNAP_LABEL[geomSnap.kind];
+      } else {
+        hideSnapMarker();
+      }
+    } else if (currentTool === 'guide' && guideChainStart) {
+      refreshGuidePreview();
     } else if ((currentTool === 'rect' || currentTool === 'circle') && drawStage === 1 && p) {
       clearPreview();
       const mat = new THREE.MeshBasicMaterial({ color: AXIS_COLOR_NONE, wireframe: true, transparent: true, opacity: 0.8 });
@@ -1339,7 +1501,7 @@
         refreshExtrudePreview(e.clientX, e.clientY);
       } else {
         const hit = pickObjectWithFace(e.clientX, e.clientY);
-        if (hit && hit.obj.type !== 'line') {
+        if (hit && hit.obj.type !== 'line' && hit.obj.type !== 'guide') {
           showFaceHighlight(buildFaceHighlightMesh(hit.obj, determineFace(hit.obj, hit.point)));
         } else {
           hideFaceHighlight();
@@ -1398,23 +1560,35 @@
     // VCB numeric entry: while placing a line's next point, or mid push/pull with Extrude,
     // digits/Enter set an exact value instead of falling through to delete-selection etc.
     const vcbLine = currentTool === 'line' && drawStage === 1;
+    const vcbGuide = currentTool === 'guide' && !!guideChainStart;
+    const vcbOffset = currentTool === 'guide' && !!offsetSourceObj;
     const vcbExtrude = currentTool === 'extrude' && !!extrudeObj;
-    if ((vcbLine || vcbExtrude) && !isTypingTarget()) {
+    if ((vcbLine || vcbGuide || vcbOffset || vcbExtrude) && !isTypingTarget()) {
       if (/^[0-9.]$/.test(e.key) || (e.key === '-' && typedValue === '')) {
         typedValue += e.key;
-        if (vcbLine) refreshLinePreview(); else refreshExtrudePreview(lastMouseX, lastMouseY);
+        if (vcbLine) refreshLinePreview();
+        else if (vcbGuide) refreshGuidePreview();
+        else if (vcbOffset) refreshOffsetPreview();
+        else refreshExtrudePreview(lastMouseX, lastMouseY);
         e.preventDefault();
         return;
       }
       if (e.key === 'Backspace' && typedValue) {
         typedValue = typedValue.slice(0, -1);
-        if (vcbLine) refreshLinePreview(); else refreshExtrudePreview(lastMouseX, lastMouseY);
+        if (vcbLine) refreshLinePreview();
+        else if (vcbGuide) refreshGuidePreview();
+        else if (vcbOffset) refreshOffsetPreview();
+        else refreshExtrudePreview(lastMouseX, lastMouseY);
         e.preventDefault();
         return;
       }
       if (e.key === 'Enter') {
         if (vcbLine) {
           if (typedValue && lastLineEndPoint) commitLineSegment(lastLineEndPoint.clone());
+        } else if (vcbGuide) {
+          if (typedValue && lastGuideEndPoint) commitGuideSegment(lastGuideEndPoint.clone());
+        } else if (vcbOffset) {
+          if (typedValue) commitOffset();
         } else if (typedValue) {
           endExtrudeDrag();
         }
@@ -1430,7 +1604,7 @@
     if (e.ctrlKey && e.key.toLowerCase() === 'o') { e.preventDefault(); doOpen(); }
     if (e.ctrlKey && e.key.toLowerCase() === 's') { e.preventDefault(); doSave(); }
     if (!e.ctrlKey && !e.metaKey && !isTypingTarget()) {
-      const map = { s:'select', l:'line', r:'rect', c:'circle', e:'erase', p:'extrude', m:'move' };
+      const map = { s:'select', l:'line', r:'rect', c:'circle', e:'erase', p:'extrude', m:'move', g:'guide' };
       const t = map[e.key.toLowerCase()];
       if (t) setTool(t);
     }
@@ -1506,6 +1680,9 @@
   document.getElementById('btnOpen').addEventListener('click', doOpen);
   document.getElementById('btnSave').addEventListener('click', doSave);
   document.getElementById('btnSaveAs').addEventListener('click', doSaveAs);
+  document.getElementById('btnClearGuides').addEventListener('click', () => {
+    objects.filter(o => o.type === 'guide').forEach(o => removeObject(o));
+  });
 
   // ───────────────────────── Render loop ─────────────────────────
   function animate() {
