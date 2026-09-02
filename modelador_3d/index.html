@@ -358,19 +358,73 @@
     return mesh;
   }
 
-  // Arbitrary closed polygon (auto-created when a line chain closes back on itself).
-  // Shape() lives in local XY; mapping local (X,Y)->world (x,0,z) needs rotateX(+90deg).
-  // Extrude direction under that rotation maps local +Z -> world -Y, so depth is negated to go up.
-  function buildPolyfaceMesh(points, height, baseY) {
-    baseY = baseY || 0;
+  // ── Arbitrary closed polygon (auto-created when a line chain closes back on itself) ──
+  // Supports 3 axis-aligned planes so a closed loop can be a horizontal floor OR a
+  // vertical wall (drawn using the blue-axis lock): 'xz' (horizontal, points=[x,z],
+  // extrudes toward +Y), 'zy' (wall at x=base, points=[z,y], extrudes toward +X), 'xy'
+  // (wall at z=base, points=[x,y], extrudes toward +Z). `base` is the polygon's offset
+  // along whichever world axis is perpendicular to its plane.
+  const POLYFACE_BASES = {
+    xz: { x: new THREE.Vector3(1,0,0), y: new THREE.Vector3(0,0,1), z: new THREE.Vector3(0,1,0) },
+    zy: { x: new THREE.Vector3(0,0,1), y: new THREE.Vector3(0,1,0), z: new THREE.Vector3(1,0,0) },
+    xy: { x: new THREE.Vector3(1,0,0), y: new THREE.Vector3(0,1,0), z: new THREE.Vector3(0,0,1) },
+  };
+  function polyfaceOffsetVector(orientation, offset) {
+    const b = POLYFACE_BASES[orientation] || POLYFACE_BASES.xz;
+    return b.z.clone().multiplyScalar(offset);
+  }
+  // Maps a point's local (u,v) polygon coords, at a given offset along the plane's
+  // normal, back to world XYZ.
+  function polyfaceTo3D(orientation, offset, u, v) {
+    const b = POLYFACE_BASES[orientation] || POLYFACE_BASES.xz;
+    return b.x.clone().multiplyScalar(u).add(b.y.clone().multiplyScalar(v)).add(polyfaceOffsetVector(orientation, offset));
+  }
+  // Inverse: a world point's (u,v) coords within the polygon's plane.
+  function polyfaceTo2D(orientation, worldPoint) {
+    const b = POLYFACE_BASES[orientation] || POLYFACE_BASES.xz;
+    return [worldPoint.dot(b.x), worldPoint.dot(b.y)];
+  }
+  // The world coordinate that measures "how far along the normal" a point is.
+  function polyfaceNormalCoord(orientation, worldPoint) {
+    const b = POLYFACE_BASES[orientation] || POLYFACE_BASES.xz;
+    return worldPoint.dot(b.z);
+  }
+  // A 2D in-plane direction (e.g. a wall's outward edge normal) mapped to world XYZ.
+  function polyface2DDirTo3D(orientation, du, dv) {
+    const b = POLYFACE_BASES[orientation] || POLYFACE_BASES.xz;
+    return b.x.clone().multiplyScalar(du).add(b.y.clone().multiplyScalar(dv));
+  }
+
+  // Figures out which of the 3 axis-aligned planes a just-closed line chain lies in —
+  // 'xz' (horizontal floor), 'zy' or 'xy' (a vertical wall, reached by drawing with the
+  // blue-axis lock). Returns null if the loop isn't flat in any of them (e.g. drawn off
+  // any axis lock), so the caller can leave the original lines alone instead of collapsing
+  // them into a broken/degenerate face.
+  const POLYGON_PLANAR_EPS = 0.02;
+  function detectPolygonOrientation(points3D) {
+    const xs = points3D.map(p => p.x), ys = points3D.map(p => p.y), zs = points3D.map(p => p.z);
+    const spanX = Math.max(...xs) - Math.min(...xs);
+    const spanY = Math.max(...ys) - Math.min(...ys);
+    const spanZ = Math.max(...zs) - Math.min(...zs);
+    if (spanY <= POLYGON_PLANAR_EPS) return { orientation: 'xz', base: ys[0], points: points3D.map(p => [p.x, p.z]) };
+    if (spanX <= POLYGON_PLANAR_EPS) return { orientation: 'zy', base: xs[0], points: points3D.map(p => [p.z, p.y]) };
+    if (spanZ <= POLYGON_PLANAR_EPS) return { orientation: 'xy', base: zs[0], points: points3D.map(p => [p.x, p.y]) };
+    return null;
+  }
+
+  function buildPolyfaceMesh(points, height, orientation, base) {
+    orientation = orientation || 'xz';
+    base = base || 0;
     const shape = new THREE.Shape(points.map(p => new THREE.Vector2(p[0], p[1])));
     const mat = new THREE.MeshStandardMaterial({ color: COLOR_DEFAULT, side: THREE.DoubleSide });
     const geo = height > 0
-      ? new THREE.ExtrudeGeometry(shape, { depth: -height, bevelEnabled: false })
+      ? new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false })
       : new THREE.ShapeGeometry(shape);
-    geo.rotateX(Math.PI / 2);
+    const b = POLYFACE_BASES[orientation] || POLYFACE_BASES.xz;
+    const matrix = new THREE.Matrix4().makeBasis(b.x, b.y, b.z).setPosition(polyfaceOffsetVector(orientation, base));
+    geo.applyMatrix4(matrix);
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.y += baseY + (height > 0 ? 0 : 0.002); // small nudge only when flat, avoids z-fighting with the grid
+    if (height <= 0) mesh.position.addScaledVector(b.z, 0.002); // nudge off the plane, avoids z-fighting
     attachEdges(mesh);
     return mesh;
   }
@@ -379,7 +433,7 @@
     if (obj.type === 'line') return buildLineMesh(new THREE.Vector3(...obj.params.a), new THREE.Vector3(...obj.params.b));
     if (obj.type === 'rect') return buildRectMesh(obj.params.x1, obj.params.z1, obj.params.x2, obj.params.z2, obj.height, obj.params.baseY);
     if (obj.type === 'circle') return buildCircleMesh(obj.params.cx, obj.params.cz, obj.params.radius, obj.height, obj.params.baseY);
-    if (obj.type === 'polyface') return buildPolyfaceMesh(obj.params.points, obj.height, obj.params.baseY);
+    if (obj.type === 'polyface') return buildPolyfaceMesh(obj.params.points, obj.height, obj.params.orientation, obj.params.base);
   }
 
   function addObject(type, params, height) {
@@ -490,23 +544,28 @@
     }
     if (obj.type === 'polyface') {
       const pts = obj.params.points;
+      const orientation = obj.params.orientation || 'xz';
+      const faceBase = obj.params.base || 0;
       if (faceKind === 'top') {
         const shape = new THREE.Shape(pts.map(p => new THREE.Vector2(p[0], p[1])));
         const geo = new THREE.ShapeGeometry(shape);
-        geo.rotateX(Math.PI / 2);
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.position.y = topY;
-        return mesh;
+        const b = POLYFACE_BASES[orientation] || POLYFACE_BASES.xz;
+        const topOffset = faceBase + (h > 0 ? h : 0) + 0.01;
+        geo.applyMatrix4(new THREE.Matrix4().makeBasis(b.x, b.y, b.z).setPosition(polyfaceOffsetVector(orientation, topOffset)));
+        return new THREE.Mesh(geo, mat);
       }
       const wallMatch = /^wall(\d+)$/.exec(faceKind);
       if (wallMatch) {
         const k = parseInt(wallMatch[1], 10);
-        const a = pts[k], b = pts[(k + 1) % pts.length];
-        const y0 = baseY, y1 = baseY + h;
+        const a = pts[k], b2 = pts[(k + 1) % pts.length];
+        const p0 = polyfaceTo3D(orientation, faceBase, a[0], a[1]);
+        const p1 = polyfaceTo3D(orientation, faceBase, b2[0], b2[1]);
+        const p2 = polyfaceTo3D(orientation, faceBase + h, b2[0], b2[1]);
+        const p3 = polyfaceTo3D(orientation, faceBase + h, a[0], a[1]);
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
-          a[0], y0, a[1],  b[0], y0, b[1],  b[0], y1, b[1],
-          a[0], y0, a[1],  b[0], y1, b[1],  a[0], y1, a[1],
+          p0.x, p0.y, p0.z,  p1.x, p1.y, p1.z,  p2.x, p2.y, p2.z,
+          p0.x, p0.y, p0.z,  p2.x, p2.y, p2.z,  p3.x, p3.y, p3.z,
         ]), 3));
         geo.computeVertexNormals();
         return new THREE.Mesh(geo, mat);
@@ -599,7 +658,12 @@
   // World-space outward normal for a given face kind (used to read the true push/pull
   // direction off the screen, instead of assuming "up on screen" always means "outward").
   function worldNormalForFace(obj, faceKind, hitPoint) {
-    if (faceKind === 'top') return new THREE.Vector3(0, 1, 0);
+    if (faceKind === 'top') {
+      // For a polyface this is also hit when it's still flat (first-time extrude) — push
+      // along the plane's own normal, not always +Y, so a vertical wall extrudes sideways.
+      if (obj.type === 'polyface') return (POLYFACE_BASES[obj.params.orientation || 'xz'] || POLYFACE_BASES.xz).z.clone();
+      return new THREE.Vector3(0, 1, 0);
+    }
     if (faceKind === 'x+') return new THREE.Vector3(1, 0, 0);
     if (faceKind === 'x-') return new THREE.Vector3(-1, 0, 0);
     if (faceKind === 'z+') return new THREE.Vector3(0, 0, 1);
@@ -703,15 +767,20 @@
       return capDist < radiusDist ? 'top' : 'radius';
     }
     if (obj.type === 'polyface') {
+      const orientation = obj.params.orientation || 'xz';
+      const base = obj.params.base || 0;
+      const alongNormal = polyfaceNormalCoord(orientation, hitPoint);
+      const faceCapDist = Math.min(Math.abs(alongNormal - (base + obj.height)), Math.abs(alongNormal - base));
+      const [hu, hv] = polyfaceTo2D(orientation, hitPoint);
       const pts = obj.params.points;
       let bestIdx = 0, bestDist = Infinity;
       for (let k = 0; k < pts.length; k++) {
         const a = pts[k], b = pts[(k + 1) % pts.length];
-        const cp = closestPointOnSegment2D(hitPoint.x, hitPoint.z, a, b);
-        const d = Math.hypot(hitPoint.x - cp[0], hitPoint.z - cp[1]);
+        const cp = closestPointOnSegment2D(hu, hv, a, b);
+        const d = Math.hypot(hu - cp[0], hv - cp[1]);
         if (d < bestDist) { bestDist = d; bestIdx = k; }
       }
-      return capDist < bestDist ? 'top' : 'wall' + bestIdx;
+      return faceCapDist < bestDist ? 'top' : 'wall' + bestIdx;
     }
     return 'top';
   }
@@ -899,8 +968,11 @@
     }
     if (o.type === 'circle') return ys.map(y => new THREE.Vector3(o.params.cx, y, o.params.cz));
     if (o.type === 'polyface') {
+      const orientation = o.params.orientation || 'xz';
+      const base = o.params.base || 0;
+      const offsets = o.height > 0 ? [base, base + o.height] : [base];
       const pts = [];
-      ys.forEach(y => o.params.points.forEach(p => pts.push(new THREE.Vector3(p[0], y, p[1]))));
+      offsets.forEach(off => o.params.points.forEach(p => pts.push(polyfaceTo3D(orientation, off, p[0], p[1]))));
       return pts;
     }
     return [];
@@ -986,8 +1058,10 @@
       p.cx += dx; p.cz += dz;
       p.baseY = (p.baseY || 0) + dy;
     } else if (type === 'polyface') {
-      p.points = p.points.map(pt => [pt[0] + dx, pt[1] + dz]);
-      p.baseY = (p.baseY || 0) + dy;
+      const orientation = p.orientation || 'xz';
+      const [du, dv] = polyfaceTo2D(orientation, new THREE.Vector3(dx, dy, dz));
+      p.points = p.points.map(pt => [pt[0] + du, pt[1] + dv]);
+      p.base = (p.base || 0) + polyfaceNormalCoord(orientation, new THREE.Vector3(dx, dy, dz));
     }
     return p;
   }
@@ -1029,10 +1103,15 @@
     chainLineObjs.push(segment);
     const closesLoop = chainOrigin && finalPt.distanceTo(chainOrigin) < 1e-6 && chainPoints.length >= 3;
     if (closesLoop) {
-      addObject('polyface', { points: chainPoints.map(pt => [pt.x, pt.z]) }, 0);
-      // The polyface's own edges (attachEdges) already draw this outline, and once a wall
-      // gets pushed independently the old chain segments would desync from it — drop them.
-      chainLineObjs.forEach(o => removeObject(o));
+      const planar = detectPolygonOrientation(chainPoints);
+      if (planar) {
+        addObject('polyface', { points: planar.points, orientation: planar.orientation, base: planar.base }, 0);
+        // The polyface's own edges (attachEdges) already draw this outline, and once a wall
+        // gets pushed independently the old chain segments would desync from it — drop them.
+        chainLineObjs.forEach(o => removeObject(o));
+      }
+      // If it's not flat in a red/green or blue-axis plane, leave the drawn lines as-is
+      // rather than collapsing them into a broken face.
       cancelDraw();
     } else {
       chainPoints.push(finalPt.clone());
@@ -1184,8 +1263,8 @@
       if (wallMatch) {
         extrudeWallIndex = parseInt(wallMatch[1], 10);
         extrudeBasePoints = JSON.parse(JSON.stringify(hit.obj.params.points));
-        const [nx, nz] = polygonEdgeNormal(hit.obj.params.points, extrudeWallIndex);
-        extrudeWorldNormal = new THREE.Vector3(nx, 0, nz);
+        const [nu, nv] = polygonEdgeNormal(hit.obj.params.points, extrudeWallIndex);
+        extrudeWorldNormal = polyface2DDirTo3D(hit.obj.params.orientation || 'xz', nu, nv);
       } else {
         extrudeWallIndex = null;
         extrudeBasePoints = null;
