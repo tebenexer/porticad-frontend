@@ -531,7 +531,7 @@
     rect: 'Clic en una esquina, clic en la esquina opuesta.',
     circle: 'Clic en el centro, clic para fijar el radio.',
     erase: 'Haz clic sobre una figura para borrarla.',
-    extrude: 'Pasa el cursor para ver resaltada la cara exacta. Clic y arrastra: la cara sigue al cursor en su dirección normal. Escribe un número + Enter para una distancia exacta.',
+    extrude: 'Pasa el cursor para ver resaltada la cara exacta. Clic para agarrarla, mueve el mouse (la cara sigue al cursor), clic de nuevo para soltar — o escribe un número + Enter. Esc cancela.',
     move: 'Clic sobre una figura y arrastra para reubicarla. Acércate a un eje rojo/verde/azul para moverla solo en esa dirección (incluye subir/bajar del plano).'
   };
 
@@ -676,27 +676,51 @@
     return result;
   }
 
-  // Our box/cylinder meshes carry no rotation, so a hit's local face normal equals its
-  // world normal directly — no matrix transform needed to read off which side was hit.
-  function determineFace(obj, normal) {
-    if (!normal || obj.height <= 0) return 'top'; // flat face: only "pull up to create height" applies
+  // Which face was hit, decided from the hit POINT's position, not the raycaster's face
+  // normal — ExtrudeGeometry (used for closed-loop faces) can hand back an inverted local
+  // normal depending on winding, which was making the wrong (opposite) wall get pushed.
+  // Position is ground truth regardless of any geometry's winding quirks.
+  function determineFace(obj, hitPoint) {
+    if (!hitPoint || obj.height <= 0) return 'top'; // flat face: only "pull up to create height" applies
+    const baseY = (obj.params && obj.params.baseY) || 0;
+    const topY = baseY + obj.height;
+    const capDist = Math.min(Math.abs(hitPoint.y - topY), Math.abs(hitPoint.y - baseY));
+
     if (obj.type === 'rect') {
-      if (Math.abs(normal.y) > 0.5) return 'top';
-      return Math.abs(normal.x) > Math.abs(normal.z) ? (normal.x > 0 ? 'x+' : 'x-') : (normal.z > 0 ? 'z+' : 'z-');
+      const { x1, z1, x2, z2 } = obj.params;
+      const xMin = Math.min(x1, x2), xMax = Math.max(x1, x2), zMin = Math.min(z1, z2), zMax = Math.max(z1, z2);
+      const candidates = [
+        { kind: 'top', d: capDist },
+        { kind: 'x-', d: Math.abs(hitPoint.x - xMin) }, { kind: 'x+', d: Math.abs(hitPoint.x - xMax) },
+        { kind: 'z-', d: Math.abs(hitPoint.z - zMin) }, { kind: 'z+', d: Math.abs(hitPoint.z - zMax) },
+      ];
+      candidates.sort((a, b) => a.d - b.d);
+      return candidates[0].kind;
     }
-    if (obj.type === 'circle') return Math.abs(normal.y) > 0.5 ? 'top' : 'radius';
+    if (obj.type === 'circle') {
+      const { cx, cz, radius } = obj.params;
+      const radiusDist = Math.abs(Math.hypot(hitPoint.x - cx, hitPoint.z - cz) - radius);
+      return capDist < radiusDist ? 'top' : 'radius';
+    }
     if (obj.type === 'polyface') {
-      if (Math.abs(normal.y) > 0.5) return 'top';
       const pts = obj.params.points;
-      let bestIdx = 0, bestDot = -Infinity;
+      let bestIdx = 0, bestDist = Infinity;
       for (let k = 0; k < pts.length; k++) {
-        const [nx, nz] = polygonEdgeNormal(pts, k);
-        const dot = nx * normal.x + nz * normal.z;
-        if (dot > bestDot) { bestDot = dot; bestIdx = k; }
+        const a = pts[k], b = pts[(k + 1) % pts.length];
+        const cp = closestPointOnSegment2D(hitPoint.x, hitPoint.z, a, b);
+        const d = Math.hypot(hitPoint.x - cp[0], hitPoint.z - cp[1]);
+        if (d < bestDist) { bestDist = d; bestIdx = k; }
       }
-      return 'wall' + bestIdx;
+      return capDist < bestDist ? 'top' : 'wall' + bestIdx;
     }
     return 'top';
+  }
+
+  function closestPointOnSegment2D(px, pz, a, b) {
+    const dx = b[0] - a[0], dz = b[1] - a[1];
+    const lenSq = dx * dx + dz * dz || 1;
+    const t = Math.max(0, Math.min(1, ((px - a[0]) * dx + (pz - a[1]) * dz) / lenSq));
+    return [a[0] + dx * t, a[1] + dz * t];
   }
 
   // Resolves a face kind to the exact param field to edit, the base value to drag from,
@@ -741,6 +765,7 @@
 
   function endExtrudeDrag() {
     extrudeObj = null;
+    extrudeSnapshotParams = null;
     extrudeWallIndex = null;
     extrudeBasePoints = null;
     extrudeFaceKind = null;
@@ -939,6 +964,8 @@
   let extrudeBaseValue = 0;
   let extrudeWallIndex = null;  // set instead of extrudeField when pushing one wall of a polyface
   let extrudeBasePoints = null; // snapshot of polyface points at drag start, for extrudeWallIndex
+  let extrudeSnapshotHeight = 0;   // full pre-grab snapshot, restored if the grab is cancelled (Escape)
+  let extrudeSnapshotParams = null;
   let chainOrigin = null;  // first vertex of the active line chain (for auto-close detection)
   let chainPoints = [];    // vertices placed so far in the active chain, in order
   let chainLineObjs = [];  // the 'line' objects created for the active chain's segments
@@ -1042,7 +1069,16 @@
   function cancelDraw() {
     drawStage = 0; drawStart = null;
     clearPreview();
+    if (extrudeObj && extrudeSnapshotParams) {
+      // The object was left reflecting wherever the cursor last was — revert it, since
+      // Escape (or switching tools) mid-grab should abandon the push, not keep it half-done.
+      extrudeObj.height = extrudeSnapshotHeight;
+      extrudeObj.params = extrudeSnapshotParams;
+      rebuildMesh(extrudeObj);
+    }
     extrudeObj = null;
+    extrudeSnapshotParams = null;
+    controls.enabled = true;
     selectDragStart = null;
     boxSelectActive = false;
     hideMarquee();
@@ -1129,13 +1165,21 @@
     }
 
     if (currentTool === 'extrude') {
+      if (extrudeObj) {
+        // Second click: confirm and release — the object already reflects the cursor's
+        // current position from the last pointermove, so finishing just stops tracking.
+        endExtrudeDrag();
+        return;
+      }
       const hit = pickObjectWithFace(e.clientX, e.clientY);
       if (!hit || hit.obj.type === 'line') return;
-      const faceKind = determineFace(hit.obj, hit.normal);
+      const faceKind = determineFace(hit.obj, hit.point);
       const wallMatch = /^wall(\d+)$/.exec(faceKind);
       extrudeObj = hit.obj;
       extrudeFaceKind = faceKind;
       extrudeHitPoint = hit.point.clone();
+      extrudeSnapshotHeight = hit.obj.height;
+      extrudeSnapshotParams = JSON.parse(JSON.stringify(hit.obj.params));
       typedValue = '';
       if (wallMatch) {
         extrudeWallIndex = parseInt(wallMatch[1], 10);
@@ -1217,7 +1261,7 @@
       } else {
         const hit = pickObjectWithFace(e.clientX, e.clientY);
         if (hit && hit.obj.type !== 'line') {
-          showFaceHighlight(buildFaceHighlightMesh(hit.obj, determineFace(hit.obj, hit.normal)));
+          showFaceHighlight(buildFaceHighlightMesh(hit.obj, determineFace(hit.obj, hit.point)));
         } else {
           hideFaceHighlight();
         }
@@ -1241,9 +1285,9 @@
   });
 
   window.addEventListener('pointerup', (e) => {
-    if (extrudeObj) {
-      endExtrudeDrag();
-    }
+    // Extrude no longer ends on mouseup — it's a click-to-grab / click-again-to-finish
+    // gesture now (see the 'extrude' branch in pointerdown), so a plain click can start it
+    // without the immediate mouseup instantly ending the grab.
 
     if (moveObj) {
       moveObj = null;
