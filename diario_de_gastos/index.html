@@ -71,7 +71,10 @@
     border-radius: 7px; padding: 6px 11px; font-size: 14px; cursor: pointer;
   }
   .icon-btn:hover { border-color: #58a6ff; color: #58a6ff; }
-  .today-btn { margin-left: auto; }
+  .push-right { margin-left: auto; }
+  .view-toggle { display: flex; gap: 3px; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 3px; }
+  .view-btn { background: none; border: none; color: #8b949e; padding: 5px 12px; font-size: 13px; font-weight: 600; border-radius: 5px; cursor: pointer; }
+  .view-btn.active { background: #21262d; color: #58a6ff; }
 
   /* category buttons */
   .catrow { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -232,6 +235,29 @@
   .btn.primary:hover { background: #79b8ff; }
   .btn.ghost { background: #21262d; color: #e6edf3; border: 1px solid #30363d; }
   .btn.ghost:hover { border-color: #58a6ff; color: #58a6ff; }
+
+  /* ── Print / PDF ── */
+  @media print {
+    body { background: #fff; color: #000; }
+    .topbar, .datebar, .catrow, .subrow, .modal-overlay, .page-sub { display: none !important; }
+    .wrap { max-width: 100%; padding: 0; margin: 0; }
+    .report { margin-top: 0; }
+    .report-title, .section-head, .cat-head { color: #000 !important; }
+    .section-head { border-bottom-color: #999; }
+    .cat-head .add-mini { display: none !important; }
+    .table-wrap { border-color: #ccc; overflow: visible; break-inside: avoid; }
+    table { min-width: 0; }
+    th { background: #eee; color: #000; border-bottom-color: #ccc; }
+    td { color: #000; border-bottom-color: #ddd; }
+    .muted { color: #555; }
+    tr.subtotal td { background: #f2f2f2; }
+    .row-actions { display: none !important; }
+    .notaline td { color: #555; }
+    .totals-box { break-inside: avoid; margin-top: 16px; }
+    .stat { border-color: #ccc; background: #fff; }
+    .stat .value { color: #000 !important; }
+    .empty-row td { color: #777; }
+  }
 </style>
 </head>
 <body>
@@ -280,10 +306,15 @@
   <p class="page-sub">Registra los gastos del día por categoría y consulta el acumulado.</p>
 
   <div class="datebar">
+    <div class="view-toggle">
+      <button class="view-btn active" id="view-btn-day" onclick="setViewMode('day')">Día</button>
+      <button class="view-btn" id="view-btn-week" onclick="setViewMode('week')">Semana</button>
+    </div>
     <button class="icon-btn" onclick="changeDate(-1)">‹</button>
     <input type="date" id="date-input" onchange="setDate(this.value)">
     <button class="icon-btn" onclick="changeDate(1)">›</button>
-    <button class="icon-btn today-btn" onclick="goToday()">Hoy</button>
+    <button class="icon-btn" onclick="goToday()">Hoy</button>
+    <button class="icon-btn push-right" onclick="window.print()">🖨️ Imprimir / PDF</button>
   </div>
 
   <div class="catrow">
@@ -307,6 +338,7 @@
 
   <div class="report">
     <div class="report-title">Diario de Gastos — <span id="report-date-label"></span></div>
+    <div id="week-summary"></div>
 
     <div class="section-head trabajo">Trabajo</div>
     <div id="cat-comida"></div>
@@ -321,7 +353,7 @@
     <div class="totals-box">
       <div class="stat blue"><div class="label">Total Trabajo</div><div class="value" id="total-trabajo">$0.00</div></div>
       <div class="stat orange"><div class="label">Total Personales</div><div class="value" id="total-personales">$0.00</div></div>
-      <div class="stat green"><div class="label">Total del Día</div><div class="value" id="total-dia">$0.00</div></div>
+      <div class="stat green"><div class="label" id="total-dia-label">Total del Día</div><div class="value" id="total-dia">$0.00</div></div>
     </div>
   </div>
 </div>
@@ -401,10 +433,20 @@ let currentDate = todayStr();
 let editingId = null;
 let currentCat = null;
 let currentItems = [];
+let viewMode = 'day';
 
-function todayStr(){
-  const d = new Date();
+function toDateStr(d){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function todayStr(){ return toDateStr(new Date()); }
+function fmtDateShort(dateStr){ const [,m,d] = dateStr.split('-'); return `${d}/${m}`; }
+function getWeekRange(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDay(); // 0=Dom .. 6=Sáb
+  const diffToMonday = (day === 0 ? -6 : 1 - day);
+  const monday = new Date(d); monday.setDate(d.getDate() + diffToMonday);
+  const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+  return { start: toDateStr(monday), end: toDateStr(sunday) };
 }
 function fmt(n){
   return '$' + Number(n||0).toLocaleString('es-DO', {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -505,11 +547,18 @@ auth.onAuthStateChanged(async user=>{
 /* ---- date nav ---- */
 function setDate(d){ currentDate = d; document.getElementById('date-input').value = d; render(); }
 function changeDate(delta){
+  const step = viewMode === 'week' ? delta * 7 : delta;
   const d = new Date(currentDate + 'T00:00:00');
-  d.setDate(d.getDate() + delta);
-  setDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+  d.setDate(d.getDate() + step);
+  setDate(toDateStr(d));
 }
 function goToday(){ setDate(todayStr()); }
+function setViewMode(mode){
+  viewMode = mode;
+  document.getElementById('view-btn-day').classList.toggle('active', mode === 'day');
+  document.getElementById('view-btn-week').classList.toggle('active', mode === 'week');
+  render();
+}
 
 /* ---- trabajo expand ---- */
 function toggleTrabajo(){
@@ -665,13 +714,21 @@ function editEntry(id){
 /* ---- render ---- */
 function render(){
   document.getElementById('date-input').value = currentDate;
-  document.getElementById('report-date-label').textContent = currentDate;
+
+  const isWeek = viewMode === 'week';
+  const range = isWeek ? getWeekRange(currentDate) : { start: currentDate, end: currentDate };
+  document.getElementById('report-date-label').textContent = isWeek
+    ? `Semana del ${fmtDateShort(range.start)} al ${fmtDateShort(range.end)}`
+    : currentDate;
+  document.getElementById('total-dia-label').textContent = isWeek ? 'Total de la Semana' : 'Total del Día';
 
   let totalTrabajo = 0, totalPersonales = 0;
 
   Object.keys(CATS).forEach(cat=>{
     const c = CATS[cat];
-    const list = entries.filter(e=>e.cat===cat && e.date===currentDate);
+    const list = entries
+      .filter(e=>e.cat===cat && e.date>=range.start && e.date<=range.end)
+      .sort((a,b)=> a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
     const container = document.getElementById('cat-' + cat);
     let subtotal = 0;
     list.forEach(e=>subtotal += e.total);
@@ -681,13 +738,17 @@ function render(){
     html += '<div class="table-wrap"><table>';
 
     if (c.type === 'simple') {
-      html += `<tr><th>${c.supplierLabel}</th><th>Cant.</th><th>Valor</th><th>Prop.</th><th>Extra Prop.</th><th>Total</th><th></th></tr>`;
+      const dateTh = isWeek ? '<th>Fecha</th>' : '';
+      const totalCols = isWeek ? 8 : 7;
+      html += `<tr><th>${c.supplierLabel}</th>${dateTh}<th>Cant.</th><th>Valor</th><th>Prop.</th><th>Extra Prop.</th><th>Total</th><th></th></tr>`;
       if (!list.length) {
-        html += `<tr class="empty-row"><td colspan="7">Sin registros</td></tr>`;
+        html += `<tr class="empty-row"><td colspan="${totalCols}">Sin registros</td></tr>`;
       } else {
         list.forEach(e=>{
+          const dateTd = isWeek ? `<td class="muted">${fmtDateShort(e.date)}</td>` : '';
           html += `<tr>
             <td>${escapeHtml(e.suplidor)}</td>
+            ${dateTd}
             <td class="num">${e.cant}</td>
             <td class="num">${fmt(e.valor)}</td>
             <td class="num">${fmt(e.propina)}</td>
@@ -695,14 +756,17 @@ function render(){
             <td class="num strong">${fmt(e.total)}</td>
             <td class="row-actions"><button onclick="editEntry('${e.id}')">✏️</button><button class="del" onclick="deleteEntry('${e.id}')">🗑</button></td>
           </tr>`;
-          if (e.nota) html += `<tr class="notaline"><td colspan="7">Nota: ${escapeHtml(e.nota)}</td></tr>`;
+          if (e.nota) html += `<tr class="notaline"><td colspan="${totalCols}">Nota: ${escapeHtml(e.nota)}</td></tr>`;
         });
-        html += `<tr class="subtotal"><td colspan="5">Subtotal ${c.label}</td><td class="num">${fmt(subtotal)}</td><td></td></tr>`;
+        const subtotalColspan = isWeek ? 6 : 5;
+        html += `<tr class="subtotal"><td colspan="${subtotalColspan}">Subtotal ${c.label}</td><td class="num">${fmt(subtotal)}</td><td></td></tr>`;
       }
     } else {
-      html += `<tr><th>${c.supplierLabel}</th><th>Descripción</th><th>Cant.</th><th>Valor</th><th>Total</th><th></th></tr>`;
+      const dateTh = isWeek ? '<th>Fecha</th>' : '';
+      const totalCols = isWeek ? 7 : 6;
+      html += `<tr><th>${c.supplierLabel}</th>${dateTh}<th>Descripción</th><th>Cant.</th><th>Valor</th><th>Total</th><th></th></tr>`;
       if (!list.length) {
-        html += `<tr class="empty-row"><td colspan="6">Sin registros</td></tr>`;
+        html += `<tr class="empty-row"><td colspan="${totalCols}">Sin registros</td></tr>`;
       } else {
         list.forEach(e=>{
           const items = (e.items && e.items.length) ? e.items : [{desc:'',cant:0,valor:0,total:0}];
@@ -711,6 +775,7 @@ function render(){
             html += '<tr>';
             if (idx === 0) {
               html += `<td rowspan="${rowCount}">${escapeHtml(e.suplidor)}</td>`;
+              if (isWeek) html += `<td rowspan="${rowCount}" class="muted">${fmtDateShort(e.date)}</td>`;
             }
             html += `
               <td>${escapeHtml(it.desc) || `<span class="muted">Descripción ${idx+1}</span>`}</td>
@@ -733,7 +798,8 @@ function render(){
             <td class="num strong">Total: ${fmt(e.total)}</td>
           </tr>`;
         });
-        html += `<tr class="subtotal"><td colspan="4">Subtotal ${c.label}</td><td class="num">${fmt(subtotal)}</td><td></td></tr>`;
+        const subtotalColspan = isWeek ? 5 : 4;
+        html += `<tr class="subtotal"><td colspan="${subtotalColspan}">Subtotal ${c.label}</td><td class="num">${fmt(subtotal)}</td><td></td></tr>`;
       }
     }
 
@@ -744,6 +810,34 @@ function render(){
   document.getElementById('total-trabajo').textContent = fmt(totalTrabajo);
   document.getElementById('total-personales').textContent = fmt(totalPersonales);
   document.getElementById('total-dia').textContent = fmt(totalTrabajo + totalPersonales);
+
+  renderWeekSummary(isWeek, range);
+}
+
+function renderWeekSummary(isWeek, range){
+  const el = document.getElementById('week-summary');
+  if (!isWeek) { el.innerHTML = ''; return; }
+  const DOW = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  const today = todayStr();
+  let html = '<div class="cat-head">Resumen por día</div><div class="table-wrap"><table><tr><th>Día</th><th>Fecha</th><th>Trabajo</th><th>Personales</th><th>Total</th></tr>';
+  const d = new Date(range.start + 'T00:00:00');
+  for (let i = 0; i < 7; i++) {
+    const ds = toDateStr(d);
+    let t = 0, p = 0;
+    entries.filter(e=>e.date===ds).forEach(e=>{
+      if (TRABAJO_CATS.includes(e.cat)) t += e.total; else p += e.total;
+    });
+    html += `<tr${ds===today ? ' style="background:#12161d;"' : ''}>
+      <td>${DOW[i]}</td>
+      <td class="muted">${fmtDateShort(ds)}</td>
+      <td class="num">${fmt(t)}</td>
+      <td class="num">${fmt(p)}</td>
+      <td class="num strong">${fmt(t+p)}</td>
+    </tr>`;
+    d.setDate(d.getDate() + 1);
+  }
+  html += '</table></div>';
+  el.innerHTML = html;
 }
 
 function escapeHtml(s){
