@@ -6,6 +6,9 @@
 <title>Diario de Gastos — PortiCAD</title>
 <link rel="icon" href="/favicon.png" type="image/png" />
 <link rel="shortcut icon" href="/favicon.png" />
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -31,6 +34,22 @@
   .topbar-sep  { color: #30363d; font-size: 18px; }
   .topbar-crumb { font-size: 14px; color: #8b949e; display: flex; align-items: center; gap: 6px; }
   .topbar-title { font-size: 15px; font-weight: 600; color: #e6edf3; }
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .topbar-user { font-size: 12.5px; color: #8b949e; white-space: nowrap; }
+  .sync-indicator { font-size: 11.5px; color: #8b949e; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #3fb950; }
+  .sync-dot.syncing { background: #f2a541; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+
+  /* ── Auth screen ── */
+  #auth-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+  .auth-box { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 32px; width: 100%; max-width: 400px; }
+  .auth-box h1 { font-size: 20px; margin-bottom: 4px; }
+  .auth-sub { color: #8b949e; font-size: 13px; margin-bottom: 22px; }
+  .auth-tabs { display: flex; margin-bottom: 20px; border-bottom: 1px solid #21262d; }
+  .auth-tab { background: none; border: none; color: #8b949e; cursor: pointer; padding: 9px 16px; font-size: 14px; font-weight: 600; border-bottom: 2px solid transparent; }
+  .auth-tab.active { color: #e6edf3; border-color: #58a6ff; }
+  .auth-error { background: #f8514922; border: 1px solid #f85149; border-radius: 8px; padding: 9px 12px; font-size: 12.5px; color: #f85149; margin-bottom: 12px; display: none; }
 
   .wrap { max-width: 980px; margin: 0 auto; padding: 20px 16px 60px; }
 
@@ -217,11 +236,42 @@
 </head>
 <body>
 
+<div id="auth-screen">
+  <div class="auth-box">
+    <h1>📒 Diario de Gastos</h1>
+    <p class="auth-sub">PortiCAD — inicia sesión para sincronizar tus registros</p>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="auth-tab-login" onclick="switchAuthTab('login')">Iniciar sesión</button>
+      <button class="auth-tab" id="auth-tab-register" onclick="switchAuthTab('register')">Registrarse</button>
+    </div>
+    <div id="auth-error" class="auth-error"></div>
+    <div id="tab-login">
+      <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="tu@email.com"></div>
+      <div class="field"><label>Contraseña</label><input type="password" id="login-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <button class="btn primary" style="width:100%;" onclick="doLogin()">Entrar</button>
+      <div style="text-align:center;margin-top:10px;"><a href="#" onclick="doResetPassword();return false;" style="color:#8b949e;font-size:12.5px;">¿Olvidaste tu contraseña?</a></div>
+    </div>
+    <div id="tab-register" style="display:none;">
+      <div class="field"><label>Nombre</label><input type="text" id="reg-name" placeholder="Tu nombre"></div>
+      <div class="field"><label>Email</label><input type="email" id="reg-email" placeholder="tu@email.com"></div>
+      <div class="field"><label>Contraseña (mín. 6 caracteres)</label><input type="password" id="reg-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doRegister()"></div>
+      <button class="btn primary" style="width:100%;" onclick="doRegister()">Crear cuenta</button>
+    </div>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+
 <div class="topbar">
   <a class="topbar-logo" href="/">PortiCAD</a>
   <span class="topbar-sep">›</span>
   <div class="topbar-crumb">
     <span class="topbar-title">Diario de Gastos</span>
+  </div>
+  <div class="topbar-right">
+    <span class="sync-indicator"><span class="sync-dot" id="sync-dot"></span><span id="sync-label">Sincronizado</span></span>
+    <span class="topbar-user" id="nav-email"></span>
+    <button class="icon-btn" onclick="doSignOut()">Salir</button>
   </div>
 </div>
 
@@ -316,6 +366,8 @@
   </div>
 </div>
 
+</div><!-- /#app -->
+
 <script>
 const CATS = {
   comida:          { label: 'Comida',               type: 'simple', supplierLabel: 'Suplidor' },
@@ -326,11 +378,25 @@ const CATS = {
   personales:      { label: 'Gastos Personales',     type: 'multi',  supplierLabel: 'Suplidor' }
 };
 const TRABAJO_CATS = ['comida','suplementarios','materiales','herramientas','nomina'];
-const STORAGE_KEY = 'pcd_diario_gastos_entries';
+
+// ══════════════════════════════════════════════════════
+//  FIREBASE (misma base de datos y sesión que Gastos Personales)
+// ══════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyBcmTo28tpDlyvbBqE8FwQcZVoVDTjePDQ",
+  authDomain: "porticad-gastos.firebaseapp.com",
+  projectId: "porticad-gastos",
+  storageBucket: "porticad-gastos.firebasestorage.app",
+  messagingSenderId: "91275396132",
+  appId: "1:91275396132:web:2b53b8df006244511744b1"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+let currentUser = null;
+function userCol(){ return db.collection('users').doc(currentUser.uid).collection('diario_gastos'); }
 
 let entries = [];
-try { entries = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(e) { entries = []; }
-
 let currentDate = todayStr();
 let editingId = null;
 let currentCat = null;
@@ -344,8 +410,97 @@ function fmt(n){
   return '$' + Number(n||0).toLocaleString('es-DO', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 function num(v){ const n = parseFloat(v); return isNaN(n) ? 0 : n; }
-function save(){ try { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); } catch(e) { console.warn('No se pudo guardar en localStorage', e); } }
 function uid(){ return 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function setSyncing(v){
+  const dot = document.getElementById('sync-dot');
+  const label = document.getElementById('sync-label');
+  if (dot) dot.className = 'sync-dot' + (v ? ' syncing' : '');
+  if (label) label.textContent = v ? 'Guardando...' : 'Sincronizado';
+}
+
+// ══════════════════════════════════════════════════════
+//  AUTH
+// ══════════════════════════════════════════════════════
+function showAuthError(msg){
+  const el = document.getElementById('auth-error');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(()=>{ el.style.display = 'none'; }, 5000);
+}
+function authMsg(code){
+  const map = {
+    'auth/user-not-found': 'No existe cuenta con ese email.',
+    'auth/wrong-password': 'Contraseña incorrecta.',
+    'auth/invalid-credential': 'Email o contraseña incorrectos.',
+    'auth/email-already-in-use': 'Ya existe una cuenta con ese email.',
+    'auth/invalid-email': 'Email inválido.',
+    'auth/too-many-requests': 'Demasiados intentos. Espera unos minutos.',
+    'auth/network-request-failed': 'Error de red.'
+  };
+  return map[code] || ('Error: ' + code);
+}
+function switchAuthTab(tab){
+  document.getElementById('tab-login').style.display = tab === 'login' ? 'block' : 'none';
+  document.getElementById('tab-register').style.display = tab === 'register' ? 'block' : 'none';
+  document.getElementById('auth-tab-login').classList.toggle('active', tab === 'login');
+  document.getElementById('auth-tab-register').classList.toggle('active', tab === 'register');
+  document.getElementById('auth-error').style.display = 'none';
+}
+async function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  if (!email || !pass) { showAuthError('Completa email y contraseña.'); return; }
+  try { await auth.signInWithEmailAndPassword(email, pass); }
+  catch(e) { showAuthError(authMsg(e.code)); }
+}
+async function doRegister(){
+  const name = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const pass = document.getElementById('reg-pass').value;
+  if (!name || !email || !pass) { showAuthError('Completa todos los campos.'); return; }
+  if (pass.length < 6) { showAuthError('La contraseña debe tener al menos 6 caracteres.'); return; }
+  try {
+    const cred = await auth.createUserWithEmailAndPassword(email, pass);
+    await cred.user.updateProfile({ displayName: name });
+  } catch(e) { showAuthError(authMsg(e.code)); }
+}
+async function doResetPassword(){
+  const email = document.getElementById('login-email').value.trim();
+  if (!email) { showAuthError('Ingresa tu email primero.'); return; }
+  try { await auth.sendPasswordResetEmail(email); alert('Email de recuperación enviado a ' + email); }
+  catch(e) { showAuthError(authMsg(e.code)); }
+}
+async function doSignOut(){ await auth.signOut(); }
+
+async function loadEntries(){
+  const snap = await userCol().get();
+  entries = snap.docs.map(d=>({ id: d.id, ...d.data() }));
+}
+async function fsSave(entry){
+  setSyncing(true);
+  try { await userCol().doc(entry.id).set(entry); }
+  finally { setSyncing(false); }
+}
+async function fsDelete(id){
+  setSyncing(true);
+  try { await userCol().doc(id).delete(); }
+  finally { setSyncing(false); }
+}
+
+auth.onAuthStateChanged(async user=>{
+  if (user) {
+    currentUser = user;
+    document.getElementById('nav-email').textContent = user.displayName || user.email;
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    await loadEntries();
+    render();
+  } else {
+    currentUser = null;
+    entries = [];
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
+});
 
 /* ---- date nav ---- */
 function setDate(d){ currentDate = d; document.getElementById('date-input').value = d; render(); }
@@ -452,7 +607,7 @@ function recalcMultiTotal(){
   document.getElementById('f-total-multi').value = (itemsTotal + adicional).toFixed(2);
 }
 
-function saveEntry(){
+async function saveEntry(){
   const c = CATS[currentCat];
   let entry;
   if (c.type === 'simple') {
@@ -491,15 +646,15 @@ function saveEntry(){
   } else {
     entries.push(entry);
   }
-  save();
+  await fsSave(entry);
   closeModal();
   render();
 }
 
-function deleteEntry(id){
+async function deleteEntry(id){
   if (!confirm('¿Eliminar este registro?')) return;
   entries = entries.filter(e=>e.id!==id);
-  save();
+  await fsDelete(id);
   render();
 }
 function editEntry(id){
@@ -599,8 +754,6 @@ function escapeAttr(s){ return escapeHtml(s); }
 document.getElementById('modal-overlay').addEventListener('click', function(e){
   if (e.target === this) closeModal();
 });
-
-render();
 </script>
 </body>
 </html>
