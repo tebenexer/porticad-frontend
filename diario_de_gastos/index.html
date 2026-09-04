@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diario de Gastos — PortiCAD</title>
+<link rel="icon" href="/favicon.png" type="image/png" />
+<link rel="shortcut icon" href="/favicon.png" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 15px;
+    min-height: 100vh;
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 8px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .topbar-logo { font-size: 16px; font-weight: 700; color: #58a6ff; text-decoration: none; }
+  .topbar-sep  { color: #30363d; font-size: 18px; }
+  .topbar-crumb { font-size: 14px; color: #8b949e; display: flex; align-items: center; gap: 6px; }
+  .topbar-title { font-size: 15px; font-weight: 600; color: #e6edf3; }
+
+  .wrap { max-width: 980px; margin: 0 auto; padding: 20px 16px 60px; }
+
+  h1.page-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .page-sub { color: #8b949e; font-size: 13px; margin-bottom: 18px; }
+
+  /* date bar */
+  .datebar {
+    display: flex; align-items: center; gap: 10px;
+    background: #161b22; border: 1px solid #21262d; border-radius: 10px;
+    padding: 10px 12px; margin-bottom: 18px; flex-wrap: wrap;
+  }
+  .datebar input[type=date] {
+    background: #0d1117; border: 1px solid #30363d; border-radius: 7px;
+    color: #e6edf3; padding: 7px 10px; font-size: 14px;
+  }
+  .icon-btn {
+    background: #0d1117; border: 1px solid #30363d; color: #e6edf3;
+    border-radius: 7px; padding: 6px 11px; font-size: 14px; cursor: pointer;
+  }
+  .icon-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+  .today-btn { margin-left: auto; }
+
+  /* category buttons */
+  .catrow { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+  .cat-btn {
+    flex: 1 1 220px;
+    background: linear-gradient(180deg,#1c2333,#161b22);
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 18px 16px;
+    color: #e6edf3;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color .15s, transform .1s;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .cat-btn:hover { border-color: #58a6ff; }
+  .cat-btn:active { transform: scale(.98); }
+  .cat-btn .arrow { margin-left: auto; font-size: 13px; color: #8b949e; transition: transform .15s; }
+  .cat-btn.open .arrow { transform: rotate(90deg); }
+  .cat-btn .ic { font-size: 20px; }
+
+  .subrow {
+    display: none;
+    gap: 10px; flex-wrap: wrap;
+    margin: 0 0 18px 0;
+    padding: 14px;
+    background: #0d1117;
+    border: 1px dashed #30363d;
+    border-radius: 10px;
+  }
+  .subrow.show { display: flex; }
+  .sub-btn {
+    flex: 1 1 150px;
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 9px;
+    padding: 12px 14px;
+    color: #e6edf3;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+  }
+  .sub-btn:hover { border-color: #38bdf8; color: #38bdf8; }
+
+  .personales-row { margin-bottom: 22px; }
+
+  /* report */
+  .report { margin-top: 26px; }
+  .report-title { font-size: 19px; font-weight: 700; margin-bottom: 14px; }
+  .section-head {
+    font-size: 15px; font-weight: 700; color: #58a6ff;
+    border-bottom: 2px solid #21262d; padding-bottom: 6px; margin: 22px 0 10px;
+  }
+  .section-head.trabajo { color: #38bdf8; }
+  .section-head.personales { color: #f2a541; }
+  .cat-head {
+    font-size: 13px; font-weight: 700; color: #8b949e;
+    text-transform: uppercase; letter-spacing: .05em;
+    margin: 14px 0 6px; display: flex; align-items: center; gap: 8px;
+  }
+  .cat-head .add-mini {
+    background: #21262d; border: 1px solid #30363d; color: #58a6ff;
+    border-radius: 6px; padding: 2px 8px; font-size: 12px; cursor: pointer; font-weight: 600;
+  }
+  .cat-head .add-mini:hover { border-color: #58a6ff; }
+
+  .table-wrap { overflow-x: auto; border: 1px solid #21262d; border-radius: 8px; margin-bottom: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 560px; }
+  th {
+    text-align: left; padding: 7px 9px; font-size: 11px; color: #8b949e;
+    text-transform: uppercase; letter-spacing: .04em; background: #161b22;
+    border-bottom: 1px solid #21262d; white-space: nowrap;
+  }
+  td { padding: 7px 9px; border-bottom: 1px solid #191d24; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #12161d; }
+  .num { text-align: right; white-space: nowrap; }
+  .muted { color: #8b949e; }
+  .strong { font-weight: 700; }
+  .row-actions { display: flex; gap: 4px; white-space: nowrap; }
+  .row-actions button {
+    background: none; border: 1px solid #30363d; color: #8b949e;
+    border-radius: 6px; padding: 3px 7px; font-size: 12px; cursor: pointer;
+  }
+  .row-actions button:hover { border-color: #58a6ff; color: #58a6ff; }
+  .row-actions button.del:hover { border-color: #f85149; color: #f85149; }
+  tr.subtotal td { background: #12161d; font-weight: 700; border-top: 1px solid #21262d; }
+  .empty-row td { color: #6e7681; font-style: italic; padding: 12px 9px; }
+  .notaline { background: #0d1117; }
+  .notaline td { color: #8b949e; font-size: 12.5px; padding: 5px 9px 9px; }
+
+  .totals-box {
+    margin-top: 24px; display: grid; grid-template-columns: repeat(3,1fr); gap: 12px;
+  }
+  @media (max-width: 700px) { .totals-box { grid-template-columns: 1fr; } }
+  .stat {
+    background: #161b22; border: 1px solid #21262d; border-radius: 10px; padding: 14px 16px;
+  }
+  .stat .label { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: .05em; }
+  .stat .value { font-size: 20px; font-weight: 700; margin-top: 4px; }
+  .stat.blue .value { color: #38bdf8; }
+  .stat.orange .value { color: #f2a541; }
+  .stat.green .value { color: #3fb950; }
+
+  /* modal */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: #000c; z-index: 300;
+    align-items: flex-start; justify-content: center; padding: 24px 14px; overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: #161b22; border: 1px solid #30363d; border-radius: 12px;
+    padding: 22px; width: 100%; max-width: 560px; margin: auto;
+    box-sizing: border-box;
+  }
+  @media (max-width: 480px) {
+    .modal { padding: 16px; }
+  }
+  .modal h2 { font-size: 17px; margin-bottom: 16px; }
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+  .field label { font-size: 12.5px; color: #8b949e; font-weight: 600; }
+  .field input, .field textarea {
+    background: #0d1117; border: 1px solid #30363d; border-radius: 7px;
+    color: #e6edf3; font-size: 14.5px; padding: 9px 11px; width: 100%; outline: none;
+  }
+  .field input:focus, .field textarea:focus { border-color: #58a6ff; }
+  .field input[readonly] { color: #3fb950; font-weight: 700; background: #10151c; }
+  .field-row { display: flex; gap: 10px; }
+  .field-row .field { flex: 1; }
+
+  .minitable-wrap { overflow-x: auto; margin-bottom: 6px; }
+  .minitable { width: 100%; min-width: 380px; border-collapse: collapse; margin-bottom: 0; }
+  .minitable th { font-size: 10.5px; color: #8b949e; padding: 3px 5px; text-align: left; font-weight: 600; }
+  .minitable td { padding: 3px 5px; }
+  .minitable input { padding: 6px 7px; font-size: 13px; }
+  .minitable .lbl { font-size: 13px; color: #e6edf3; font-weight: 600; white-space: nowrap; padding-right: 6px; }
+  .minitable .dash { color: #6e7681; text-align: center; }
+  .row-del {
+    background: none; border: 1px solid #30363d; color: #8b949e;
+    border-radius: 6px; width: 24px; height: 24px; font-size: 12px; cursor: pointer;
+  }
+  .row-del:hover:not(:disabled) { border-color: #f85149; color: #f85149; }
+  .row-del:disabled { opacity: .3; cursor: not-allowed; }
+  .btn-add-line {
+    background: none; border: 1px dashed #30363d; color: #58a6ff;
+    border-radius: 7px; padding: 6px 10px; font-size: 12.5px; font-weight: 600;
+    cursor: pointer; width: 100%; margin-bottom: 14px;
+  }
+  .btn-add-line:hover { border-color: #58a6ff; background: #58a6ff14; }
+
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+  .btn { border: none; border-radius: 8px; padding: 9px 18px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn.primary { background: #58a6ff; color: #04101f; }
+  .btn.primary:hover { background: #79b8ff; }
+  .btn.ghost { background: #21262d; color: #e6edf3; border: 1px solid #30363d; }
+  .btn.ghost:hover { border-color: #58a6ff; color: #58a6ff; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="topbar-logo" href="/">PortiCAD</a>
+  <span class="topbar-sep">›</span>
+  <div class="topbar-crumb">
+    <span class="topbar-title">Diario de Gastos</span>
+  </div>
+</div>
+
+<div class="wrap">
+  <h1 class="page-title">Diario de Gastos</h1>
+  <p class="page-sub">Registra los gastos del día por categoría y consulta el acumulado.</p>
+
+  <div class="datebar">
+    <button class="icon-btn" onclick="changeDate(-1)">‹</button>
+    <input type="date" id="date-input" onchange="setDate(this.value)">
+    <button class="icon-btn" onclick="changeDate(1)">›</button>
+    <button class="icon-btn today-btn" onclick="goToday()">Hoy</button>
+  </div>
+
+  <div class="catrow">
+    <button class="cat-btn" id="btn-trabajo" onclick="toggleTrabajo()">
+      <span class="ic">💼</span> Gastos de Trabajo <span class="arrow" id="trabajo-arrow">▸</span>
+    </button>
+  </div>
+  <div class="subrow" id="trabajo-sub">
+    <button class="sub-btn" onclick="openModal('comida')">🍽️ Comida</button>
+    <button class="sub-btn" onclick="openModal('suplementarios')">🧾 Gastos Suplementarios</button>
+    <button class="sub-btn" onclick="openModal('materiales')">🧱 Gastos Materiales</button>
+    <button class="sub-btn" onclick="openModal('herramientas')">🛠️ Gastos de Herramientas</button>
+    <button class="sub-btn" onclick="openModal('nomina')">👷 Nómina</button>
+  </div>
+
+  <div class="catrow personales-row">
+    <button class="cat-btn" onclick="openModal('personales')">
+      <span class="ic">🧍</span> Gastos Personales
+    </button>
+  </div>
+
+  <div class="report">
+    <div class="report-title">Diario de Gastos — <span id="report-date-label"></span></div>
+
+    <div class="section-head trabajo">Trabajo</div>
+    <div id="cat-comida"></div>
+    <div id="cat-suplementarios"></div>
+    <div id="cat-materiales"></div>
+    <div id="cat-herramientas"></div>
+    <div id="cat-nomina"></div>
+
+    <div class="section-head personales">Gastos Personales</div>
+    <div id="cat-personales"></div>
+
+    <div class="totals-box">
+      <div class="stat blue"><div class="label">Total Trabajo</div><div class="value" id="total-trabajo">$0.00</div></div>
+      <div class="stat orange"><div class="label">Total Personales</div><div class="value" id="total-personales">$0.00</div></div>
+      <div class="stat green"><div class="label">Total del Día</div><div class="value" id="total-dia">$0.00</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h2 id="modal-title">Comida</h2>
+
+    <div id="fields-simple">
+      <div class="field"><label id="lbl-suplidor">Suplidor</label><input type="text" id="f-suplidor" placeholder="Nombre del suplidor"></div>
+      <div class="field-row">
+        <div class="field"><label>Cant.</label><input type="number" id="f-cant" step="any" oninput="recalcSimple()"></div>
+        <div class="field"><label>Valor</label><input type="number" id="f-valor" step="any" oninput="recalcSimple()"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Propina</label><input type="number" id="f-propina" step="any" oninput="recalcSimple()"></div>
+        <div class="field"><label>Extra Propina</label><input type="number" id="f-extra" step="any" oninput="recalcSimple()"></div>
+      </div>
+      <div class="field"><label>Total</label><input type="text" id="f-total" readonly value="0.00"></div>
+      <div class="field"><label>Nota</label><input type="text" id="f-nota" placeholder="Opcional"></div>
+    </div>
+
+    <div id="fields-multi" style="display:none;">
+      <div class="field"><label id="lbl-suplidor2">Suplidor</label><input type="text" id="f-suplidor2" placeholder="Nombre"></div>
+      <div class="minitable-wrap">
+        <table class="minitable">
+          <thead><tr><th></th><th>Descripción</th><th>Cant.</th><th>Valor</th><th>Total</th><th></th></tr></thead>
+          <tbody id="items-tbody"></tbody>
+        </table>
+      </div>
+      <button type="button" class="btn-add-line" onclick="addItemRow()">+ Agregar línea</button>
+      <div class="field"><label>Adicional</label><input type="number" id="f-adicional" step="any" oninput="recalcMultiTotal()" placeholder="0.00"></div>
+      <div class="field"><label>Total</label><input type="text" id="f-total-multi" readonly value="0.00"></div>
+      <div class="field"><label>Nota</label><input type="text" id="f-nota2" placeholder="Opcional"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn primary" onclick="saveEntry()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CATS = {
+  comida:          { label: 'Comida',               type: 'simple', supplierLabel: 'Suplidor' },
+  suplementarios:  { label: 'Gastos Suplementarios', type: 'simple', supplierLabel: 'Suplidor' },
+  materiales:      { label: 'Gastos Materiales',     type: 'multi',  supplierLabel: 'Suplidor' },
+  herramientas:    { label: 'Gastos de Herramientas', type: 'multi', supplierLabel: 'Suplidor' },
+  nomina:          { label: 'Nómina',                type: 'multi',  supplierLabel: 'Empleado' },
+  personales:      { label: 'Gastos Personales',     type: 'multi',  supplierLabel: 'Suplidor' }
+};
+const TRABAJO_CATS = ['comida','suplementarios','materiales','herramientas','nomina'];
+const STORAGE_KEY = 'pcd_diario_gastos_entries';
+
+let entries = [];
+try { entries = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(e) { entries = []; }
+
+let currentDate = todayStr();
+let editingId = null;
+let currentCat = null;
+let currentItems = [];
+
+function todayStr(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function fmt(n){
+  return '$' + Number(n||0).toLocaleString('es-DO', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function num(v){ const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+function save(){ try { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); } catch(e) { console.warn('No se pudo guardar en localStorage', e); } }
+function uid(){ return 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+/* ---- date nav ---- */
+function setDate(d){ currentDate = d; document.getElementById('date-input').value = d; render(); }
+function changeDate(delta){
+  const d = new Date(currentDate + 'T00:00:00');
+  d.setDate(d.getDate() + delta);
+  setDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+}
+function goToday(){ setDate(todayStr()); }
+
+/* ---- trabajo expand ---- */
+function toggleTrabajo(){
+  const sub = document.getElementById('trabajo-sub');
+  const btn = document.getElementById('btn-trabajo');
+  const open = sub.classList.toggle('show');
+  btn.classList.toggle('open', open);
+}
+
+/* ---- modal ---- */
+function openModal(cat, entryId){
+  currentCat = cat;
+  editingId = entryId || null;
+  const c = CATS[cat];
+  document.getElementById('modal-title').textContent = c.label + (editingId ? ' (editar)' : '');
+  const simple = document.getElementById('fields-simple');
+  const multi = document.getElementById('fields-multi');
+
+  if (c.type === 'simple') {
+    simple.style.display = ''; multi.style.display = 'none';
+    document.getElementById('lbl-suplidor').textContent = c.supplierLabel;
+    const e = editingId ? entries.find(x=>x.id===editingId) : null;
+    document.getElementById('f-suplidor').value = e ? e.suplidor : '';
+    document.getElementById('f-cant').value = e ? e.cant : '';
+    document.getElementById('f-valor').value = e ? e.valor : '';
+    document.getElementById('f-propina').value = e ? e.propina : '';
+    document.getElementById('f-extra').value = e ? e.extraPropina : '';
+    document.getElementById('f-nota').value = e ? (e.nota||'') : '';
+    recalcSimple();
+  } else {
+    simple.style.display = 'none'; multi.style.display = '';
+    document.getElementById('lbl-suplidor2').textContent = c.supplierLabel;
+    const e = editingId ? entries.find(x=>x.id===editingId) : null;
+    document.getElementById('f-suplidor2').value = e ? e.suplidor : '';
+    document.getElementById('f-adicional').value = e ? (e.adicional || '') : '';
+    document.getElementById('f-nota2').value = e ? (e.nota||'') : '';
+    currentItems = (e && e.items && e.items.length)
+      ? e.items.map(it=>({desc: it.desc||'', cant: it.cant||'', valor: it.valor||''}))
+      : [{desc:'',cant:'',valor:''},{desc:'',cant:'',valor:''}];
+    renderItemsTable();
+  }
+
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal(){
+  document.getElementById('modal-overlay').classList.remove('open');
+  editingId = null; currentCat = null;
+}
+
+function recalcSimple(){
+  const cant = num(document.getElementById('f-cant').value);
+  const valor = num(document.getElementById('f-valor').value);
+  const propina = num(document.getElementById('f-propina').value);
+  const extra = num(document.getElementById('f-extra').value);
+  const total = (cant * valor) + propina + extra;
+  document.getElementById('f-total').value = total.toFixed(2);
+}
+function renderItemsTable(){
+  const tbody = document.getElementById('items-tbody');
+  let html = '';
+  currentItems.forEach((it, i)=>{
+    const total = num(it.cant) * num(it.valor);
+    html += `<tr>
+      <td class="lbl">${i+1}</td>
+      <td><input type="text" value="${escapeAttr(it.desc)}" placeholder="Descripción ${i+1}" oninput="updateItem(${i},'desc',this.value)"></td>
+      <td><input type="number" step="any" value="${it.cant}" style="width:56px;" oninput="updateItem(${i},'cant',this.value)"></td>
+      <td><input type="number" step="any" value="${it.valor}" style="width:70px;" oninput="updateItem(${i},'valor',this.value)"></td>
+      <td><input type="text" readonly id="item-total-${i}" value="${total.toFixed(2)}" style="width:74px;"></td>
+      <td><button type="button" class="row-del" onclick="removeItemRow(${i})" ${currentItems.length<=1?'disabled':''}>✕</button></td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+  recalcMultiTotal();
+}
+function updateItem(i, field, value){
+  currentItems[i][field] = value;
+  if (field !== 'desc') {
+    const totalCell = document.getElementById('item-total-'+i);
+    if (totalCell) totalCell.value = (num(currentItems[i].cant) * num(currentItems[i].valor)).toFixed(2);
+    recalcMultiTotal();
+  }
+}
+function addItemRow(){
+  currentItems.push({desc:'',cant:'',valor:''});
+  renderItemsTable();
+}
+function removeItemRow(i){
+  if (currentItems.length <= 1) return;
+  currentItems.splice(i,1);
+  renderItemsTable();
+}
+function recalcMultiTotal(){
+  const itemsTotal = currentItems.reduce((s,it)=> s + num(it.cant) * num(it.valor), 0);
+  const adicional = num(document.getElementById('f-adicional').value);
+  document.getElementById('f-total-multi').value = (itemsTotal + adicional).toFixed(2);
+}
+
+function saveEntry(){
+  const c = CATS[currentCat];
+  let entry;
+  if (c.type === 'simple') {
+    const suplidor = document.getElementById('f-suplidor').value.trim();
+    if (!suplidor) { alert('Ingresa el ' + c.supplierLabel.toLowerCase()); return; }
+    entry = {
+      id: editingId || uid(), date: currentDate, cat: currentCat,
+      suplidor,
+      cant: num(document.getElementById('f-cant').value),
+      valor: num(document.getElementById('f-valor').value),
+      propina: num(document.getElementById('f-propina').value),
+      extraPropina: num(document.getElementById('f-extra').value),
+      nota: document.getElementById('f-nota').value.trim()
+    };
+    entry.total = (entry.cant * entry.valor) + entry.propina + entry.extraPropina;
+  } else {
+    const suplidor = document.getElementById('f-suplidor2').value.trim();
+    if (!suplidor) { alert('Ingresa el ' + c.supplierLabel.toLowerCase()); return; }
+    const items = currentItems
+      .map(it=>({desc: (it.desc||'').trim(), cant: num(it.cant), valor: num(it.valor), total: num(it.cant)*num(it.valor)}))
+      .filter(it=> it.desc || it.cant || it.valor);
+    const adicional = num(document.getElementById('f-adicional').value);
+    entry = {
+      id: editingId || uid(), date: currentDate, cat: currentCat,
+      suplidor,
+      items,
+      adicional,
+      nota: document.getElementById('f-nota2').value.trim()
+    };
+    entry.total = items.reduce((s,it)=>s+it.total,0) + adicional;
+  }
+
+  if (editingId) {
+    const idx = entries.findIndex(x=>x.id===editingId);
+    if (idx > -1) entries[idx] = entry;
+  } else {
+    entries.push(entry);
+  }
+  save();
+  closeModal();
+  render();
+}
+
+function deleteEntry(id){
+  if (!confirm('¿Eliminar este registro?')) return;
+  entries = entries.filter(e=>e.id!==id);
+  save();
+  render();
+}
+function editEntry(id){
+  const e = entries.find(x=>x.id===id);
+  if (e) openModal(e.cat, id);
+}
+
+/* ---- render ---- */
+function render(){
+  document.getElementById('date-input').value = currentDate;
+  document.getElementById('report-date-label').textContent = currentDate;
+
+  let totalTrabajo = 0, totalPersonales = 0;
+
+  Object.keys(CATS).forEach(cat=>{
+    const c = CATS[cat];
+    const list = entries.filter(e=>e.cat===cat && e.date===currentDate);
+    const container = document.getElementById('cat-' + cat);
+    let subtotal = 0;
+    list.forEach(e=>subtotal += e.total);
+    if (TRABAJO_CATS.includes(cat)) totalTrabajo += subtotal; else totalPersonales += subtotal;
+
+    let html = `<div class="cat-head">${c.label} <button class="add-mini" onclick="openModal('${cat}')">+ Agregar</button></div>`;
+    html += '<div class="table-wrap"><table>';
+
+    if (c.type === 'simple') {
+      html += `<tr><th>${c.supplierLabel}</th><th>Cant.</th><th>Valor</th><th>Prop.</th><th>Extra Prop.</th><th>Total</th><th></th></tr>`;
+      if (!list.length) {
+        html += `<tr class="empty-row"><td colspan="7">Sin registros</td></tr>`;
+      } else {
+        list.forEach(e=>{
+          html += `<tr>
+            <td>${escapeHtml(e.suplidor)}</td>
+            <td class="num">${e.cant}</td>
+            <td class="num">${fmt(e.valor)}</td>
+            <td class="num">${fmt(e.propina)}</td>
+            <td class="num">${fmt(e.extraPropina)}</td>
+            <td class="num strong">${fmt(e.total)}</td>
+            <td class="row-actions"><button onclick="editEntry('${e.id}')">✏️</button><button class="del" onclick="deleteEntry('${e.id}')">🗑</button></td>
+          </tr>`;
+          if (e.nota) html += `<tr class="notaline"><td colspan="7">Nota: ${escapeHtml(e.nota)}</td></tr>`;
+        });
+        html += `<tr class="subtotal"><td colspan="5">Subtotal ${c.label}</td><td class="num">${fmt(subtotal)}</td><td></td></tr>`;
+      }
+    } else {
+      html += `<tr><th>${c.supplierLabel}</th><th>Descripción</th><th>Cant.</th><th>Valor</th><th>Total</th><th></th></tr>`;
+      if (!list.length) {
+        html += `<tr class="empty-row"><td colspan="6">Sin registros</td></tr>`;
+      } else {
+        list.forEach(e=>{
+          const items = (e.items && e.items.length) ? e.items : [{desc:'',cant:0,valor:0,total:0}];
+          const rowCount = items.length + 2; // + adicional row + total/nota row
+          items.forEach((it, idx)=>{
+            html += '<tr>';
+            if (idx === 0) {
+              html += `<td rowspan="${rowCount}">${escapeHtml(e.suplidor)}</td>`;
+            }
+            html += `
+              <td>${escapeHtml(it.desc) || `<span class="muted">Descripción ${idx+1}</span>`}</td>
+              <td class="num">${it.cant||''}</td>
+              <td class="num">${fmt(it.valor)}</td>
+              <td class="num">${fmt(it.total)}</td>`;
+            if (idx === 0) {
+              html += `<td rowspan="${rowCount}" class="row-actions"><button onclick="editEntry('${e.id}')">✏️</button><button class="del" onclick="deleteEntry('${e.id}')">🗑</button></td>`;
+            }
+            html += '</tr>';
+          });
+          html += `<tr>
+            <td class="muted">Adicional</td>
+            <td class="num">—</td>
+            <td class="num">${fmt(e.adicional)}</td>
+            <td class="num">${fmt(e.adicional)}</td>
+          </tr>
+          <tr class="notaline">
+            <td colspan="3">${e.nota ? 'Nota: ' + escapeHtml(e.nota) : ''}</td>
+            <td class="num strong">Total: ${fmt(e.total)}</td>
+          </tr>`;
+        });
+        html += `<tr class="subtotal"><td colspan="4">Subtotal ${c.label}</td><td class="num">${fmt(subtotal)}</td><td></td></tr>`;
+      }
+    }
+
+    html += '</table></div>';
+    container.innerHTML = html;
+  });
+
+  document.getElementById('total-trabajo').textContent = fmt(totalTrabajo);
+  document.getElementById('total-personales').textContent = fmt(totalPersonales);
+  document.getElementById('total-dia').textContent = fmt(totalTrabajo + totalPersonales);
+}
+
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function escapeAttr(s){ return escapeHtml(s); }
+
+document.getElementById('modal-overlay').addEventListener('click', function(e){
+  if (e.target === this) closeModal();
+});
+
+render();
+</script>
+</body>
+</html>
