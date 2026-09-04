@@ -101,6 +101,17 @@
   .view-btn { background: none; border: none; color: var(--muted); padding: 5px 12px; font-size: 13px; font-weight: 600; border-radius: 5px; cursor: pointer; }
   .view-btn.active { background: var(--border2); color: var(--accent); }
 
+  /* page tabs */
+  .tabnav { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--border2); }
+  .tabnav-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    padding: 10px 4px; margin-right: 22px; font-size: 14.5px; font-weight: 700;
+    border-bottom: 2px solid transparent;
+  }
+  .tabnav-btn.active { color: var(--accent); border-color: var(--accent); }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
   /* category buttons */
   .catrow { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
   .cat-btn {
@@ -264,9 +275,11 @@
   /* ── Print / PDF ── */
   @media print {
     body { background: #fff; color: #000; }
-    .topbar, .datebar, .catrow, .subrow, .modal-overlay, .page-sub { display: none !important; }
+    .topbar, .datebar, .tabnav, .catrow, .subrow, .modal-overlay, .page-sub { display: none !important; }
     .wrap { max-width: 100%; padding: 0; margin: 0; }
     .report { margin-top: 0; }
+    #pane-registrar { display: none !important; }
+    #pane-reporte { display: block !important; }
     .report-title, .section-head, .cat-head { color: #000 !important; }
     .section-head { border-bottom-color: #999; }
     .cat-head .add-mini { display: none !important; }
@@ -345,43 +358,58 @@
     <button class="icon-btn push-right" onclick="window.print()">🖨️ Imprimir / PDF</button>
   </div>
 
-  <div class="catrow">
-    <button class="cat-btn" id="btn-trabajo" onclick="toggleTrabajo()">
-      <span class="ic">💼</span> Gastos de Trabajo <span class="arrow" id="trabajo-arrow">▸</span>
-    </button>
-  </div>
-  <div class="subrow" id="trabajo-sub">
-    <button class="sub-btn" onclick="openModal('comida')">🍽️ Comida</button>
-    <button class="sub-btn" onclick="openModal('suplementarios')">🧾 Gastos Suplementarios</button>
-    <button class="sub-btn" onclick="openModal('materiales')">🧱 Gastos Materiales</button>
-    <button class="sub-btn" onclick="openModal('herramientas')">🛠️ Gastos de Herramientas</button>
-    <button class="sub-btn" onclick="openModal('nomina')">👷 Nómina</button>
+  <div class="tabnav">
+    <button class="tabnav-btn active" id="tabnav-btn-registrar" onclick="showTab('registrar')">📝 Registrar</button>
+    <button class="tabnav-btn" id="tabnav-btn-reporte" onclick="showTab('reporte')">📊 Reporte</button>
   </div>
 
-  <div class="catrow personales-row">
-    <button class="cat-btn" onclick="openModal('personales')">
-      <span class="ic">🧍</span> Gastos Personales
-    </button>
-  </div>
+  <div id="pane-registrar" class="tab-pane active">
+    <div class="catrow">
+      <button class="cat-btn" id="btn-trabajo" onclick="toggleTrabajo()">
+        <span class="ic">💼</span> Gastos de Trabajo <span class="arrow" id="trabajo-arrow">▸</span>
+      </button>
+    </div>
+    <div class="subrow" id="trabajo-sub">
+      <button class="sub-btn" onclick="openModal('comida')">🍽️ Comida</button>
+      <button class="sub-btn" onclick="openModal('suplementarios')">🧾 Gastos Suplementarios</button>
+      <button class="sub-btn" onclick="openModal('materiales')">🧱 Gastos Materiales</button>
+      <button class="sub-btn" onclick="openModal('herramientas')">🛠️ Gastos de Herramientas</button>
+      <button class="sub-btn" onclick="openModal('nomina')">👷 Nómina</button>
+    </div>
 
-  <div class="report">
-    <div class="report-title">Diario de Gastos — <span id="report-date-label"></span></div>
-    <div id="week-summary"></div>
-
-    <div class="section-head trabajo">Trabajo</div>
-    <div id="cat-comida"></div>
-    <div id="cat-suplementarios"></div>
-    <div id="cat-materiales"></div>
-    <div id="cat-herramientas"></div>
-    <div id="cat-nomina"></div>
-
-    <div class="section-head personales">Gastos Personales</div>
-    <div id="cat-personales"></div>
+    <div class="catrow personales-row">
+      <button class="cat-btn" onclick="openModal('personales')">
+        <span class="ic">🧍</span> Gastos Personales
+      </button>
+    </div>
 
     <div class="totals-box">
       <div class="stat blue"><div class="label">Total Trabajo</div><div class="value" id="total-trabajo">$0.00</div></div>
       <div class="stat orange"><div class="label">Total Personales</div><div class="value" id="total-personales">$0.00</div></div>
       <div class="stat green"><div class="label" id="total-dia-label">Total del Día</div><div class="value" id="total-dia">$0.00</div></div>
+    </div>
+  </div>
+
+  <div id="pane-reporte" class="tab-pane">
+    <div class="report">
+      <div class="report-title">Diario de Gastos — <span id="report-date-label"></span></div>
+      <div id="week-summary"></div>
+
+      <div class="section-head trabajo">Trabajo</div>
+      <div id="cat-comida"></div>
+      <div id="cat-suplementarios"></div>
+      <div id="cat-materiales"></div>
+      <div id="cat-herramientas"></div>
+      <div id="cat-nomina"></div>
+
+      <div class="section-head personales">Gastos Personales</div>
+      <div id="cat-personales"></div>
+
+      <div class="totals-box">
+        <div class="stat blue"><div class="label">Total Trabajo</div><div class="value" id="total-trabajo-2">$0.00</div></div>
+        <div class="stat orange"><div class="label">Total Personales</div><div class="value" id="total-personales-2">$0.00</div></div>
+        <div class="stat green"><div class="label" id="total-dia-label-2">Total del Día</div><div class="value" id="total-dia-2">$0.00</div></div>
+      </div>
     </div>
   </div>
 </div>
@@ -608,6 +636,20 @@ function setViewMode(mode){
   render();
 }
 
+/* ---- page tabs ---- */
+function showTab(name){
+  document.getElementById('pane-registrar').classList.toggle('active', name === 'registrar');
+  document.getElementById('pane-reporte').classList.toggle('active', name === 'reporte');
+  document.getElementById('tabnav-btn-registrar').classList.toggle('active', name === 'registrar');
+  document.getElementById('tabnav-btn-reporte').classList.toggle('active', name === 'reporte');
+  try { localStorage.setItem('pcd_diario_gastos_tab', name); } catch(e) {}
+}
+(function(){
+  let saved = null;
+  try { saved = localStorage.getItem('pcd_diario_gastos_tab'); } catch(e) {}
+  if (saved === 'reporte') showTab('reporte');
+})();
+
 /* ---- trabajo expand ---- */
 function toggleTrabajo(){
   const sub = document.getElementById('trabajo-sub');
@@ -769,6 +811,7 @@ function render(){
     ? `Semana del ${fmtDateShort(range.start)} al ${fmtDateShort(range.end)}`
     : currentDate;
   document.getElementById('total-dia-label').textContent = isWeek ? 'Total de la Semana' : 'Total del Día';
+  document.getElementById('total-dia-label-2').textContent = isWeek ? 'Total de la Semana' : 'Total del Día';
 
   let totalTrabajo = 0, totalPersonales = 0;
 
@@ -858,6 +901,9 @@ function render(){
   document.getElementById('total-trabajo').textContent = fmt(totalTrabajo);
   document.getElementById('total-personales').textContent = fmt(totalPersonales);
   document.getElementById('total-dia').textContent = fmt(totalTrabajo + totalPersonales);
+  document.getElementById('total-trabajo-2').textContent = fmt(totalTrabajo);
+  document.getElementById('total-personales-2').textContent = fmt(totalPersonales);
+  document.getElementById('total-dia-2').textContent = fmt(totalTrabajo + totalPersonales);
 
   renderWeekSummary(isWeek, range);
 }
