@@ -919,7 +919,9 @@
       bucketTip.position.set(0, tipP.y, tipP.z);
       bucketGroup.add(bucketTip);
 
-      dirtMound = new THREE.Mesh(new THREE.SphereGeometry(0.001, 8, 6), new THREE.MeshStandardMaterial({ color: 0x5a4326, roughness: 1 }));
+      // esfera unitaria: su escala ES el radio real en metros (ver tick(), BUCKET_FILL_SIZE)
+      dirtMound = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshStandardMaterial({ color: 0x5a4326, roughness: 1 }));
+      dirtMound.scale.set(0.001, 0.001, 0.001);
       dirtMound.position.set(0, (BK[1].y + BK[3].y) / 2 + 0.12, (BK[1].z + BK[3].z) / 2);
       bucketGroup.add(dirtMound);
     }
@@ -1189,19 +1191,18 @@
         entry.mesh.position.set(-origin.x, -origin.y, -origin.z);
       });
 
-      // la cuchara real pasa a mandar la excavación: el punto de referencia y el
-      // indicador de carga se mudan al pivote real D. De punto de partida quedan en
-      // el propio pivote (el pasador); si hace falta más precisión en el diente de la
-      // cuchara: el diente/punta real NO está en el pasador D (eso es la articulación,
-      // no el filo) — BUCKET_TIP_OFFSET la ubica en el espacio propio de armPivotD,
-      // mismo sistema que los puntos de referencia R1-R8. Ajustable en vivo con el
-      // panel de picking (?debug=1).
+      // la cuchara real pasa a mandar la excavación: el diente (bucketTip,
+      // BUCKET_TIP_OFFSET) y el montoncito de material cargado (dirtMound,
+      // BUCKET_FILL_POINT) se cuelgan del pivote real D, cada uno con su propio punto
+      // — el diente es por dónde corta, el montículo es dónde conviene que se vea la
+      // tierra adentro, no son el mismo lugar. Ambos ajustables en vivo con el panel
+      // de picking (?debug=1).
       bucketGroup.remove(bucketTip);
       bucketGroup.remove(dirtMound);
       armPivotD.add(bucketTip);
       armPivotD.add(dirtMound);
       bucketTip.position.set(BUCKET_TIP_OFFSET.x, BUCKET_TIP_OFFSET.y, BUCKET_TIP_OFFSET.z);
-      dirtMound.position.set(BUCKET_TIP_OFFSET.x, BUCKET_TIP_OFFSET.y + 0.1, BUCKET_TIP_OFFSET.z);
+      dirtMound.position.set(BUCKET_FILL_POINT.x, BUCKET_FILL_POINT.y, BUCKET_FILL_POINT.z);
     }
 
     // ---------- panel de picking: 4 pasadores, como cilindro pasante (?debug=1) ----------
@@ -1251,11 +1252,20 @@
     ];
 
     // punto real de contacto/corte de la cuchara (bucketTip): NO es el pasador D (esa
-    // es la articulación, no el filo) — arranca en R7, la esquina del fondo más lejos
-    // del pasador (candidata más razonable a diente), pero es ajustable a mano con el
-    // panel de picking mirando las esferas de referencia de arriba. Mismo espacio
-    // local que BUCKET_REF_POINTS (armPivotD).
-    var BUCKET_TIP_OFFSET = { x: -0.017, y: -0.859, z: -1.100 };
+    // es la articulación, no el filo). Valor confirmado marcando con clic sobre el
+    // diente real en el panel de picking (?debug=1); ajustable ahí mismo si hace
+    // falta afinarlo más. Mismo espacio local que BUCKET_REF_POINTS (armPivotD).
+    var BUCKET_TIP_OFFSET = { x: -0.5462, y: -0.1289, z: -1.3432 };
+
+    // punto donde se ve el montoncito de tierra cargada (dirtMound) — separado del
+    // diente (BUCKET_TIP_OFFSET): ese es por dónde corta, este es dónde conviene que
+    // se vea el material adentro de la cuchara. El centro geométrico del fondo
+    // (promedio de R5-R8) quedaba tapado por la malla real de la cuchara (detrás del
+    // piso, oculto por el depth test normal) — este valor se confirmó con clic,
+    // visible justo por encima del fondo/dientes. Ajustable con clic igual que el
+    // diente. BUCKET_FILL_SIZE es el radio (m) del montículo a carga 100%.
+    var BUCKET_FILL_POINT = { x: 0.03, y: -0.06, z: 0.02 };
+    var BUCKET_FILL_SIZE = 0.35;
 
     // cilindro fino orientable: geometría unitaria (radio fijo, largo 1 a lo largo de
     // Z desde el origen), se reorienta con quaternion + se escala en Z para estirarlo
@@ -1367,6 +1377,23 @@
             '</div>' +
             '<input type="range" id="dbgTip' + ax + '" min="-2" max="2" step="0.01" value="' + BUCKET_TIP_OFFSET[lax] + '" style="width:100%">';
         }).join('') +
+        '<div style="color:#8b949e;margin:10px 0 4px;border-top:1px solid #30363d;padding-top:8px">🟤 Montón de material cargado (dónde se ve la tierra adentro)</div>' +
+        '<button type="button" id="dbgFillPick" style="width:100%;font-size:10px;padding:5px;margin-bottom:6px;background:#8a5a2e;color:#fff;border:none;border-radius:4px;font-weight:bold;cursor:pointer">📍 Marcar con clic dentro de la cuchara</button>' +
+        '<div style="color:#8b949e;margin-bottom:4px">O ajustá a mano:</div>' +
+        ['X', 'Y', 'Z'].map(function (ax) {
+          var lax = ax.toLowerCase();
+          return '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;color:#8b949e;margin-bottom:2px">' +
+            '<span>' + ax + '</span>' +
+            '<input type="number" id="dbgFill' + ax + 'Num" step="0.01" value="' + BUCKET_FILL_POINT[lax] + '" style="width:70px;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:4px;padding:2px 4px;font-family:inherit;font-size:11px;text-align:right">' +
+            '</div>' +
+            '<input type="range" id="dbgFill' + ax + '" min="-2" max="2" step="0.01" value="' + BUCKET_FILL_POINT[lax] + '" style="width:100%">';
+        }).join('') +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;color:#8b949e;margin-bottom:2px">' +
+        '<span>Tamaño a carga llena (m)</span>' +
+        '<input type="number" id="dbgFillSizeNum" step="0.01" value="' + BUCKET_FILL_SIZE + '" style="width:70px;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:4px;padding:2px 4px;font-family:inherit;font-size:11px;text-align:right">' +
+        '</div>' +
+        '<input type="range" id="dbgFillSize" min="0.05" max="1" step="0.01" value="' + BUCKET_FILL_SIZE + '" style="width:100%">' +
+        '<button type="button" id="dbgFillPreview" style="width:100%;margin-top:6px;font-size:10px;padding:5px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:4px;cursor:pointer">Vista previa: llenar/vaciar la cuchara</button>' +
         '<div style="font-weight:bold;color:#58a6ff;margin:10px 0 6px;border-top:1px solid #30363d;padding-top:10px">📏 Regla</div>' +
         '<div style="color:#8b949e;margin-bottom:8px">Con "Modo regla" activo, un clic marca un punto. En referencia "Cuchara" los puntos quedan en el espacio propio de la cuchara (no cambian aunque muevas el brazo), para medir su ancho/alto/profundidad marcando sus esquinas; el panel calcula esas 3 medidas solo. En "Máquina" mide alcance sobre el terreno.</div>' +
         '<div style="display:flex;gap:10px;margin-bottom:6px;font-size:10px">' +
@@ -1429,7 +1456,6 @@
       function setBucketTip(x, y, z) {
         BUCKET_TIP_OFFSET.x = x; BUCKET_TIP_OFFSET.y = y; BUCKET_TIP_OFFSET.z = z;
         bucketTip.position.set(x, y, z);
-        dirtMound.position.set(x, y + 0.1, z);
         if (bucketTipMarker) bucketTipMarker.position.set(x, y, z);
         ['X', 'Y', 'Z'].forEach(function (ax) {
           var v = BUCKET_TIP_OFFSET[ax.toLowerCase()];
@@ -1487,6 +1513,92 @@
         setBucketTip(local.x, local.y, local.z);
         tipArmed = false;
         tipPickBtn.textContent = '📍 Marcar con clic sobre el diente';
+      });
+
+      // ---- montón de material cargado: mismo mecanismo que el diente (clic o
+      // sliders), pero para BUCKET_FILL_POINT/BUCKET_FILL_SIZE — dónde y qué tan
+      // grande se ve la tierra adentro de la cuchara al cargarla. ----
+      var fillMarker = armPivotD ? makeRulerMarker(armPivotD, '#8a5a2e') : null;
+      if (fillMarker) {
+        fillMarker.userData.isPickMarker = true;
+        fillMarker.position.set(BUCKET_FILL_POINT.x, BUCKET_FILL_POINT.y, BUCKET_FILL_POINT.z);
+      }
+      function setBucketFill(x, y, z) {
+        BUCKET_FILL_POINT.x = x; BUCKET_FILL_POINT.y = y; BUCKET_FILL_POINT.z = z;
+        dirtMound.position.set(x, y, z);
+        if (fillMarker) fillMarker.position.set(x, y, z);
+        ['X', 'Y', 'Z'].forEach(function (ax) {
+          var v = BUCKET_FILL_POINT[ax.toLowerCase()];
+          document.getElementById('dbgFill' + ax).value = v;
+          document.getElementById('dbgFill' + ax + 'Num').value = v;
+        });
+      }
+      ['X', 'Y', 'Z'].forEach(function (ax) {
+        var lax = ax.toLowerCase();
+        var el = document.getElementById('dbgFill' + ax), numEl = document.getElementById('dbgFill' + ax + 'Num');
+        function apply(v) {
+          var next = { x: BUCKET_FILL_POINT.x, y: BUCKET_FILL_POINT.y, z: BUCKET_FILL_POINT.z };
+          next[lax] = v;
+          setBucketFill(next.x, next.y, next.z);
+        }
+        el.addEventListener('input', function () { apply(parseFloat(el.value)); });
+        numEl.addEventListener('change', function () {
+          var v = parseFloat(numEl.value);
+          if (isNaN(v)) { numEl.value = BUCKET_FILL_POINT[lax]; return; }
+          apply(v);
+        });
+      });
+      var fillSizeEl = document.getElementById('dbgFillSize'), fillSizeNumEl = document.getElementById('dbgFillSizeNum');
+      function applyFillSize(v) {
+        BUCKET_FILL_SIZE = v; fillSizeEl.value = v; fillSizeNumEl.value = v;
+      }
+      fillSizeEl.addEventListener('input', function () { applyFillSize(parseFloat(fillSizeEl.value)); });
+      fillSizeNumEl.addEventListener('change', function () {
+        var v = parseFloat(fillSizeNumEl.value);
+        if (isNaN(v)) { fillSizeNumEl.value = BUCKET_FILL_SIZE; return; }
+        applyFillSize(v);
+      });
+
+      var fillArmed = false;
+      var fillPickerDown = null;
+      var fillPickBtn = document.getElementById('dbgFillPick');
+      fillPickBtn.addEventListener('click', function () {
+        fillArmed = !fillArmed;
+        fillPickBtn.textContent = fillArmed ? '👉 Tocá adentro de la cuchara…' : '📍 Marcar con clic dentro de la cuchara';
+      });
+      tipDom.addEventListener('pointerdown', function (e) {
+        if (!fillArmed) return;
+        fillPickerDown = { x: e.clientX, y: e.clientY, t: performance.now() };
+      });
+      tipDom.addEventListener('pointerup', function (e) {
+        if (!fillArmed || !fillPickerDown) return;
+        var moved = Math.hypot(e.clientX - fillPickerDown.x, e.clientY - fillPickerDown.y);
+        var dt = performance.now() - fillPickerDown.t;
+        fillPickerDown = null;
+        if (moved > 6 || dt > 600) return;
+        if (!armPivotD) return;
+        var rect = tipDom.getBoundingClientRect();
+        var ndc = new THREE.Vector2(
+          ((e.clientX - rect.left) / rect.width) * 2 - 1,
+          -((e.clientY - rect.top) / rect.height) * 2 + 1
+        );
+        tipRaycaster.setFromCamera(ndc, activeCam);
+        var hits = tipRaycaster.intersectObjects([turretPivot, machineRoot], true).filter(function (h) {
+          return h.object.visible && !h.object.userData.isPickMarker;
+        });
+        if (!hits.length) return;
+        var local = armPivotD.worldToLocal(hits[0].point.clone());
+        setBucketFill(local.x, local.y, local.z);
+        fillArmed = false;
+        fillPickBtn.textContent = '📍 Marcar con clic dentro de la cuchara';
+      });
+
+      var fillPreviewOn = false;
+      var fillPreviewBtn = document.getElementById('dbgFillPreview');
+      fillPreviewBtn.addEventListener('click', function () {
+        fillPreviewOn = !fillPreviewOn;
+        bucketLoad = fillPreviewOn ? BUCKET_CAPACITY : 0;
+        fillPreviewBtn.textContent = fillPreviewOn ? 'Vista previa: vaciar la cuchara' : 'Vista previa: llenar/vaciar la cuchara';
       });
 
       function axisOf(key) {
@@ -1933,7 +2045,11 @@
       }
 
       var loadPct = bucketLoad / BUCKET_CAPACITY;
-      dirtMound.scale.setScalar(0.001 + loadPct * 6.5);
+      // dirtMound es una esfera unitaria: la escala ES el radio real en metros. Antes
+      // el radio base era 0.001 y llegaba a ~6.5mm a carga llena — invisible. Achatada
+      // en Y para que se vea como un montón de tierra, no una bocha.
+      var fillR = BUCKET_FILL_SIZE * (0.15 + loadPct * 0.85);
+      dirtMound.scale.set(fillR, fillR * 0.55, fillR);
       dirtMound.visible = loadPct > 0.02;
 
       document.getElementById('hudVol').textContent = totalExcavated.toFixed(2) + ' m³';
