@@ -1259,13 +1259,12 @@
 
     // punto donde se ve el montoncito de tierra cargada (dirtMound) — separado del
     // diente (BUCKET_TIP_OFFSET): ese es por dónde corta, este es dónde conviene que
-    // se vea el material adentro de la cuchara. El centro geométrico del fondo
-    // (promedio de R5-R8) quedaba tapado por la malla real de la cuchara (detrás del
-    // piso, oculto por el depth test normal) — este valor se confirmó con clic,
-    // visible justo por encima del fondo/dientes. Ajustable con clic igual que el
-    // diente. BUCKET_FILL_SIZE es el radio (m) del montículo a carga 100%.
-    var BUCKET_FILL_POINT = { x: 0.03, y: -0.06, z: 0.02 };
-    var BUCKET_FILL_SIZE = 0.35;
+    // se vea el material adentro de la cuchara. Reconfirmado a mano con el panel de
+    // picking (?debug=1), visible bien anidado dentro de la cavidad real. Ajustable
+    // con clic igual que el diente. BUCKET_FILL_SIZE es el radio (m) del montículo a
+    // carga 100%.
+    var BUCKET_FILL_POINT = { x: -0.33, y: -0.29, z: -0.93 };
+    var BUCKET_FILL_SIZE = 0.38;
 
     // cilindro fino orientable: geometría unitaria (radio fijo, largo 1 a lo largo de
     // Z desde el origen), se reorienta con quaternion + se escala en Z para estirarlo
