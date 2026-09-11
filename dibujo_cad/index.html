@@ -2092,6 +2092,40 @@ function bboxIntersects(a, b) {
   return !(a.x1 < b.x0 || a.x0 > b.x1 || a.y1 < b.y0 || a.y0 > b.y1);
 }
 
+// El bbox de una línea/polilínea diagonal es mucho más grande que su trazo real, así que un
+// recuadro de selección puede solapar el bbox sin tocar la línea en sí (falso positivo). Para
+// line/rect/polyline comprobamos la geometría real (vértice dentro del recuadro, o algún tramo
+// que cruce alguno de sus 4 lados); para círculo, distancia del centro al recuadro vs radio.
+// Arco/texto/cotas siguen usando el bbox — es una aproximación razonable para esas formas.
+function pointInBox(p, box) {
+  return p.x >= box.x0 && p.x <= box.x1 && p.y >= box.y0 && p.y <= box.y1;
+}
+function segIntersectsBox(p1, p2, box) {
+  if (pointInBox(p1, box) || pointInBox(p2, box)) return true;
+  const corners = [
+    { x: box.x0, y: box.y0 }, { x: box.x1, y: box.y0 },
+    { x: box.x1, y: box.y1 }, { x: box.x0, y: box.y1 },
+  ];
+  for (let i = 0; i < 4; i++) {
+    const r = segIntersectParam(p1, p2, corners[i], corners[(i + 1) % 4]);
+    if (r && r.t >= 0 && r.t <= 1 && r.u >= 0 && r.u <= 1) return true;
+  }
+  return false;
+}
+function circleIntersectsBox(c, r, box) {
+  const cx = Math.max(box.x0, Math.min(c.x, box.x1));
+  const cy = Math.max(box.y0, Math.min(c.y, box.y1));
+  return Math.hypot(c.x - cx, c.y - cy) <= r;
+}
+function entityCrossesBox(e, box) {
+  if (!bboxIntersects(entityBBox(e), box)) return false;
+  if (e.type === 'circle') return circleIntersectsBox(e.c, e.r, box);
+  const path = entityToPath(e);
+  if (!path) return true;
+  if (path.pts.some(p => pointInBox(p, box))) return true;
+  return pathSegments(path).some(seg => segIntersectsBox(seg.p1, seg.p2, box));
+}
+
 function drawMarquee() {
   if (!boxSelect) return;
   const s = boxSelect.startScreen, c = boxSelect.curScreen;
@@ -3829,7 +3863,7 @@ function pointerUp() {
     } else {
       const a = toWorld(s.x, s.y), b = toWorld(c.x, c.y);
       const box = { x0: Math.min(a.x, b.x), x1: Math.max(a.x, b.x), y0: Math.min(a.y, b.y), y1: Math.max(a.y, b.y) };
-      entities.forEach((e, i) => { if (isEntityVisible(e) && !isEntityLocked(e) && bboxIntersects(entityBBox(e), box)) hits.push(i); });
+      entities.forEach((e, i) => { if (isEntityVisible(e) && !isEntityLocked(e) && entityCrossesBox(e, box)) hits.push(i); });
     }
     const shiftHeld = boxSelect.shift;
     if (shiftHeld) hits.forEach(i => selected.add(i));
