@@ -173,6 +173,14 @@ body{ display:flex; flex-direction:column; }
   border-radius:10px; padding:8px 6px; min-width:200px; z-index:2000; box-shadow:0 8px 32px rgba(0,0,0,.5);
 }
 
+/* ── Menú desplegable "Editar" (pestaña arriba de la toolbar, se despliega horizontal a su lado) ── */
+.editar-menu-panel{
+  display:none; position:fixed; flex-direction:row; align-items:stretch; background:var(--panel);
+  border:1px solid var(--border); border-radius:10px; padding:6px; gap:2px; z-index:2000;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);
+}
+.editar-menu-panel .tbtn{ width:62px; }
+
 /* ── Fila principal: barra lateral + lienzo (la topbar de arriba queda solo para menús) ── */
 .main-row{ display:flex; flex-direction:row; flex:1; min-height:0; overflow:hidden; }
 
@@ -538,40 +546,6 @@ body{ display:flex; flex-direction:column; }
     </div>
   </div>
 
-  <div class="file-menu-wrap" id="editar-menu-wrap">
-    <button class="mt-btn" id="tool-editar-btn" onclick="toggleEditarMenu(event)" title="Editar — copiar, offset, empalme, recortar, alargar">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-      Editar ▾
-    </button>
-    <div class="mt-panel icon-lg-panel" id="editar-menu-panel">
-      <div class="mt-hd">EDITAR</div>
-      <button class="file-menu-item" onclick="closeEditarMenu(); clickCopyBtn();">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        Copiar
-      </button>
-      <button class="file-menu-item" onclick="closeEditarMenu(); clickOffsetBtn('offset');">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="7" width="10" height="10" rx="1"/><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"/></svg>
-        Offset
-      </button>
-      <button class="file-menu-item" onclick="closeEditarMenu(); clickOffsetBtn('offset-fixed');">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-        Offset Fijo
-      </button>
-      <button class="file-menu-item" onclick="closeEditarMenu(); setTool('fillet');">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v9a7 7 0 0 0 7 7h9"/></svg>
-        Empalme
-      </button>
-      <button class="file-menu-item" onclick="closeEditarMenu(); clickTrimBtn();">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
-        Recortar
-      </button>
-      <button class="file-menu-item" onclick="closeEditarMenu(); clickExtendBtn();">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="12" x2="16" y2="12"/><polyline points="12 6 18 12 12 18"/></svg>
-        Alargar
-      </button>
-    </div>
-  </div>
-
   <div class="file-menu-wrap" id="util-menu-wrap">
     <button class="mt-btn" id="tool-util-btn" onclick="toggleUtilMenu(event)" title="Instrumento de medición — distancia, área/perímetro, ángulo, radio y volumen">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="10" rx="1.5"/><line x1="7" y1="7" x2="7" y2="11"/><line x1="11" y1="7" x2="11" y2="10"/><line x1="15" y1="7" x2="15" y2="11"/><line x1="19" y1="7" x2="19" y2="10"/></svg>
@@ -651,6 +625,13 @@ body{ display:flex; flex-direction:column; }
 <!-- ── Fila principal: barra de herramientas (izquierda) + lienzo ── -->
 <div class="main-row">
 <div class="toolbar" id="toolbar">
+  <div class="tgroup-label">Editar</div>
+  <button class="tbtn" id="tool-editar-btn" onclick="toggleEditarMenu(event)" title="Editar — copiar, offset, empalme, recortar, alargar">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    <span>Editar ▾</span>
+  </button>
+  <div class="tsep"></div>
+
   <div class="tgroup-label">Seleccionar</div>
   <button class="tbtn active" id="tool-select" onclick="setTool('select')" title="Seleccionar / Mover (V)">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l7.07 17 2.51-7.39L21 11.07z"/></svg>
@@ -705,6 +686,34 @@ body{ display:flex; flex-direction:column; }
     <span>Snap Obj</span>
   </button>
 
+</div>
+
+<!-- Menú desplegable "Editar" (position:fixed, se despliega horizontal junto a la pestaña) -->
+<div class="editar-menu-panel" id="editar-menu-panel">
+  <button class="tbtn" onclick="closeEditarMenu(); clickCopyBtn();" title="Copiar">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    <span>Copiar</span>
+  </button>
+  <button class="tbtn" onclick="closeEditarMenu(); clickOffsetBtn('offset');" title="Offset">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="7" width="10" height="10" rx="1"/><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"/></svg>
+    <span>Offset</span>
+  </button>
+  <button class="tbtn" onclick="closeEditarMenu(); clickOffsetBtn('offset-fixed');" title="Offset Fijo">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+    <span>Offset Fijo</span>
+  </button>
+  <button class="tbtn" onclick="closeEditarMenu(); setTool('fillet');" title="Empalme">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v9a7 7 0 0 0 7 7h9"/></svg>
+    <span>Empalme</span>
+  </button>
+  <button class="tbtn" onclick="closeEditarMenu(); clickTrimBtn();" title="Recortar">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+    <span>Recortar</span>
+  </button>
+  <button class="tbtn" onclick="closeEditarMenu(); clickExtendBtn();" title="Alargar">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="12" x2="16" y2="12"/><polyline points="12 6 18 12 12 18"/></svg>
+    <span>Alargar</span>
+  </button>
 </div>
 
 <!-- Menú desplegable "Arco" (position:fixed, se posiciona junto al botón al abrirse) -->
@@ -1127,9 +1136,11 @@ function pickAnotarMethod(method) { closeAnotarMenu(); setTool(method); }
 function toggleEditarMenu(e) {
   e.stopPropagation();
   const p = document.getElementById('editar-menu-panel');
-  if (p.style.display === 'block') { p.style.display = 'none'; return; }
-  p.style.display = 'block';
-  escapeTopbarClip(p);
+  if (p.style.display === 'flex') { p.style.display = 'none'; return; }
+  const btnRect = e.currentTarget.getBoundingClientRect();
+  p.style.top = btnRect.top + 'px';
+  p.style.left = (btnRect.right + 6) + 'px';
+  p.style.display = 'flex';
 }
 function closeEditarMenu() { document.getElementById('editar-menu-panel').style.display = 'none'; }
 document.addEventListener('click', () => closeEditarMenu());
