@@ -72,6 +72,13 @@
   }
   .menu-dropdown button:hover { background: #1f6feb22; }
   .menu-dropdown .key { color: #8b949e; font-size: 11px; }
+  .menubar-sep { width: 1px; height: 20px; background: #30363d; margin: 0 4px; }
+  .menubar-btn {
+    background: none; border: none; color: #c9d1d9; padding: 6px 8px; border-radius: 4px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .menubar-btn:hover:not(:disabled) { background: #21262d; color: #e6edf3; }
+  .menubar-btn:disabled { color: #484f58; cursor: default; }
 
   /* ── Layout ── */
   .workspace { flex: 1; display: flex; min-height: 0; }
@@ -138,6 +145,13 @@
       <button id="btnClearGuides">Limpiar guías</button>
     </div>
   </div>
+  <div class="menubar-sep"></div>
+  <button class="menubar-btn" id="btnUndo" title="Deshacer (Ctrl+Z)" disabled>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/></svg>
+  </button>
+  <button class="menubar-btn" id="btnRedo" title="Rehacer (Ctrl+Y)" disabled>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h1"/></svg>
+  </button>
 </div>
 
 <div class="workspace">
@@ -284,16 +298,135 @@
 
   // ───────────────────────── Model data ─────────────────────────
   // objects[]: { id, type:'line'|'guide'|'rect'|'circle'|'polyface', params:{...}, height, mesh }
+  // 'line' and 'polyface' vertices are shared NODES (see `nodes` below), so two lines (or a
+  // line and a face) that meet at the same point are actually the same point — move it once
+  // and everything referencing it updates. rect/circle/guide stay independent/parametric.
   let objects = [];
   let nextId = 1;
   let selectedObjects = [];
 
+  let nodes = new Map();   // id -> { id, x, y, z }
+  let nextNodeId = 1;
+  function createNode(v) { const n = { id: nextNodeId++, x: v.x, y: v.y, z: v.z }; nodes.set(n.id, n); return n; }
+  function nodePos(id) { const n = nodes.get(id); return new THREE.Vector3(n.x, n.y, n.z); }
+  function setNodePos(id, v) { const n = nodes.get(id); n.x = v.x; n.y = v.y; n.z = v.z; }
+
+  // Every 'line'/'polyface' object that references node `id` — used to cascade a move.
+  function objectsUsingNode(id) {
+    return objects.filter(o => (o.type === 'line' || o.type === 'polyface') && o.params.nodeIds.includes(id));
+  }
+  function nodeMoved(id) { objectsUsingNode(id).forEach(rebuildMesh); }
+
+  function pruneOrphanNodes() {
+    const used = new Set();
+    objects.forEach(o => {
+      if (o.type === 'line' || o.type === 'polyface') o.params.nodeIds.forEach(id => used.add(id));
+      // A polyface's top-edge nodes stay alive even if every line using them was erased —
+      // they're still needed to keep tracking the solid's top surface (see spawnPolyfaceTopEdges).
+      if (o.type === 'polyface' && o.params.topNodeIds) o.params.topNodeIds.forEach(id => used.add(id));
+    });
+    Array.from(nodes.keys()).forEach(id => { if (!used.has(id)) nodes.delete(id); });
+  }
+
+  // A "derived" node is a polyface's top-edge node (see spawnPolyfaceTopEdges): its position
+  // is always kept in lockstep with the solid's actual top surface (base node + height), never
+  // dragged independently — the solid mesh itself is still a straight extrusion of the base
+  // loop, so letting the Move tool grab a top node on its own would desync the edge lines from
+  // the solid they sit on.
+  function isDerivedNode(id) {
+    return objects.some(o => o.type === 'polyface' && o.params.topNodeIds && o.params.topNodeIds.includes(id));
+  }
+
+  // ───────────────────────── Undo / Redo ─────────────────────────
+  // Whole-state snapshots (not per-action inverse operations) — simplest thing that's
+  // actually correct given how tangled the shared-node graph can get (a single wall push can
+  // touch a face, its perimeter lines, and its top-edge lines all at once). Object ids and
+  // node ids are preserved across a snapshot so undo/redo doesn't disturb identity/selection
+  // any more than necessary.
+  const UNDO_LIMIT = 50;
+  let undoStack = [];
+  let redoStack = [];
+  let pendingUndoSnapshot = null; // captured at grab time for a drag (move/extrude), pushed only on real commit
+
+  function snapshotState() {
+    return {
+      nextId, nextNodeId,
+      nodes: Array.from(nodes.values()).map(n => ({ ...n })),
+      objects: objects.map(o => ({ id: o.id, type: o.type, params: JSON.parse(JSON.stringify(o.params)), height: o.height })),
+    };
+  }
+
+  function restoreState(snap) {
+    objects.forEach(o => { scene.remove(o.mesh); disposeMesh(o.mesh); });
+    objects = [];
+    selectedObjects = [];
+    nodes = new Map();
+    snap.nodes.forEach(n => nodes.set(n.id, { ...n }));
+    nextNodeId = snap.nextNodeId;
+    snap.objects.forEach(o => {
+      const obj = { id: o.id, type: o.type, params: o.params, height: o.height || 0 };
+      obj.mesh = meshFor(obj);
+      obj.mesh.userData.objRef = obj;
+      scene.add(obj.mesh);
+      obj.mesh.updateMatrixWorld(true);
+      applyColor(obj);
+      objects.push(obj);
+    });
+    nextId = snap.nextId;
+    updateStatusCount();
+  }
+
+  function updateUndoRedoButtons() {
+    btnUndo.disabled = undoStack.length === 0;
+    btnRedo.disabled = redoStack.length === 0;
+  }
+
+  // Call BEFORE a mutation that commits in one shot (drawing a segment, adding a rect, an
+  // erase, etc.) — captures the state to go back to if the user undoes this action.
+  function pushUndo() {
+    undoStack.push(snapshotState());
+    if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+    redoStack = [];
+    updateUndoRedoButtons();
+  }
+
+  // Pushes the snapshot captured at grab time for a drag-based action (Move/Extrude) — used
+  // instead of pushUndo() there because the "before" state has to be captured before the live
+  // preview starts mutating things, but should only land on the stack if the drag is actually
+  // committed (not if it's cancelled — see cancelDraw, which discards pendingUndoSnapshot).
+  function commitPendingUndo() {
+    if (!pendingUndoSnapshot) return;
+    undoStack.push(pendingUndoSnapshot);
+    if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+    redoStack = [];
+    pendingUndoSnapshot = null;
+    updateUndoRedoButtons();
+  }
+
+  function doUndo() {
+    if (!undoStack.length) return;
+    cancelDraw(); // abandon any in-progress draw/drag before jumping to a different state
+    redoStack.push(snapshotState());
+    restoreState(undoStack.pop());
+    updateUndoRedoButtons();
+  }
+
+  function doRedo() {
+    if (!redoStack.length) return;
+    cancelDraw();
+    undoStack.push(snapshotState());
+    restoreState(redoStack.pop());
+    updateUndoRedoButtons();
+  }
+
   const COLOR_DEFAULT = 0x58a6ff;
   const COLOR_SELECTED = 0xf0b429;
   const GUIDE_COLOR_DEFAULT = 0x8b949e; // muted gray, reads as "reference", not real geometry
+  const LINE_COLOR_DEFAULT = 0xffffff;  // white vector lines read clearly on the dark background
+  const TYPE_DEFAULT_COLOR = { guide: GUIDE_COLOR_DEFAULT, line: LINE_COLOR_DEFAULT };
 
   function applyColor(obj) {
-    const base = obj.type === 'guide' ? GUIDE_COLOR_DEFAULT : COLOR_DEFAULT;
+    const base = TYPE_DEFAULT_COLOR[obj.type] || COLOR_DEFAULT;
     const c = selectedObjects.includes(obj) ? COLOR_SELECTED : base;
     obj.mesh.traverse(n => { if (n.material && n.material.color && !n.userData.isEdgeOverlay) n.material.color.setHex(c); });
   }
@@ -317,39 +450,36 @@
     mesh.add(edges);
   }
 
-  function buildLineMesh(a, b) {
+  // Shared by Line and Guide: an invisible cylinder gives reliable, generous-radius
+  // raycasting/picking (a true zero-width THREE.Line is hard to click precisely), while the
+  // actual visible line is a real vector line (no 3D thickness) riding on top of it, with
+  // raycasting disabled so it never competes with the pickable cylinder for the same hit.
+  const EDGE_PICK_RADIUS = 0.045;
+  function buildEdgeMesh(a, b, lineMaterial) {
     const dir = new THREE.Vector3().subVectors(b, a);
     const len = dir.length() || 0.001;
-    const geo = new THREE.CylinderGeometry(0.035, 0.035, len, 8);
+    const geo = new THREE.CylinderGeometry(EDGE_PICK_RADIUS, EDGE_PICK_RADIUS, len, 6);
     geo.translate(0, len/2, 0);
-    const mat = new THREE.MeshStandardMaterial({ color: COLOR_DEFAULT });
-    const mesh = new THREE.Mesh(geo, mat);
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ visible: false }));
     mesh.position.copy(a);
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+
+    const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,len,0)]);
+    const visLine = new THREE.Line(lineGeo, lineMaterial);
+    if (lineMaterial.isLineDashedMaterial) visLine.computeLineDistances();
+    visLine.raycast = () => {};
+    mesh.add(visLine);
     return mesh;
   }
 
-  // Reference/guide line ("cinta métrica"): a dashed line other tools can still snap to
-  // (via objectVertices/resolveGeometrySnap) but that's excluded from extrude and never
-  // forms a face. Picking uses an invisible cylinder (reliable raycasting, like buildLineMesh)
-  // with the visible dashed THREE.Line as a non-raycasting child on top of it.
-  function buildGuideMesh(a, b) {
-    const dir = new THREE.Vector3().subVectors(b, a);
-    const len = dir.length() || 0.001;
-    const geo = new THREE.CylinderGeometry(0.05, 0.05, len, 6);
-    geo.translate(0, len/2, 0);
-    const mat = new THREE.MeshBasicMaterial({ visible: false });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.copy(a);
-    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+  function buildLineMesh(a, b) {
+    return buildEdgeMesh(a, b, new THREE.LineBasicMaterial({ color: LINE_COLOR_DEFAULT }));
+  }
 
-    const dashGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,len,0)]);
-    const dashMat = new THREE.LineDashedMaterial({ color: GUIDE_COLOR_DEFAULT, dashSize: 0.25, gapSize: 0.18 });
-    const dashedLine = new THREE.Line(dashGeo, dashMat);
-    dashedLine.computeLineDistances();
-    dashedLine.raycast = () => {};
-    mesh.add(dashedLine);
-    return mesh;
+  // Reference/guide line ("cinta métrica"): other tools can still snap to it (via
+  // objectVertices/resolveGeometrySnap) but it's excluded from extrude and never forms a face.
+  function buildGuideMesh(a, b) {
+    return buildEdgeMesh(a, b, new THREE.LineDashedMaterial({ color: GUIDE_COLOR_DEFAULT, dashSize: 0.25, gapSize: 0.18 }));
   }
 
   function buildRectMesh(x1, z1, x2, z2, height, baseY) {
@@ -425,6 +555,13 @@
     return b.x.clone().multiplyScalar(du).add(b.y.clone().multiplyScalar(dv));
   }
 
+  // A polyface's current 2D (u,v) outline, resolved live from its shared nodes — never
+  // cached, so moving a node is automatically reflected next render.
+  function polyfacePoints2D(face) {
+    const orientation = face.params.orientation || 'xz';
+    return face.params.nodeIds.map(id => polyfaceTo2D(orientation, nodePos(id)));
+  }
+
   // Figures out which of the 3 axis-aligned planes a just-closed line chain lies in —
   // 'xz' (horizontal floor), 'zy' or 'xy' (a vertical wall, reached by drawing with the
   // blue-axis lock). Returns null if the loop isn't flat in any of them (e.g. drawn off
@@ -460,11 +597,11 @@
   }
 
   function meshFor(obj) {
-    if (obj.type === 'line') return buildLineMesh(new THREE.Vector3(...obj.params.a), new THREE.Vector3(...obj.params.b));
+    if (obj.type === 'line') return buildLineMesh(nodePos(obj.params.nodeIds[0]), nodePos(obj.params.nodeIds[1]));
     if (obj.type === 'guide') return buildGuideMesh(new THREE.Vector3(...obj.params.a), new THREE.Vector3(...obj.params.b));
     if (obj.type === 'rect') return buildRectMesh(obj.params.x1, obj.params.z1, obj.params.x2, obj.params.z2, obj.height, obj.params.baseY);
     if (obj.type === 'circle') return buildCircleMesh(obj.params.cx, obj.params.cz, obj.params.radius, obj.height, obj.params.baseY);
-    if (obj.type === 'polyface') return buildPolyfaceMesh(obj.params.points, obj.height, obj.params.orientation, obj.params.base);
+    if (obj.type === 'polyface') return buildPolyfaceMesh(polyfacePoints2D(obj), obj.height, obj.params.orientation, obj.params.base);
   }
 
   function addObject(type, params, height) {
@@ -488,11 +625,28 @@
     applyColor(obj);
   }
 
+  // Every polyface whose BASE boundary loop uses (nodeIdA, nodeIdB) as one of its actual
+  // edges (adjacent in the loop) — i.e. the fill(s) that would lose part of their perimeter
+  // if this specific edge line were deleted. Deliberately checks only the base loop, not a
+  // solid's derived top/vertical edges (spawnPolyfaceTopEdges) — those are cosmetic tracing,
+  // not part of what defines the fill's shape, so erasing one shouldn't take the solid with it.
+  function facesUsingEdge(nodeIdA, nodeIdB) {
+    return objects.filter(o => o.type === 'polyface' && areAdjacentInLoop(o.params.nodeIds, nodeIdA, nodeIdB));
+  }
+
   function removeObject(obj) {
+    if (!objects.includes(obj)) return; // already gone (e.g. cascaded away with its fill already)
+    if (obj.type === 'line') {
+      // SketchUp-style: erasing an edge that bounds a face takes the face's fill with it,
+      // but leaves the face's other edges standing (now bounding nothing).
+      const [a, b] = obj.params.nodeIds;
+      facesUsingEdge(a, b).forEach(removeObject);
+    }
     scene.remove(obj.mesh);
     disposeMesh(obj.mesh);
     objects = objects.filter(o => o !== obj);
     selectedObjects = selectedObjects.filter(o => o !== obj);
+    pruneOrphanNodes();
     updateStatusCount();
   }
 
@@ -500,6 +654,7 @@
     objects.forEach(o => { scene.remove(o.mesh); disposeMesh(o.mesh); });
     objects = [];
     selectedObjects = [];
+    nodes = new Map();
     updateStatusCount();
   }
 
@@ -574,7 +729,7 @@
       }
     }
     if (obj.type === 'polyface') {
-      const pts = obj.params.points;
+      const pts = polyfacePoints2D(obj);
       const orientation = obj.params.orientation || 'xz';
       const faceBase = obj.params.base || 0;
       if (faceKind === 'top') {
@@ -614,6 +769,8 @@
   const statusToolEl = document.getElementById('statusTool');
   const statusCoordsEl = document.getElementById('statusCoords');
   const statusCountEl = document.getElementById('statusCount');
+  const btnUndo = document.getElementById('btnUndo');
+  const btnRedo = document.getElementById('btnRedo');
 
   const TOOL_HINTS = {
     select: 'Haz clic sobre una figura para seleccionarla.',
@@ -659,32 +816,50 @@
 
   function groundPoint(clientX, clientY) { return planePoint(clientX, clientY, 0); }
 
-  function pickObject(clientX, clientY) {
-    const rect = renderer.domElement.getBoundingClientRect();
-    mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-    mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-    raycaster.setFromCamera(mouseNDC, camera);
-    const meshes = objects.map(o => o.mesh);
-    const hits = raycaster.intersectObjects(meshes, true);
-    if (!hits.length) return null;
-    let n = hits[0].object;
+  function objRefOf(hit) {
+    let n = hit.object;
     while (n && !n.userData.objRef) n = n.parent;
     return n ? n.userData.objRef : null;
   }
 
-  // Like pickObject, but also returns which face was hit (for per-face push/pull).
-  function pickObjectWithFace(clientX, clientY) {
+  function raycastAll(clientX, clientY) {
     const rect = renderer.domElement.getBoundingClientRect();
     mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
     mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(mouseNDC, camera);
-    const meshes = objects.map(o => o.mesh);
-    const hits = raycaster.intersectObjects(meshes, true);
+    return raycaster.intersectObjects(objects.map(o => o.mesh), true);
+  }
+
+  // A kept perimeter line/guide sits flush on its face's own edge once that face has real
+  // volume (extruded), so the two compete for the same ray hit almost exactly at tie. Since
+  // clicking a thin edge is usually the more deliberate/precise action, prefer a line/guide
+  // hit that's about as close as the closest hit, rather than blindly trusting hits[0].
+  const COINCIDENT_HIT_EPS = 0.05;
+  function pickObject(clientX, clientY) {
+    const hits = raycastAll(clientX, clientY);
     if (!hits.length) return null;
-    let n = hits[0].object;
-    while (n && !n.userData.objRef) n = n.parent;
-    if (!n) return null;
-    return { obj: n.userData.objRef, normal: hits[0].face ? hits[0].face.normal.clone() : null, point: hits[0].point.clone() };
+    const closestDist = hits[0].distance;
+    const edgeHit = hits.find(h => {
+      const ref = objRefOf(h);
+      return ref && (ref.type === 'line' || ref.type === 'guide') && h.distance <= closestDist + COINCIDENT_HIT_EPS;
+    });
+    return objRefOf(edgeHit || hits[0]);
+  }
+
+  // Like pickObject, but also returns which face was hit (for per-face push/pull). Extrude
+  // can never act on a line/guide, so here it's the opposite preference: skip past one if
+  // an actual face/solid was also hit, so pushing a face doesn't get blocked by its own
+  // kept perimeter edge sitting on top of it.
+  function pickObjectWithFace(clientX, clientY) {
+    const hits = raycastAll(clientX, clientY);
+    if (!hits.length) return null;
+    const faceHit = hits.find(h => {
+      const ref = objRefOf(h);
+      return ref && ref.type !== 'line' && ref.type !== 'guide';
+    }) || hits[0];
+    const obj = objRefOf(faceHit);
+    if (!obj) return null;
+    return { obj, normal: faceHit.face ? faceHit.face.normal.clone() : null, point: faceHit.point.clone() };
   }
 
   // World-space outward normal for a given face kind (used to read the true push/pull
@@ -804,7 +979,7 @@
       const alongNormal = polyfaceNormalCoord(orientation, hitPoint);
       const faceCapDist = Math.min(Math.abs(alongNormal - (base + obj.height)), Math.abs(alongNormal - base));
       const [hu, hv] = polyfaceTo2D(orientation, hitPoint);
-      const pts = obj.params.points;
+      const pts = polyfacePoints2D(obj);
       let bestIdx = 0, bestDist = Infinity;
       for (let k = 0; k < pts.length; k++) {
         const a = pts[k], b = pts[(k + 1) % pts.length];
@@ -846,15 +1021,69 @@
     obj.params[field] = sign > 0 ? Math.max(newValue, otherValue + MIN_FACE_SIZE) : Math.min(newValue, otherValue - MIN_FACE_SIZE);
   }
 
+  // The first time a polyface actually gains volume, spawn real, independent, erasable
+  // 'line' objects for its top perimeter and its vertical edges — before this, extruding a
+  // shape only drew a cosmetic (unpickable) EdgesGeometry outline baked into the solid mesh,
+  // so the user had no way to select/erase just one edge of the resulting box. Each top
+  // corner gets its own real shared node (topNodeIds, parallel to the base nodeIds), kept in
+  // lockstep with the solid's actual top surface by refreshExtrudePreview on every later
+  // height/wall push — see isDerivedNode for why these nodes can't be dragged independently.
+  function spawnPolyfaceTopEdges(face) {
+    const orientation = face.params.orientation || 'xz';
+    const topOffset = (face.params.base || 0) + face.height;
+    const baseIds = face.params.nodeIds;
+    const topNodeIds = baseIds.map(id => {
+      const [u, v] = polyfaceTo2D(orientation, nodePos(id));
+      return createNode(polyfaceTo3D(orientation, topOffset, u, v)).id;
+    });
+    face.params.topNodeIds = topNodeIds;
+    const n = topNodeIds.length;
+    for (let i = 0; i < n; i++) {
+      addObject('line', { nodeIds: [topNodeIds[i], topNodeIds[(i + 1) % n]] }); // top perimeter
+      addObject('line', { nodeIds: [baseIds[i], topNodeIds[i]] }); // vertical edge
+    }
+  }
+
+  // Snapshot of a polyface's node positions (base, plus top-edge nodes if it has them) for
+  // Escape-revert during a push/pull drag.
+  function snapshotPolyfaceNodes(face, topOnly) {
+    const list = [];
+    if (!topOnly) face.params.nodeIds.forEach(id => list.push({ id, pos: nodePos(id) }));
+    if (face.params.topNodeIds) face.params.topNodeIds.forEach(id => list.push({ id, pos: nodePos(id) }));
+    return list;
+  }
+
   // Applies the current push/pull (from the live cursor, or the typed VCB value if any),
   // rebuilds the mesh, and keeps the face highlight tracking the exact face being pushed.
   function refreshExtrudePreview(clientX, clientY) {
     if (currentTool !== 'extrude' || !extrudeObj) return;
     const delta = typedValue !== '' ? (parseFloat(typedValue) || 0) : computePushDelta(extrudeHitPoint, extrudeWorldNormal, clientX, clientY);
+    const orientation = extrudeObj.params.orientation || 'xz';
+    const base = extrudeObj.params.base || 0;
     if (extrudeWallIndex !== null) {
-      extrudeObj.params.points = offsetPolygonEdge(extrudeBasePoints, extrudeWallIndex, delta);
+      const newPts = offsetPolygonEdge(extrudeBasePoints, extrudeWallIndex, delta);
+      const nodeIds = extrudeObj.params.nodeIds;
+      newPts.forEach((p, idx) => setNodePos(nodeIds[idx], polyfaceTo3D(orientation, base, p[0], p[1])));
+      nodeIds.forEach(id => nodeMoved(id));
+      if (extrudeObj.params.topNodeIds) {
+        // Keep the top-edge nodes tracking the same (u,v) as their base counterparts, at the
+        // solid's top offset, so the top perimeter/vertical edge lines stay glued to the wall.
+        const topOffset = base + extrudeObj.height;
+        newPts.forEach((p, idx) => setNodePos(extrudeObj.params.topNodeIds[idx], polyfaceTo3D(orientation, topOffset, p[0], p[1])));
+        extrudeObj.params.topNodeIds.forEach(id => nodeMoved(id));
+      }
     } else {
       applyFaceDrag(extrudeObj, extrudeField, extrudeSign, extrudeBaseValue, delta);
+      if (extrudeObj.type === 'polyface' && extrudeObj.params.topNodeIds) {
+        // A top push changes only the offset-along-normal component of each top node — same
+        // (u,v) as its base counterpart, new offset = base + the just-updated height.
+        const topOffset = base + extrudeObj.height;
+        extrudeObj.params.nodeIds.forEach((baseId, idx) => {
+          const [u, v] = polyfaceTo2D(orientation, nodePos(baseId));
+          setNodePos(extrudeObj.params.topNodeIds[idx], polyfaceTo3D(orientation, topOffset, u, v));
+        });
+        extrudeObj.params.topNodeIds.forEach(id => nodeMoved(id));
+      }
     }
     rebuildMesh(extrudeObj);
     selectObject(extrudeObj);
@@ -865,10 +1094,15 @@
   }
 
   function endExtrudeDrag() {
+    if (extrudeObj && extrudeObj.type === 'polyface' && extrudeObj.height > 0 && !extrudeObj.params.topNodeIds) {
+      spawnPolyfaceTopEdges(extrudeObj);
+    }
+    commitPendingUndo();
     extrudeObj = null;
     extrudeSnapshotParams = null;
     extrudeWallIndex = null;
     extrudeBasePoints = null;
+    extrudeNodeSnapshot = null;
     extrudeFaceKind = null;
     extrudeHitPoint = null;
     extrudeWorldNormal = null;
@@ -952,8 +1186,8 @@
     };
     const matches = objects.filter(o => {
       if (o.type === 'line' || o.type === 'guide') {
-        const a = projectToScreen(new THREE.Vector3(...o.params.a), canvasRect);
-        const b = projectToScreen(new THREE.Vector3(...o.params.b), canvasRect);
+        const [pa, pb] = lineEndpoints(o);
+        const a = projectToScreen(pa, canvasRect), b = projectToScreen(pb, canvasRect);
         return segmentIntersectsRect(a, b, dragBox);
       }
       return rectsIntersect(screenBoundsOf(o, canvasRect), dragBox);
@@ -974,6 +1208,25 @@
     return Math.hypot((clientX - canvasRect.left) - s.x, (clientY - canvasRect.top) - s.y);
   }
 
+  // Nearest real shared node to the cursor (screen-space), for the Move tool's node-drag
+  // priority — checked against every node regardless of which object(s) reference it.
+  function findNearestNode(clientX, clientY) {
+    let best = null;
+    nodes.forEach((n, id) => {
+      if (isDerivedNode(id)) return; // a top-edge node moves only as part of its whole solid
+      const d = screenDistToPoint(clientX, clientY, nodePos(id));
+      if (d <= SNAP_PIXEL_RADIUS && (!best || d < best.d)) best = { id, d };
+    });
+    return best ? best.id : null;
+  }
+
+  // The two world-space endpoints of a 'line' (via its shared nodes) or 'guide' (via its
+  // own stored coords) — the two types that midpoint/on-edge snapping applies to.
+  function lineEndpoints(o) {
+    if (o.type === 'line') return [nodePos(o.params.nodeIds[0]), nodePos(o.params.nodeIds[1])];
+    return [new THREE.Vector3(...o.params.a), new THREE.Vector3(...o.params.b)];
+  }
+
   function closestPointOnSegment(p, a, b) {
     const ab = new THREE.Vector3().subVectors(b, a);
     const lenSq = ab.lengthSq();
@@ -982,11 +1235,14 @@
     return a.clone().addScaledVector(ab, t);
   }
 
-  // Every vertex of an object worth snapping to — for a line that's just its two endpoints;
-  // for a solid it's every corner at its base AND (if extruded) at its top, so a line can
-  // connect down to the ground or up to any corner of a box/face, same as SketchUp.
+  // Every vertex of an object worth snapping to, as { point, nodeId } — nodeId is the real
+  // shared node to reuse when a new line/face is drawn onto it (null for a synthesized
+  // vertex, e.g. rect/circle corners, or a solid's top layer, which don't correspond to a
+  // single stored node). For a solid this is every corner at its base AND (if extruded) at
+  // its top, so a line can connect down to the ground or up to any corner, same as SketchUp.
   function objectVertices(o) {
-    if (o.type === 'line' || o.type === 'guide') return [new THREE.Vector3(...o.params.a), new THREE.Vector3(...o.params.b)];
+    if (o.type === 'line') return o.params.nodeIds.map(id => ({ point: nodePos(id), nodeId: id }));
+    if (o.type === 'guide') return [{ point: new THREE.Vector3(...o.params.a), nodeId: null }, { point: new THREE.Vector3(...o.params.b), nodeId: null }];
     const baseY = o.params.baseY || 0;
     const ys = o.height > 0 ? [baseY, baseY + o.height] : [baseY];
     if (o.type === 'rect') {
@@ -996,15 +1252,23 @@
         new THREE.Vector3(x1, y, z1), new THREE.Vector3(x1, y, z2),
         new THREE.Vector3(x2, y, z1), new THREE.Vector3(x2, y, z2)
       ));
-      return pts;
+      return pts.map(point => ({ point, nodeId: null }));
     }
-    if (o.type === 'circle') return ys.map(y => new THREE.Vector3(o.params.cx, y, o.params.cz));
+    if (o.type === 'circle') return ys.map(y => ({ point: new THREE.Vector3(o.params.cx, y, o.params.cz), nodeId: null }));
     if (o.type === 'polyface') {
       const orientation = o.params.orientation || 'xz';
       const base = o.params.base || 0;
-      const offsets = o.height > 0 ? [base, base + o.height] : [base];
       const pts = [];
-      offsets.forEach(off => o.params.points.forEach(p => pts.push(polyfaceTo3D(orientation, off, p[0], p[1]))));
+      o.params.nodeIds.forEach(id => pts.push({ point: nodePos(id), nodeId: id }));
+      if (o.height > 0) {
+        if (o.params.topNodeIds) {
+          // Real top-edge nodes exist (spawnPolyfaceTopEdges already ran) — reuse them so a
+          // new line snapped onto a box's top corner shares the same point, not a duplicate.
+          o.params.topNodeIds.forEach(id => pts.push({ point: nodePos(id), nodeId: id }));
+        } else {
+          o.params.nodeIds.forEach(id => pts.push({ point: polyfaceTo3D(orientation, base + o.height, ...polyfaceTo2D(orientation, nodePos(id))), nodeId: null }));
+        }
+      }
       return pts;
     }
     return [];
@@ -1014,30 +1278,30 @@
   function resolveGeometrySnap(rawPoint, clientX, clientY) {
     let best = null;
     objects.forEach(o => {
-      objectVertices(o).forEach(v => {
-        const d = screenDistToPoint(clientX, clientY, v);
-        if (d <= SNAP_PIXEL_RADIUS && (!best || d < best.d)) best = { point: v, d, kind: 'endpoint' };
+      objectVertices(o).forEach(({ point, nodeId }) => {
+        const d = screenDistToPoint(clientX, clientY, point);
+        if (d <= SNAP_PIXEL_RADIUS && (!best || d < best.d)) best = { point, d, kind: 'endpoint', nodeId };
       });
     });
-    if (best) return { point: best.point.clone(), kind: best.kind };
+    if (best) return { point: best.point.clone(), kind: best.kind, nodeId: best.nodeId };
 
     objects.forEach(o => {
       if (o.type !== 'line' && o.type !== 'guide') return;
-      const a = new THREE.Vector3(...o.params.a), b = new THREE.Vector3(...o.params.b);
+      const [a, b] = lineEndpoints(o);
       const mid = a.clone().add(b).multiplyScalar(0.5);
       const d = screenDistToPoint(clientX, clientY, mid);
-      if (d <= SNAP_PIXEL_RADIUS && (!best || d < best.d)) best = { point: mid, d, kind: 'midpoint' };
+      if (d <= SNAP_PIXEL_RADIUS && (!best || d < best.d)) best = { point: mid, d, kind: 'midpoint', nodeId: null };
     });
-    if (best) return { point: best.point.clone(), kind: best.kind };
+    if (best) return { point: best.point.clone(), kind: best.kind, nodeId: best.nodeId };
 
     objects.forEach(o => {
       if (o.type !== 'line' && o.type !== 'guide') return;
-      const a = new THREE.Vector3(...o.params.a), b = new THREE.Vector3(...o.params.b);
+      const [a, b] = lineEndpoints(o);
       const cp = closestPointOnSegment(rawPoint, a, b);
       const d = screenDistToPoint(clientX, clientY, cp);
-      if (d <= SNAP_PIXEL_RADIUS && (!best || d < best.d)) best = { point: cp, d, kind: 'onedge' };
+      if (d <= SNAP_PIXEL_RADIUS && (!best || d < best.d)) best = { point: cp, d, kind: 'onedge', nodeId: null };
     });
-    if (best) return { point: best.point.clone(), kind: best.kind };
+    if (best) return { point: best.point.clone(), kind: best.kind, nodeId: best.nodeId };
 
     return null;
   }
@@ -1058,6 +1322,7 @@
   // draw state
   let drawStage = 0;       // 0 = idle, 1 = first point placed
   let drawStart = null;    // THREE.Vector3
+  let drawStartNodeId = null; // shared node id backing drawStart, for the line tool
   let previewMesh = null;
   let extrudeObj = null;
   let extrudeFaceKind = null;   // 'top' | 'radius' | 'x+' | 'x-' | 'z+' | 'z-' | 'wallN' — for the live highlight
@@ -1067,20 +1332,27 @@
   let extrudeSign = 1;
   let extrudeBaseValue = 0;
   let extrudeWallIndex = null;  // set instead of extrudeField when pushing one wall of a polyface
-  let extrudeBasePoints = null; // snapshot of polyface points at drag start, for extrudeWallIndex
+  let extrudeBasePoints = null; // snapshot of polyface 2D points at drag start, for offsetPolygonEdge's math
+  let extrudeNodeSnapshot = null; // [{id, pos}] snapshot of the face's nodes at drag start, for Escape-revert
   let extrudeSnapshotHeight = 0;   // full pre-grab snapshot, restored if the grab is cancelled (Escape)
   let extrudeSnapshotParams = null;
   let chainOrigin = null;  // first vertex of the active line chain (for auto-close detection)
   let chainPoints = [];    // vertices placed so far in the active chain, in order
+  let chainNodeIds = [];   // node ids placed so far in the active chain, parallel to chainPoints
   let chainLineObjs = [];  // the 'line' objects created for the active chain's segments
   let moveObj = null;
   let moveAnchor = null;      // THREE.Vector3 — world point clicked at drag start
   let moveBaseParams = null;  // deep clone of obj.params at drag start, translated fresh each move
+  let moveNodeId = null;         // set instead of moveObj when dragging a single shared node
+  let moveNodeOriginalPos = null; // that node's position at grab start, for Escape-revert
+  let moveNodeBase = null;       // [{id, pos}] snapshot when dragging a whole line/polyface's nodes together
 
-  // Rewrites obj.params (from a snapshot) shifted by (dx,dy,dz) — used by the Move tool.
+  // Rewrites obj.params (from a snapshot) shifted by (dx,dy,dz) — used by the Move tool for
+  // the independent/parametric types. 'line' and 'polyface' move via their shared nodes
+  // instead (see the Move tool's node-drag / whole-edge-drag branches), not through here.
   function translatedParams(type, baseParams, dx, dy, dz) {
     const p = JSON.parse(JSON.stringify(baseParams));
-    if (type === 'line' || type === 'guide') {
+    if (type === 'guide') {
       p.a = [p.a[0] + dx, p.a[1] + dy, p.a[2] + dz];
       p.b = [p.b[0] + dx, p.b[1] + dy, p.b[2] + dz];
     } else if (type === 'rect') {
@@ -1089,11 +1361,6 @@
     } else if (type === 'circle') {
       p.cx += dx; p.cz += dz;
       p.baseY = (p.baseY || 0) + dy;
-    } else if (type === 'polyface') {
-      const orientation = p.orientation || 'xz';
-      const [du, dv] = polyfaceTo2D(orientation, new THREE.Vector3(dx, dy, dz));
-      p.points = p.points.map(pt => [pt[0] + du, pt[1] + dv]);
-      p.base = (p.base || 0) + polyfaceNormalCoord(orientation, new THREE.Vector3(dx, dy, dz));
     }
     return p;
   }
@@ -1103,6 +1370,7 @@
   // (snap or axis-lock) is currently showing, instead of wherever the mouse happens to be.
   let typedValue = '';
   let lastLineEndPoint = null;
+  let lastLineEndNodeId = null; // shared node id backing lastLineEndPoint, if it's an exact snap
   let guideChainStart = null; // anchor for the Guide tool's current segment (continues like Line)
   let lastGuideEndPoint = null;
 
@@ -1150,6 +1418,7 @@
 
   function commitOffset() {
     if (offsetSourceObj && lastOffsetVec) {
+      pushUndo();
       const newA = offsetBaseA.clone().add(lastOffsetVec), newB = offsetBaseB.clone().add(lastOffsetVec);
       addObject('guide', { a: [newA.x, newA.y, newA.z], b: [newB.x, newB.y, newB.z] });
     }
@@ -1162,11 +1431,12 @@
   function resolveDirectedEndpoint(anchor, clientX, clientY) {
     const raw = groundPoint(clientX, clientY) || anchor.clone();
     const geomSnap = resolveGeometrySnap(raw, clientX, clientY);
-    let endPoint, color, label;
+    let endPoint, color, label, nodeId = null;
     if (geomSnap) {
       endPoint = geomSnap.point;
       color = geomSnap.kind === 'endpoint' ? SNAP_COLOR_ENDPOINT : geomSnap.kind === 'midpoint' ? SNAP_COLOR_MIDPOINT : SNAP_COLOR_ONEDGE;
       label = SNAP_LABEL[geomSnap.kind];
+      nodeId = geomSnap.nodeId;
     } else {
       const axisSnap = resolveAxisSnap(anchor, clientX, clientY);
       if (axisSnap) {
@@ -1180,31 +1450,70 @@
     if (direction.lengthSq() > 1e-9) direction.normalize(); else direction.set(1, 0, 0);
     if (typedValue) {
       const len = parseFloat(typedValue);
-      if (!isNaN(len)) endPoint = anchor.clone().addScaledVector(direction, len);
+      // A typed exact length no longer lands exactly on whatever was snapped (the direction
+      // is kept, but the distance is overridden), so it's not the same point as that node.
+      if (!isNaN(len)) { endPoint = anchor.clone().addScaledVector(direction, len); nodeId = null; }
     }
-    return { point: endPoint, color, label, snapped: !!geomSnap };
+    return { point: endPoint, color, label, snapped: !!geomSnap, nodeId };
   }
 
   function resolveLineEndpoint(clientX, clientY) { return resolveDirectedEndpoint(drawStart, clientX, clientY); }
 
-  function commitLineSegment(finalPt) {
-    const segment = addObject('line', { a: [drawStart.x, drawStart.y, drawStart.z], b: [finalPt.x, finalPt.y, finalPt.z] });
+  // Face splitting: drawing a line between two points that already sit on the same face's
+  // perimeter cuts that face into two along the new line, instead of just adding a stray
+  // edge on top of it. Scoped deliberately narrow (confirmed with the user): only this
+  // exact "line between two existing border nodes" case, not general interior-line clipping.
+  function areAdjacentInLoop(loop, a, b) {
+    const n = loop.length;
+    for (let i = 0; i < n; i++) {
+      const cur = loop[i], next = loop[(i + 1) % n];
+      if ((cur === a && next === b) || (cur === b && next === a)) return true;
+    }
+    return false;
+  }
+  function findSplittableFace(nA, nB) {
+    return objects.find(o => o.type === 'polyface' &&
+      o.params.nodeIds.includes(nA) && o.params.nodeIds.includes(nB) &&
+      !areAdjacentInLoop(o.params.nodeIds, nA, nB));
+  }
+  function splitFace(face, nA, nB) {
+    const loop = face.params.nodeIds;
+    const i = loop.indexOf(nA), j = loop.indexOf(nB);
+    const [lo, hi] = i < j ? [i, j] : [j, i];
+    const loopA = loop.slice(lo, hi + 1);
+    const loopB = loop.slice(hi).concat(loop.slice(0, lo + 1));
+    addObject('polyface', { nodeIds: loopA, orientation: face.params.orientation, base: face.params.base }, face.height);
+    addObject('polyface', { nodeIds: loopB, orientation: face.params.orientation, base: face.params.base }, face.height);
+    removeObject(face);
+  }
+  function checkFaceSplit(nA, nB) {
+    if (nA == null || nB == null || nA === nB) return;
+    const face = findSplittableFace(nA, nB);
+    if (face) splitFace(face, nA, nB);
+  }
+
+  function commitLineSegment(finalPt, finalNodeId) {
+    pushUndo();
+    const endNodeId = (finalNodeId != null) ? finalNodeId : createNode(finalPt).id;
+    const segment = addObject('line', { nodeIds: [drawStartNodeId, endNodeId] });
     chainLineObjs.push(segment);
+    checkFaceSplit(drawStartNodeId, endNodeId);
     const closesLoop = chainOrigin && finalPt.distanceTo(chainOrigin) < 1e-6 && chainPoints.length >= 3;
     if (closesLoop) {
       const planar = detectPolygonOrientation(chainPoints);
       if (planar) {
-        addObject('polyface', { points: planar.points, orientation: planar.orientation, base: planar.base }, 0);
-        // The polyface's own edges (attachEdges) already draw this outline, and once a wall
-        // gets pushed independently the old chain segments would desync from it — drop them.
-        chainLineObjs.forEach(o => removeObject(o));
+        // The perimeter lines just committed (chainLineObjs) already reference these same
+        // nodes, so they stay glued to the face automatically — no manual sync needed.
+        addObject('polyface', { nodeIds: chainNodeIds.slice(), orientation: planar.orientation, base: planar.base }, 0);
       }
       // If it's not flat in a red/green or blue-axis plane, leave the drawn lines as-is
       // rather than collapsing them into a broken face.
       cancelDraw();
     } else {
       chainPoints.push(finalPt.clone());
+      chainNodeIds.push(endNodeId);
       drawStart = finalPt.clone(); // chain to next segment
+      drawStartNodeId = endNodeId;
       clearPreview();
       hideSnapMarker();
       typedValue = '';
@@ -1221,18 +1530,20 @@
     const resolved = resolveLineEndpoint(lastMouseX, lastMouseY);
     if (resolved.snapped && !typedValue) showSnapMarker(resolved.point, resolved.color); else hideSnapMarker();
     previewMesh = buildLineMesh(drawStart, resolved.point);
-    previewMesh.traverse(n => { if (n.material) n.material = new THREE.MeshBasicMaterial({ color: resolved.color, wireframe: true, transparent: true, opacity: 0.85 }); });
+    previewMesh.traverse(n => { if (n.material && n.material.color) n.material.color.setHex(resolved.color); });
     scene.add(previewMesh);
     let txt = 'x: ' + resolved.point.x.toFixed(2) + '  z: ' + resolved.point.z.toFixed(2);
     if (resolved.label && !typedValue) txt += '  · ' + resolved.label;
     if (typedValue) txt += '  → ' + typedValue + ' [Enter]';
     statusCoordsEl.textContent = txt;
     lastLineEndPoint = resolved.point.clone();
+    lastLineEndNodeId = resolved.nodeId;
   }
 
   // Guide ("cinta métrica"): same click-move-click-to-place-next-point flow as Line, but
   // no auto-close-to-face — it's purely a reference/measuring aid.
   function commitGuideSegment(finalPt) {
+    pushUndo();
     addObject('guide', { a: [guideChainStart.x, guideChainStart.y, guideChainStart.z], b: [finalPt.x, finalPt.y, finalPt.z] });
     guideChainStart = finalPt.clone(); // continue chaining, like Line
     clearPreview();
@@ -1268,6 +1579,10 @@
       // Escape (or switching tools) mid-grab should abandon the push, not keep it half-done.
       extrudeObj.height = extrudeSnapshotHeight;
       extrudeObj.params = extrudeSnapshotParams;
+      if (extrudeNodeSnapshot) {
+        extrudeNodeSnapshot.forEach(({ id, pos }) => setNodePos(id, pos));
+        extrudeNodeSnapshot.forEach(({ id }) => nodeMoved(id));
+      }
       rebuildMesh(extrudeObj);
     }
     extrudeObj = null;
@@ -1277,15 +1592,32 @@
     boxSelectActive = false;
     hideMarquee();
     hideSnapMarker();
+    drawStartNodeId = null;
     chainOrigin = null;
     chainPoints = [];
+    chainNodeIds = [];
     chainLineObjs = [];
     hideFaceHighlight();
+    // Reverting a Move-in-progress: a node/edge drag has already mutated shared node
+    // positions directly (unlike the rect/circle/guide params path, which only ever writes
+    // into moveObj.params), so Escape/tool-switch needs to explicitly put them back.
+    if (moveNodeId !== null && moveNodeOriginalPos) {
+      setNodePos(moveNodeId, moveNodeOriginalPos);
+      nodeMoved(moveNodeId);
+    }
+    if (moveNodeBase) {
+      moveNodeBase.forEach(({ id, pos }) => setNodePos(id, pos));
+      moveNodeBase.forEach(({ id }) => nodeMoved(id));
+    }
     moveObj = null;
     moveAnchor = null;
     moveBaseParams = null;
+    moveNodeId = null;
+    moveNodeOriginalPos = null;
+    moveNodeBase = null;
     typedValue = '';
     lastLineEndPoint = null;
+    lastLineEndNodeId = null;
     guideChainStart = null;
     lastGuideEndPoint = null;
     offsetSourceObj = null;
@@ -1294,9 +1626,12 @@
     lastOffsetVec = null;
     extrudeWallIndex = null;
     extrudeBasePoints = null;
+    extrudeNodeSnapshot = null;
     extrudeFaceKind = null;
     extrudeHitPoint = null;
     extrudeWorldNormal = null;
+    pendingUndoSnapshot = null; // whatever grab this belonged to was abandoned, not committed
+    pruneOrphanNodes();
   }
 
   const dom = renderer.domElement;
@@ -1314,7 +1649,7 @@
 
     if (currentTool === 'erase') {
       const obj = pickObject(e.clientX, e.clientY);
-      if (obj) removeObject(obj);
+      if (obj) { pushUndo(); removeObject(obj); }
       return;
     }
 
@@ -1324,15 +1659,18 @@
         if (!raw) return;
         const geomSnap = resolveGeometrySnap(raw, e.clientX, e.clientY);
         const startPt = geomSnap ? geomSnap.point : raw;
+        const startNodeId = (geomSnap && geomSnap.nodeId != null) ? geomSnap.nodeId : createNode(startPt).id;
         drawStart = startPt.clone();
+        drawStartNodeId = startNodeId;
         drawStage = 1;
         chainOrigin = startPt.clone();
         chainPoints = [startPt.clone()];
+        chainNodeIds = [startNodeId];
         chainLineObjs = [];
         typedValue = '';
       } else {
-        const finalPt = lastLineEndPoint ? lastLineEndPoint.clone() : resolveLineEndpoint(e.clientX, e.clientY).point;
-        commitLineSegment(finalPt);
+        const resolved = lastLineEndPoint ? { point: lastLineEndPoint.clone(), nodeId: lastLineEndNodeId } : resolveLineEndpoint(e.clientX, e.clientY);
+        commitLineSegment(resolved.point, resolved.nodeId);
       }
       return;
     }
@@ -1348,8 +1686,7 @@
         const hit = pickObject(e.clientX, e.clientY);
         if (hit && (hit.type === 'line' || hit.type === 'guide')) {
           offsetSourceObj = hit;
-          offsetBaseA = new THREE.Vector3(...hit.params.a);
-          offsetBaseB = new THREE.Vector3(...hit.params.b);
+          [offsetBaseA, offsetBaseB] = lineEndpoints(hit);
           typedValue = '';
           return;
         }
@@ -1372,6 +1709,7 @@
         drawStart = p.clone();
         drawStage = 1;
       } else {
+        pushUndo();
         addObject('rect', { x1: drawStart.x, z1: drawStart.z, x2: p.x, z2: p.z }, 0);
         cancelDraw();
       }
@@ -1386,6 +1724,7 @@
         drawStage = 1;
       } else {
         const r = drawStart.distanceTo(p);
+        pushUndo();
         addObject('circle', { cx: drawStart.x, cz: drawStart.z, radius: r }, 0);
         cancelDraw();
       }
@@ -1403,6 +1742,7 @@
       if (!hit || hit.obj.type === 'line' || hit.obj.type === 'guide') return;
       const faceKind = determineFace(hit.obj, hit.point);
       const wallMatch = /^wall(\d+)$/.exec(faceKind);
+      pendingUndoSnapshot = snapshotState();
       extrudeObj = hit.obj;
       extrudeFaceKind = faceKind;
       extrudeHitPoint = hit.point.clone();
@@ -1411,12 +1751,14 @@
       typedValue = '';
       if (wallMatch) {
         extrudeWallIndex = parseInt(wallMatch[1], 10);
-        extrudeBasePoints = JSON.parse(JSON.stringify(hit.obj.params.points));
-        const [nu, nv] = polygonEdgeNormal(hit.obj.params.points, extrudeWallIndex);
+        extrudeBasePoints = polyfacePoints2D(hit.obj);
+        extrudeNodeSnapshot = snapshotPolyfaceNodes(hit.obj);
+        const [nu, nv] = polygonEdgeNormal(extrudeBasePoints, extrudeWallIndex);
         extrudeWorldNormal = polyface2DDirTo3D(hit.obj.params.orientation || 'xz', nu, nv);
       } else {
         extrudeWallIndex = null;
         extrudeBasePoints = null;
+        extrudeNodeSnapshot = (hit.obj.type === 'polyface' && hit.obj.params.topNodeIds) ? snapshotPolyfaceNodes(hit.obj, true) : null;
         const info = faceInfo(hit.obj, faceKind);
         extrudeField = info.field;
         extrudeSign = info.sign;
@@ -1428,11 +1770,32 @@
     }
 
     if (currentTool === 'move') {
+      // Priority 1: grab a shared node directly (by screen proximity, not raycast) — moving
+      // it cascades to every line/face that references it, with no per-object special case.
+      const nodeId = findNearestNode(e.clientX, e.clientY);
+      if (nodeId !== null) {
+        pendingUndoSnapshot = snapshotState();
+        moveNodeId = nodeId;
+        moveNodeOriginalPos = nodePos(nodeId).clone();
+        moveAnchor = nodePos(nodeId);
+        controls.enabled = false;
+        return;
+      }
       const hit = pickObjectWithFace(e.clientX, e.clientY);
       if (!hit) return;
+      pendingUndoSnapshot = snapshotState();
       moveObj = hit.obj;
       moveAnchor = hit.point.clone();
-      moveBaseParams = JSON.parse(JSON.stringify(moveObj.params));
+      if (moveObj.type === 'line' || moveObj.type === 'polyface') {
+        // Priority 2: grabbed the body of an edge/face away from any single node — translate
+        // all of its own nodes together (still cascades to anything else sharing them).
+        let ids = moveObj.params.nodeIds.slice();
+        if (moveObj.type === 'polyface' && moveObj.params.topNodeIds) ids = ids.concat(moveObj.params.topNodeIds);
+        moveNodeBase = ids.map(id => ({ id, pos: nodePos(id) }));
+      } else {
+        // Priority 3: rect/circle/guide — untouched parametric translate.
+        moveBaseParams = JSON.parse(JSON.stringify(moveObj.params));
+      }
       controls.enabled = false;
       return;
     }
@@ -1466,11 +1829,12 @@
       const resolved = resolveLineEndpoint(e.clientX, e.clientY);
       if (resolved.snapped && !typedValue) showSnapMarker(resolved.point, resolved.color); else hideSnapMarker();
       previewMesh = buildLineMesh(drawStart, resolved.point);
-      previewMesh.traverse(n => { if (n.material) n.material = new THREE.MeshBasicMaterial({ color: resolved.color, wireframe: true, transparent: true, opacity: 0.85 }); });
+      previewMesh.traverse(n => { if (n.material && n.material.color) n.material.color.setHex(resolved.color); });
       scene.add(previewMesh);
       if (resolved.label && !typedValue) statusCoordsEl.textContent += '  · ' + resolved.label;
       if (typedValue) statusCoordsEl.textContent += '  → ' + typedValue + ' [Enter]';
       lastLineEndPoint = resolved.point.clone();
+      lastLineEndNodeId = resolved.nodeId;
     } else if (currentTool === 'guide' && offsetSourceObj) {
       refreshOffsetPreview();
     } else if (currentTool === 'guide' && !guideChainStart && p) {
@@ -1509,7 +1873,7 @@
       }
     }
 
-    if (currentTool === 'move' && moveObj) {
+    if (currentTool === 'move' && (moveNodeId !== null || moveObj)) {
       const axisSnap = resolveAxisSnap(moveAnchor, e.clientX, e.clientY);
       let current;
       if (axisSnap) {
@@ -1518,10 +1882,22 @@
       } else {
         current = planePoint(e.clientX, e.clientY, moveAnchor.y) || moveAnchor;
       }
-      const delta = current.clone().sub(moveAnchor);
-      moveObj.params = translatedParams(moveObj.type, moveBaseParams, delta.x, delta.y, delta.z);
-      rebuildMesh(moveObj);
-      selectObject(moveObj);
+      if (moveNodeId !== null) {
+        // moveAnchor was set to this node's own original position, so the new position is
+        // simply wherever the cursor now resolves to along the drag plane/axis-lock.
+        setNodePos(moveNodeId, current);
+        nodeMoved(moveNodeId);
+      } else if (moveNodeBase) {
+        const delta = current.clone().sub(moveAnchor);
+        moveNodeBase.forEach(({ id, pos }) => setNodePos(id, pos.clone().add(delta)));
+        moveNodeBase.forEach(({ id }) => nodeMoved(id));
+        selectObject(moveObj);
+      } else {
+        const delta = current.clone().sub(moveAnchor);
+        moveObj.params = translatedParams(moveObj.type, moveBaseParams, delta.x, delta.y, delta.z);
+        rebuildMesh(moveObj);
+        selectObject(moveObj);
+      }
     }
   });
 
@@ -1530,10 +1906,16 @@
     // gesture now (see the 'extrude' branch in pointerdown), so a plain click can start it
     // without the immediate mouseup instantly ending the grab.
 
-    if (moveObj) {
+    if (moveObj || moveNodeId !== null) {
+      // A plain mouseup commits the drag as-is (unlike Escape, which reverts) — just stop
+      // tracking, the node(s)/params are already left wherever the last pointermove put them.
+      commitPendingUndo();
       moveObj = null;
       moveAnchor = null;
       moveBaseParams = null;
+      moveNodeId = null;
+      moveNodeOriginalPos = null;
+      moveNodeBase = null;
       controls.enabled = true;
     }
 
@@ -1584,7 +1966,7 @@
       }
       if (e.key === 'Enter') {
         if (vcbLine) {
-          if (typedValue && lastLineEndPoint) commitLineSegment(lastLineEndPoint.clone());
+          if (typedValue && lastLineEndPoint) commitLineSegment(lastLineEndPoint.clone(), lastLineEndNodeId);
         } else if (vcbGuide) {
           if (typedValue && lastGuideEndPoint) commitGuideSegment(lastGuideEndPoint.clone());
         } else if (vcbOffset) {
@@ -1598,11 +1980,16 @@
     }
 
     if ((e.key === 'Delete' || e.key === 'Backspace') && !isTypingTarget()) {
-      selectedObjects.slice().forEach(o => removeObject(o));
+      if (selectedObjects.length) {
+        pushUndo();
+        selectedObjects.slice().forEach(o => removeObject(o));
+      }
     }
     if (e.ctrlKey && e.key.toLowerCase() === 'n') { e.preventDefault(); doNew(); }
     if (e.ctrlKey && e.key.toLowerCase() === 'o') { e.preventDefault(); doOpen(); }
     if (e.ctrlKey && e.key.toLowerCase() === 's') { e.preventDefault(); doSave(); }
+    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); doUndo(); }
+    if ((e.ctrlKey && e.key.toLowerCase() === 'y') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'z')) { e.preventDefault(); doRedo(); }
     if (!e.ctrlKey && !e.metaKey && !isTypingTarget()) {
       const map = { s:'select', l:'line', r:'rect', c:'circle', e:'erase', p:'extrude', m:'move', g:'guide' };
       const t = map[e.key.toLowerCase()];
@@ -1625,12 +2012,14 @@
 
   function doNew() {
     if (objects.length && !confirm('¿Descartar el dibujo actual y empezar uno nuevo?')) return;
+    if (objects.length) pushUndo();
     clearAll();
   }
 
   function serialize() {
     return JSON.stringify({
-      app: 'porticad-modelador-3d', version: 1,
+      app: 'porticad-modelador-3d', version: 2,
+      nodes: Array.from(nodes.values()),
       objects: objects.map(o => ({ type: o.type, params: o.params, height: o.height }))
     }, null, 2);
   }
@@ -1665,7 +2054,15 @@
       try {
         const data = JSON.parse(reader.result);
         if (!Array.isArray(data.objects)) throw new Error('formato inválido');
+        if (objects.length) pushUndo();
         clearAll();
+        // Nodes must exist before any line/polyface tries to resolve its nodeIds via meshFor.
+        if (Array.isArray(data.nodes)) {
+          data.nodes.forEach(n => {
+            nodes.set(n.id, { id: n.id, x: n.x, y: n.y, z: n.z });
+            if (n.id >= nextNodeId) nextNodeId = n.id + 1;
+          });
+        }
         data.objects.forEach(o => addObject(o.type, o.params, o.height || 0));
         currentFilename = file.name;
       } catch (err) {
@@ -1681,8 +2078,13 @@
   document.getElementById('btnSave').addEventListener('click', doSave);
   document.getElementById('btnSaveAs').addEventListener('click', doSaveAs);
   document.getElementById('btnClearGuides').addEventListener('click', () => {
-    objects.filter(o => o.type === 'guide').forEach(o => removeObject(o));
+    const guides = objects.filter(o => o.type === 'guide');
+    if (!guides.length) return;
+    pushUndo();
+    guides.forEach(o => removeObject(o));
   });
+  btnUndo.addEventListener('click', doUndo);
+  btnRedo.addEventListener('click', doRedo);
 
   // ───────────────────────── Render loop ─────────────────────────
   function animate() {
@@ -1693,6 +2095,7 @@
   animate();
 
   setTool('select');
+  updateUndoRedoButtons();
 })();
 </script>
 </body>
