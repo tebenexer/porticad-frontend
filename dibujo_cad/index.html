@@ -3306,8 +3306,9 @@ function pointerDown(sx, sy, button, shiftKey) { // shiftKey: Shift, Ctrl o Cmd 
       dragOrigin = snapWorld(mouseWorld);
       dragOrigEntities = {};
       selected.forEach(idx => { dragOrigEntities[idx] = JSON.parse(JSON.stringify(entities[idx])); });
-    } else if (!shiftKey) {
-      selected.clear();
+    } else {
+      if (!shiftKey) selected.clear();
+      boxSelect = { startScreen: { x: sx, y: sy }, curScreen: { x: sx, y: sy }, shift: shiftKey };
     }
     draw();
     return;
