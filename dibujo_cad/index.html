@@ -245,7 +245,8 @@ body{ display:flex; flex-direction:column; }
 /* ── Mobile ── */
 @media (max-width:768px){
   .topbar{ overflow-x:auto; overflow-y:hidden; }
-  .topbar::-webkit-scrollbar{ height:0; }
+  .topbar::-webkit-scrollbar{ height:5px; }
+  .topbar::-webkit-scrollbar-thumb{ background:var(--border); border-radius:3px; }
   .topbar-crumb{ display:none; }
   .badge{ display:none; }
   #file-name-label{ display:none; }
@@ -884,6 +885,7 @@ function toggleUnitMenu(e) {
   if (p.style.display === 'block') { p.style.display = 'none'; return; }
   updateUnitMenuHighlight();
   p.style.display = 'block';
+  escapeTopbarClip(p);
 }
 function closeUnitMenu() { document.getElementById('unit-menu-panel').style.display = 'none'; }
 document.addEventListener('click', () => closeUnitMenu());
@@ -1113,7 +1115,9 @@ function pickArcMethod(method) { closeArcMenu(); setTool(method); }
 function toggleAnotarMenu(e) {
   e.stopPropagation();
   const p = document.getElementById('anotar-menu-panel');
-  p.style.display = p.style.display === 'block' ? 'none' : 'block';
+  if (p.style.display === 'block') { p.style.display = 'none'; return; }
+  p.style.display = 'block';
+  escapeTopbarClip(p);
 }
 function closeAnotarMenu() { document.getElementById('anotar-menu-panel').style.display = 'none'; }
 document.addEventListener('click', () => closeAnotarMenu());
@@ -1123,7 +1127,9 @@ function pickAnotarMethod(method) { closeAnotarMenu(); setTool(method); }
 function toggleEditarMenu(e) {
   e.stopPropagation();
   const p = document.getElementById('editar-menu-panel');
-  p.style.display = p.style.display === 'block' ? 'none' : 'block';
+  if (p.style.display === 'block') { p.style.display = 'none'; return; }
+  p.style.display = 'block';
+  escapeTopbarClip(p);
 }
 function closeEditarMenu() { document.getElementById('editar-menu-panel').style.display = 'none'; }
 document.addEventListener('click', () => closeEditarMenu());
@@ -3698,8 +3704,12 @@ function pointerDown(sx, sy, button, shiftKey) { // shiftKey: Shift, Ctrl o Cmd 
             finishAreaMeasurement(ap.area, ap.perimeter, ap.kind, { x: mouseWorld.x, y: mouseWorld.y }, needsHeight);
             return;
           }
-          document.getElementById('hint').textContent = '⚠ Esa forma no tiene área (línea o arco abierto) — o haz clic en un punto vacío para trazar un polígono';
-          return;
+          // El clic cayó sobre una línea/arco/polilínea abierta (sin área propia) en vez de en
+          // "vacío" — pero un dibujo hecho de líneas sueltas (lo más común: cada pared es una
+          // línea) tiene justo sus vértices sobre esas líneas. Antes esto bloqueaba con una
+          // advertencia y el usuario nunca podía empezar a trazar el polígono a mano. Ahora, si
+          // no es una forma con área propia, el clic simplemente arranca el trazado manual —
+          // igual que si hubiera clicado en un punto vacío.
         }
         const p = smartSnap(mouseWorld);
         measureDraw = { method: tool, pts: [p] };
@@ -3911,6 +3921,16 @@ canvas.addEventListener('wheel', e => {
   zoomAt(e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0 ? 1.12 : 1 / 1.12);
 }, { passive: false });
 
+// En pantallas angostas la topbar se vuelve scrolleable horizontal (algunos botones, como
+// "Instrumento" con Área y Perímetro, quedan fuera del ancho visible). El mouse solo scrollea
+// vertical por defecto, así que sin esto esos botones eran inalcanzables con rueda de mouse.
+document.querySelector('.topbar').addEventListener('wheel', e => {
+  const el = e.currentTarget;
+  if (el.scrollWidth <= el.clientWidth) return;
+  el.scrollLeft += e.deltaY;
+  e.preventDefault();
+}, { passive: false });
+
 /* ── Touch ── */
 let lastTouchDist = null;
 function touchPoint(t) { const r = canvas.getBoundingClientRect(); return { x: t.clientX - r.left, y: t.clientY - r.top }; }
@@ -4115,13 +4135,30 @@ window.addEventListener('keyup', e => {
   if (e.code === 'Space') { spaceHeld = false; canvas.style.cursor = ''; }
 });
 
+// Los desplegables de la topbar son position:absolute dentro de su .file-menu-wrap/.mt-wrap.
+// En pantallas angostas la topbar es horizontalmente scrolleable (para llegar a botones como
+// "Instrumento") y, por la interacción de overflow-x:auto con overflow-y, su overflow-y queda
+// forzado a 'auto' — recorta cualquier panel que se salga por abajo, dejándolo "abierto" pero
+// invisible. Los pasamos a position:fixed con las coordenadas que el navegador ya calculó
+// (mismo truco que usa el menú "Arco" de la barra lateral) para que escapen ese recorte.
+function escapeTopbarClip(panel) {
+  panel.style.position = ''; panel.style.top = ''; panel.style.left = ''; panel.style.right = '';
+  const r = panel.getBoundingClientRect();
+  panel.style.position = 'fixed';
+  panel.style.top = r.top + 'px';
+  panel.style.left = r.left + 'px';
+  panel.style.right = 'auto';
+}
+
 /* ════════════════════════════════════════════════
    MULTI-TOOLS DROPDOWN
 ════════════════════════════════════════════════ */
 function toggleMT(e) {
   e.stopPropagation();
   const p = document.getElementById('mt-panel');
-  p.style.display = p.style.display === 'block' ? 'none' : 'block';
+  if (p.style.display === 'block') { p.style.display = 'none'; return; }
+  p.style.display = 'block';
+  escapeTopbarClip(p);
 }
 document.addEventListener('click', () => { document.getElementById('mt-panel').style.display = 'none'; });
 
@@ -4138,7 +4175,9 @@ let currentFileHandle = null; // FileSystemFileHandle (solo Chrome/Edge) para "G
 function toggleFileMenu(e) {
   e.stopPropagation();
   const p = document.getElementById('file-menu-panel');
-  p.style.display = p.style.display === 'block' ? 'none' : 'block';
+  if (p.style.display === 'block') { p.style.display = 'none'; return; }
+  p.style.display = 'block';
+  escapeTopbarClip(p);
 }
 function closeFileMenu() { document.getElementById('file-menu-panel').style.display = 'none'; }
 document.addEventListener('click', () => closeFileMenu());
@@ -4147,7 +4186,9 @@ document.addEventListener('click', () => closeFileMenu());
 function toggleUtilMenu(e) {
   e.stopPropagation();
   const p = document.getElementById('util-menu-panel');
-  p.style.display = p.style.display === 'block' ? 'none' : 'block';
+  if (p.style.display === 'block') { p.style.display = 'none'; return; }
+  p.style.display = 'block';
+  escapeTopbarClip(p);
 }
 function closeUtilMenu() { document.getElementById('util-menu-panel').style.display = 'none'; }
 document.addEventListener('click', () => closeUtilMenu());
@@ -4160,6 +4201,7 @@ function toggleSizeMenu(e) {
   if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
   updateSizeMenuFields();
   panel.style.display = 'block';
+  escapeTopbarClip(panel);
 }
 function closeSizeMenu() { document.getElementById('size-menu-panel').style.display = 'none'; }
 document.addEventListener('click', () => closeSizeMenu());
@@ -4232,6 +4274,7 @@ function toggleThemeMenu(e) {
   if (p.style.display === 'block') { p.style.display = 'none'; return; }
   updateThemeMenuHighlight();
   p.style.display = 'block';
+  escapeTopbarClip(p);
 }
 function closeThemeMenu() { document.getElementById('theme-menu-panel').style.display = 'none'; }
 document.addEventListener('click', () => closeThemeMenu());
@@ -4259,6 +4302,7 @@ function togglePropertiesMenu(e) {
   updatePropertiesPanel();
   lastPropsSig = [...selected].sort((a, b) => a - b).join(',');
   p.style.display = 'block';
+  escapeTopbarClip(p);
 }
 function closePropertiesMenu() { document.getElementById('props-menu-panel').style.display = 'none'; }
 document.addEventListener('click', () => closePropertiesMenu());
@@ -4399,6 +4443,7 @@ function toggleLayersMenu(e) {
   renderLayersList();
   updateSelectionPropsUI();
   panel.style.display = 'block';
+  escapeTopbarClip(panel);
 }
 function closeLayersMenu() { document.getElementById('layers-menu-panel').style.display = 'none'; }
 document.addEventListener('click', () => closeLayersMenu());
