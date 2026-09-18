@@ -3,28 +3,39 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="refresh" content="0; url=https://web-production-27587.up.railway.app/admin">
 <title>Presentador IASD</title>
 <style>
-  body {
+  html, body {
     margin: 0;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    height: 100%;
     background: #0b0b12;
-    color: #eee;
-    font-family: Arial, Helvetica, sans-serif;
-    text-align: center;
+    overflow: hidden;
   }
-  a { color: #7db3ff; }
+  #presentador-frame {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+  #frame-escape {
+    position: fixed;
+    top: 8px;
+    right: 8px;
+    z-index: 10;
+    background: rgba(20, 20, 28, 0.85);
+    color: #7db3ff;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    text-decoration: none;
+  }
 </style>
-<script>
-  window.location.replace("https://web-production-27587.up.railway.app/admin");
-</script>
 </head>
 <body>
-  <p>Redirigiendo al presentador&hellip; si no ocurre autom&aacute;ticamente,
-    <a href="https://web-production-27587.up.railway.app/admin">haz clic aqu&iacute;</a>.</p>
+  <iframe id="presentador-frame" src="https://web-production-27587.up.railway.app/admin" allow="fullscreen" allowfullscreen></iframe>
+  <a id="frame-escape" href="https://web-production-27587.up.railway.app/admin" target="_top">
+    Abrir aparte &#8599;
+  </a>
 </body>
 </html>
