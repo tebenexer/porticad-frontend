@@ -4,38 +4,31 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Proyector IASD</title>
+<!-- Se abre la pantalla del proyector directamente (no dentro de esta pagina): asi lee las carpetas
+     de la PC que se eligieron en Administrar contenido y puede reproducir video con sonido. -->
+<meta http-equiv="refresh" content="0; url=https://web-production-27587.up.railway.app/">
+<script>location.replace("https://web-production-27587.up.railway.app/");</script>
 <style>
   html, body {
     margin: 0;
     height: 100%;
     background: #000;
-    overflow: hidden;
-  }
-  #proyector-frame {
-    display: block;
-    width: 100%;
-    height: 100%;
-    border: 0;
-  }
-  #frame-escape {
-    position: fixed;
-    top: 8px;
-    right: 8px;
-    z-index: 10;
-    background: rgba(20, 20, 28, 0.85);
-    color: #7db3ff;
+    color: #ccc;
     font-family: Arial, Helvetica, sans-serif;
-    font-size: 12px;
-    padding: 6px 10px;
-    border-radius: 6px;
-    text-decoration: none;
   }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  a { color: #7db3ff; }
 </style>
 </head>
 <body>
-  <iframe id="proyector-frame" src="https://web-production-27587.up.railway.app/" allow="autoplay; fullscreen" allowfullscreen></iframe>
-  <a id="frame-escape" href="https://web-production-27587.up.railway.app/" target="_top">
-    Abrir aparte &#8599;
-  </a>
+  <p>
+    Abriendo el proyector&hellip;<br>
+    Si no se abre solo, <a href="https://web-production-27587.up.railway.app/">pulsa aqu&iacute;</a>.
+  </p>
 </body>
 </html>
