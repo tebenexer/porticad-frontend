@@ -197,6 +197,10 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0;}
       <div class="form-group" style="margin-bottom:11px;"><label>Nombre</label><input type="text" id="reg-name" placeholder="Tu nombre"></div>
       <div class="form-group" style="margin-bottom:11px;"><label>Email</label><input type="email" id="reg-email" placeholder="tu@email.com"></div>
       <div class="form-group" style="margin-bottom:18px;"><label>Contraseña (min 6 caracteres)</label><input type="password" id="reg-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doRegister()"></div>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:#8b949e;line-height:1.45;cursor:pointer;margin:0 0 12px;">
+        <input id="reg-terminos" type="checkbox" style="margin-top:2px;flex-shrink:0;">
+        <span>Acepto los <a href="/legal/terminos/" target="_blank" rel="noopener" style="color:#58a6ff;">Términos de uso</a> y la <a href="/legal/privacidad/" target="_blank" rel="noopener" style="color:#58a6ff;">Política de privacidad</a>. Esta herramienta es un registro personal y no es asesoría financiera, contable ni fiscal.</span>
+      </label>
       <button class="btn btn-primary btn-full" onclick="doRegister()">Crear cuenta</button>
     </div>
   </div>
@@ -669,6 +673,7 @@ async function doRegister() {
   const pass=document.getElementById('reg-pass').value;
   if(!name||!email||!pass){showAuthError('Completa todos los campos.');return;}
   if(pass.length<6){showAuthError('La contraseña debe tener al menos 6 caracteres.');return;}
+  if(!document.getElementById('reg-terminos').checked){showAuthError('Debes aceptar los Términos de uso y la Política de privacidad para crear la cuenta.');return;}
   try{
     const cred=await auth.createUserWithEmailAndPassword(email,pass);
     await cred.user.updateProfile({displayName:name});
