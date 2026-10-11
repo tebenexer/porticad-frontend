@@ -364,14 +364,20 @@
   // ───────────────────────── Grid + axes ─────────────────────────
   const GRID_SIZE = 40, GRID_DIV = 40;
   const grid = new THREE.GridHelper(GRID_SIZE, GRID_DIV, 0x30363d, 0x21262d);
+  // La cuadrícula y los ejes se dibujan primero y sin escribir profundidad: así nunca compiten
+  // (z-fighting) con las caras y líneas que se apoyan en el suelo.
+  grid.material.depthWrite = false;
+  grid.renderOrder = -2;
   scene.add(grid);
 
   function makeAxisLine(dir, color) {
     const geo = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(0,0,0), dir.clone().multiplyScalar(GRID_SIZE/2)
     ]);
-    const mat = new THREE.LineBasicMaterial({ color, linewidth: 2 });
-    return new THREE.Line(geo, mat);
+    const mat = new THREE.LineBasicMaterial({ color, linewidth: 2, depthWrite: false });
+    const line = new THREE.Line(geo, mat);
+    line.renderOrder = -1;
+    return line;
   }
   scene.add(makeAxisLine(new THREE.Vector3(1,0,0), 0xf85149)); // X - red
   scene.add(makeAxisLine(new THREE.Vector3(-1,0,0), 0xf85149));
@@ -704,7 +710,7 @@
       mesh.rotation.x = -Math.PI/2;
       mesh.position.set(cx, baseY + 0.002 + (lift || 0), cz);
     }
-    attachEdges(mesh);
+    attachEdges(mesh, 30);
     return mesh;
   }
 
@@ -809,7 +815,7 @@
     }
   }
 
-  function buildPolyfaceMesh(points, height, orientation, base, lift) {
+  function buildPolyfaceMesh(points, height, orientation, base, lift, noEdges) {
     orientation = orientation || 'xz';
     base = base || 0;
     const shape = new THREE.Shape(points.map(p => new THREE.Vector2(p[0], p[1])));
@@ -826,7 +832,9 @@
     if (matrix.determinant() < 0) flipWinding(geo);
     const mesh = new THREE.Mesh(geo, mat);
     if (height <= 0) mesh.position.addScaledVector(b.z, 0.002 + (lift || 0)); // nudge off the plane, avoids z-fighting
-    attachEdges(mesh);
+    // Un cuerpo con aristas reales (líneas) no lleva además el contorno incrustado: dibujar dos aristas
+    // en el mismo sitio es lo que hacía que se viera «temblar», y borrar una línea no quitaba la arista.
+    if (!noEdges) attachEdges(mesh);
     return mesh;
   }
 
@@ -835,7 +843,7 @@
     if (obj.type === 'guide') return buildGuideMesh(new THREE.Vector3(...obj.params.a), new THREE.Vector3(...obj.params.b));
     if (obj.type === 'rect') return buildRectMesh(obj.params.x1, obj.params.z1, obj.params.x2, obj.params.z2, obj.height, obj.params.baseY, obj.params.lift);
     if (obj.type === 'circle') return buildCircleMesh(obj.params.cx, obj.params.cz, obj.params.radius, obj.height, obj.params.baseY, obj.params.lift);
-    if (obj.type === 'polyface') return buildPolyfaceMesh(polyfacePoints2D(obj), obj.height, obj.params.orientation, obj.params.base, obj.params.lift);
+    if (obj.type === 'polyface') return buildPolyfaceMesh(polyfacePoints2D(obj), obj.height, obj.params.orientation, obj.params.base, obj.params.lift, obj.height > 0 && !!obj.params.topNodeIds);
     if (obj.type === 'solid') return buildSolidMesh(obj.params.verts, obj.params.tris);
   }
 
@@ -1362,6 +1370,7 @@
   function endExtrudeDrag() {
     if (extrudeObj && extrudeObj.type === 'polyface' && extrudeObj.height > 0 && !extrudeObj.params.topNodeIds) {
       spawnPolyfaceTopEdges(extrudeObj);
+      rebuildMesh(extrudeObj);
     }
     commitPendingUndo();
     extrudeObj = null;
@@ -1838,8 +1847,14 @@
     const [lo, hi] = i < j ? [i, j] : [j, i];
     const loopA = loop.slice(lo, hi + 1);
     const loopB = loop.slice(hi).concat(loop.slice(0, lo + 1));
-    addObject('polyface', { nodeIds: loopA, orientation: face.params.orientation, base: face.params.base }, face.height);
-    addObject('polyface', { nodeIds: loopB, orientation: face.params.orientation, base: face.params.base }, face.height);
+    const topOf = new Map();
+    if (face.params.topNodeIds) face.params.nodeIds.forEach((id, k) => topOf.set(id, face.params.topNodeIds[k]));
+    [loopA, loopB].forEach(L => {
+      const params = { nodeIds: L, orientation: face.params.orientation, base: face.params.base };
+      if (topOf.size) params.topNodeIds = L.map(id => topOf.get(id));   // cada mitad conserva su borde superior
+      addObject('polyface', params, face.height);
+    });
+    if (topOf.size) ensureLine(topOf.get(nA), topOf.get(nB), bodyMeta(face));   // arista nueva en la tapa
     removeObject(face);
   }
   function checkFaceSplit(nA, nB) {
@@ -3027,8 +3042,7 @@
     }
 
     if (currentTool === 'erase') {
-      const obj = pickObject(e.clientX, e.clientY);
-      if (obj) { pushUndo(); expandGroups(curveMates(obj)).forEach(removeObject); cleanupGroups(); }
+      eraseAt(e.clientX, e.clientY);
       return;
     }
 
@@ -3238,6 +3252,8 @@
       refreshEditPreview();
     } else if (currentTool === 'followme') {
       followHover();
+    } else if (currentTool === 'erase') {
+      eraseHover(e.clientX, e.clientY);
     }
 
     if (currentTool === 'extrude') {
@@ -3400,11 +3416,7 @@
     }
 
     if ((e.key === 'Delete' || e.key === 'Backspace') && !isTypingTarget()) {
-      if (selectedObjects.length) {
-        pushUndo();
-        selectedObjects.slice().forEach(o => removeObject(o));
-        cleanupGroups();
-      }
+      if (selectedObjects.length) deleteSelectionSmart();
     }
     if (e.key === 'Control' && !e.repeat && (currentTool === 'rotate' || currentTool === 'scale')) { transformCopy = !transformCopy; refreshEditPreview(); }
     if (e.ctrlKey && !isTypingTarget()) {
@@ -3427,6 +3439,239 @@
       if (t) setTool(t);
     }
   });
+
+  // ═════════════ Cuerpos y aristas: borrar una arista como en SketchUp ═════════════
+  // Un cuerpo extruido (rectángulo, círculo o polígono con altura) se guarda como UNA pieza paramétrica
+  // (base + altura) para poder empujar/tirar de él. Para tocar una arista de verdad hay que «abrirlo»:
+  // se convierte en sus caras planas sueltas (base, tapa y paredes) que comparten nodos y aristas, y
+  // entonces borrar la arista quita las dos caras que la tocan — igual que en SketchUp.
+  function bodyMeta(o) { return { layer: o.layer || 0, hidden: !!o.hidden, gid: o.gid || 0 }; }
+  function lineBetween(a, b) {
+    return objects.find(x => x.type === 'line' && ((x.params.nodeIds[0] === a && x.params.nodeIds[1] === b) || (x.params.nodeIds[0] === b && x.params.nodeIds[1] === a)));
+  }
+  function ensureLine(a, b, meta, curveId) {
+    if (a === b || lineBetween(a, b)) return;
+    const params = { nodeIds: [a, b] };
+    if (curveId) params.curveId = curveId;
+    addObject('line', params, 0, meta);
+  }
+  function nodeIdAt(p) { const e = nodeAt(p); return e != null ? e : createNode(p).id; }
+
+  // Plano (orientación + desplazamiento) de una pared a partir de tres de sus esquinas.
+  function wallPlane(P0, P1, P3) {
+    const x = P1.clone().sub(P0).normalize();
+    const n = x.clone().cross(P3.clone().sub(P0)).normalize();
+    const y = n.clone().cross(x);
+    return { orientation: orientationKey(x, y, n), base: n.dot(P0) };
+  }
+  function addWallFace(a, b, c, d, meta) {
+    const pl = wallPlane(nodePos(a), nodePos(b), nodePos(d));
+    return addObject('polyface', { nodeIds: [a, b, c, d], orientation: pl.orientation, base: pl.base }, 0, meta);
+  }
+  function shellFromPrism(baseIds, topIds, orientation, b0, h, meta) {
+    addObject('polyface', { nodeIds: baseIds.slice(), orientation, base: b0 }, 0, meta);
+    addObject('polyface', { nodeIds: topIds.slice(), orientation, base: b0 + h }, 0, meta);
+    const n = baseIds.length;
+    for (let i = 0; i < n; i++) { const j = (i + 1) % n; addWallFace(baseIds[i], baseIds[j], topIds[j], topIds[i], meta); }
+  }
+
+  function isBody(o) { return !!o && o.height > 0 && (o.type === 'rect' || o.type === 'circle' || o.type === 'polyface'); }
+
+  // Convierte el cuerpo en sus caras sueltas + aristas reales. Devuelve true si lo hizo.
+  function explodeBody(o) {
+    if (!isBody(o)) return false;
+    const meta = bodyMeta(o);
+    if (o.type === 'polyface') {
+      if (!o.params.topNodeIds) spawnPolyfaceTopEdges(o);
+      const base = o.params.nodeIds.slice(), top = o.params.topNodeIds.slice();
+      const orientation = o.params.orientation || 'xz', b0 = o.params.base || 0, h = o.height;
+      shellFromPrism(base, top, orientation, b0, h, meta);
+      const n = base.length;
+      for (let i = 0; i < n; i++) {   // por si alguna arista ya se había borrado antes
+        const j = (i + 1) % n;
+        ensureLine(base[i], base[j], meta); ensureLine(top[i], top[j], meta); ensureLine(base[i], top[i], meta);
+      }
+      removeObject(o);
+      return true;
+    }
+    if (o.type === 'rect') {
+      const { x1, z1, x2, z2 } = o.params, y0 = o.params.baseY || 0, y1 = y0 + o.height;
+      const ring = y => [[x1, z1], [x2, z1], [x2, z2], [x1, z2]].map(([x, z]) => nodeIdAt(new THREE.Vector3(x, y, z)));
+      removeObject(o);
+      const base = ring(y0), top = ring(y1);
+      shellFromPrism(base, top, 'xz', y0, y1 - y0, meta);
+      for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; ensureLine(base[i], base[j], meta); ensureLine(top[i], top[j], meta); ensureLine(base[i], top[i], meta); }
+      return true;
+    }
+    if (o.type === 'circle') {
+      const { cx, cz, radius } = o.params, y0 = o.params.baseY || 0, y1 = y0 + o.height, N = 32;
+      const ring = y => circlePoints(new THREE.Vector3(cx, y, cz), radius, N).map(q => nodeIdAt(q));
+      removeObject(o);
+      const base = ring(y0), top = ring(y1);
+      shellFromPrism(base, top, 'xz', y0, y1 - y0, meta);
+      const c1 = nextCurveId();
+      for (let i = 0; i < N; i++) ensureLine(base[i], base[(i + 1) % N], meta, c1);
+      const c2 = nextCurveId();
+      for (let i = 0; i < N; i++) ensureLine(top[i], top[(i + 1) % N], meta, c2);
+      return true;
+    }
+    return false;
+  }
+
+  // ¿A qué cuerpo pertenece esta arista? (base, tapa o vertical de un cuerpo de polígono)
+  function bodyOwningEdge(line) {
+    const [a, b] = line.params.nodeIds;
+    return objects.find(o => o.type === 'polyface' && o.height > 0 && (
+      areAdjacentInLoop(o.params.nodeIds, a, b) ||
+      (o.params.topNodeIds && (areAdjacentInLoop(o.params.topNodeIds, a, b) ||
+        o.params.nodeIds.some((id, i) => (id === a && o.params.topNodeIds[i] === b) || (id === b && o.params.topNodeIds[i] === a))))));
+  }
+
+  const COPLANAR_EPS = 1e-4;
+  function coplanarFlat(f1, f2) {
+    return !(f1.height > 0) && !(f2.height > 0) &&
+      (f1.params.orientation || 'xz') === (f2.params.orientation || 'xz') &&
+      Math.abs((f1.params.base || 0) - (f2.params.base || 0)) < COPLANAR_EPS;
+  }
+  // Une dos caras planas que comparten la arista a–b en una sola (lo contrario de dividir una cara).
+  function mergeFacesAcrossEdge(fA, fB, a, b) {
+    const hasDir = (L, x, y) => { const n = L.length; for (let i = 0; i < n; i++) if (L[i] === x && L[(i + 1) % n] === y) return true; return false; };
+    const A = fA.params.nodeIds.slice(); let B = fB.params.nodeIds.slice();
+    if (!hasDir(A, a, b)) { if (!hasDir(A, b, a)) return null; const t = a; a = b; b = t; }
+    if (!hasDir(B, b, a)) { B = B.reverse(); if (!hasDir(B, b, a)) return null; }
+    const iA = A.indexOf(b), pathA = A.slice(iA).concat(A.slice(0, iA));      // b … a
+    const iB = B.indexOf(a), pathB = B.slice(iB).concat(B.slice(0, iB));      // a … b
+    const merged = pathA.concat(pathB.slice(1, -1));
+    if (new Set(merged).size !== merged.length || merged.length < 3) return null;
+    return merged;
+  }
+
+  // Borra una arista (y las demás de su curva). Cuerpo → se abre; dos caras coplanares → se unen;
+  // si no, se van las caras que la usaban (como SketchUp).
+  function eraseEdgeLine(line) {
+    if (!objects.includes(line)) return;
+    const mates = curveMates(line);
+    const body = mates.map(bodyOwningEdge).find(Boolean);
+    if (body) explodeBody(body);
+    if (mates.length === 1) {
+      const [a, b] = line.params.nodeIds;
+      const fs = facesUsingEdge(a, b);
+      if (fs.length === 2 && coplanarFlat(fs[0], fs[1])) {
+        const merged = mergeFacesAcrossEdge(fs[0], fs[1], a, b);
+        if (merged) {
+          const f0 = fs[0];
+          addObject('polyface', { nodeIds: merged, orientation: f0.params.orientation, base: f0.params.base }, 0, bodyMeta(f0));
+          removeObject(fs[0]); removeObject(fs[1]);
+        }
+      }
+    }
+    mates.forEach(removeObject);
+  }
+
+  // Borra un objeto entero sin dejar sus aristas sueltas flotando.
+  function removeBodyClean(o) {
+    if (!objects.includes(o)) return;
+    if (o.type === 'polyface' && o.height > 0) {
+      const base = o.params.nodeIds, top = o.params.topNodeIds || [], n = base.length, pairs = [];
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        pairs.push([base[i], base[j]]);
+        if (top.length) { pairs.push([top[i], top[j]]); pairs.push([base[i], top[i]]); }
+      }
+      removeObject(o);
+      pairs.forEach(([a, b]) => { const l = lineBetween(a, b); if (l && !facesUsingEdge(a, b).length) removeObject(l); });
+    } else removeObject(o);
+  }
+
+  // ── Elegir qué arista se va a borrar: la más cercana al cursor (en píxeles) que no esté tapada ──
+  const ERASE_EDGE_PX = 9;
+  function segScreenDist(px, py, a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+    const t = l2 < 1e-9 ? 0 : Math.max(0, Math.min(1, ((px - a.x) * dx + (py - a.y) * dy) / l2));
+    return { d: Math.hypot(px - (a.x + dx * t), py - (a.y + dy * t)), t };
+  }
+  function behindCamera(p) { return p.clone().applyMatrix4(camera.matrixWorldInverse).z > -1e-4; }
+  function edgeOccluded(p) {
+    if (styleMode === 'wire' || styleMode === 'xray') return false;
+    const ndc = p.clone().project(camera);
+    raycaster.setFromCamera({ x: ndc.x, y: ndc.y }, camera);
+    const dist = p.clone().sub(raycaster.ray.origin).dot(raycaster.ray.direction);
+    const faces = pickableObjects().filter(o => FACE_TYPES.includes(o.type)).map(o => o.mesh);
+    const hits = raycaster.intersectObjects(faces, true);
+    return hits.length > 0 && hits[0].distance < dist - (0.03 + 0.002 * dist);
+  }
+  function bodyEdgeSegments(o) {
+    const segs = [];
+    if (o.type === 'rect') {
+      const { x1, z1, x2, z2 } = o.params, y0 = o.params.baseY || 0, y1 = y0 + o.height;
+      [y0, y1].forEach(y => {
+        const c = [[x1, z1], [x2, z1], [x2, z2], [x1, z2]].map(([x, z]) => new THREE.Vector3(x, y, z));
+        for (let i = 0; i < 4; i++) segs.push([c[i], c[(i + 1) % 4]]);
+      });
+      [[x1, z1], [x2, z1], [x2, z2], [x1, z2]].forEach(([x, z]) => segs.push([new THREE.Vector3(x, y0, z), new THREE.Vector3(x, y1, z)]));
+    } else if (o.type === 'circle') {
+      const y0 = o.params.baseY || 0;
+      [y0, y0 + o.height].forEach(y => {
+        const c = circlePoints(new THREE.Vector3(o.params.cx, y, o.params.cz), o.params.radius, 32);
+        for (let i = 0; i < 32; i++) segs.push([c[i], c[(i + 1) % 32]]);
+      });
+    }
+    return segs;
+  }
+  function nearestEdge(clientX, clientY) {
+    const r = dom.getBoundingClientRect(), px = clientX - r.left, py = clientY - r.top;
+    let best = null;
+    const consider = (a, b, make) => {
+      if (behindCamera(a) || behindCamera(b)) return;
+      const sa = projectToScreen(a, r), sb = projectToScreen(b, r);
+      const { d, t } = segScreenDist(px, py, sa, sb);
+      if (d > ERASE_EDGE_PX || (best && d >= best.d)) return;
+      const pt = a.clone().lerp(b, t);
+      if (edgeOccluded(pt)) return;
+      best = { d, a, b, ...make() };
+    };
+    pickableObjects().forEach(o => {
+      if (o.type === 'line') { const [a, b] = lineEndpoints(o); consider(a, b, () => ({ kind: 'line', obj: o })); }
+      else if (o.type === 'guide') { const [a, b] = lineEndpoints(o); consider(a, b, () => ({ kind: 'guide', obj: o })); }
+      else if ((o.type === 'rect' || o.type === 'circle') && o.height > 0) bodyEdgeSegments(o).forEach(([a, b]) => consider(a, b, () => ({ kind: 'body', obj: o })));
+    });
+    return best;
+  }
+
+  function eraseAt(clientX, clientY) {
+    const cand = nearestEdge(clientX, clientY);
+    if (cand) {
+      if (isLockedByGroup(cand.obj)) { pushUndo(); expandGroups([cand.obj]).forEach(removeBodyClean); cleanupGroups(); return; }
+      pushUndo();
+      if (cand.kind === 'body') {
+        explodeBody(cand.obj);
+        const l = lineBetween(nodeAt(cand.a), nodeAt(cand.b));
+        if (l) eraseEdgeLine(l);
+      } else if (cand.kind === 'line') eraseEdgeLine(cand.obj);
+      else removeObject(cand.obj);
+      pruneOrphanNodes();
+      return;
+    }
+    const obj = pickObject(clientX, clientY);
+    if (!obj) return;
+    pushUndo();
+    expandGroups(curveMates(obj)).forEach(removeBodyClean);
+    cleanupGroups();
+  }
+
+  // Vista previa en naranja de la arista que se borraría.
+  function eraseHover(clientX, clientY) {
+    const cand = nearestEdge(clientX, clientY);
+    setPreview(cand ? buildPreviewShape([cand.a, cand.b], false, false) : null);
+  }
+
+  // Suprimir sobre la selección: aristas por la vía de arriba, el resto sin dejar restos sueltos.
+  function deleteSelectionSmart() {
+    pushUndo();
+    selectedObjects.slice().forEach(o => { if (o.type === 'line') eraseEdgeLine(o); else removeBodyClean(o); });
+    pruneOrphanNodes();
+    cleanupGroups();
+  }
 
   // ═════════════ Grupos, componentes, capas y ocultar ═════════════
   const IDENT_M = () => new THREE.Matrix4().identity().toArray();
@@ -4248,6 +4493,12 @@
     requestAnimationFrame(animate);
     stepCameraAnim(performance.now());
     controls.update();
+    // Plano cercano/lejano ajustados a la distancia: más precisión de profundidad = menos parpadeo.
+    if (camera === perspCam) {
+      const d = camera.position.distanceTo(controls.target);
+      const near = Math.max(0.05, d * 0.02), far = Math.max(300, d * 120);
+      if (Math.abs(near - camera.near) > camera.near * 0.05 || Math.abs(far - camera.far) > camera.far * 0.05) { camera.near = near; camera.far = far; camera.updateProjectionMatrix(); }
+    }
     renderer.render(scene, camera);
   }
   animate();
