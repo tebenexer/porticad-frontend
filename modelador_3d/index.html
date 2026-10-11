@@ -119,6 +119,25 @@
   }
   .statusbar .tool-name { color: #58a6ff; font-weight: 600; }
 
+  /* ── Caja de valores (VCB) + etiqueta de inferencia ── */
+  .vcb {
+    position: absolute; right: 14px; bottom: 14px; display: none; align-items: stretch;
+    background: #161b22f2; border: 1px solid #30363d; border-radius: 8px; overflow: hidden;
+    box-shadow: 0 6px 20px rgba(0,0,0,.45); pointer-events: none; z-index: 40;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .vcb-label { background: #1f6feb22; color: #58a6ff; font-size: 11px; font-weight: 700;
+               letter-spacing: .04em; text-transform: uppercase; padding: 8px 10px; display: flex; align-items: center; }
+  .vcb-val { color: #e6edf3; font-size: 15px; font-weight: 600; padding: 7px 12px; min-width: 120px; text-align: right; }
+  .vcb-val.typing { color: #f0b429; }
+  .vcb-val.typing::after { content: '\23CE'; margin-left: 6px; color: #8b949e; font-weight: 400; }
+  .snap-tip {
+    position: absolute; display: none; z-index: 45; pointer-events: none;
+    background: #0d1117ee; border: 1px solid #30363d; border-left-width: 3px; border-radius: 4px;
+    padding: 3px 8px; font-size: 11px; font-weight: 600; color: #e6edf3; white-space: nowrap;
+  }
+  .viewport.drawing { cursor: crosshair; }
+
   input[type=file] { display: none; }
 </style>
 </head>
@@ -166,8 +185,23 @@
     <button class="tool-btn" data-tool="rect" title="Rectángulo (R)">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="6" width="16" height="12"/></svg>
     </button>
+    <button class="tool-btn" data-tool="rrect" title="Rectángulo rotado (T): borde + ancho">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="3 14 14 3 21 10 10 21"/></svg>
+    </button>
     <button class="tool-btn" data-tool="circle" title="Círculo (C)">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/></svg>
+    </button>
+    <button class="tool-btn" data-tool="polygon" title="Polígono (O): escribe 8s + Enter para 8 lados">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="12 2.5 20.5 8.5 17.5 19 6.5 19 3.5 8.5"/></svg>
+    </button>
+    <button class="tool-btn" data-tool="arc2" title="Arco 2 puntos (A): inicio, fin, flecha">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 18 Q12 4 20 18"/><circle cx="4" cy="18" r="1.4" fill="currentColor"/><circle cx="20" cy="18" r="1.4" fill="currentColor"/></svg>
+    </button>
+    <button class="tool-btn" data-tool="arc3" title="Arco 3 puntos (Q): inicio, punto del arco, fin">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 18 C6 6 18 6 20 18"/><circle cx="4" cy="18" r="1.4" fill="currentColor"/><circle cx="12" cy="7.2" r="1.4" fill="currentColor"/><circle cx="20" cy="18" r="1.4" fill="currentColor"/></svg>
+    </button>
+    <button class="tool-btn" data-tool="freehand" title="Mano alzada (F): mantén presionado y dibuja">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c3-9 5 2 8-5s4 5 10-6"/></svg>
     </button>
     <div class="tool-sep"></div>
     <button class="tool-btn" data-tool="erase" title="Borrador (E)">
@@ -188,6 +222,8 @@
   <div class="viewport" id="viewport">
     <div class="hint" id="hint">Selecciona una herramienta para empezar.</div>
     <div class="marquee" id="marquee"></div>
+    <div class="snap-tip" id="snapTip"></div>
+    <div class="vcb" id="vcb"><span class="vcb-label" id="vcbLabel">Longitud</span><span class="vcb-val" id="vcbVal">0.00</span></div>
   </div>
 </div>
 
@@ -276,7 +312,7 @@
   // of the red/green/blue axes (through anchor) the cursor's 3D ray currently passes closest to
   // on screen. Works regardless of anchor's height, so it also catches the blue (vertical) axis.
   const AXIS_X_DIR = new THREE.Vector3(1, 0, 0), AXIS_Y_DIR = new THREE.Vector3(0, 1, 0), AXIS_Z_DIR = new THREE.Vector3(0, 0, 1);
-  function resolveAxisSnap(anchor, clientX, clientY) {
+  function resolveAxisSnap(anchor, clientX, clientY, horizontalOnly) {
     const rect = renderer.domElement.getBoundingClientRect();
     mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
     mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
@@ -289,6 +325,7 @@
     ];
     let best = null;
     axes.forEach(ax => {
+      if (horizontalOnly && ax.key === 'y') return;
       const candidate = closestPointOnLineToRay(anchor, ax.dir, rayOrigin, rayDir);
       const d = screenDistToPoint(clientX, clientY, candidate);
       if (d <= AXIS_LOCK_PIXEL_RADIUS && (!best || d < best.d)) best = { point: candidate, axis: ax.key, color: ax.color, label: ax.label, d };
@@ -579,6 +616,23 @@
     return null;
   }
 
+  function flipWinding(geo) {
+    const idx = geo.getIndex();
+    if (idx) {
+      const a = idx.array;
+      for (let i = 0; i + 2 < a.length; i += 3) { const t = a[i + 1]; a[i + 1] = a[i + 2]; a[i + 2] = t; }
+      idx.needsUpdate = true;
+    } else {
+      Object.keys(geo.attributes).forEach(name => {
+        const at = geo.attributes[name], n = at.itemSize, arr = at.array;
+        for (let i = 0; i + 2 < at.count; i += 3) {
+          for (let k = 0; k < n; k++) { const i1 = (i + 1) * n + k, i2 = (i + 2) * n + k; const t = arr[i1]; arr[i1] = arr[i2]; arr[i2] = t; }
+        }
+        at.needsUpdate = true;
+      });
+    }
+  }
+
   function buildPolyfaceMesh(points, height, orientation, base) {
     orientation = orientation || 'xz';
     base = base || 0;
@@ -590,6 +644,10 @@
     const b = POLYFACE_BASES[orientation] || POLYFACE_BASES.xz;
     const matrix = new THREE.Matrix4().makeBasis(b.x, b.y, b.z).setPosition(polyfaceOffsetVector(orientation, base));
     geo.applyMatrix4(matrix);
+    // The horizontal ('xz') and 'zy' plane bases are left-handed, which silently reverses the
+    // triangle winding once baked into the geometry — the top of a floor/solid then lit as its
+    // back side (dark blue, unlike a Rectangle/Circle). Flip it back so every face shades alike.
+    if (matrix.determinant() < 0) flipWinding(geo);
     const mesh = new THREE.Mesh(geo, mat);
     if (height <= 0) mesh.position.addScaledVector(b.z, 0.002); // nudge off the plane, avoids z-fighting
     attachEdges(mesh);
@@ -775,8 +833,13 @@
   const TOOL_HINTS = {
     select: 'Haz clic sobre una figura para seleccionarla.',
     line: 'Clic para el primer punto, clic para el segundo (engancha a extremos/medios/aristas y esquinas de sólidos, incluido el eje azul). Escribe un número + Enter para una longitud exacta. Cierra sobre el punto de inicio para crear una cara. Esc para cancelar.',
-    rect: 'Clic en una esquina, clic en la esquina opuesta.',
-    circle: 'Clic en el centro, clic para fijar el radio.',
+    rect: 'Clic en una esquina, clic en la esquina opuesta (engancha a puntos existentes). Escribe 200,100 + Enter para ancho y fondo exactos.',
+    rrect: 'Clic en el inicio del borde, clic en su fin (cualquier ángulo, engancha a los ejes) y mueve para fijar el ancho. Escribe una longitud y luego un ancho exactos + Enter.',
+    circle: 'Clic en el centro, clic para fijar el radio. Escribe un radio + Enter para un valor exacto.',
+    polygon: 'Clic en el centro, clic en un vértice. Escribe 8s + Enter para cambiar el número de lados (o flechas ↑↓); escribe un radio + Enter para un valor exacto.',
+    arc2: 'Clic en el inicio, clic en el fin de la cuerda, mueve para la flecha (la altura del arco) y clic. Escribe valores exactos + Enter.',
+    arc3: 'Clic en el inicio, clic en un punto por donde pasa el arco, clic en el fin.',
+    freehand: 'Mantén el botón presionado y dibuja a mano; al soltar se simplifica en segmentos. Termina sobre el inicio para cerrar y crear una cara.',
     erase: 'Haz clic sobre una figura para borrarla.',
     extrude: 'Pasa el cursor para ver resaltada la cara exacta. Clic para agarrarla, mueve el mouse (la cara sigue al cursor), clic de nuevo para soltar — o escribe un número + Enter. Esc cancela.',
     move: 'Clic sobre una figura y arrastra para reubicarla. Acércate a un eje rojo/verde/azul para moverla solo en esa dirección (incluye subir/bajar del plano).',
@@ -791,9 +854,11 @@
     cancelDraw();
     currentTool = tool;
     document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
-    const names = { select:'Seleccionar', line:'Línea', rect:'Rectángulo', circle:'Círculo', erase:'Borrador', extrude:'Extruir', move:'Mover', guide:'Cinta métrica' };
+    const names = { select:'Seleccionar', line:'Línea', rect:'Rectángulo', rrect:'Rectángulo rotado', circle:'Círculo', polygon:'Polígono', arc2:'Arco 2 puntos', arc3:'Arco 3 puntos', freehand:'Mano alzada', erase:'Borrador', extrude:'Extruir', move:'Mover', guide:'Cinta métrica' };
     statusToolEl.textContent = names[tool];
     hintEl.textContent = TOOL_HINTS[tool];
+    viewport.classList.toggle('drawing', DRAW_TOOLS.includes(tool));
+    if (DRAW_TOOLS.includes(tool)) lastDrawTool = tool;
   }
 
   document.getElementById('toolbar').addEventListener('click', (e) => {
@@ -1088,6 +1153,7 @@
     rebuildMesh(extrudeObj);
     selectObject(extrudeObj);
     showFaceHighlight(buildFaceHighlightMesh(extrudeObj, extrudeFaceKind));
+    setVCB('Distancia', delta.toFixed(2));
     let txt = 'distancia: ' + delta.toFixed(2);
     if (typedValue !== '') txt += '  → ' + typedValue + ' [Enter]';
     statusCoordsEl.textContent = txt;
@@ -1306,18 +1372,99 @@
     return null;
   }
 
+  // ── Inference feedback (SketchUp/IngeTrazo style): a shape-coded marker per snap kind that
+  // keeps a constant on-screen size, a small label next to the cursor, and a long dashed guide
+  // along the locked axis. All three live and die together via showSnapMarker/hideSnapMarker.
+  const SNAP_SHAPE = { endpoint: 'square', midpoint: 'triangle', onedge: 'cross' };
+  const snapSpriteCache = {};
+  function snapSpriteTexture(shape, color) {
+    const key = shape + color;
+    if (snapSpriteCache[key]) return snapSpriteCache[key];
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d');
+    const css = '#' + color.toString(16).padStart(6, '0');
+    g.lineWidth = 7; g.lineJoin = 'round'; g.lineCap = 'round';
+    const stroke = () => { g.strokeStyle = '#0d1117'; g.lineWidth = 11; g.stroke(); g.strokeStyle = css; g.lineWidth = 6; g.stroke(); };
+    g.beginPath();
+    if (shape === 'square') { g.rect(14, 14, 36, 36); stroke(); g.fillStyle = css + '55'; g.fill(); }
+    else if (shape === 'triangle') { g.moveTo(32, 10); g.lineTo(54, 50); g.lineTo(10, 50); g.closePath(); stroke(); g.fillStyle = css + '55'; g.fill(); }
+    else if (shape === 'cross') { g.moveTo(14, 14); g.lineTo(50, 50); g.moveTo(50, 14); g.lineTo(14, 50); stroke(); }
+    else { g.arc(32, 32, 16, 0, Math.PI * 2); stroke(); g.fillStyle = css + '55'; g.fill(); }
+    const tex = new THREE.CanvasTexture(c);
+    snapSpriteCache[key] = tex;
+    return tex;
+  }
+
+  const snapTipEl = document.getElementById('snapTip');
+  const vcbEl = document.getElementById('vcb');
+  const vcbLabelEl = document.getElementById('vcbLabel');
+  const vcbValEl = document.getElementById('vcbVal');
+
+  function showSnapTip(point, text, color) {
+    if (!text) { snapTipEl.style.display = 'none'; return; }
+    const s = projectToScreen(point, dom.getBoundingClientRect());
+    snapTipEl.textContent = text;
+    snapTipEl.style.borderLeftColor = '#' + color.toString(16).padStart(6, '0');
+    snapTipEl.style.left = (s.x + 16) + 'px';
+    snapTipEl.style.top = (s.y + 14) + 'px';
+    snapTipEl.style.display = 'block';
+  }
+
   let snapMarkerMesh = null;
-  function showSnapMarker(point, color) {
+  let axisGuideMesh = null;
+  function showSnapMarker(point, color, kind, labelOverride) {
     hideSnapMarker();
-    const geo = new THREE.SphereGeometry(0.09, 12, 12);
-    const mat = new THREE.MeshBasicMaterial({ color });
-    snapMarkerMesh = new THREE.Mesh(geo, mat);
+    const mat = new THREE.SpriteMaterial({
+      map: snapSpriteTexture(SNAP_SHAPE[kind] || 'circle', color),
+      depthTest: false, transparent: true, sizeAttenuation: false
+    });
+    snapMarkerMesh = new THREE.Sprite(mat);
+    snapMarkerMesh.scale.set(0.034, 0.034, 1);
+    snapMarkerMesh.renderOrder = 999;
     snapMarkerMesh.position.copy(point);
+    snapMarkerMesh.raycast = () => {};
     scene.add(snapMarkerMesh);
+    showSnapTip(point, labelOverride || SNAP_LABEL[kind], color);
+  }
+  function showAxisGuide(anchor, axisKey, color) {
+    const dir = axisKey === 'x' ? AXIS_X_DIR : axisKey === 'y' ? AXIS_Y_DIR : AXIS_Z_DIR;
+    const geo = new THREE.BufferGeometry().setFromPoints([
+      anchor.clone().addScaledVector(dir, -GRID_SIZE), anchor.clone().addScaledVector(dir, GRID_SIZE)
+    ]);
+    axisGuideMesh = new THREE.Line(geo, new THREE.LineDashedMaterial({ color, dashSize: 0.35, gapSize: 0.22, transparent: true, opacity: 0.75 }));
+    axisGuideMesh.computeLineDistances();
+    axisGuideMesh.raycast = () => {};
+    scene.add(axisGuideMesh);
   }
   function hideSnapMarker() {
-    if (snapMarkerMesh) { scene.remove(snapMarkerMesh); disposeMesh(snapMarkerMesh); snapMarkerMesh = null; }
+    if (snapMarkerMesh) { scene.remove(snapMarkerMesh); snapMarkerMesh.material.dispose(); snapMarkerMesh = null; }
+    if (axisGuideMesh) { scene.remove(axisGuideMesh); disposeMesh(axisGuideMesh); axisGuideMesh = null; }
+    snapTipEl.style.display = 'none';
   }
+
+  // One call that turns a resolveDirectedEndpoint() result into on-screen feedback.
+  function showInference(resolved, anchor) {
+    hideSnapMarker();
+    if (typedValue) return; // a typed exact value overrides whatever the cursor is inferring
+    if (resolved.snapped) showSnapMarker(resolved.point, resolved.color, resolved.kind);
+    else if (resolved.axis && anchor) {
+      showAxisGuide(anchor, resolved.axis, resolved.color);
+      showSnapTip(resolved.point, resolved.label, resolved.color);
+    }
+  }
+  function snapColorFor(kind) {
+    return kind === 'endpoint' ? SNAP_COLOR_ENDPOINT : kind === 'midpoint' ? SNAP_COLOR_MIDPOINT : SNAP_COLOR_ONEDGE;
+  }
+
+  // Value Control Box: shows the live measurement for the active tool, or the typed value
+  // (amber, with an Enter mark) once the user starts typing.
+  function setVCB(label, measured) {
+    vcbEl.style.display = 'flex';
+    vcbLabelEl.textContent = label;
+    vcbValEl.textContent = typedValue ? typedValue : measured;
+    vcbValEl.classList.toggle('typing', !!typedValue);
+  }
+  function hideVCB() { vcbEl.style.display = 'none'; }
 
   // draw state
   let drawStage = 0;       // 0 = idle, 1 = first point placed
@@ -1411,6 +1558,7 @@
     previewMesh = buildGuideMesh(newA, newB);
     previewMesh.traverse(n => { if (n.material && n.material.color) n.material.color.setHex(AXIS_COLOR_NONE); });
     scene.add(previewMesh);
+    setVCB('Desfase', offsetVec.length().toFixed(2));
     let txt = 'offset: ' + offsetVec.length().toFixed(2);
     if (typedValue) txt += '  → ' + typedValue + ' [Enter]';
     statusCoordsEl.textContent = txt;
@@ -1428,24 +1576,27 @@
   // Shared by the Line and Guide tools: resolves where the "next point" should land —
   // geometry snap first, then axis lock, then a free point on the plane through `anchor`
   // — and overrides it with the typed VCB length along that same direction if one is set.
-  function resolveDirectedEndpoint(anchor, clientX, clientY) {
-    const raw = groundPoint(clientX, clientY) || anchor.clone();
-    const geomSnap = resolveGeometrySnap(raw, clientX, clientY);
-    let endPoint, color, label, nodeId = null;
+  function resolveDirectedEndpoint(anchor, clientX, clientY, planar) {
+    const raw = (planar ? planePoint(clientX, clientY, anchor.y) : groundPoint(clientX, clientY)) || anchor.clone();
+    let geomSnap = resolveGeometrySnap(raw, clientX, clientY);
+    // Planar mode (shape tools): only snap to geometry that sits in the drawing plane.
+    if (planar && geomSnap && Math.abs(geomSnap.point.y - anchor.y) > 1e-3) geomSnap = null;
+    let endPoint, color, label, nodeId = null, axisKey = null;
     if (geomSnap) {
       endPoint = geomSnap.point;
       color = geomSnap.kind === 'endpoint' ? SNAP_COLOR_ENDPOINT : geomSnap.kind === 'midpoint' ? SNAP_COLOR_MIDPOINT : SNAP_COLOR_ONEDGE;
       label = SNAP_LABEL[geomSnap.kind];
       nodeId = geomSnap.nodeId;
     } else {
-      const axisSnap = resolveAxisSnap(anchor, clientX, clientY);
+      const axisSnap = resolveAxisSnap(anchor, clientX, clientY, !!planar);
       if (axisSnap) {
-        endPoint = axisSnap.point; color = axisSnap.color; label = axisSnap.label;
+        endPoint = axisSnap.point; color = axisSnap.color; label = axisSnap.label; axisKey = axisSnap.axis;
       } else {
         endPoint = planePoint(clientX, clientY, anchor.y) || anchor.clone();
         color = AXIS_COLOR_NONE; label = null;
       }
     }
+    if (planar) endPoint.y = anchor.y;
     const direction = endPoint.clone().sub(anchor);
     if (direction.lengthSq() > 1e-9) direction.normalize(); else direction.set(1, 0, 0);
     if (typedValue) {
@@ -1454,7 +1605,7 @@
       // is kept, but the distance is overridden), so it's not the same point as that node.
       if (!isNaN(len)) { endPoint = anchor.clone().addScaledVector(direction, len); nodeId = null; }
     }
-    return { point: endPoint, color, label, snapped: !!geomSnap, nodeId };
+    return { point: endPoint, color, label, snapped: !!geomSnap, nodeId, axis: axisKey, kind: geomSnap ? geomSnap.kind : null };
   }
 
   function resolveLineEndpoint(clientX, clientY) { return resolveDirectedEndpoint(drawStart, clientX, clientY); }
@@ -1493,6 +1644,7 @@
   }
 
   function commitLineSegment(finalPt, finalNodeId) {
+    rememberTyped();
     pushUndo();
     const endNodeId = (finalNodeId != null) ? finalNodeId : createNode(finalPt).id;
     const segment = addObject('line', { nodeIds: [drawStartNodeId, endNodeId] });
@@ -1528,10 +1680,11 @@
     if (currentTool !== 'line' || drawStage !== 1) return;
     clearPreview();
     const resolved = resolveLineEndpoint(lastMouseX, lastMouseY);
-    if (resolved.snapped && !typedValue) showSnapMarker(resolved.point, resolved.color); else hideSnapMarker();
+    showInference(resolved, drawStart);
     previewMesh = buildLineMesh(drawStart, resolved.point);
     previewMesh.traverse(n => { if (n.material && n.material.color) n.material.color.setHex(resolved.color); });
     scene.add(previewMesh);
+    setVCB('Longitud', drawStart.distanceTo(resolved.point).toFixed(2));
     let txt = 'x: ' + resolved.point.x.toFixed(2) + '  z: ' + resolved.point.z.toFixed(2);
     if (resolved.label && !typedValue) txt += '  · ' + resolved.label;
     if (typedValue) txt += '  → ' + typedValue + ' [Enter]';
@@ -1555,11 +1708,12 @@
     if (currentTool !== 'guide' || !guideChainStart) return;
     clearPreview();
     const resolved = resolveDirectedEndpoint(guideChainStart, lastMouseX, lastMouseY);
-    if (resolved.snapped && !typedValue) showSnapMarker(resolved.point, resolved.color); else hideSnapMarker();
+    showInference(resolved, guideChainStart);
     previewMesh = buildGuideMesh(guideChainStart, resolved.point);
     previewMesh.traverse(n => { if (n.material && n.material.color) n.material.color.setHex(resolved.color); });
     scene.add(previewMesh);
     const len = guideChainStart.distanceTo(resolved.point);
+    setVCB('Longitud', len.toFixed(2));
     let txt = 'longitud: ' + len.toFixed(2);
     if (resolved.label && !typedValue) txt += '  · ' + resolved.label;
     if (typedValue) txt += '  → ' + typedValue + ' [Enter]';
@@ -1616,6 +1770,9 @@
     moveNodeOriginalPos = null;
     moveNodeBase = null;
     typedValue = '';
+    shapePts = [];
+    freehandPts = null;
+    hideVCB();
     lastLineEndPoint = null;
     lastLineEndNodeId = null;
     guideChainStart = null;
@@ -1634,6 +1791,398 @@
     pruneOrphanNodes();
   }
 
+
+  // ═════════════ Drawing tools: rect / circle / polygon / arcs / rotated rect / freehand ═════════════
+  // Everything below draws on a horizontal plane at the height of the first point. Closed
+  // results become real shared-node line loops + a polyface (same as closing a Line chain),
+  // arcs and freehand strokes become curve-grouped line chains (one click selects/erases it all).
+  const SHAPE_TOOLS = ['polygon', 'arc2', 'arc3', 'rrect', 'freehand'];
+  const DRAW_TOOLS = ['line', 'rect', 'circle', 'guide'].concat(SHAPE_TOOLS);
+  let shapePts = [];        // points already placed for the active shape tool
+  let polySides = 6;
+  let freehandPts = null;   // while the button is held with the Freehand tool
+  let lastDrawTool = null;  // for "repeat last command" (Shift+R)
+  let lastCommitTool = null, lastCommitTyped = '', repeatPending = '';
+
+  function typedNums() {
+    return typedValue.split(/[;,]/).filter(t => t !== '' && t !== '-').map(parseFloat).filter(n => !isNaN(n));
+  }
+  function rememberTyped() { lastCommitTool = currentTool; lastCommitTyped = typedValue; }
+  function applyRepeat() { if (repeatPending) { typedValue = repeatPending; repeatPending = ''; } }
+
+  // First-point resolution: geometry snap if any, else the ground plane.
+  function resolveStartPoint(clientX, clientY) {
+    const raw = groundPoint(clientX, clientY);
+    if (!raw) return null;
+    const g = resolveGeometrySnap(raw, clientX, clientY);
+    if (g) return { point: g.point.clone(), snapped: true, kind: g.kind, nodeId: g.nodeId };
+    return { point: raw, snapped: false, kind: null, nodeId: null };
+  }
+  // Second-point resolution on the plane through `y`: only geometry that sits in that plane counts.
+  function resolvePlanarGeom(clientX, clientY, y) {
+    const raw = planePoint(clientX, clientY, y);
+    if (!raw) return null;
+    const g = resolveGeometrySnap(raw, clientX, clientY);
+    if (g && Math.abs(g.point.y - y) < 1e-3) return { point: new THREE.Vector3(g.point.x, y, g.point.z), snapped: true, kind: g.kind };
+    return { point: new THREE.Vector3(raw.x, y, raw.z), snapped: false, kind: null };
+  }
+
+  // ── preview builders (translucent fill + bright outline, instead of a bare wireframe) ──
+  function buildPreviewShape(points, closed, fill) {
+    const g = new THREE.Group();
+    const lift = new THREE.Vector3(0, 0.004, 0);
+    const pts = points.map(q => q.clone().add(lift));
+    if (fill && closed && pts.length >= 3) {
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const idx = [];
+      for (let i = 1; i < pts.length - 1; i++) idx.push(0, i, i + 1);
+      geo.setIndex(idx);
+      g.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: AXIS_COLOR_NONE, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false })));
+    }
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
+    g.add(closed ? new THREE.LineLoop(lineGeo, new THREE.LineBasicMaterial({ color: AXIS_COLOR_NONE }))
+                 : new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: AXIS_COLOR_NONE })));
+    g.traverse(n => { n.raycast = () => {}; });
+    return g;
+  }
+  function setPreview(obj) {
+    clearPreview();
+    previewMesh = obj;
+    if (previewMesh) scene.add(previewMesh);
+  }
+  function circlePoints(c, r, n) {
+    const pts = [];
+    for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; pts.push(new THREE.Vector3(c.x + r * Math.cos(a), c.y, c.z + r * Math.sin(a))); }
+    return pts;
+  }
+
+  // ── geometry helpers ──
+  // Arc through three points on a horizontal plane (circumcircle), p0 → pm → p1. Returns the
+  // tessellated points (7.5° per segment) plus the radius, or a straight 2-point result if collinear.
+  function arcThrough(p0, pm, p1) {
+    const ax = p0.x, az = p0.z, bx = pm.x, bz = pm.z, cx = p1.x, cz = p1.z;
+    const d = 2 * (ax * (bz - cz) + bx * (cz - az) + cx * (az - bz));
+    if (Math.abs(d) < 1e-9) return { pts: [p0.clone(), p1.clone()], radius: Infinity };
+    const a2 = ax * ax + az * az, b2 = bx * bx + bz * bz, c2 = cx * cx + cz * cz;
+    const ux = (a2 * (bz - cz) + b2 * (cz - az) + c2 * (az - bz)) / d;
+    const uz = (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / d;
+    const R = Math.hypot(ax - ux, az - uz);
+    const TAU = Math.PI * 2, norm = a => ((a % TAU) + TAU) % TAU;
+    const a0 = Math.atan2(az - uz, ax - ux), am = Math.atan2(bz - uz, bx - ux), a1 = Math.atan2(cz - uz, cx - ux);
+    const ccw = norm(a1 - a0), mid = norm(am - a0);
+    const sweep = mid <= ccw ? ccw : ccw - TAU; // the direction that actually passes through pm
+    const n = Math.min(64, Math.max(4, Math.ceil(Math.abs(sweep) / (Math.PI / 24))));
+    const pts = [p0.clone()];
+    for (let i = 1; i < n; i++) { const a = a0 + sweep * i / n; pts.push(new THREE.Vector3(ux + R * Math.cos(a), p0.y, uz + R * Math.sin(a))); }
+    pts.push(p1.clone());
+    return { pts, radius: R };
+  }
+  function perpXZ(a, b) { // unit vector perpendicular to a→b on the horizontal plane
+    const t = new THREE.Vector3(b.x - a.x, 0, b.z - a.z);
+    if (t.lengthSq() < 1e-12) return new THREE.Vector3(0, 0, 1);
+    t.normalize();
+    return new THREE.Vector3(-t.z, 0, t.x);
+  }
+  function simplifyPath(pts, eps) { // Douglas–Peucker on the horizontal plane
+    if (pts.length < 3) return pts.slice();
+    const keep = new Array(pts.length).fill(false);
+    keep[0] = keep[pts.length - 1] = true;
+    const stack = [[0, pts.length - 1]];
+    while (stack.length) {
+      const [i, j] = stack.pop();
+      let dmax = 0, idx = -1;
+      for (let k = i + 1; k < j; k++) {
+        const d = closestPointOnSegment(pts[k], pts[i], pts[j]).distanceTo(pts[k]);
+        if (d > dmax) { dmax = d; idx = k; }
+      }
+      if (idx !== -1 && dmax > eps) { keep[idx] = true; stack.push([i, idx], [idx, j]); }
+    }
+    return pts.filter((_, i) => keep[i]);
+  }
+
+  function nodeAt(pt) {
+    for (const [id, n] of nodes) if (Math.hypot(n.x - pt.x, n.y - pt.y, n.z - pt.z) < 1e-4) return id;
+    return null;
+  }
+  function nextCurveId() { return 1 + objects.reduce((m, o) => Math.max(m, (o.params && o.params.curveId) || 0), 0); }
+  // Curve-mates: every segment of the same arc / freehand stroke (so one click picks/erases it all).
+  function curveMates(o) {
+    if (o && o.type === 'line' && o.params.curveId) return objects.filter(x => x.type === 'line' && x.params.curveId === o.params.curveId);
+    return o ? [o] : [];
+  }
+
+  // Commits a shape as shared-node line segments (reusing existing nodes at the same spot, so
+  // it welds onto neighbouring geometry) and, if closed and flat, the polyface fill.
+  function commitShape(points, closed, curve) {
+    const pts = [];
+    points.forEach(q => { if (!pts.length || pts[pts.length - 1].distanceTo(q) > 1e-4) pts.push(q.clone()); });
+    if (closed && pts.length > 1 && pts[0].distanceTo(pts[pts.length - 1]) < 1e-4) pts.pop();
+    if (pts.length < (closed ? 3 : 2)) return false;
+    rememberTyped();
+    pushUndo();
+    const ids = pts.map(q => { const e = nodeAt(q); return e != null ? e : createNode(q).id; });
+    const curveId = curve ? nextCurveId() : null;
+    const segs = closed ? pts.length : pts.length - 1;
+    for (let i = 0; i < segs; i++) {
+      const params = { nodeIds: [ids[i], ids[(i + 1) % ids.length]] };
+      if (curveId) params.curveId = curveId;
+      addObject('line', params);
+    }
+    if (closed) {
+      const planar = detectPolygonOrientation(pts);
+      if (planar) addObject('polyface', { nodeIds: ids.slice(), orientation: planar.orientation, base: planar.base }, 0);
+    }
+    return true;
+  }
+
+  // ── Rectangle & circle (axis-aligned parametric objects), now with snapping + typed sizes ──
+  // Rect typed sizes: "200,100" (width,depth) or "200" (width only). Signs flip direction.
+  function computeRectEnd(clientX, clientY) {
+    const res = resolvePlanarGeom(clientX, clientY, drawStart.y);
+    const cur = res ? res.point : drawStart.clone();
+    const nums = typedNums();
+    let dx = cur.x - drawStart.x, dz = cur.z - drawStart.z;
+    const sx = dx < 0 ? -1 : 1, sz = dz < 0 ? -1 : 1;
+    if (nums.length >= 1) dx = sx * nums[0];
+    if (nums.length >= 2) dz = sz * nums[1];
+    return { end: new THREE.Vector3(drawStart.x + dx, drawStart.y, drawStart.z + dz), w: Math.abs(dx), d: Math.abs(dz), res };
+  }
+  function computeCircleRadius(clientX, clientY) {
+    const res = resolvePlanarGeom(clientX, clientY, drawStart.y);
+    const cur = res ? res.point : drawStart.clone();
+    const nums = typedNums();
+    return { r: nums.length ? Math.abs(nums[0]) : drawStart.distanceTo(cur), res };
+  }
+  function refreshRectCirclePreview() {
+    if (currentTool !== 'rect' && currentTool !== 'circle') return;
+    if (drawStage === 0) {
+      const sp = resolveStartPoint(lastMouseX, lastMouseY);
+      if (sp && sp.snapped) showSnapMarker(sp.point, snapColorFor(sp.kind), sp.kind); else hideSnapMarker();
+      return;
+    }
+    if (currentTool === 'rect') {
+      const { end, w, d, res } = computeRectEnd(lastMouseX, lastMouseY);
+      if (res && res.snapped && !typedValue) showSnapMarker(end, snapColorFor(res.kind), res.kind); else hideSnapMarker();
+      const y = drawStart.y;
+      setPreview(buildPreviewShape([
+        new THREE.Vector3(drawStart.x, y, drawStart.z), new THREE.Vector3(end.x, y, drawStart.z),
+        new THREE.Vector3(end.x, y, end.z), new THREE.Vector3(drawStart.x, y, end.z)], true, true));
+      setVCB('Dimensiones', w.toFixed(2) + ', ' + d.toFixed(2));
+    } else {
+      const { r, res } = computeCircleRadius(lastMouseX, lastMouseY);
+      if (res && res.snapped && !typedValue) showSnapMarker(res.point, snapColorFor(res.kind), res.kind); else hideSnapMarker();
+      setPreview(buildPreviewShape(circlePoints(drawStart, Math.max(r, 0.001), 48), true, true));
+      setVCB('Radio', r.toFixed(2));
+    }
+  }
+  function commitRectCircle(clientX, clientY) {
+    if (currentTool === 'rect') {
+      const { end, w, d } = computeRectEnd(clientX, clientY);
+      if (w < 1e-3 || d < 1e-3) return;
+      rememberTyped(); pushUndo();
+      const params = { x1: drawStart.x, z1: drawStart.z, x2: end.x, z2: end.z };
+      if (Math.abs(drawStart.y) > 1e-9) params.baseY = drawStart.y;
+      addObject('rect', params, 0);
+    } else {
+      const { r } = computeCircleRadius(clientX, clientY);
+      if (r < 1e-3) return;
+      rememberTyped(); pushUndo();
+      const params = { cx: drawStart.x, cz: drawStart.z, radius: r };
+      if (Math.abs(drawStart.y) > 1e-9) params.baseY = drawStart.y;
+      addObject('circle', params, 0);
+    }
+    cancelDraw();
+  }
+
+  // ── Shape tools: one function computes both the live preview and what a click/Enter commits ──
+  // Returns { advance, final:{pts,closed,curve}, preview, label, measure, inference, resolved }.
+  function computeShapeStep(clientX, clientY) {
+    const out = { advance: null, final: null, preview: null, label: null, measure: '', resolved: null, anchor: null };
+    const n = shapePts.length;
+    if (n === 0) {
+      const sp = resolveStartPoint(clientX, clientY);
+      if (sp) { out.advance = sp.point; out.resolved = { snapped: sp.snapped, kind: sp.kind, point: sp.point, color: sp.snapped ? snapColorFor(sp.kind) : 0 }; }
+      return out;
+    }
+    const y = shapePts[0].y;
+    const t = currentTool;
+    const nums = typedNums();
+    const typedEndsWithS = /s$/.test(typedValue);
+    const dirRes = (anchor) => { // directed endpoint on the plane, typed length honoured
+      const r = resolveDirectedEndpoint(anchor, clientX, clientY, true);
+      out.resolved = r; out.anchor = anchor; return r;
+    };
+
+    if (t === 'polygon') {
+      const c = shapePts[0];
+      const r0 = dirRes(c);
+      let dir = r0.point.clone().sub(c);
+      let radius = dir.length();
+      if (radius < 1e-9) dir.set(1, 0, 0); else dir.normalize();
+      if (nums.length && !typedEndsWithS) radius = Math.abs(nums[0]);
+      const a0 = Math.atan2(dir.z, dir.x);
+      const pts = [];
+      for (let i = 0; i < polySides; i++) { const a = a0 + i / polySides * Math.PI * 2; pts.push(new THREE.Vector3(c.x + radius * Math.cos(a), y, c.z + radius * Math.sin(a))); }
+      out.final = { pts, closed: true, curve: false };
+      out.preview = buildPreviewShape(pts, true, true);
+      out.label = 'Radio · ' + polySides + ' lados';
+      out.measure = radius.toFixed(2);
+      return out;
+    }
+    if (t === 'freehand') return out;
+
+    // arc2 / arc3 / rrect share "second point like a Line" for their first leg
+    if (n === 1) {
+      const a = shapePts[0];
+      const r = dirRes(a);
+      out.advance = r.point.clone();
+      out.preview = buildPreviewShape([a, r.point], false, false);
+      out.label = t === 'arc3' ? 'Hasta el punto del arco' : 'Longitud';
+      out.measure = a.distanceTo(r.point).toFixed(2);
+      return out;
+    }
+    const p0 = shapePts[0], p1 = shapePts[1];
+    const cursor = planePoint(clientX, clientY, y) || p1.clone();
+    cursor.y = y;
+    if (t === 'arc2') {
+      const mid = p0.clone().add(p1).multiplyScalar(0.5);
+      const nrm = perpXZ(p0, p1);
+      let s = cursor.clone().sub(mid).dot(nrm);
+      const side = s < 0 ? -1 : 1;
+      if (nums.length) s = side * nums[0];
+      if (Math.abs(s) < 1e-4) { out.final = { pts: [p0.clone(), p1.clone()], closed: false, curve: true }; }
+      else {
+        const apex = mid.clone().addScaledVector(nrm, s);
+        const arc = arcThrough(p0, apex, p1);
+        out.final = { pts: arc.pts, closed: false, curve: true };
+      }
+      out.preview = buildPreviewShape(out.final.pts, false, false);
+      out.label = 'Flecha'; out.measure = Math.abs(s).toFixed(2);
+      return out;
+    }
+    if (t === 'arc3') {
+      const r = dirRes(p0);
+      const arc = arcThrough(p0, p1, r.point);
+      out.final = { pts: arc.pts, closed: false, curve: true };
+      out.preview = buildPreviewShape(arc.pts, false, false);
+      out.label = 'Radio'; out.measure = isFinite(arc.radius) ? arc.radius.toFixed(2) : '∞';
+      return out;
+    }
+    if (t === 'rrect') {
+      const nrm = perpXZ(p0, p1);
+      let w = cursor.clone().sub(p1).dot(nrm);
+      const side = w < 0 ? -1 : 1;
+      if (nums.length) w = side * nums[0];
+      const off = nrm.clone().multiplyScalar(w);
+      const pts = [p0.clone(), p1.clone(), p1.clone().add(off), p0.clone().add(off)];
+      out.final = { pts, closed: true, curve: false };
+      out.preview = buildPreviewShape(pts, true, true);
+      out.label = 'Ancho · lado ' + p0.distanceTo(p1).toFixed(2); out.measure = Math.abs(w).toFixed(2);
+      return out;
+    }
+    return out;
+  }
+
+  // Which stages accept typed values (arc3 has none: its points are all geometric).
+  function shapeVcbActive() {
+    const n = shapePts.length;
+    if (currentTool === 'polygon') return n === 1;
+    if (currentTool === 'arc2' || currentTool === 'rrect') return n === 1 || n === 2;
+    return false;
+  }
+
+  function refreshShapePreview() {
+    if (!SHAPE_TOOLS.includes(currentTool)) return;
+    if (currentTool === 'freehand') {
+      if (freehandPts) {
+        const q = planePoint(lastMouseX, lastMouseY, freehandPts[0].y);
+        if (q) {
+          q.y = freehandPts[0].y;
+          if (q.distanceTo(freehandPts[freehandPts.length - 1]) > 0.12) freehandPts.push(q);
+          setPreview(buildPreviewShape(freehandPts, false, false));
+          setVCB('Puntos', String(freehandPts.length));
+        }
+      } else {
+        const sp = resolveStartPoint(lastMouseX, lastMouseY);
+        if (sp && sp.snapped) showSnapMarker(sp.point, snapColorFor(sp.kind), sp.kind); else hideSnapMarker();
+      }
+      return;
+    }
+    const step = computeShapeStep(lastMouseX, lastMouseY);
+    if (shapePts.length === 0) {
+      if (step.resolved && step.resolved.snapped) showSnapMarker(step.advance, step.resolved.color, step.resolved.kind); else hideSnapMarker();
+      hideVCB();
+      return;
+    }
+    setPreview(step.preview);
+    if (step.resolved) {
+      // resolved may come from resolveDirectedEndpoint (axis/geometry) — show inference feedback
+      if (step.resolved.point && step.anchor) showInference(step.resolved, step.anchor); else hideSnapMarker();
+    } else hideSnapMarker();
+    if (step.label) setVCB(step.label, step.measure);
+  }
+
+  function shapeClick(clientX, clientY) {
+    lastMouseX = clientX; lastMouseY = clientY;
+    if (currentTool === 'freehand') return;
+    const step = computeShapeStep(clientX, clientY);
+    if (shapePts.length === 0) {
+      if (!step.advance) return;
+      shapePts = [step.advance.clone()];
+      typedValue = '';
+      applyRepeat();
+      refreshShapePreview();
+      return;
+    }
+    if (step.final) {
+      const closed = step.final.closed;
+      const ok = commitShape(step.final.pts, closed, step.final.curve);
+      if (ok) cancelDraw();
+      return;
+    }
+    if (step.advance) {
+      shapePts.push(step.advance.clone());
+      typedValue = '';
+      refreshShapePreview();
+    }
+  }
+
+  function shapeEnter() {
+    if (currentTool === 'polygon' && /^\d+s$/.test(typedValue)) {
+      polySides = Math.min(64, Math.max(3, parseInt(typedValue, 10)));
+      typedValue = '';
+      refreshShapePreview();
+      return;
+    }
+    shapeClick(lastMouseX, lastMouseY);
+  }
+
+  function freehandStart(clientX, clientY) {
+    const sp = resolveStartPoint(clientX, clientY);
+    if (!sp) return;
+    freehandPts = [sp.point.clone()];
+    hideSnapMarker();
+  }
+  function freehandFinish() {
+    const pts = freehandPts;
+    freehandPts = null;
+    clearPreview(); hideVCB();
+    if (!pts || pts.length < 2) return;
+    let eps = 0.05, simp = simplifyPath(pts, eps);
+    while (simp.length > 160 && eps < 2) { eps *= 1.5; simp = simplifyPath(pts, eps); }
+    const first = simp[0], last = simp[simp.length - 1];
+    const closed = simp.length >= 4 && first.distanceTo(last) < 0.35;
+    if (closed) simp[simp.length - 1] = first.clone();
+    commitShape(simp, closed, true);
+  }
+
+  function repeatLast() {
+    if (!lastDrawTool) return;
+    const typed = lastCommitTool === lastDrawTool ? lastCommitTyped : '';
+    setTool(lastDrawTool);
+    repeatPending = typed;
+  }
+
   const dom = renderer.domElement;
 
   dom.addEventListener('contextmenu', e => e.preventDefault());
@@ -1649,7 +2198,7 @@
 
     if (currentTool === 'erase') {
       const obj = pickObject(e.clientX, e.clientY);
-      if (obj) { pushUndo(); removeObject(obj); }
+      if (obj) { pushUndo(); curveMates(obj).forEach(removeObject); }
       return;
     }
 
@@ -1668,6 +2217,8 @@
         chainNodeIds = [startNodeId];
         chainLineObjs = [];
         typedValue = '';
+        applyRepeat();
+        refreshLinePreview();
       } else {
         const resolved = lastLineEndPoint ? { point: lastLineEndPoint.clone(), nodeId: lastLineEndNodeId } : resolveLineEndpoint(e.clientX, e.clientY);
         commitLineSegment(resolved.point, resolved.nodeId);
@@ -1702,32 +2253,26 @@
       return;
     }
 
-    if (currentTool === 'rect') {
-      const p = groundPoint(e.clientX, e.clientY);
-      if (!p) return;
+    if (currentTool === 'rect' || currentTool === 'circle') {
+      lastMouseX = e.clientX; lastMouseY = e.clientY;
       if (drawStage === 0) {
-        drawStart = p.clone();
+        const sp = resolveStartPoint(e.clientX, e.clientY);
+        if (!sp) return;
+        drawStart = sp.point.clone();
         drawStage = 1;
+        typedValue = '';
+        applyRepeat();
+        hideSnapMarker();
+        refreshRectCirclePreview();
       } else {
-        pushUndo();
-        addObject('rect', { x1: drawStart.x, z1: drawStart.z, x2: p.x, z2: p.z }, 0);
-        cancelDraw();
+        commitRectCircle(e.clientX, e.clientY);
       }
       return;
     }
 
-    if (currentTool === 'circle') {
-      const p = groundPoint(e.clientX, e.clientY);
-      if (!p) return;
-      if (drawStage === 0) {
-        drawStart = p.clone();
-        drawStage = 1;
-      } else {
-        const r = drawStart.distanceTo(p);
-        pushUndo();
-        addObject('circle', { cx: drawStart.x, cz: drawStart.z, radius: r }, 0);
-        cancelDraw();
-      }
+    if (SHAPE_TOOLS.includes(currentTool)) {
+      if (currentTool === 'freehand') freehandStart(e.clientX, e.clientY);
+      else shapeClick(e.clientX, e.clientY);
       return;
     }
 
@@ -1818,8 +2363,7 @@
     if (currentTool === 'line' && drawStage === 0 && p) {
       const geomSnap = resolveGeometrySnap(p, e.clientX, e.clientY);
       if (geomSnap) {
-        const snapColor = geomSnap.kind === 'endpoint' ? SNAP_COLOR_ENDPOINT : geomSnap.kind === 'midpoint' ? SNAP_COLOR_MIDPOINT : SNAP_COLOR_ONEDGE;
-        showSnapMarker(geomSnap.point, snapColor);
+        showSnapMarker(geomSnap.point, snapColorFor(geomSnap.kind), geomSnap.kind);
         statusCoordsEl.textContent += '  · ' + SNAP_LABEL[geomSnap.kind];
       } else {
         hideSnapMarker();
@@ -1827,10 +2371,11 @@
     } else if (currentTool === 'line' && drawStage === 1 && p) {
       clearPreview();
       const resolved = resolveLineEndpoint(e.clientX, e.clientY);
-      if (resolved.snapped && !typedValue) showSnapMarker(resolved.point, resolved.color); else hideSnapMarker();
+      showInference(resolved, drawStart);
       previewMesh = buildLineMesh(drawStart, resolved.point);
       previewMesh.traverse(n => { if (n.material && n.material.color) n.material.color.setHex(resolved.color); });
       scene.add(previewMesh);
+      setVCB('Longitud', drawStart.distanceTo(resolved.point).toFixed(2));
       if (resolved.label && !typedValue) statusCoordsEl.textContent += '  · ' + resolved.label;
       if (typedValue) statusCoordsEl.textContent += '  → ' + typedValue + ' [Enter]';
       lastLineEndPoint = resolved.point.clone();
@@ -1840,24 +2385,17 @@
     } else if (currentTool === 'guide' && !guideChainStart && p) {
       const geomSnap = resolveGeometrySnap(p, e.clientX, e.clientY);
       if (geomSnap) {
-        const snapColor = geomSnap.kind === 'endpoint' ? SNAP_COLOR_ENDPOINT : geomSnap.kind === 'midpoint' ? SNAP_COLOR_MIDPOINT : SNAP_COLOR_ONEDGE;
-        showSnapMarker(geomSnap.point, snapColor);
+        showSnapMarker(geomSnap.point, snapColorFor(geomSnap.kind), geomSnap.kind);
         statusCoordsEl.textContent += '  · ' + SNAP_LABEL[geomSnap.kind];
       } else {
         hideSnapMarker();
       }
     } else if (currentTool === 'guide' && guideChainStart) {
       refreshGuidePreview();
-    } else if ((currentTool === 'rect' || currentTool === 'circle') && drawStage === 1 && p) {
-      clearPreview();
-      const mat = new THREE.MeshBasicMaterial({ color: AXIS_COLOR_NONE, wireframe: true, transparent: true, opacity: 0.8 });
-      if (currentTool === 'rect') {
-        previewMesh = buildRectMesh(drawStart.x, drawStart.z, p.x, p.z, 0);
-      } else {
-        previewMesh = buildCircleMesh(drawStart.x, drawStart.z, drawStart.distanceTo(p), 0);
-      }
-      previewMesh.traverse(n => { if (n.material) n.material = mat; });
-      scene.add(previewMesh);
+    } else if (currentTool === 'rect' || currentTool === 'circle') {
+      refreshRectCirclePreview();
+    } else if (SHAPE_TOOLS.includes(currentTool)) {
+      refreshShapePreview();
     }
 
     if (currentTool === 'extrude') {
@@ -1919,12 +2457,14 @@
       controls.enabled = true;
     }
 
+    if (currentTool === 'freehand' && freehandPts) freehandFinish();
+
     if (currentTool === 'select' && selectDragStart) {
       if (boxSelectActive) {
         finalizeBoxSelect(selectDragStart.x, selectDragStart.y, e.clientX, e.clientY);
         hideMarquee();
       } else {
-        selectObject(pickObject(e.clientX, e.clientY));
+        setSelection(curveMates(pickObject(e.clientX, e.clientY)));
       }
       selectDragStart = null;
       boxSelectActive = false;
@@ -1945,27 +2485,45 @@
     const vcbGuide = currentTool === 'guide' && !!guideChainStart;
     const vcbOffset = currentTool === 'guide' && !!offsetSourceObj;
     const vcbExtrude = currentTool === 'extrude' && !!extrudeObj;
-    if ((vcbLine || vcbGuide || vcbOffset || vcbExtrude) && !isTypingTarget()) {
-      if (/^[0-9.]$/.test(e.key) || (e.key === '-' && typedValue === '')) {
-        typedValue += e.key;
-        if (vcbLine) refreshLinePreview();
-        else if (vcbGuide) refreshGuidePreview();
-        else if (vcbOffset) refreshOffsetPreview();
-        else refreshExtrudePreview(lastMouseX, lastMouseY);
+    const vcbRectCircle = (currentTool === 'rect' || currentTool === 'circle') && drawStage === 1;
+    const vcbShape = SHAPE_TOOLS.includes(currentTool) && shapeVcbActive();
+    const refreshVcbPreview = () => {
+      if (vcbLine) refreshLinePreview();
+      else if (vcbGuide) refreshGuidePreview();
+      else if (vcbOffset) refreshOffsetPreview();
+      else if (vcbRectCircle) refreshRectCirclePreview();
+      else if (vcbShape) refreshShapePreview();
+      else refreshExtrudePreview(lastMouseX, lastMouseY);
+    };
+    if (currentTool === 'polygon' && shapePts.length === 1 && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && !isTypingTarget()) {
+      polySides = Math.min(64, Math.max(3, polySides + (e.key === 'ArrowUp' ? 1 : -1)));
+      refreshShapePreview();
+      e.preventDefault();
+      return;
+    }
+    if ((vcbLine || vcbGuide || vcbOffset || vcbExtrude || vcbRectCircle || vcbShape) && !isTypingTarget()) {
+      const allowSep = vcbRectCircle || vcbShape;
+      const lastCh = typedValue.slice(-1);
+      const okMinus = e.key === '-' && (typedValue === '' || lastCh === ',' || lastCh === ';');
+      const okSides = e.key.toLowerCase() === 's' && currentTool === 'polygon' && /^\d+$/.test(typedValue);
+      if (/^[0-9.]$/.test(e.key) || okMinus || okSides || ((e.key === ',' || e.key === ';') && allowSep && /\d$/.test(typedValue) && !/[;,]/.test(typedValue))) {
+        typedValue += e.key.toLowerCase();
+        refreshVcbPreview();
         e.preventDefault();
         return;
       }
       if (e.key === 'Backspace' && typedValue) {
         typedValue = typedValue.slice(0, -1);
-        if (vcbLine) refreshLinePreview();
-        else if (vcbGuide) refreshGuidePreview();
-        else if (vcbOffset) refreshOffsetPreview();
-        else refreshExtrudePreview(lastMouseX, lastMouseY);
+        refreshVcbPreview();
         e.preventDefault();
         return;
       }
       if (e.key === 'Enter') {
-        if (vcbLine) {
+        if (vcbRectCircle) {
+          commitRectCircle(lastMouseX, lastMouseY);
+        } else if (vcbShape) {
+          shapeEnter();
+        } else if (vcbLine) {
           if (typedValue && lastLineEndPoint) commitLineSegment(lastLineEndPoint.clone(), lastLineEndNodeId);
         } else if (vcbGuide) {
           if (typedValue && lastGuideEndPoint) commitGuideSegment(lastGuideEndPoint.clone());
@@ -1991,7 +2549,8 @@
     if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); doUndo(); }
     if ((e.ctrlKey && e.key.toLowerCase() === 'y') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'z')) { e.preventDefault(); doRedo(); }
     if (!e.ctrlKey && !e.metaKey && !isTypingTarget()) {
-      const map = { s:'select', l:'line', r:'rect', c:'circle', e:'erase', p:'extrude', m:'move', g:'guide' };
+      if (e.shiftKey && e.key.toLowerCase() === 'r') { repeatLast(); e.preventDefault(); return; }
+      const map = { s:'select', l:'line', r:'rect', c:'circle', e:'erase', p:'extrude', m:'move', g:'guide', t:'rrect', o:'polygon', a:'arc2', q:'arc3', f:'freehand' };
       const t = map[e.key.toLowerCase()];
       if (t) setTool(t);
     }
