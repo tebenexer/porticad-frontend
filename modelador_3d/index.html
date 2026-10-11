@@ -138,6 +138,45 @@
   }
   .viewport.drawing { cursor: crosshair; }
 
+  /* ── Panel Organizar ── */
+  .panel {
+    position: absolute; top: 10px; right: 10px; width: 262px; max-height: calc(100% - 20px);
+    background: #161b22f2; border: 1px solid #30363d; border-radius: 8px; z-index: 30;
+    display: flex; flex-direction: column; font-size: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.4);
+  }
+  .p-head { display: flex; justify-content: space-between; align-items: center; padding: 7px 10px; cursor: pointer; font-weight: 700; color: #c9d1d9; letter-spacing: .02em; }
+  .p-tabs { display: flex; border-top: 1px solid #30363d; border-bottom: 1px solid #30363d; }
+  .p-tab { flex: 1; background: none; border: none; color: #8b949e; padding: 6px 2px; font-size: 12px; cursor: pointer; border-bottom: 2px solid transparent; }
+  .p-tab:hover { color: #e6edf3; }
+  .p-tab.on { color: #58a6ff; border-bottom-color: #58a6ff; }
+  .p-body { padding: 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+  .p-row { display: flex; align-items: center; gap: 4px; padding: 2px 4px; border-radius: 5px; border: 1px solid transparent; }
+  .p-row.cur { background: #1f6feb22; border-color: #1f6feb55; }
+  .p-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; color: #e6edf3; padding: 3px 2px; }
+  .p-name i { color: #f0b429; font-style: normal; }
+  .p-n { color: #8b949e; font-size: 11px; min-width: 18px; text-align: right; }
+  .p-ico { width: 22px; height: 22px; background: none; border: none; color: #8b949e; cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 4px; font-size: 14px; }
+  .p-ico:hover { background: #21262d; color: #e6edf3; }
+  .p-mini { background: #21262d; border: 1px solid #30363d; color: #e6edf3; font-size: 11px; padding: 2px 7px; border-radius: 4px; cursor: pointer; }
+  .p-mini:hover { border-color: #58a6ff; }
+  .p-btns { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .p-btns button, .p-grid button, .p-seg button { background: #21262d; border: 1px solid #30363d; color: #e6edf3; font-size: 12px; padding: 5px 8px; border-radius: 5px; cursor: pointer; }
+  .p-btns button:hover, .p-grid button:hover, .p-seg button:hover { border-color: #58a6ff; }
+  .p-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .p-seg { display: flex; gap: 4px; } .p-seg button { flex: 1; }
+  .p-grid button.on, .p-seg button.on { background: #1f6feb33; border-color: #1f6feb; color: #79c0ff; }
+  .p-sub { margin-top: 8px; color: #8b949e; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+  .p-note { color: #8b949e; font-size: 11px; line-height: 1.4; padding: 2px 2px; }
+  .p-chk { display: flex; align-items: center; gap: 6px; color: #c9d1d9; padding: 2px 0; }
+  .p-slide { display: flex; align-items: center; gap: 8px; } .p-slide input { flex: 1; } .p-slide span { min-width: 44px; text-align: right; font-family: ui-monospace, Menlo, monospace; color: #e6edf3; }
+  .group-banner {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 35;
+    display: none; align-items: center; gap: 10px; background: #1f6feb; color: #fff;
+    padding: 5px 6px 5px 12px; border-radius: 20px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.4);
+  }
+  .group-banner button { background: #ffffff33; border: none; color: #fff; border-radius: 14px; padding: 3px 10px; cursor: pointer; font-size: 12px; }
+  .group-banner button:hover { background: #ffffff55; }
+
   input[type=file] { display: none; }
 </style>
 </head>
@@ -177,6 +216,12 @@
       <button id="btnFlipX">Voltear en X (rojo)</button>
       <button id="btnFlipZ">Voltear en Z (verde)</button>
       <button id="btnFlipY">Voltear en Y (azul)</button>
+      <div style="height:1px;background:#30363d;margin:4px 0"></div>
+      <button id="btnGroup">Agrupar <span class="key">Ctrl+G</span></button>
+      <button id="btnExplode">Descomponer <span class="key">Ctrl+Mayús+G</span></button>
+      <button id="btnMakeComp">Crear componente…</button>
+      <button id="btnHideSel">Ocultar selección <span class="key">H</span></button>
+      <button id="btnShowAll">Mostrar todo lo oculto <span class="key">Mayús+H</span></button>
     </div>
   </div>
   <div class="menubar-sep"></div>
@@ -240,6 +285,9 @@
     <button class="tool-btn" data-tool="fillet" title="Empalme / redondear esquina (I)">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4v9a7 7 0 0 0 7 7h9"/></svg>
     </button>
+    <button class="tool-btn" data-tool="followme" title="Sígueme (U): barrer un perfil por una trayectoria">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20c0-8 5-8 9-8s9 0 9-8"/><ellipse cx="4" cy="17" rx="2.2" ry="3.6" transform="rotate(-20 4 17)"/><ellipse cx="20" cy="6.5" rx="2.2" ry="3.6" transform="rotate(-30 20 6.5)" stroke-dasharray="2 2"/></svg>
+    </button>
     <div class="tool-sep"></div>
     <button class="tool-btn" data-tool="guide" title="Cinta métrica / guía (G)">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="4" stroke-dasharray="3 3"/><circle cx="4" cy="20" r="1.5" fill="currentColor"/><circle cx="20" cy="4" r="1.5" fill="currentColor"/></svg>
@@ -250,6 +298,7 @@
     <div class="hint" id="hint">Selecciona una herramienta para empezar.</div>
     <div class="marquee" id="marquee"></div>
     <div class="snap-tip" id="snapTip"></div>
+    <div class="group-banner" id="groupBanner" style="display:none"><span>Editando: <b></b></span><button id="btnExitGroup">Cerrar grupo</button></div>
     <div class="vcb" id="vcb"><span class="vcb-label" id="vcbLabel">Longitud</span><span class="vcb-val" id="vcbVal">0.00</span></div>
   </div>
 </div>
@@ -273,8 +322,10 @@
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0d1117);
 
-  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 2000);
-  camera.position.set(14, 12, 14);
+  const perspCam = new THREE.PerspectiveCamera(50, 1, 0.1, 2000);
+  perspCam.position.set(14, 12, 14);
+  const orthoCam = new THREE.OrthographicCamera(-10, 10, 10, -10, -2000, 4000);
+  let camera = perspCam;   // el activo (perspectiva o paralela)
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(window.devicePixelRatio || 1);
@@ -294,9 +345,18 @@
 
   function resize() {
     const w = viewport.clientWidth, h = viewport.clientHeight;
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
+    perspCam.aspect = w / h;
+    perspCam.updateProjectionMatrix();
+    fitOrthoFrustum(w / h);
     renderer.setSize(w, h);
+  }
+  // Cámara paralela: el tamaño visible sale de la distancia al objetivo, igual que en perspectiva.
+  let orthoRefDist = 22;   // distancia de referencia que fija el tamaño visible en modo paralelo
+  function fitOrthoFrustum(aspect) {
+    const halfH = orthoRefDist * Math.tan(THREE.MathUtils.degToRad(perspCam.fov / 2));
+    orthoCam.left = -halfH * aspect; orthoCam.right = halfH * aspect;
+    orthoCam.top = halfH; orthoCam.bottom = -halfH;
+    orthoCam.updateProjectionMatrix();
   }
   window.addEventListener('resize', resize);
   resize();
@@ -369,6 +429,34 @@
   let nextId = 1;
   let selectedObjects = [];
 
+  // ── Organización: capas, grupos, componentes, escenas y estilo de vista ──
+  // Cada objeto lleva obj.layer (id de capa), obj.hidden (oculto a mano) y obj.gid (id de grupo, 0 = suelto).
+  let panelEl = null;
+  let layers = [{ id: 0, name: 'Capa 0', visible: true }];
+  let nextLayerId = 1;
+  let currentLayer = 0;
+  let groups = new Map();        // id -> { id, name, comp (id de componente | null), m (matriz 4x4: definición -> mundo) }
+  let nextGroupId = 1;
+  let components = new Map();    // id -> { id, name, nodes:[], objects:[] }  (definición en su propio espacio)
+  let nextCompId = 1;
+  let editingGroup = null;       // id del grupo abierto para edición (doble clic) o null
+  let scenes = [];
+  let nextSceneId = 1;
+  let styleMode = 'shaded';      // shaded | hidden | xray | wire
+  const FACE_TYPES = ['rect', 'circle', 'polyface', 'solid'];
+  function layerById(id) { return layers.find(l => l.id === id) || layers[0]; }
+  function isShown(o) { return !o.hidden && layerById(o.layer || 0).visible; }
+  function shownObjects() { return objects.filter(isShown); }
+  // Lo que se puede tocar con el cursor: visible y, si hay un grupo abierto, solo su contenido.
+  function pickableObjects() { return objects.filter(o => isShown(o) && (editingGroup == null || o.gid === editingGroup)); }
+  function groupMembers(gid) { return objects.filter(o => o.gid === gid); }
+  // Un clic sobre algo agrupado selecciona todo el grupo (salvo el grupo que se está editando).
+  function expandGroups(arr) {
+    const out = new Set(arr);
+    arr.forEach(o => { if (o && o.gid && o.gid !== editingGroup) groupMembers(o.gid).forEach(m => out.add(m)); });
+    return Array.from(out);
+  }
+
   let nodes = new Map();   // id -> { id, x, y, z }
   let nextNodeId = 1;
   function createNode(v) { const n = { id: nextNodeId++, x: v.x, y: v.y, z: v.z }; nodes.set(n.id, n); return n; }
@@ -416,7 +504,8 @@
     return {
       nextId, nextNodeId,
       nodes: Array.from(nodes.values()).map(n => ({ ...n })),
-      objects: objects.map(o => ({ id: o.id, type: o.type, params: JSON.parse(JSON.stringify(o.params)), height: o.height })),
+      objects: objects.map(o => ({ id: o.id, type: o.type, params: JSON.parse(JSON.stringify(o.params)), height: o.height, layer: o.layer || 0, hidden: !!o.hidden, gid: o.gid || 0 })),
+      org: JSON.parse(JSON.stringify({ layers, nextLayerId, currentLayer, groups: Array.from(groups.values()), nextGroupId, components: Array.from(components.values()), nextCompId })),
     };
   }
 
@@ -427,8 +516,15 @@
     nodes = new Map();
     snap.nodes.forEach(n => nodes.set(n.id, { ...n }));
     nextNodeId = snap.nextNodeId;
+    if (snap.org) {
+      const og = JSON.parse(JSON.stringify(snap.org));
+      layers = og.layers; nextLayerId = og.nextLayerId; currentLayer = og.currentLayer;
+      groups = new Map(og.groups.map(g => [g.id, g])); nextGroupId = og.nextGroupId;
+      components = new Map(og.components.map(c => [c.id, c])); nextCompId = og.nextCompId;
+      if (editingGroup != null && !groups.has(editingGroup)) editingGroup = null;
+    }
     snap.objects.forEach(o => {
-      const obj = { id: o.id, type: o.type, params: o.params, height: o.height || 0 };
+      const obj = { id: o.id, type: o.type, params: o.params, height: o.height || 0, layer: o.layer || 0, hidden: !!o.hidden, gid: o.gid || 0 };
       obj.mesh = meshFor(obj);
       obj.mesh.userData.objRef = obj;
       scene.add(obj.mesh);
@@ -438,6 +534,7 @@
     });
     nextId = snap.nextId;
     updateStatusCount();
+    refreshPanel();
   }
 
   function updateUndoRedoButtons() {
@@ -489,11 +586,40 @@
   const LINE_COLOR_DEFAULT = 0xffffff;  // white vector lines read clearly on the dark background
   const TYPE_DEFAULT_COLOR = { guide: GUIDE_COLOR_DEFAULT, line: LINE_COLOR_DEFAULT };
 
+  const COLOR_HIDDEN_LINE = 0xf0f6fc;
   function applyColor(obj) {
-    const base = TYPE_DEFAULT_COLOR[obj.type] || COLOR_DEFAULT;
+    let base = TYPE_DEFAULT_COLOR[obj.type] || COLOR_DEFAULT;
+    if (styleMode === 'hidden' && FACE_TYPES.includes(obj.type)) base = COLOR_HIDDEN_LINE;
     const c = selectedObjects.includes(obj) ? COLOR_SELECTED : base;
     obj.mesh.traverse(n => { if (n.material && n.material.color && !n.userData.isEdgeOverlay) n.material.color.setHex(c); });
+    applyDisplay(obj);
   }
+
+  // Visibilidad (capa / ocultar), atenuado fuera del grupo abierto y estilo de vista
+  // (sombreado, líneas ocultas, rayos X, alámbrico) — todo converge aquí para cada malla.
+  function applyDisplay(obj) {
+    obj.mesh.visible = isShown(obj);
+    const dim = editingGroup != null && obj.gid !== editingGroup;
+    const isFace = FACE_TYPES.includes(obj.type);
+    obj.mesh.traverse(n => {
+      if (!n.material) return;
+      if (n.userData.isEdgeOverlay || n.isLine) {
+        n.material.transparent = dim; n.material.opacity = dim ? 0.25 : 1;
+        // Sobre fondo oscuro, las aristas negras desaparecen en alámbrico y rayos X: se aclaran.
+        if (n.userData.isEdgeOverlay) n.material.color.setHex(styleMode === 'wire' || styleMode === 'xray' ? 0xc9d1d9 : 0x000000);
+        return;
+      }
+      if (!isFace || !n.isMesh) return;
+      const m = n.material;
+      if (styleMode === 'wire') { m.visible = false; return; }
+      m.visible = true;
+      const ghost = styleMode === 'xray' || dim;
+      m.transparent = ghost;
+      m.opacity = dim ? 0.25 : (styleMode === 'xray' ? 0.35 : 1);
+      m.depthWrite = !ghost;
+    });
+  }
+  function applyAllDisplay() { objects.forEach(applyColor); }
 
   function disposeMesh(mesh) {
     mesh.traverse(n => {
@@ -504,9 +630,9 @@
 
   // Adds SketchUp-style black edge lines along every border of a solid (top/bottom
   // perimeter + verticals). Raycasting is disabled on it so it never steals picks/faces.
-  function attachEdges(mesh) {
+  function attachEdges(mesh, thresholdAngle) {
     const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(mesh.geometry),
+      new THREE.EdgesGeometry(mesh.geometry, thresholdAngle),
       new THREE.LineBasicMaterial({ color: 0x000000 })
     );
     edges.userData.isEdgeOverlay = true;
@@ -710,15 +836,30 @@
     if (obj.type === 'rect') return buildRectMesh(obj.params.x1, obj.params.z1, obj.params.x2, obj.params.z2, obj.height, obj.params.baseY, obj.params.lift);
     if (obj.type === 'circle') return buildCircleMesh(obj.params.cx, obj.params.cz, obj.params.radius, obj.height, obj.params.baseY, obj.params.lift);
     if (obj.type === 'polyface') return buildPolyfaceMesh(polyfacePoints2D(obj), obj.height, obj.params.orientation, obj.params.base, obj.params.lift);
+    if (obj.type === 'solid') return buildSolidMesh(obj.params.verts, obj.params.tris);
   }
 
-  function addObject(type, params, height) {
-    const obj = { id: nextId++, type, params, height: height || 0 };
+  // Sólido libre (resultado de Sígueme): malla de triángulos con sus propios vértices.
+  function buildSolidMesh(verts, tris) {
+    const pos = new Float32Array(tris.length * 9);
+    tris.forEach((t, i) => t.forEach((vi, k) => { const v = verts[vi]; pos[i * 9 + k * 3] = v[0]; pos[i * 9 + k * 3 + 1] = v[1]; pos[i * 9 + k * 3 + 2] = v[2]; }));
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.computeVertexNormals();
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: COLOR_DEFAULT, side: THREE.DoubleSide }));
+    attachEdges(mesh, 30);
+    return mesh;
+  }
+
+  function addObject(type, params, height, meta) {
+    const obj = { id: nextId++, type, params, height: height || 0, layer: currentLayer, hidden: false, gid: editingGroup || 0 };
+    if (meta) { if (meta.layer != null) obj.layer = meta.layer; if (meta.hidden != null) obj.hidden = !!meta.hidden; if (meta.gid != null) obj.gid = meta.gid; }
     obj.mesh = meshFor(obj);
     obj.mesh.userData.objRef = obj;
     scene.add(obj.mesh);
     obj.mesh.updateMatrixWorld(true);
     objects.push(obj);
+    applyDisplay(obj);
     updateStatusCount();
     return obj;
   }
@@ -763,7 +904,10 @@
     objects = [];
     selectedObjects = [];
     nodes = new Map();
+    layers = [{ id: 0, name: 'Capa 0', visible: true }]; nextLayerId = 1; currentLayer = 0;
+    groups = new Map(); nextGroupId = 1; components = new Map(); nextCompId = 1; editingGroup = null;
     updateStatusCount();
+    refreshPanel();
   }
 
   function setSelection(arr) {
@@ -893,6 +1037,7 @@
     scale: 'Selecciona antes lo que quieres escalar. Clic en el punto base, clic en un punto de referencia, mueve para el nuevo tamaño y clic — o escribe el factor (2, 0.5) + Enter. Ctrl = escalar una copia.',
     offset: 'Pasa el cursor sobre una cara plana (rectángulo, círculo o polígono) y haz clic; mueve el mouse hacia afuera o adentro para el desfase y haz clic — o escribe la distancia + Enter. Crea un contorno paralelo con su propia cara.',
     fillet: 'Haz clic sobre una esquina donde se unen dos líneas, mueve el mouse para el redondeo y haz clic — o escribe el radio + Enter. Las líneas se acortan y se agrega el arco (también en las esquinas de caras planas).',
+    followme: 'Haz clic en una cara plana (el perfil) y luego en una línea o arco de la trayectoria — o selecciona primero la trayectoria. Barre el perfil a lo largo de ella y crea un sólido. El perfil debe tocar la trayectoria en uno de sus extremos.',
     paste: 'Mueve el cursor para ubicar la copia (engancha a puntos) y haz clic para soltarla. Esc cancela.',
     freehand: 'Mantén el botón presionado y dibuja a mano; al soltar se simplifica en segmentos. Termina sobre el inicio para cerrar y crear una cara.',
     erase: 'Haz clic sobre una figura para borrarla.',
@@ -909,7 +1054,7 @@
     cancelDraw();
     currentTool = tool;
     document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
-    const names = { select:'Seleccionar', line:'Línea', rect:'Rectángulo', rrect:'Rectángulo rotado', circle:'Círculo', polygon:'Polígono', arc2:'Arco 2 puntos', arc3:'Arco 3 puntos', freehand:'Mano alzada', rotate:'Rotar', scale:'Escalar', paste:'Pegar', offset:'Desfase', fillet:'Empalme', erase:'Borrador', extrude:'Extruir', move:'Mover', guide:'Cinta métrica' };
+    const names = { select:'Seleccionar', line:'Línea', rect:'Rectángulo', rrect:'Rectángulo rotado', circle:'Círculo', polygon:'Polígono', arc2:'Arco 2 puntos', arc3:'Arco 3 puntos', freehand:'Mano alzada', rotate:'Rotar', scale:'Escalar', paste:'Pegar', offset:'Desfase', fillet:'Empalme', followme:'Sígueme', erase:'Borrador', extrude:'Extruir', move:'Mover', guide:'Cinta métrica' };
     statusToolEl.textContent = names[tool];
     hintEl.textContent = TOOL_HINTS[tool];
     viewport.classList.toggle('drawing', DRAW_TOOLS.includes(tool));
@@ -947,7 +1092,7 @@
     mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
     mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(mouseNDC, camera);
-    return raycaster.intersectObjects(objects.map(o => o.mesh), true);
+    return raycaster.intersectObjects(pickableObjects().map(o => o.mesh), true);
   }
 
   // A kept perimeter line/guide sits flush on its face's own edge once that face has real
@@ -1229,6 +1374,7 @@
     extrudeWorldNormal = null;
     typedValue = '';
     hideFaceHighlight();
+    hideVCB();
     controls.enabled = true;
   }
 
@@ -1305,7 +1451,7 @@
       minX: Math.min(x1, x2) - canvasRect.left, maxX: Math.max(x1, x2) - canvasRect.left,
       minY: Math.min(y1, y2) - canvasRect.top, maxY: Math.max(y1, y2) - canvasRect.top,
     };
-    const matches = objects.filter(o => {
+    const matches = pickableObjects().filter(o => {
       if (o.type === 'line' || o.type === 'guide') {
         const [pa, pb] = lineEndpoints(o);
         const a = projectToScreen(pa, canvasRect), b = projectToScreen(pb, canvasRect);
@@ -1313,7 +1459,7 @@
       }
       return rectsIntersect(screenBoundsOf(o, canvasRect), dragBox);
     });
-    setSelection(matches);
+    setSelection(expandGroups(matches));
   }
 
   // ── Line-drawing inference: snap to existing endpoints / midpoints / on-edge points ──
@@ -1364,6 +1510,7 @@
   function objectVertices(o) {
     if (o.type === 'line') return o.params.nodeIds.map(id => ({ point: nodePos(id), nodeId: id }));
     if (o.type === 'guide') return [{ point: new THREE.Vector3(...o.params.a), nodeId: null }, { point: new THREE.Vector3(...o.params.b), nodeId: null }];
+    if (o.type === 'solid') return o.params.verts.map(v => ({ point: new THREE.Vector3(v[0], v[1], v[2]), nodeId: null }));
     const baseY = o.params.baseY || 0;
     const ys = o.height > 0 ? [baseY, baseY + o.height] : [baseY];
     if (o.type === 'rect') {
@@ -1398,7 +1545,7 @@
   // Priority: endpoint > midpoint > on-edge (matches SketchUp's inference order).
   function resolveGeometrySnap(rawPoint, clientX, clientY) {
     let best = null;
-    objects.forEach(o => {
+    shownObjects().forEach(o => {
       objectVertices(o).forEach(({ point, nodeId }) => {
         const d = screenDistToPoint(clientX, clientY, point);
         if (d <= SNAP_PIXEL_RADIUS && (!best || d < best.d)) best = { point, d, kind: 'endpoint', nodeId };
@@ -1406,7 +1553,7 @@
     });
     if (best) return { point: best.point.clone(), kind: best.kind, nodeId: best.nodeId };
 
-    objects.forEach(o => {
+    shownObjects().forEach(o => {
       if (o.type !== 'line' && o.type !== 'guide') return;
       const [a, b] = lineEndpoints(o);
       const mid = a.clone().add(b).multiplyScalar(0.5);
@@ -1415,7 +1562,7 @@
     });
     if (best) return { point: best.point.clone(), kind: best.kind, nodeId: best.nodeId };
 
-    objects.forEach(o => {
+    shownObjects().forEach(o => {
       if (o.type !== 'line' && o.type !== 'guide') return;
       const [a, b] = lineEndpoints(o);
       const cp = closestPointOnSegment(rawPoint, a, b);
@@ -1547,6 +1694,7 @@
   let moveBaseParams = null;  // deep clone of obj.params at drag start, translated fresh each move
   let moveNodeId = null;         // set instead of moveObj when dragging a single shared node
   let moveNodeOriginalPos = null; // that node's position at grab start, for Escape-revert
+  let moveGroup = null;          // { objs, nodes:[{id,pos}], params: Map, gm: [{gid,m}] } al mover un grupo completo
   let moveNodeBase = null;       // [{id, pos}] snapshot when dragging a whole line/polyface's nodes together
 
   // Rewrites obj.params (from a snapshot) shifted by (dx,dy,dz) — used by the Move tool for
@@ -1563,6 +1711,8 @@
     } else if (type === 'circle') {
       p.cx += dx; p.cz += dz;
       p.baseY = (p.baseY || 0) + dy;
+    } else if (type === 'solid') {
+      p.verts = p.verts.map(v => [v[0] + dx, v[1] + dy, v[2] + dz]);
     }
     return p;
   }
@@ -1818,6 +1968,9 @@
       moveNodeBase.forEach(({ id, pos }) => setNodePos(id, pos));
       moveNodeBase.forEach(({ id }) => nodeMoved(id));
     }
+    if (moveGroup) restoreMoveGroup();
+    moveGroup = null;
+    fmFace = null; fmPath = null;
     moveObj = null;
     moveAnchor = null;
     moveBaseParams = null;
@@ -2295,6 +2448,12 @@
 
   function applyMatrixToObjects(objs, M) {
     const k = matScale(M);
+    // Una instancia de componente recuerda su matriz (definición -> mundo) mientras la mueven, giran o escalan enteras.
+    const touchedGroups = new Set(objs.map(o => o.gid).filter(Boolean));
+    touchedGroups.forEach(gid => {
+      const g = groups.get(gid);
+      if (g && g.m && groupMembers(gid).every(o => objs.includes(o))) g.m = new THREE.Matrix4().fromArray(g.m).premultiply(M).toArray();
+    });
     objs.forEach(o => {
       if (o.type === 'rect' && !rectStaysParametric(o, M)) convertRectToPolyface(o);
       else if (o.type === 'circle' && !circleStaysParametric(o, M)) convertCircleToPolyface(o);
@@ -2321,6 +2480,9 @@
         const c = new THREE.Vector3(o.params.cx, o.params.baseY || 0, o.params.cz).applyMatrix4(M);
         o.params.cx = c.x; o.params.cz = c.z; o.params.baseY = c.y; o.params.radius *= k;
         o.height *= k;
+      } else if (o.type === 'solid') {
+        o.params.verts = o.params.verts.map(v => new THREE.Vector3(v[0], v[1], v[2]).applyMatrix4(M).toArray());
+        if (M.determinant() < 0) o.params.tris = o.params.tris.map(t => [t[0], t[2], t[1]]);
       }
     });
     ids.forEach(id => setNodePos(id, nodePos(id).applyMatrix4(M)));
@@ -2334,12 +2496,27 @@
     const idMap = new Map();
     const mapId = id => { if (!idMap.has(id)) idMap.set(id, createNode(nodePos(id)).id); return idMap.get(id); };
     const curveMap = new Map(); let nc = nextCurveId();
-    return objs.map(o => {
+    const out = objs.map(o => {
       const p = JSON.parse(JSON.stringify(o.params));
       if (p.nodeIds) p.nodeIds = p.nodeIds.map(mapId);
       if (p.topNodeIds) p.topNodeIds = p.topNodeIds.map(mapId);
       if (p.curveId) { if (!curveMap.has(p.curveId)) curveMap.set(p.curveId, nc++); p.curveId = curveMap.get(p.curveId); }
-      return addObject(o.type, p, o.height);
+      return addObject(o.type, p, o.height, { layer: o.layer, hidden: o.hidden, gid: 0 });
+    });
+    cloneGroupsInto(objs, out);
+    return out;
+  }
+  // Las copias de objetos agrupados forman un grupo nuevo (misma definición de componente, misma matriz).
+  function cloneGroupsInto(srcObjs, newObjs) {
+    const gmap = new Map();
+    srcObjs.forEach((o, i) => {
+      if (!o.gid) return;
+      if (!gmap.has(o.gid)) {
+        const g = groups.get(o.gid); if (!g) return;
+        const ng = { id: nextGroupId++, name: g.name, comp: g.comp, m: g.m ? g.m.slice() : null };
+        groups.set(ng.id, ng); gmap.set(o.gid, ng.id);
+      }
+      newObjs[i].gid = gmap.get(o.gid);
     });
   }
 
@@ -2512,7 +2689,7 @@
     if (t === 'offset') {
       if (!offFace) {
         const hit = pickObjectWithFace(clientX, clientY);
-        if (hit && faceOffsetInfo(hit.obj)) { offFace = hit.obj; typedValue = ''; hideFaceHighlight(); refreshEditPreview(); }
+        if (hit && faceOffsetInfo(hit.obj) && !isLockedByGroup(hit.obj)) { offFace = hit.obj; typedValue = ''; hideFaceHighlight(); refreshEditPreview(); }
         else statusCoordsEl.textContent = 'Desfase: haz clic sobre una cara plana (altura 0).';
       } else commitFaceOffset(clientX, clientY);
       return;
@@ -2527,7 +2704,7 @@
     }
     if (!selectedObjects.length) {
       const o = pickObject(clientX, clientY);
-      if (o) { setSelection(curveMates(o)); refreshEditPreview(); }
+      if (o) { setSelection(expandGroups(curveMates(o))); refreshEditPreview(); }
       return;
     }
     const st = computeEditStep(clientX, clientY);
@@ -2548,30 +2725,41 @@
     const box = selectionBox();
     clipboard = {
       nodes: Array.from(ids).map(id => ({ ...nodes.get(id) })),
-      objects: sel.map(o => ({ type: o.type, params: JSON.parse(JSON.stringify(o.params)), height: o.height })),
+      objects: sel.map(o => ({ type: o.type, params: JSON.parse(JSON.stringify(o.params)), height: o.height, layer: o.layer || 0, hidden: !!o.hidden, gid: o.gid || 0 })),
+      groups: Array.from(new Set(sel.map(o => o.gid).filter(Boolean))).map(gid => JSON.parse(JSON.stringify(groups.get(gid)))),
       anchor: new THREE.Vector3((box.min.x + box.max.x) / 2, box.min.y, (box.min.z + box.max.z) / 2),
     };
     statusCoordsEl.textContent = 'Copiado: ' + sel.length + ' objeto(s). Ctrl+V para pegar.';
   }
 
-  function instantiateClipboard() {
+  // Crea objetos vivos a partir de un paquete { nodes, objects, groups } (portapapeles o definición de componente).
+  // withGroups=false los deja sueltos (lo usa la sincronización de componentes).
+  function instantiateClipboard(src, withGroups) {
+    src = src || clipboard;
+    if (withGroups === undefined) withGroups = true;
     const idMap = new Map();
-    clipboard.nodes.forEach(n => idMap.set(n.id, createNode(n).id));
+    src.nodes.forEach(n => idMap.set(n.id, createNode(n).id));
     const curveMap = new Map(); let nc = nextCurveId();
-    return clipboard.objects.map(d => {
+    const gmap = new Map();
+    if (withGroups) (src.groups || []).forEach(g => {
+      const ng = { id: nextGroupId++, name: g.name, comp: g.comp, m: g.m ? g.m.slice() : null };
+      groups.set(ng.id, ng); gmap.set(g.id, ng.id);
+    });
+    return src.objects.map(d => {
       const p = JSON.parse(JSON.stringify(d.params));
       if (p.nodeIds) p.nodeIds = p.nodeIds.map(i => idMap.get(i));
       if (p.topNodeIds) p.topNodeIds = p.topNodeIds.map(i => idMap.get(i));
       if (p.curveId) { if (!curveMap.has(p.curveId)) curveMap.set(p.curveId, nc++); p.curveId = curveMap.get(p.curveId); }
-      return addObject(d.type, p, d.height);
+      return addObject(d.type, p, d.height, { layer: d.layer, hidden: d.hidden, gid: withGroups && d.gid && gmap.has(d.gid) ? gmap.get(d.gid) : 0 });
     });
   }
 
-  function startPaste(inPlace) {
-    if (!clipboard) { statusCoordsEl.textContent = 'No hay nada copiado.'; return; }
+  function startPaste(inPlace, srcPack) {
+    const src = srcPack || clipboard;
+    if (!src) { statusCoordsEl.textContent = 'No hay nada copiado.'; return; }
     setTool('paste'); // also cancels any draw in progress
     const snapshot = snapshotState();
-    const objs = instantiateClipboard();
+    const objs = instantiateClipboard(src);
     setSelection(objs);
     if (inPlace) {
       undoStack.push(snapshot); if (undoStack.length > UNDO_LIMIT) undoStack.shift(); redoStack = []; updateUndoRedoButtons();
@@ -2585,6 +2773,8 @@
       objs, snapshot,
       baseline: objs.map(o => ({ params: JSON.parse(JSON.stringify(o.params)), height: o.height, type: o.type })),
       nodeBase: Array.from(ids).map(id => ({ id, pos: nodePos(id) })),
+      src,
+      groupBase: Array.from(new Set(objs.map(o => o.gid).filter(Boolean))).map(gid => ({ gid, m: groups.get(gid).m ? groups.get(gid).m.slice() : null })),
     };
     movePaste();
   }
@@ -2592,11 +2782,12 @@
   function movePaste() {
     if (!pasteState) return;
     const sp = resolveStartPoint(lastMouseX, lastMouseY);
-    const pt = sp ? sp.point : clipboard.anchor.clone();
+    const pt = sp ? sp.point : pasteState.src.anchor.clone();
     if (sp && sp.snapped) showSnapMarker(sp.point, snapColorFor(sp.kind), sp.kind); else hideSnapMarker();
     pasteState.objs.forEach((o, i) => { o.params = JSON.parse(JSON.stringify(pasteState.baseline[i].params)); o.height = pasteState.baseline[i].height; });
     pasteState.nodeBase.forEach(({ id, pos }) => setNodePos(id, pos));
-    const d = pt.clone().sub(clipboard.anchor);
+    const d = pt.clone().sub(pasteState.src.anchor);
+    pasteState.groupBase.forEach(({ gid, m }) => { if (groups.get(gid)) groups.get(gid).m = m ? m.slice() : null; });
     applyMatrixToObjects(pasteState.objs, new THREE.Matrix4().makeTranslation(d.x, d.y, d.z));
     setSelection(pasteState.objs.slice());
   }
@@ -2819,8 +3010,8 @@
     cancelDraw();
   }
 
-  function selectAll() { setSelection(objects.slice()); }
-  function invertSelection() { const cur = new Set(selectedObjects); setSelection(objects.filter(o => !cur.has(o))); }
+  function selectAll() { setSelection(pickableObjects()); }
+  function invertSelection() { const cur = new Set(selectedObjects); setSelection(pickableObjects().filter(o => !cur.has(o))); }
 
   const dom = renderer.domElement;
 
@@ -2837,7 +3028,7 @@
 
     if (currentTool === 'erase') {
       const obj = pickObject(e.clientX, e.clientY);
-      if (obj) { pushUndo(); curveMates(obj).forEach(removeObject); }
+      if (obj) { pushUndo(); expandGroups(curveMates(obj)).forEach(removeObject); cleanupGroups(); }
       return;
     }
 
@@ -2909,6 +3100,8 @@
       return;
     }
 
+    if (currentTool === 'followme') { followClick(e.clientX, e.clientY); return; }
+
     if (EDIT_TOOLS.includes(currentTool)) { editClick(e.clientX, e.clientY); return; }
 
     if (SHAPE_TOOLS.includes(currentTool)) {
@@ -2925,7 +3118,8 @@
         return;
       }
       const hit = pickObjectWithFace(e.clientX, e.clientY);
-      if (!hit || hit.obj.type === 'line' || hit.obj.type === 'guide') return;
+      if (!hit || hit.obj.type === 'line' || hit.obj.type === 'guide' || hit.obj.type === 'solid') return;
+      if (isLockedByGroup(hit.obj)) { statusCoordsEl.textContent = 'Abre el grupo con doble clic para editar su contenido.'; return; }
       const faceKind = determineFace(hit.obj, hit.point);
       const wallMatch = /^wall(\d+)$/.exec(faceKind);
       pendingUndoSnapshot = snapshotState();
@@ -2959,6 +3153,8 @@
       // Priority 1: grab a shared node directly (by screen proximity, not raycast) — moving
       // it cascades to every line/face that references it, with no per-object special case.
       const nodeId = findNearestNode(e.clientX, e.clientY);
+      const lockedUser = nodeId !== null ? objectsUsingNode(nodeId).find(isLockedByGroup) : null;
+      if (lockedUser) { startGroupMove(lockedUser.gid, nodePos(nodeId)); return; }
       if (nodeId !== null) {
         pendingUndoSnapshot = snapshotState();
         moveNodeId = nodeId;
@@ -2969,6 +3165,7 @@
       }
       const hit = pickObjectWithFace(e.clientX, e.clientY);
       if (!hit) return;
+      if (isLockedByGroup(hit.obj)) { startGroupMove(hit.obj.gid, hit.point.clone()); return; }
       pendingUndoSnapshot = snapshotState();
       moveObj = hit.obj;
       moveAnchor = hit.point.clone();
@@ -3039,6 +3236,8 @@
       refreshShapePreview();
     } else if (EDIT_TOOLS.includes(currentTool)) {
       refreshEditPreview();
+    } else if (currentTool === 'followme') {
+      followHover();
     }
 
     if (currentTool === 'extrude') {
@@ -3046,12 +3245,23 @@
         refreshExtrudePreview(e.clientX, e.clientY);
       } else {
         const hit = pickObjectWithFace(e.clientX, e.clientY);
-        if (hit && hit.obj.type !== 'line' && hit.obj.type !== 'guide') {
+        if (hit && hit.obj.type !== 'line' && hit.obj.type !== 'guide' && hit.obj.type !== 'solid' && !isLockedByGroup(hit.obj)) {
           showFaceHighlight(buildFaceHighlightMesh(hit.obj, determineFace(hit.obj, hit.point)));
         } else {
           hideFaceHighlight();
         }
       }
+    }
+
+    if (currentTool === 'move' && moveGroup) {
+      const axisSnap = resolveAxisSnap(moveAnchor, e.clientX, e.clientY);
+      let current;
+      if (axisSnap) { current = axisSnap.point; statusCoordsEl.textContent += '  · ' + axisSnap.label; }
+      else current = planePoint(e.clientX, e.clientY, moveAnchor.y) || moveAnchor;
+      restoreMoveGroup();
+      const delta = current.clone().sub(moveAnchor);
+      applyMatrixToObjects(moveGroup.objs, new THREE.Matrix4().makeTranslation(delta.x, delta.y, delta.z));
+      setSelection(moveGroup.objs.slice());
     }
 
     if (currentTool === 'move' && (moveNodeId !== null || moveObj)) {
@@ -3087,6 +3297,11 @@
     // gesture now (see the 'extrude' branch in pointerdown), so a plain click can start it
     // without the immediate mouseup instantly ending the grab.
 
+    if (moveGroup) {
+      commitPendingUndo();
+      moveGroup = null; moveAnchor = null; controls.enabled = true;
+    }
+
     if (moveObj || moveNodeId !== null) {
       // A plain mouseup commits the drag as-is (unlike Escape, which reverts) — just stop
       // tracking, the node(s)/params are already left wherever the last pointermove put them.
@@ -3107,7 +3322,7 @@
         finalizeBoxSelect(selectDragStart.x, selectDragStart.y, e.clientX, e.clientY);
         hideMarquee();
       } else {
-        setSelection(curveMates(pickObject(e.clientX, e.clientY)));
+        setSelection(expandGroups(curveMates(pickObject(e.clientX, e.clientY))));
       }
       selectDragStart = null;
       boxSelectActive = false;
@@ -3116,11 +3331,11 @@
 
   function isTypingTarget() {
     const tag = document.activeElement && document.activeElement.tagName;
-    return tag === 'INPUT' || tag === 'TEXTAREA';
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
   }
 
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { cancelDraw(); selectObject(null); }
+    if (e.key === 'Escape') { const closeIt = editingGroup != null && currentTool === 'select' && !selectedObjects.length; cancelDraw(); selectObject(null); if (closeIt) exitGroupEdit(); }
 
     // VCB numeric entry: while placing a line's next point, or mid push/pull with Extrude,
     // digits/Enter set an exact value instead of falling through to delete-selection etc.
@@ -3188,6 +3403,7 @@
       if (selectedObjects.length) {
         pushUndo();
         selectedObjects.slice().forEach(o => removeObject(o));
+        cleanupGroups();
       }
     }
     if (e.key === 'Control' && !e.repeat && (currentTool === 'rotate' || currentTool === 'scale')) { transformCopy = !transformCopy; refreshEditPreview(); }
@@ -3196,6 +3412,7 @@
       if (kk === 'c') { e.preventDefault(); copySelection(); }
       else if (kk === 'v') { e.preventDefault(); startPaste(e.altKey); }
       else if (kk === 'a') { e.preventDefault(); selectAll(); }
+      else if (kk === 'g') { e.preventDefault(); if (e.shiftKey) explodeGroup(); else makeGroup(); }
     }
     if (e.ctrlKey && e.key.toLowerCase() === 'n') { e.preventDefault(); doNew(); }
     if (e.ctrlKey && e.key.toLowerCase() === 'o') { e.preventDefault(); doOpen(); }
@@ -3204,11 +3421,702 @@
     if ((e.ctrlKey && e.key.toLowerCase() === 'y') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'z')) { e.preventDefault(); doRedo(); }
     if (!e.ctrlKey && !e.metaKey && !isTypingTarget()) {
       if (e.shiftKey && e.key.toLowerCase() === 'r') { repeatLast(); e.preventDefault(); return; }
-      const map = { s:'select', l:'line', r:'rect', c:'circle', e:'erase', p:'extrude', m:'move', g:'guide', t:'rrect', o:'polygon', a:'arc2', q:'arc3', f:'freehand', w:'rotate', k:'scale', d:'offset', i:'fillet' };
+      if (e.key.toLowerCase() === 'h') { if (e.shiftKey) showAllHidden(); else hideSelection(); e.preventDefault(); return; }
+      const map = { s:'select', l:'line', r:'rect', c:'circle', e:'erase', p:'extrude', m:'move', g:'guide', t:'rrect', o:'polygon', a:'arc2', q:'arc3', f:'freehand', w:'rotate', k:'scale', d:'offset', i:'fillet', u:'followme' };
       const t = map[e.key.toLowerCase()];
       if (t) setTool(t);
     }
   });
+
+  // ═════════════ Grupos, componentes, capas y ocultar ═════════════
+  const IDENT_M = () => new THREE.Matrix4().identity().toArray();
+  function say(msg) { statusCoordsEl.textContent = msg; }
+  function isLockedByGroup(o) { return !!o && !!o.gid && o.gid !== editingGroup; }
+
+  // Mover un grupo entero: se conserva el estado de partida y cada movimiento se reaplica desde ahí.
+  function startGroupMove(gid, anchor) {
+    const mem = groupMembers(gid);
+    if (!mem.length) return;
+    pendingUndoSnapshot = snapshotState();
+    const ids = new Set();
+    mem.forEach(o => { if (o.type === 'line' || o.type === 'polyface') { o.params.nodeIds.forEach(i => ids.add(i)); (o.params.topNodeIds || []).forEach(i => ids.add(i)); } });
+    moveGroup = {
+      objs: mem,
+      nodes: Array.from(ids).map(id => ({ id, pos: nodePos(id) })),
+      params: new Map(mem.map(o => [o, { params: JSON.parse(JSON.stringify(o.params)), height: o.height }])),
+      gm: [{ gid, m: groups.get(gid).m ? groups.get(gid).m.slice() : null }],
+    };
+    moveAnchor = anchor.clone();
+    setSelection(mem);
+    controls.enabled = false;
+  }
+  function restoreMoveGroup() {
+    if (!moveGroup) return;
+    moveGroup.objs.forEach(o => { const b = moveGroup.params.get(o); o.params = JSON.parse(JSON.stringify(b.params)); o.height = b.height; });
+    moveGroup.nodes.forEach(({ id, pos }) => setNodePos(id, pos));
+    moveGroup.gm.forEach(({ gid, m }) => { if (groups.get(gid)) groups.get(gid).m = m ? m.slice() : null; });
+    moveGroup.objs.forEach(rebuildMesh);
+  }
+
+  function cleanupGroups() {
+    const used = new Set(objects.map(o => o.gid).filter(Boolean));
+    Array.from(groups.keys()).forEach(id => { if (!used.has(id)) groups.delete(id); });
+    if (editingGroup != null && !groups.has(editingGroup)) { editingGroup = null; applyAllDisplay(); }
+    refreshPanel();
+  }
+
+  function makeGroup() {
+    if (editingGroup != null) { say('Cierra el grupo abierto antes de crear otro (no se anidan).'); return; }
+    if (!selectedObjects.length) { say('Selecciona algo para agrupar.'); return; }
+    pushUndo();
+    const gid0 = nextGroupId++;
+    const g = { id: gid0, name: 'Grupo ' + gid0, comp: null, m: IDENT_M() };
+    groups.set(g.id, g);
+    const sel = selectedObjects.slice();
+    sel.forEach(o => { o.gid = g.id; });
+    cleanupGroups();
+    setSelection(sel);
+    say('Grupo creado con ' + sel.length + ' objeto(s). Doble clic para editarlo.');
+  }
+
+  function explodeGroup() {
+    const gids = new Set(selectedObjects.map(o => o.gid).filter(Boolean));
+    if (!gids.size) { say('Selecciona un grupo o componente para descomponer.'); return; }
+    pushUndo();
+    objects.forEach(o => { if (gids.has(o.gid)) o.gid = 0; });
+    if (editingGroup != null && gids.has(editingGroup)) editingGroup = null;
+    cleanupGroups();
+    applyAllDisplay();
+    say('Descompuesto.');
+  }
+
+  // Paquete portable de objetos (nodos + objetos), sin grupos.
+  function packObjects(objs) {
+    const ids = new Set();
+    objs.forEach(o => { if (o.type === 'line' || o.type === 'polyface') { o.params.nodeIds.forEach(i => ids.add(i)); (o.params.topNodeIds || []).forEach(i => ids.add(i)); } });
+    return {
+      nodes: Array.from(ids).map(id => ({ ...nodes.get(id) })),
+      objects: objs.map(o => ({ type: o.type, params: JSON.parse(JSON.stringify(o.params)), height: o.height, layer: o.layer || 0, hidden: false, gid: 0 })),
+      groups: [],
+    };
+  }
+
+  function makeComponent(nameArg) {
+    if (editingGroup != null) { say('Cierra el grupo abierto antes.'); return; }
+    if (!selectedObjects.length) { say('Selecciona algo para convertir en componente.'); return; }
+    const name = (nameArg != null ? nameArg : prompt('Nombre del componente:', 'Componente ' + nextCompId) || '').trim();
+    if (!name) return;
+    pushUndo();
+    const sel = selectedObjects.slice();
+    const g = { id: nextGroupId++, name, comp: null, m: IDENT_M() };
+    groups.set(g.id, g);
+    sel.forEach(o => { o.gid = g.id; });
+    const box = selectionBox();
+    const comp = { id: nextCompId++, name, anchor: [(box.min.x + box.max.x) / 2, box.min.y, (box.min.z + box.max.z) / 2], ...packObjects(sel) };
+    g.comp = comp.id;
+    components.set(comp.id, comp);
+    cleanupGroups();
+    setSelection(sel);
+    say('Componente "' + name + '" creado. Insértalo desde el panel Grupos; al editar una instancia, las demás se actualizan.');
+  }
+
+  function insertComponent(compId) {
+    const c = components.get(compId);
+    if (!c) return;
+    if (editingGroup != null) exitGroupEdit();
+    const src = {
+      nodes: c.nodes,
+      objects: c.objects.map(d => ({ ...d, gid: -1 })),
+      groups: [{ id: -1, name: c.name, comp: c.id, m: IDENT_M() }],
+      anchor: new THREE.Vector3(...c.anchor),
+    };
+    startPaste(false, src);
+  }
+
+  function deleteComponentDef(compId) {
+    const inst = Array.from(groups.values()).filter(g => g.comp === compId);
+    if (inst.length && !confirm('Hay ' + inst.length + ' instancia(s). Se convertirán en grupos normales. ¿Continuar?')) return;
+    pushUndo();
+    inst.forEach(g => { g.comp = null; });
+    components.delete(compId);
+    refreshPanel();
+  }
+
+  // Re-genera las demás instancias de un componente a partir de la que se acaba de editar.
+  function syncComponent(gid) {
+    const g = groups.get(gid), comp = g && components.get(g.comp);
+    if (!comp) return;
+    const mem = groupMembers(gid);
+    if (!mem.length) return;
+    const others = Array.from(groups.values()).filter(h => h.comp === comp.id && h.id !== gid);
+    if (others.length) pushUndo();
+    const inv = new THREE.Matrix4().fromArray(g.m).invert();
+    const tmp = instantiateClipboard(packObjects(mem), false);
+    applyMatrixToObjects(tmp, inv);
+    const def = packObjects(tmp);
+    tmp.forEach(removeObject);
+    comp.nodes = def.nodes; comp.objects = def.objects;
+    others.forEach(h => {
+      const old = groupMembers(h.id);
+      const layer = old.length ? old[0].layer : 0, hidden = old.length ? old[0].hidden : false;
+      old.forEach(removeObject);
+      const objs = instantiateClipboard(def, false);
+      applyMatrixToObjects(objs, new THREE.Matrix4().fromArray(h.m));
+      objs.forEach(o => { o.gid = h.id; o.layer = layer; o.hidden = hidden; });
+    });
+    pruneOrphanNodes();
+  }
+
+  function enterGroup(gid) {
+    if (!groups.has(gid) || editingGroup === gid) return;
+    if (editingGroup != null) exitGroupEdit();
+    editingGroup = gid;
+    setSelection([]);
+    applyAllDisplay();
+    refreshPanel();
+    say('Editando "' + groups.get(gid).name + '". Doble clic fuera del grupo o Esc para cerrarlo.');
+  }
+  function exitGroupEdit() {
+    if (editingGroup == null) return;
+    const gid = editingGroup;
+    editingGroup = null;
+    const g = groups.get(gid);
+    if (g && g.comp) syncComponent(gid);
+    applyAllDisplay();
+    setSelection(groupMembers(gid));
+    refreshPanel();
+  }
+
+  // ── ocultar / mostrar ──
+  function hideSelection() {
+    if (!selectedObjects.length) { say('Selecciona algo para ocultar.'); return; }
+    pushUndo();
+    selectedObjects.forEach(o => { o.hidden = true; });
+    setSelection([]);
+    applyAllDisplay();
+  }
+  function showAllHidden() {
+    if (!objects.some(o => o.hidden)) { say('No hay objetos ocultos.'); return; }
+    pushUndo();
+    objects.forEach(o => { o.hidden = false; });
+    applyAllDisplay();
+  }
+
+  // ── capas ──
+  function addLayer(nameArg) {
+    const name = (nameArg != null ? nameArg : prompt('Nombre de la capa:', 'Capa ' + nextLayerId) || '').trim();
+    if (!name) return;
+    pushUndo();
+    const l = { id: nextLayerId++, name, visible: true };
+    layers.push(l);
+    currentLayer = l.id;
+    refreshPanel();
+  }
+  function setLayerVisible(id, v) {
+    layerById(id).visible = v;
+    setSelection(selectedObjects.filter(isShown));
+    applyAllDisplay();
+    refreshPanel();
+  }
+  function deleteLayer(id) {
+    if (id === 0) return;
+    pushUndo();
+    objects.forEach(o => { if (o.layer === id) o.layer = 0; });
+    layers = layers.filter(l => l.id !== id);
+    if (currentLayer === id) currentLayer = 0;
+    applyAllDisplay();
+    refreshPanel();
+  }
+  function moveSelectionToLayer(id) {
+    if (!selectedObjects.length) { say('Selecciona algo para moverlo a la capa.'); return; }
+    pushUndo();
+    selectedObjects.forEach(o => { o.layer = id; });
+    setSelection(selectedObjects.filter(isShown));
+    applyAllDisplay();
+    refreshPanel();
+  }
+  function renameLayer(id) {
+    const l = layerById(id), name = (prompt('Nombre de la capa:', l.name) || '').trim();
+    if (name) { l.name = name; refreshPanel(); }
+  }
+  function renameGroup(id) {
+    const g = groups.get(id); if (!g) return;
+    const name = (prompt('Nombre:', g.name) || '').trim();
+    if (!name) return;
+    g.name = name;
+    if (g.comp && components.get(g.comp)) components.get(g.comp).name = name;
+    refreshPanel();
+  }
+
+  // Doble clic con Seleccionar: abre el grupo bajo el cursor; fuera de él, lo cierra.
+  dom.addEventListener('dblclick', (e) => {
+    if (currentTool !== 'select') return;
+    const o = pickObject(e.clientX, e.clientY);
+    if (o && o.gid && o.gid !== editingGroup) enterGroup(o.gid);
+    else if (!o && editingGroup != null) exitGroupEdit();
+  });
+
+  // ═════════════ Sígueme (Follow Me): barrer un perfil a lo largo de una trayectoria ═════════════
+  let fmFace = null;   // cara elegida como perfil
+  let fmPath = null;   // { lines, nodeIds, closed }
+
+  // El perfil, como lazo 3D (sin repetir el primer punto). Solo caras planas (rectángulo, círculo, polígono).
+  function profileLoop3D(o) {
+    if (!o || o.type === 'solid') return null;
+    const info = faceOffsetInfo(o);
+    if (!info) return null;
+    if (info.kind === 'circle') return circlePoints(new THREE.Vector3(info.c2[0], info.y, info.c2[1]), info.r, 48);
+    return info.pts.map(([u, v]) => polyfaceTo3D(info.orientation, info.base, u, v));
+  }
+
+  // Cadena de líneas conectadas que contiene `seed`: se sigue por los nodos donde se unen exactamente dos líneas.
+  function pathChain(seed, restrict) {
+    const pool = restrict ? Array.from(restrict) : objects.filter(o => o.type === 'line' && isShown(o));
+    const byNode = new Map();
+    pool.forEach(l => l.params.nodeIds.forEach(id => { if (!byNode.has(id)) byNode.set(id, []); byNode.get(id).push(l); }));
+    const used = new Set([seed]);
+    let closed = false;
+    const walk = (startNode, fromLine) => {
+      const out = [], lines = [];
+      let cur = startNode, line = fromLine;
+      for (;;) {
+        const here = byNode.get(cur) || [];
+        if (here.length !== 2) break;
+        const next = here.find(l => l !== line);
+        if (!next) break;
+        if (used.has(next)) { closed = true; break; }
+        used.add(next);
+        const other = next.params.nodeIds[0] === cur ? next.params.nodeIds[1] : next.params.nodeIds[0];
+        out.push(other); lines.push(next);
+        cur = other; line = next;
+      }
+      return { out, lines };
+    };
+    const [a, b] = seed.params.nodeIds;
+    const fw = walk(b, seed);
+    if (closed) {
+      // fw.out termina en `a`: el anillo es a, b, ...resto
+      return { lines: [seed, ...fw.lines], nodeIds: [a, b, ...fw.out.slice(0, -1)], closed: true };
+    }
+    const bw = walk(a, seed);
+    const ids = [...bw.out.reverse(), a, b, ...fw.out];
+    // Un anillo que pasa por un nodo con ramal (p. ej. donde se apoya el perfil) también es una trayectoria cerrada.
+    if (ids.length > 3 && ids[0] === ids[ids.length - 1]) return { lines: [...bw.lines.reverse(), seed, ...fw.lines], nodeIds: ids.slice(0, -1), closed: true };
+    return { lines: [...bw.lines.reverse(), seed, ...fw.lines], nodeIds: ids, closed: false };
+  }
+
+  function newellNormal(pts) {
+    const n = new THREE.Vector3();
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i], q = pts[(i + 1) % pts.length];
+      n.x += (p.y - q.y) * (p.z + q.z);
+      n.y += (p.z - q.z) * (p.x + q.x);
+      n.z += (p.x - q.x) * (p.y + q.y);
+    }
+    return n;
+  }
+
+  // Barrido con juntas a inglete: cada anillo se obtiene proyectando el anterior, a lo largo del tramo,
+  // sobre el plano bisector del vértice (así el grosor se conserva en las esquinas).
+  function sweepSolid(loop, P, closed) {
+    const m = P.length, nSeg = closed ? m : m - 1;
+    if (m < 2 || loop.length < 3) return null;
+    const dirs = [];
+    for (let i = 0; i < nSeg; i++) {
+      const d = P[(i + 1) % m].clone().sub(P[i]);
+      if (d.lengthSq() < 1e-12) return null;
+      dirs.push(d.normalize());
+    }
+    const L = loop.map(v => v.clone());
+    const nl = newellNormal(L);
+    if (nl.lengthSq() < 1e-12) return null;
+    nl.normalize();
+    const planeN = (i) => {
+      if (!closed && i === m - 1) return dirs[m - 2].clone();
+      const n = dirs[(i - 1 + nSeg) % nSeg].clone().add(dirs[i % nSeg]);
+      return n.lengthSq() < 1e-6 ? null : n.normalize();
+    };
+    const proj = (pts, d, Q, N) => {
+      const den = d.dot(N);
+      if (Math.abs(den) < 1e-3) return null;
+      return pts.map(p => p.clone().addScaledVector(d, Q.clone().sub(p).dot(N) / den));
+    };
+    const rings = [];
+    if (closed) {
+      // El perfil se lleva al plano bisector del vértice de partida, proyectando por el tramo que menos lo roce.
+      const dp = Math.abs(nl.dot(dirs[0])) >= Math.abs(nl.dot(dirs[m - 1])) ? dirs[0] : dirs[m - 1];
+      if (Math.abs(nl.dot(dp)) < 0.05) return null;       // el perfil contiene la trayectoria
+      const N0 = planeN(0); if (!N0) return null;
+      const r0 = proj(L, dp, P[0], N0); if (!r0) return null;
+      if (newellNormal(r0).dot(dirs[0]) < 0) r0.reverse();
+      rings.push(r0);
+    } else {
+      if (Math.abs(nl.dot(dirs[0])) < 0.05) return null;   // el perfil es paralelo a la trayectoria
+      if (nl.dot(dirs[0]) < 0) L.reverse();
+      rings.push(L);
+    }
+    for (let i = 1; i < m; i++) {
+      const N = planeN(i); if (!N) return null;
+      const r = proj(rings[i - 1], dirs[i - 1], P[i], N); if (!r) return null;
+      rings.push(r);
+    }
+    const n = rings[0].length, verts = [], tris = [];
+    rings.forEach(r => r.forEach(v => verts.push([v.x, v.y, v.z])));
+    const idx = (r, k) => r * n + (k % n);
+    const bands = closed ? m : m - 1;
+    for (let b = 0; b < bands; b++) {
+      const r0 = b, r1 = (b + 1) % m;
+      for (let k = 0; k < n; k++) tris.push([idx(r0, k), idx(r0, k + 1), idx(r1, k + 1)], [idx(r0, k), idx(r1, k + 1), idx(r1, k)]);
+    }
+    if (!closed) {
+      const cap = (ri, outward) => {
+        const ring = rings[ri], nn = newellNormal(ring).normalize();
+        const u = Math.abs(nn.x) < 0.9 ? new THREE.Vector3(1, 0, 0).cross(nn).normalize() : new THREE.Vector3(0, 1, 0).cross(nn).normalize();
+        const v = nn.clone().cross(u);
+        const contour = ring.map(p => new THREE.Vector2(p.dot(u), p.dot(v)));
+        THREE.ShapeUtils.triangulateShape(contour, []).forEach(t => {
+          const a = ring[t[0]], b = ring[t[1]], c = ring[t[2]];
+          const tn = b.clone().sub(a).cross(c.clone().sub(a));
+          if (tn.dot(outward) < 0) tris.push([idx(ri, t[0]), idx(ri, t[2]), idx(ri, t[1])]);
+          else tris.push([idx(ri, t[0]), idx(ri, t[1]), idx(ri, t[2])]);
+        });
+      };
+      cap(0, dirs[0].clone().negate());
+      cap(m - 1, dirs[m - 2].clone());
+    }
+    return { verts, tris };
+  }
+
+  function followRun() {
+    const loop = profileLoop3D(fmFace);
+    if (!loop) { say('Sígueme: el perfil debe ser una cara plana.'); return; }
+    let P = fmPath.nodeIds.map(nodePos);
+    const c = loop.reduce((acc, v) => acc.add(v), new THREE.Vector3()).multiplyScalar(1 / loop.length);
+    if (fmPath.closed) {
+      let bi = 0, bd = Infinity;
+      P.forEach((p, i) => { const d = p.distanceTo(c); if (d < bd) { bd = d; bi = i; } });
+      P = P.slice(bi).concat(P.slice(0, bi));
+    } else if (P[P.length - 1].distanceTo(c) < P[0].distanceTo(c)) P.reverse();
+    const res = sweepSolid(loop, P, fmPath.closed);
+    if (!res) { say('Sígueme: no se pudo barrer (perfil paralelo a la trayectoria o giro de 180°).'); return; }
+    pushUndo();
+    const loopIds = fmFace.type === 'polyface' ? fmFace.params.nodeIds.slice() : [];
+    const pathLines = new Set(fmPath.lines);
+    const solid = addObject('solid', { verts: res.verts, tris: res.tris }, 0);
+    removeObject(fmFace);
+    if (loopIds.length) {
+      // el contorno del perfil queda dentro del sólido: se retira (menos lo que también sea trayectoria)
+      objects.filter(o => o.type === 'line' && !pathLines.has(o) && areAdjacentInLoop(loopIds, o.params.nodeIds[0], o.params.nodeIds[1])).forEach(removeObject);
+    }
+    fmFace = null; fmPath = null;
+    hideFaceHighlight();
+    setSelection([solid]);
+    say('Sígueme: sólido creado (' + res.tris.length + ' triángulos).');
+  }
+
+  function followClick(x, y) {
+    const preLines = selectedObjects.filter(o => o.type === 'line');
+    const o = pickObject(x, y);
+    if (!o) return;
+    if (o.type === 'line') {
+      fmPath = pathChain(o, null);
+      setSelection(fmPath.lines);
+    } else if (profileLoop3D(o)) {
+      fmFace = o;
+      showFaceHighlight(buildFaceHighlightMesh(o, 'top'));
+    } else { say('Sígueme: el perfil debe ser una cara plana (altura 0).'); return; }
+    if (!fmPath && fmFace && preLines.length) fmPath = pathChain(preLines[0], new Set(preLines));
+    if (fmFace && fmPath) followRun();
+    else say(fmFace ? 'Ahora haz clic en la trayectoria (una línea o arco).' : 'Ahora haz clic en la cara que será el perfil.');
+  }
+
+  function followHover() {
+    if (fmFace) return;
+    const hit = pickObjectWithFace(lastMouseX, lastMouseY);
+    showFaceHighlight(hit && profileLoop3D(hit.obj) ? buildFaceHighlightMesh(hit.obj, 'top') : null);
+  }
+
+
+  // ═════════════ Vistas, estilos, plano de sección y escenas ═════════════
+  let camAnim = null;
+  const STD_VIEWS = { top: [0, 1, 0], front: [0, 0, 1], back: [0, 0, -1], left: [-1, 0, 0], right: [1, 0, 0], iso: [1, 0.85, 1] };
+
+  function sceneBounds() {
+    const b = new THREE.Box3();
+    shownObjects().forEach(o => b.expandByObject(o.mesh));
+    if (b.isEmpty()) b.set(new THREE.Vector3(-8, 0, -8), new THREE.Vector3(8, 4, 8));
+    return b;
+  }
+
+  function animateCamera(pos, target, zoom, ms) {
+    camAnim = {
+      t0: performance.now(), dur: ms == null ? 450 : ms,
+      fp: camera.position.clone(), tp: pos.clone(),
+      ft: controls.target.clone(), tt: target.clone(),
+      fz: camera.zoom, tz: zoom == null ? camera.zoom : zoom,
+    };
+  }
+  function stepCameraAnim(now) {
+    if (!camAnim) return;
+    let t = Math.min(1, (now - camAnim.t0) / Math.max(camAnim.dur, 1));
+    const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    camera.position.lerpVectors(camAnim.fp, camAnim.tp, e);
+    controls.target.lerpVectors(camAnim.ft, camAnim.tt, e);
+    if (camera === orthoCam) { camera.zoom = camAnim.fz + (camAnim.tz - camAnim.fz) * e; camera.updateProjectionMatrix(); }
+    if (t >= 1) camAnim = null;
+  }
+  controls.addEventListener('start', () => { camAnim = null; });
+
+  function viewportAspect() { return Math.max(viewport.clientWidth, 1) / Math.max(viewport.clientHeight, 1); }
+
+  function setProjection(ortho) {
+    if ((camera === orthoCam) === !!ortho) return;
+    const from = camera, to = ortho ? orthoCam : perspCam;
+    to.up.copy(from.up);
+    if (ortho) {
+      orthoRefDist = Math.max(from.position.distanceTo(controls.target), 0.5);
+      to.position.copy(from.position); to.quaternion.copy(from.quaternion);
+      orthoCam.zoom = 1; fitOrthoFrustum(viewportAspect());
+    } else {
+      const dir = from.position.clone().sub(controls.target).normalize();
+      to.position.copy(controls.target).addScaledVector(dir, orthoRefDist / Math.max(orthoCam.zoom, 1e-3));
+      to.quaternion.copy(from.quaternion);
+    }
+    camera = to; controls.object = to;
+    controls.update();
+    refreshPanel();
+  }
+
+  function fitDistance(radius) {
+    return Math.max(radius, 1.5) / Math.sin(THREE.MathUtils.degToRad(perspCam.fov / 2)) * 1.15;
+  }
+  function goView(name) {
+    const b = sceneBounds(), c = b.getCenter(new THREE.Vector3());
+    const dist = fitDistance(b.getSize(new THREE.Vector3()).length() / 2);
+    const dir = new THREE.Vector3(...STD_VIEWS[name]).normalize();
+    if (camera === orthoCam) { orthoRefDist = dist; fitOrthoFrustum(viewportAspect()); }
+    animateCamera(c.clone().addScaledVector(dir, dist), c, 1);
+  }
+  function zoomExtents() {
+    const b = sceneBounds(), c = b.getCenter(new THREE.Vector3());
+    const dist = fitDistance(b.getSize(new THREE.Vector3()).length() / 2);
+    const dir = camera.position.clone().sub(controls.target);
+    if (dir.lengthSq() < 1e-9) dir.set(1, 1, 1);
+    dir.normalize();
+    if (camera === orthoCam) { orthoRefDist = dist; fitOrthoFrustum(viewportAspect()); }
+    animateCamera(c.clone().addScaledVector(dir, dist), c, 1);
+  }
+
+  function setStyle(mode) {
+    styleMode = mode;
+    applyAllDisplay();
+    refreshPanel();
+  }
+
+  // ── plano de sección: recorta todo lo que queda de un lado ──
+  let sectionState = { on: false, axis: 'y', pos: 1, flip: false, show: true };
+  const secPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
+  let secHelper = null;
+  const AXIS_VEC = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) };
+  function updateSection() {
+    const st = sectionState, av = AXIS_VEC[st.axis];
+    const sign = st.flip ? 1 : -1;               // por defecto se retira la parte de mayor coordenada
+    secPlane.normal.copy(av).multiplyScalar(sign);
+    secPlane.constant = -sign * st.pos;
+    renderer.clippingPlanes = st.on ? [secPlane] : [];
+    if (secHelper) { scene.remove(secHelper); disposeMesh(secHelper); secHelper = null; }
+    if (st.on && st.show) {
+      const g = new THREE.Group();
+      const quad = new THREE.Mesh(new THREE.PlaneGeometry(GRID_SIZE, GRID_SIZE), new THREE.MeshBasicMaterial({ color: COLOR_SELECTED, transparent: true, opacity: 0.1, side: THREE.DoubleSide, depthWrite: false }));
+      const h = GRID_SIZE / 2;
+      const border = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([[-h, -h], [h, -h], [h, h], [-h, h]].map(([x, y]) => new THREE.Vector3(x, y, 0))), new THREE.LineBasicMaterial({ color: COLOR_SELECTED }));
+      g.add(quad, border);
+      g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), av);
+      g.position.copy(av).multiplyScalar(st.pos + sign * -0.01);   // apenas del lado que se conserva
+      g.traverse(n => { n.raycast = () => {}; });
+      secHelper = g;
+      scene.add(secHelper);
+    }
+  }
+
+  // ── escenas: cámara + proyección + estilo + capas visibles + sección ──
+  function captureScene(name) {
+    return {
+      id: nextSceneId++, name,
+      pos: camera.position.toArray(), target: controls.target.toArray(),
+      ortho: camera === orthoCam, zoom: orthoCam.zoom, refDist: orthoRefDist,
+      style: styleMode, layers: Object.fromEntries(layers.map(l => [l.id, l.visible])),
+      section: { ...sectionState },
+    };
+  }
+  function addScene(nameArg) {
+    const name = (nameArg != null ? nameArg : prompt('Nombre de la escena:', 'Escena ' + nextSceneId) || '').trim();
+    if (!name) return;
+    scenes.push(captureScene(name));
+    refreshPanel();
+  }
+  function updateScene(id) {
+    const i = scenes.findIndex(s => s.id === id);
+    if (i < 0) return;
+    const fresh = captureScene(scenes[i].name); fresh.id = id; nextSceneId--;
+    scenes[i] = fresh;
+    refreshPanel();
+  }
+  function deleteScene(id) { scenes = scenes.filter(s => s.id !== id); refreshPanel(); }
+  function renameScene(id) {
+    const sc = scenes.find(s => s.id === id); if (!sc) return;
+    const name = (prompt('Nombre de la escena:', sc.name) || '').trim();
+    if (name) { sc.name = name; refreshPanel(); }
+  }
+  function applyScene(id, instant) {
+    const sc = scenes.find(s => s.id === id);
+    if (!sc) return;
+    layers.forEach(l => { if (sc.layers[l.id] !== undefined) l.visible = sc.layers[l.id]; });
+    styleMode = sc.style;
+    sectionState = { ...sc.section };
+    updateSection();
+    if (sc.ortho !== (camera === orthoCam)) setProjection(sc.ortho);
+    if (sc.ortho) { orthoRefDist = sc.refDist; fitOrthoFrustum(viewportAspect()); }
+    animateCamera(new THREE.Vector3(...sc.pos), new THREE.Vector3(...sc.target), sc.zoom, instant ? 1 : 600);
+    setSelection(selectedObjects.filter(isShown));
+    applyAllDisplay();
+    refreshPanel();
+  }
+
+  // ═════════════ Panel lateral: Capas · Grupos · Escenas · Vista ═════════════
+  let panelTab = 'capas';
+  let panelCollapsed = false;
+  function esc(t) { return String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+  const EYE_ON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const EYE_OFF = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.9 10.9 0 0 1 12 19c-7 0-11-7-11-7a19 19 0 0 1 5.1-5.9M9.9 4.2A10 10 0 0 1 12 4c7 0 11 7 11 7a19 19 0 0 1-3.2 4.2"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
+  function panelHTML() {
+    const tabs = [['capas', 'Capas'], ['grupos', 'Grupos'], ['escenas', 'Escenas'], ['vista', 'Vista']];
+    let h = '<div class="p-head" data-act="collapse"><span>Organizar</span><span class="p-chev">' + (panelCollapsed ? '▸' : '▾') + '</span></div>';
+    if (panelCollapsed) return h;
+    h += '<div class="p-tabs">' + tabs.map(([k, n]) => '<button class="p-tab' + (panelTab === k ? ' on' : '') + '" data-act="tab" data-id="' + k + '">' + n + '</button>').join('') + '</div><div class="p-body">';
+    if (panelTab === 'capas') {
+      layers.forEach(l => {
+        const n = objects.filter(o => (o.layer || 0) === l.id).length;
+        h += '<div class="p-row' + (currentLayer === l.id ? ' cur' : '') + '"><button class="p-ico" data-act="layer-vis" data-id="' + l.id + '" title="Mostrar / ocultar">' + (l.visible ? EYE_ON : EYE_OFF) + '</button>'
+          + '<span class="p-name" data-act="layer-cur" data-id="' + l.id + '" title="Clic: capa activa · doble clic: renombrar">' + esc(l.name) + '</span><span class="p-n">' + n + '</span>'
+          + (l.id ? '<button class="p-ico" data-act="layer-del" data-id="' + l.id + '" title="Eliminar capa">×</button>' : '<span class="p-ico"></span>') + '</div>';
+      });
+      h += '<div class="p-btns"><button data-act="layer-add">+ Capa</button><button data-act="layer-move">Mover selección a la capa activa</button></div>';
+      h += '<div class="p-note">Lo que dibujes va a la capa activa (la marcada).</div>';
+    } else if (panelTab === 'grupos') {
+      h += '<div class="p-btns"><button data-act="group-make">Agrupar</button><button data-act="comp-make">Crear componente</button><button data-act="group-explode">Descomponer</button></div>';
+      h += '<div class="p-sub">Grupos y componentes en el modelo</div>';
+      const gl = Array.from(groups.values());
+      if (!gl.length) h += '<div class="p-note">Sin grupos todavía. Selecciona algo y pulsa Agrupar (Ctrl+G).</div>';
+      gl.forEach(g => {
+        const n = groupMembers(g.id).length;
+        h += '<div class="p-row' + (editingGroup === g.id ? ' cur' : '') + '"><span class="p-name" data-act="group-sel" data-id="' + g.id + '" title="Clic: seleccionar · doble clic: renombrar">' + esc(g.name) + (g.comp ? ' <i>▣</i>' : '') + '</span><span class="p-n">' + n + '</span>'
+          + '<button class="p-ico" data-act="group-edit" data-id="' + g.id + '" title="Editar contenido">✎</button></div>';
+      });
+      h += '<div class="p-sub">Definiciones de componentes</div>';
+      const cl = Array.from(components.values());
+      if (!cl.length) h += '<div class="p-note">Un componente se repite: al editar una copia, las demás se actualizan.</div>';
+      cl.forEach(c => {
+        const n = Array.from(groups.values()).filter(g => g.comp === c.id).length;
+        h += '<div class="p-row"><span class="p-name">' + esc(c.name) + '</span><span class="p-n">' + n + '×</span>'
+          + '<button class="p-mini" data-act="comp-insert" data-id="' + c.id + '">Insertar</button><button class="p-ico" data-act="comp-del" data-id="' + c.id + '" title="Eliminar definición">×</button></div>';
+      });
+      h += '<div class="p-btns"><button data-act="hide-sel">Ocultar selección (H)</button><button data-act="show-all">Mostrar todo (Shift+H)</button></div>';
+    } else if (panelTab === 'escenas') {
+      h += '<div class="p-btns"><button data-act="scene-add">+ Escena con la vista actual</button></div>';
+      if (!scenes.length) h += '<div class="p-note">Una escena guarda la cámara, el estilo, las capas visibles y el plano de sección. Haz clic en una para volver a ella.</div>';
+      scenes.forEach(sc => {
+        h += '<div class="p-row"><span class="p-name" data-act="scene-go" data-id="' + sc.id + '" title="Clic: ir a la escena · doble clic: renombrar">' + esc(sc.name) + '</span>'
+          + '<button class="p-ico" data-act="scene-upd" data-id="' + sc.id + '" title="Actualizar con la vista actual">⟳</button><button class="p-ico" data-act="scene-del" data-id="' + sc.id + '" title="Eliminar">×</button></div>';
+      });
+    } else {
+      h += '<div class="p-sub">Vistas estándar</div><div class="p-grid">'
+        + [['top', 'Superior'], ['front', 'Frontal'], ['back', 'Posterior'], ['left', 'Izquierda'], ['right', 'Derecha'], ['iso', 'Isométrica']].map(([k, n]) => '<button data-act="view" data-id="' + k + '">' + n + '</button>').join('') + '</div>';
+      h += '<div class="p-btns"><button data-act="extents">Encuadrar todo</button></div>';
+      h += '<div class="p-sub">Cámara</div><div class="p-seg"><button class="' + (camera === perspCam ? 'on' : '') + '" data-act="proj" data-id="persp">Perspectiva</button><button class="' + (camera === orthoCam ? 'on' : '') + '" data-act="proj" data-id="ortho">Paralela</button></div>';
+      h += '<div class="p-sub">Estilo</div><div class="p-grid">'
+        + [['shaded', 'Sombreado'], ['hidden', 'Líneas ocultas'], ['xray', 'Rayos X'], ['wire', 'Alámbrico']].map(([k, n]) => '<button class="' + (styleMode === k ? 'on' : '') + '" data-act="style" data-id="' + k + '">' + n + '</button>').join('') + '</div>';
+      const st = sectionState;
+      h += '<div class="p-sub">Plano de sección</div>'
+        + '<label class="p-chk"><input type="checkbox" id="secOn"' + (st.on ? ' checked' : '') + '> Activar corte</label>'
+        + '<div class="p-seg">' + ['x', 'y', 'z'].map(a => '<button class="' + (st.axis === a ? 'on' : '') + '" data-act="sec-axis" data-id="' + a + '">' + (a === 'x' ? 'X rojo' : a === 'y' ? 'Y azul' : 'Z verde') + '</button>').join('') + '</div>'
+        + '<div class="p-slide"><input type="range" id="secPos" min="-20" max="20" step="0.05" value="' + st.pos + '"><span id="secPosVal">' + Number(st.pos).toFixed(2) + '</span></div>'
+        + '<label class="p-chk"><input type="checkbox" id="secFlip"' + (st.flip ? ' checked' : '') + '> Invertir lado</label>'
+        + '<label class="p-chk"><input type="checkbox" id="secShow"' + (st.show ? ' checked' : '') + '> Mostrar el plano</label>';
+    }
+    return h + '</div>';
+  }
+
+  function refreshPanel() {
+    updateGroupBanner();
+    if (!panelEl) return;
+    panelEl.innerHTML = panelHTML();
+  }
+
+  function updateGroupBanner() {
+    const el = document.getElementById('groupBanner');
+    if (!el) return;
+    const g = editingGroup != null ? groups.get(editingGroup) : null;
+    el.style.display = g ? 'flex' : 'none';
+    if (g) el.querySelector('b').textContent = g.name + (g.comp ? ' (componente)' : '');
+  }
+
+  panelEl = document.createElement('div');
+  panelEl.className = 'panel';
+  panelEl.id = 'panel';
+  viewport.appendChild(panelEl);
+
+  panelEl.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-act]');
+    if (!t) return;
+    const act = t.dataset.act, id = t.dataset.id, nid = Number(id);
+    if (e.detail >= 2 && (act === 'layer-cur' || act === 'group-sel' || act === 'scene-go')) {
+      if (act === 'layer-cur') renameLayer(nid); else if (act === 'group-sel') renameGroup(nid); else renameScene(nid);
+      return;
+    }
+    if (act === 'collapse') { panelCollapsed = !panelCollapsed; }
+    else if (act === 'tab') { panelTab = id; }
+    else if (act === 'layer-vis') { setLayerVisible(nid, !layerById(nid).visible); return; }
+    else if (act === 'layer-cur') { currentLayer = nid; }
+    else if (act === 'layer-del') { deleteLayer(nid); return; }
+    else if (act === 'layer-add') { addLayer(); return; }
+    else if (act === 'layer-move') { moveSelectionToLayer(currentLayer); return; }
+    else if (act === 'group-make') { makeGroup(); return; }
+    else if (act === 'group-explode') { explodeGroup(); return; }
+    else if (act === 'comp-make') { makeComponent(); return; }
+    else if (act === 'comp-insert') { insertComponent(nid); return; }
+    else if (act === 'comp-del') { deleteComponentDef(nid); return; }
+    else if (act === 'group-sel') { setSelection(groupMembers(nid).filter(isShown)); }
+    else if (act === 'group-edit') { setTool('select'); enterGroup(nid); return; }
+    else if (act === 'hide-sel') { hideSelection(); }
+    else if (act === 'show-all') { showAllHidden(); }
+    else if (act === 'scene-add') { addScene(); return; }
+    else if (act === 'scene-go') { applyScene(nid); return; }
+    else if (act === 'scene-upd') { updateScene(nid); return; }
+    else if (act === 'scene-del') { deleteScene(nid); return; }
+    else if (act === 'view') { goView(id); return; }
+    else if (act === 'extents') { zoomExtents(); return; }
+    else if (act === 'proj') { setProjection(id === 'ortho'); return; }
+    else if (act === 'style') { setStyle(id); return; }
+    else if (act === 'sec-axis') { sectionState.axis = id; updateSection(); }
+    refreshPanel();
+  });
+  panelEl.addEventListener('input', (e) => {
+    if (e.target.id === 'secPos') {
+      sectionState.pos = parseFloat(e.target.value) || 0;
+      document.getElementById('secPosVal').textContent = sectionState.pos.toFixed(2);
+      updateSection();
+    }
+  });
+  panelEl.addEventListener('change', (e) => {
+    if (e.target.id === 'secOn') { sectionState.on = e.target.checked; updateSection(); }
+    else if (e.target.id === 'secFlip') { sectionState.flip = e.target.checked; updateSection(); }
+    else if (e.target.id === 'secShow') { sectionState.show = e.target.checked; updateSection(); }
+  });
+  ['pointerdown', 'pointerup', 'dblclick'].forEach(ev => panelEl.addEventListener(ev, e => e.stopPropagation()));
+  document.getElementById('btnExitGroup').addEventListener('click', exitGroupEdit);
+
 
   // ───────────────────────── File menu ─────────────────────────
   const fileMenuBtn = document.getElementById('fileMenuBtn');
@@ -3236,6 +4144,11 @@
   document.getElementById('btnFlipX').addEventListener('click', () => flipSelection('x'));
   document.getElementById('btnFlipZ').addEventListener('click', () => flipSelection('z'));
   document.getElementById('btnFlipY').addEventListener('click', () => flipSelection('y'));
+  document.getElementById('btnGroup').addEventListener('click', makeGroup);
+  document.getElementById('btnExplode').addEventListener('click', explodeGroup);
+  document.getElementById('btnMakeComp').addEventListener('click', () => makeComponent());
+  document.getElementById('btnHideSel').addEventListener('click', hideSelection);
+  document.getElementById('btnShowAll').addEventListener('click', showAllHidden);
 
   function doNew() {
     if (objects.length && !confirm('¿Descartar el dibujo actual y empezar uno nuevo?')) return;
@@ -3245,9 +4158,14 @@
 
   function serialize() {
     return JSON.stringify({
-      app: 'porticad-modelador-3d', version: 2,
+      app: 'porticad-modelador-3d', version: 3,
       nodes: Array.from(nodes.values()),
-      objects: objects.map(o => ({ type: o.type, params: o.params, height: o.height }))
+      objects: objects.map(o => ({ type: o.type, params: o.params, height: o.height, layer: o.layer || 0, hidden: !!o.hidden, gid: o.gid || 0 })),
+      layers, currentLayer,
+      groups: Array.from(groups.values()),
+      components: Array.from(components.values()),
+      scenes,
+      view: { style: styleMode, ortho: camera === orthoCam, section: sectionState, pos: camera.position.toArray(), target: controls.target.toArray(), refDist: orthoRefDist, zoom: orthoCam.zoom },
     }, null, 2);
   }
 
@@ -3290,7 +4208,19 @@
             if (n.id >= nextNodeId) nextNodeId = n.id + 1;
           });
         }
-        data.objects.forEach(o => addObject(o.type, o.params, o.height || 0));
+        // Organización (versión 3): capas, grupos, componentes y escenas — antes que los objetos que las usan.
+        if (Array.isArray(data.layers) && data.layers.length) { layers = data.layers; nextLayerId = 1 + layers.reduce((m, l) => Math.max(m, l.id), 0); currentLayer = layers.some(l => l.id === data.currentLayer) ? data.currentLayer : 0; }
+        if (Array.isArray(data.groups)) { groups = new Map(data.groups.map(g => [g.id, g])); nextGroupId = 1 + data.groups.reduce((m, g) => Math.max(m, g.id), 0); }
+        if (Array.isArray(data.components)) { components = new Map(data.components.map(c => [c.id, c])); nextCompId = 1 + data.components.reduce((m, c) => Math.max(m, c.id), 0); }
+        scenes = Array.isArray(data.scenes) ? data.scenes : []; nextSceneId = 1 + scenes.reduce((m, sc) => Math.max(m, sc.id), 0);
+        if (data.view) {
+          styleMode = data.view.style || 'shaded';
+          sectionState = Object.assign({ on: false, axis: 'y', pos: 1, flip: false, show: true }, data.view.section || {});
+          updateSection();
+        }
+        data.objects.forEach(o => addObject(o.type, o.params, o.height || 0, { layer: o.layer || 0, hidden: !!o.hidden, gid: o.gid || 0 }));
+        applyAllDisplay();
+        refreshPanel();
         currentFilename = file.name;
       } catch (err) {
         alert('No se pudo abrir el archivo: ' + err.message);
@@ -3316,6 +4246,7 @@
   // ───────────────────────── Render loop ─────────────────────────
   function animate() {
     requestAnimationFrame(animate);
+    stepCameraAnim(performance.now());
     controls.update();
     renderer.render(scene, camera);
   }
@@ -3323,6 +4254,7 @@
 
   setTool('select');
   updateUndoRedoButtons();
+  refreshPanel();
 })();
 </script>
 </body>
