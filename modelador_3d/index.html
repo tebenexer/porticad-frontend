@@ -234,6 +234,12 @@
     <button class="tool-btn" data-tool="scale" title="Escalar (K): base, referencia, nuevo tamaño. Ctrl = copiar">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="12" width="9" height="9" rx="1"/><path d="M12 12l9-9"/><polyline points="15 3 21 3 21 9"/></svg>
     </button>
+    <button class="tool-btn" data-tool="offset" title="Desfase de una cara (D)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="1"/><rect x="8" y="8" width="8" height="8" rx="1" stroke-dasharray="2 2"/></svg>
+    </button>
+    <button class="tool-btn" data-tool="fillet" title="Empalme / redondear esquina (I)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4v9a7 7 0 0 0 7 7h9"/></svg>
+    </button>
     <div class="tool-sep"></div>
     <button class="tool-btn" data-tool="guide" title="Cinta métrica / guía (G)">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="4" stroke-dasharray="3 3"/><circle cx="4" cy="20" r="1.5" fill="currentColor"/><circle cx="20" cy="4" r="1.5" fill="currentColor"/></svg>
@@ -540,7 +546,7 @@
     return buildEdgeMesh(a, b, new THREE.LineDashedMaterial({ color: GUIDE_COLOR_DEFAULT, dashSize: 0.25, gapSize: 0.18 }));
   }
 
-  function buildRectMesh(x1, z1, x2, z2, height, baseY) {
+  function buildRectMesh(x1, z1, x2, z2, height, baseY, lift) {
     baseY = baseY || 0;
     const w = Math.max(Math.abs(x2 - x1), 0.001);
     const d = Math.max(Math.abs(z2 - z1), 0.001);
@@ -553,13 +559,13 @@
     } else {
       mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
       mesh.rotation.x = -Math.PI/2;
-      mesh.position.set(cx, baseY + 0.002, cz);
+      mesh.position.set(cx, baseY + 0.002 + (lift || 0), cz);
     }
     attachEdges(mesh);
     return mesh;
   }
 
-  function buildCircleMesh(cx, cz, radius, height, baseY) {
+  function buildCircleMesh(cx, cz, radius, height, baseY, lift) {
     baseY = baseY || 0;
     radius = Math.max(radius, 0.001);
     const mat = new THREE.MeshStandardMaterial({ color: COLOR_DEFAULT, side: THREE.DoubleSide });
@@ -570,7 +576,7 @@
     } else {
       mesh = new THREE.Mesh(new THREE.CircleGeometry(radius, 32), mat);
       mesh.rotation.x = -Math.PI/2;
-      mesh.position.set(cx, baseY + 0.002, cz);
+      mesh.position.set(cx, baseY + 0.002 + (lift || 0), cz);
     }
     attachEdges(mesh);
     return mesh;
@@ -677,7 +683,7 @@
     }
   }
 
-  function buildPolyfaceMesh(points, height, orientation, base) {
+  function buildPolyfaceMesh(points, height, orientation, base, lift) {
     orientation = orientation || 'xz';
     base = base || 0;
     const shape = new THREE.Shape(points.map(p => new THREE.Vector2(p[0], p[1])));
@@ -693,7 +699,7 @@
     // back side (dark blue, unlike a Rectangle/Circle). Flip it back so every face shades alike.
     if (matrix.determinant() < 0) flipWinding(geo);
     const mesh = new THREE.Mesh(geo, mat);
-    if (height <= 0) mesh.position.addScaledVector(b.z, 0.002); // nudge off the plane, avoids z-fighting
+    if (height <= 0) mesh.position.addScaledVector(b.z, 0.002 + (lift || 0)); // nudge off the plane, avoids z-fighting
     attachEdges(mesh);
     return mesh;
   }
@@ -701,9 +707,9 @@
   function meshFor(obj) {
     if (obj.type === 'line') return buildLineMesh(nodePos(obj.params.nodeIds[0]), nodePos(obj.params.nodeIds[1]));
     if (obj.type === 'guide') return buildGuideMesh(new THREE.Vector3(...obj.params.a), new THREE.Vector3(...obj.params.b));
-    if (obj.type === 'rect') return buildRectMesh(obj.params.x1, obj.params.z1, obj.params.x2, obj.params.z2, obj.height, obj.params.baseY);
-    if (obj.type === 'circle') return buildCircleMesh(obj.params.cx, obj.params.cz, obj.params.radius, obj.height, obj.params.baseY);
-    if (obj.type === 'polyface') return buildPolyfaceMesh(polyfacePoints2D(obj), obj.height, obj.params.orientation, obj.params.base);
+    if (obj.type === 'rect') return buildRectMesh(obj.params.x1, obj.params.z1, obj.params.x2, obj.params.z2, obj.height, obj.params.baseY, obj.params.lift);
+    if (obj.type === 'circle') return buildCircleMesh(obj.params.cx, obj.params.cz, obj.params.radius, obj.height, obj.params.baseY, obj.params.lift);
+    if (obj.type === 'polyface') return buildPolyfaceMesh(polyfacePoints2D(obj), obj.height, obj.params.orientation, obj.params.base, obj.params.lift);
   }
 
   function addObject(type, params, height) {
@@ -885,6 +891,8 @@
     arc3: 'Clic en el inicio, clic en un punto por donde pasa el arco, clic en el fin.',
     rotate: 'Selecciona antes lo que quieres rotar (o haz clic sobre una figura). Clic en el centro, clic para la dirección de referencia, mueve para el ángulo (se ajusta cada 15°) y clic — o escribe grados + Enter. Ctrl = rotar una copia. Gira sobre el eje vertical.',
     scale: 'Selecciona antes lo que quieres escalar. Clic en el punto base, clic en un punto de referencia, mueve para el nuevo tamaño y clic — o escribe el factor (2, 0.5) + Enter. Ctrl = escalar una copia.',
+    offset: 'Pasa el cursor sobre una cara plana (rectángulo, círculo o polígono) y haz clic; mueve el mouse hacia afuera o adentro para el desfase y haz clic — o escribe la distancia + Enter. Crea un contorno paralelo con su propia cara.',
+    fillet: 'Haz clic sobre una esquina donde se unen dos líneas, mueve el mouse para el redondeo y haz clic — o escribe el radio + Enter. Las líneas se acortan y se agrega el arco (también en las esquinas de caras planas).',
     paste: 'Mueve el cursor para ubicar la copia (engancha a puntos) y haz clic para soltarla. Esc cancela.',
     freehand: 'Mantén el botón presionado y dibuja a mano; al soltar se simplifica en segmentos. Termina sobre el inicio para cerrar y crear una cara.',
     erase: 'Haz clic sobre una figura para borrarla.',
@@ -901,7 +909,7 @@
     cancelDraw();
     currentTool = tool;
     document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
-    const names = { select:'Seleccionar', line:'Línea', rect:'Rectángulo', rrect:'Rectángulo rotado', circle:'Círculo', polygon:'Polígono', arc2:'Arco 2 puntos', arc3:'Arco 3 puntos', freehand:'Mano alzada', rotate:'Rotar', scale:'Escalar', paste:'Pegar', erase:'Borrador', extrude:'Extruir', move:'Mover', guide:'Cinta métrica' };
+    const names = { select:'Seleccionar', line:'Línea', rect:'Rectángulo', rrect:'Rectángulo rotado', circle:'Círculo', polygon:'Polígono', arc2:'Arco 2 puntos', arc3:'Arco 3 puntos', freehand:'Mano alzada', rotate:'Rotar', scale:'Escalar', paste:'Pegar', offset:'Desfase', fillet:'Empalme', erase:'Borrador', extrude:'Extruir', move:'Mover', guide:'Cinta métrica' };
     statusToolEl.textContent = names[tool];
     hintEl.textContent = TOOL_HINTS[tool];
     viewport.classList.toggle('drawing', DRAW_TOOLS.includes(tool));
@@ -1820,6 +1828,8 @@
     shapePts = [];
     freehandPts = null;
     editPts = [];
+    offFace = null;
+    filletSel = null;
     transformCopy = false;
     hideGhost();
     abortPaste();
@@ -2239,7 +2249,7 @@
   // One transform engine (a 4x4 matrix: rotation about the vertical axis, uniform scale, mirror,
   // translation) is applied to any mix of objects. Shared nodes move once; faces re-derive their
   // plane basis/offset/height from the matrix, so rotated or mirrored faces keep extruding right.
-  const EDIT_TOOLS = ['rotate', 'scale', 'paste'];
+  const EDIT_TOOLS = ['rotate', 'scale', 'paste', 'offset', 'fillet'];
   let editPts = [];          // rotate: [center, reference]; scale: [base, reference]
   let transformCopy = false; // Ctrl toggles: transform a copy and leave the original
   let ghostGroup = null;
@@ -2446,12 +2456,40 @@
   }
 
   function editVcbActive() {
+    if (currentTool === 'offset') return !!offFace;
+    if (currentTool === 'fillet') return !!filletSel;
     return (currentTool === 'rotate' || currentTool === 'scale') && editPts.length === 2 && selectedObjects.length > 0;
   }
 
   function refreshEditPreview() {
     const t = currentTool;
     if (t === 'paste') { movePaste(); return; }
+    if (t === 'offset') {
+      if (!offFace) {
+        const hit = pickObjectWithFace(lastMouseX, lastMouseY);
+        const ok = hit && faceOffsetInfo(hit.obj);
+        showFaceHighlight(ok ? buildFaceHighlightMesh(hit.obj, 'top') : null);
+        hideVCB();
+        return;
+      }
+      const st = computeOffsetStep(lastMouseX, lastMouseY);
+      if (!st) return;
+      setPreview(st.valid ? buildPreviewShape(st.loop3D, true, true) : null);
+      setVCB('Desfase', (Math.round(st.d * 1000) / 1000).toFixed(2) + (st.valid ? '' : ' ✕'));
+      return;
+    }
+    if (t === 'fillet') {
+      if (!filletSel) {
+        const c = nearestFilletCorner(lastMouseX, lastMouseY);
+        if (c) showSnapMarker(c.N, SNAP_COLOR_ENDPOINT, 'endpoint', 'Esquina para empalme'); else hideSnapMarker();
+        hideVCB();
+        return;
+      }
+      const st = computeFilletStep(lastMouseX, lastMouseY);
+      setPreview(buildPreviewShape(st.pts, false, false));
+      setVCB('Radio', st.r.toFixed(2));
+      return;
+    }
     if (t !== 'rotate' && t !== 'scale') return;
     hideGhost();
     if (!selectedObjects.length) { clearPreview(); hideVCB(); hideSnapMarker(); return; }
@@ -2471,6 +2509,22 @@
     lastMouseX = clientX; lastMouseY = clientY;
     const t = currentTool;
     if (t === 'paste') { commitPaste(clientX, clientY); return; }
+    if (t === 'offset') {
+      if (!offFace) {
+        const hit = pickObjectWithFace(clientX, clientY);
+        if (hit && faceOffsetInfo(hit.obj)) { offFace = hit.obj; typedValue = ''; hideFaceHighlight(); refreshEditPreview(); }
+        else statusCoordsEl.textContent = 'Desfase: haz clic sobre una cara plana (altura 0).';
+      } else commitFaceOffset(clientX, clientY);
+      return;
+    }
+    if (t === 'fillet') {
+      if (!filletSel) {
+        const c = nearestFilletCorner(clientX, clientY);
+        if (c) { filletSel = c; typedValue = ''; hideSnapMarker(); refreshEditPreview(); }
+        else statusCoordsEl.textContent = 'Empalme: haz clic sobre una esquina donde se unen exactamente dos líneas (en caras planas).';
+      } else commitFillet(clientX, clientY);
+      return;
+    }
     if (!selectedObjects.length) {
       const o = pickObject(clientX, clientY);
       if (o) { setSelection(curveMates(o)); refreshEditPreview(); }
@@ -2562,6 +2616,207 @@
     const snap = pasteState.snapshot;
     pasteState = null;
     restoreState(snap);
+  }
+
+
+  // ── Offset (flat faces) and Fillet (rounded corners) ──
+  let offFace = null;     // the flat face being offset
+  let filletSel = null;   // the corner chosen for the fillet
+  const OFFSET_LIFT = 0.004;
+
+  function rayPlanePoint(clientX, clientY, normal, point) {
+    const rect = dom.getBoundingClientRect();
+    mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouseNDC, camera);
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal.clone().normalize(), point);
+    const pt = new THREE.Vector3();
+    return raycaster.ray.intersectPlane(plane, pt) ? pt : null;
+  }
+
+  function polyArea2D(pts) { let a = 0; for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; }
+  function pointInPoly2D(q, pts) {
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const a = pts[i], b = pts[j];
+      if ((a[1] > q[1]) !== (b[1] > q[1]) && q[0] < (b[0] - a[0]) * (q[1] - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside;
+    }
+    return inside;
+  }
+  function distSeg2D(q, a, b) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+    let t = l2 < 1e-12 ? 0 : ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / l2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(q[0] - (a[0] + t * dx), q[1] - (a[1] + t * dy));
+  }
+  // Miter offset of a simple polygon by d (positive = outward, negative = inward).
+  function offsetPolygon2D(pts, d) {
+    const n = pts.length, sgn = polyArea2D(pts) >= 0 ? 1 : -1, lines = [];
+    for (let i = 0; i < n; i++) {
+      const p = pts[i], q = pts[(i + 1) % n];
+      const ex = q[0] - p[0], ey = q[1] - p[1], len = Math.hypot(ex, ey) || 1;
+      lines.push({ p: [p[0] + sgn * ey / len * d, p[1] - sgn * ex / len * d], e: [ex / len, ey / len] });
+    }
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const a = lines[(i - 1 + n) % n], b = lines[i];
+      const den = a.e[0] * b.e[1] - a.e[1] * b.e[0];
+      if (Math.abs(den) < 1e-9) { out.push(b.p.slice()); continue; }
+      const t = ((b.p[0] - a.p[0]) * b.e[1] - (b.p[1] - a.p[1]) * b.e[0]) / den;
+      out.push([a.p[0] + t * a.e[0], a.p[1] + t * a.e[1]]);
+    }
+    return out;
+  }
+
+  function faceOffsetInfo(o) {
+    if (!o || o.height > 0) return null;
+    if (o.type === 'circle') {
+      const y = o.params.baseY || 0;
+      return { kind: 'circle', orientation: 'xz', base: y, c2: [o.params.cx, o.params.cz], r: o.params.radius, y };
+    }
+    if (o.type === 'rect') {
+      const { x1, z1, x2, z2 } = o.params, y = o.params.baseY || 0;
+      const minx = Math.min(x1, x2), maxx = Math.max(x1, x2), minz = Math.min(z1, z2), maxz = Math.max(z1, z2);
+      return { kind: 'rect', orientation: 'xz', base: y, y, bounds: [minx, minz, maxx, maxz], pts: [[minx, minz], [maxx, minz], [maxx, maxz], [minx, maxz]] };
+    }
+    if (o.type === 'polyface') {
+      const orientation = o.params.orientation || 'xz';
+      return { kind: 'poly', orientation, base: o.params.base || 0, pts: polyfacePoints2D(o) };
+    }
+    return null;
+  }
+
+  function computeOffsetStep(clientX, clientY) {
+    const info = faceOffsetInfo(offFace);
+    if (!info) return null;
+    const b = POLYFACE_BASES[info.orientation] || POLYFACE_BASES.xz;
+    const planePt = b.z.clone().multiplyScalar(info.base);
+    const q3 = rayPlanePoint(clientX, clientY, b.z, planePt) || planePt;
+    const [qu, qv] = polyfaceTo2D(info.orientation, q3);
+    let d;
+    if (info.kind === 'circle') d = Math.hypot(qu - info.c2[0], qv - info.c2[1]) - info.r;
+    else {
+      let dmin = Infinity;
+      info.pts.forEach((p, i) => { dmin = Math.min(dmin, distSeg2D([qu, qv], p, info.pts[(i + 1) % info.pts.length])); });
+      d = pointInPoly2D([qu, qv], info.pts) ? -dmin : dmin;
+    }
+    const nums = typedNums();
+    if (nums.length) d = (d < 0 ? -1 : 1) * nums[0];
+    const out = { info, d, valid: false, loop3D: null, result: null };
+    if (info.kind === 'circle') {
+      const r2 = info.r + d;
+      if (r2 > 1e-3) {
+        out.valid = true;
+        out.result = { type: 'circle', params: { cx: info.c2[0], cz: info.c2[1], radius: r2 } };
+        out.loop3D = circlePoints(new THREE.Vector3(info.c2[0], info.y, info.c2[1]), r2, 64);
+      }
+    } else if (info.kind === 'rect') {
+      const [minx, minz, maxx, maxz] = info.bounds;
+      const nx1 = minx - d, nz1 = minz - d, nx2 = maxx + d, nz2 = maxz + d;
+      if (nx2 - nx1 > 1e-3 && nz2 - nz1 > 1e-3) {
+        out.valid = true;
+        out.result = { type: 'rect', params: { x1: nx1, z1: nz1, x2: nx2, z2: nz2 } };
+        out.loop3D = [[nx1, nz1], [nx2, nz1], [nx2, nz2], [nx1, nz2]].map(([x, z]) => new THREE.Vector3(x, info.y, z));
+      }
+    } else {
+      const np = offsetPolygon2D(info.pts, d);
+      const a0 = polyArea2D(info.pts), a1 = polyArea2D(np);
+      if (np.every(p => isFinite(p[0]) && isFinite(p[1])) && Math.sign(a0) === Math.sign(a1) && Math.abs(a1) > 1e-6) {
+        out.valid = true;
+        out.loop3D = np.map(([u, v]) => polyfaceTo3D(info.orientation, info.base, u, v));
+        out.result = { type: 'poly', pts: np };
+      }
+    }
+    return out;
+  }
+
+  function commitFaceOffset(clientX, clientY) {
+    const st = computeOffsetStep(clientX, clientY);
+    if (!st || !st.valid) return;
+    rememberTyped();
+    pushUndo();
+    const info = st.info;
+    if (st.result.type === 'circle' || st.result.type === 'rect') {
+      const params = Object.assign({}, st.result.params, { lift: OFFSET_LIFT });
+      if (Math.abs(info.y) > 1e-9) params.baseY = info.y;
+      addObject(st.result.type, params, 0);
+    } else {
+      const ids = st.loop3D.map(q => createNode(q).id);
+      for (let i = 0; i < ids.length; i++) addObject('line', { nodeIds: [ids[i], ids[(i + 1) % ids.length]] });
+      addObject('polyface', { nodeIds: ids, orientation: info.orientation, base: info.base, lift: OFFSET_LIFT }, 0);
+    }
+    cancelDraw();
+  }
+
+  // ── Fillet ──
+  function filletCandidate(nodeId) {
+    const lines = objects.filter(o => o.type === 'line' && o.params.nodeIds.includes(nodeId));
+    if (lines.length !== 2) return null;
+    // Only plain flat faces / loose lines: a solid's edges are tied to its extrusion.
+    if (objects.some(o => o.type === 'polyface' && ((o.params.topNodeIds && (o.params.topNodeIds.includes(nodeId) || o.params.nodeIds.includes(nodeId))) || (o.params.nodeIds.includes(nodeId) && o.height > 0)))) return null;
+    const [l1, l2] = lines;
+    const other = l => l.params.nodeIds[0] === nodeId ? l.params.nodeIds[1] : l.params.nodeIds[0];
+    const N = nodePos(nodeId), A = nodePos(other(l1)), B = nodePos(other(l2));
+    const a = A.clone().sub(N), b = B.clone().sub(N);
+    const la = a.length(), lb = b.length();
+    if (la < 1e-6 || lb < 1e-6) return null;
+    a.normalize(); b.normalize();
+    const phi = Math.acos(Math.max(-1, Math.min(1, a.dot(b))));
+    if (phi < 0.03 || phi > Math.PI - 0.03) return null;
+    return { nodeId, l1, l2, oA: other(l1), oB: other(l2), N, a, b, la, lb, phi, nrm: a.clone().cross(b).normalize() };
+  }
+  function nearestFilletCorner(clientX, clientY) {
+    let best = null;
+    nodes.forEach((n, id) => {
+      const d = screenDistToPoint(clientX, clientY, nodePos(id));
+      if (d <= SNAP_PIXEL_RADIUS * 1.4 && (!best || d < best.d)) { const c = filletCandidate(id); if (c) best = { d, c }; }
+    });
+    return best ? best.c : null;
+  }
+  function computeFilletStep(clientX, clientY) {
+    const c = filletSel;
+    const q = rayPlanePoint(clientX, clientY, c.nrm, c.N) || c.N.clone().add(c.a);
+    const half = Math.tan(c.phi / 2);
+    const tmax = Math.min(c.la, c.lb) * 0.98;
+    let t = q.distanceTo(c.N);
+    const nums = typedNums();
+    if (nums.length) t = Math.abs(nums[0]) / half;
+    t = Math.max(0.01, Math.min(tmax, t));
+    const r = t * half;
+    const T1 = c.N.clone().addScaledVector(c.a, t), T2 = c.N.clone().addScaledVector(c.b, t);
+    const bis = c.a.clone().add(c.b).normalize();
+    const C = c.N.clone().addScaledVector(bis, r / Math.sin(c.phi / 2));
+    const v0 = T1.clone().sub(C), sweep = Math.PI - c.phi;
+    const sign = C.clone().add(v0.clone().applyAxisAngle(c.nrm, sweep)).distanceTo(T2) <= C.clone().add(v0.clone().applyAxisAngle(c.nrm, -sweep)).distanceTo(T2) ? 1 : -1;
+    const k = Math.min(24, Math.max(3, Math.ceil(sweep / (Math.PI / 24))));
+    const pts = [T1];
+    for (let i = 1; i < k; i++) pts.push(C.clone().add(v0.clone().applyAxisAngle(c.nrm, sign * sweep * i / k)));
+    pts.push(T2);
+    return { pts, r, clamped: nums.length && Math.abs(nums[0]) - r > 1e-6 };
+  }
+  function commitFillet(clientX, clientY) {
+    if (!filletSel) return;
+    const c = filletSel, st = computeFilletStep(clientX, clientY);
+    rememberTyped();
+    pushUndo();
+    const ids = st.pts.map(q => createNode(q).id);
+    const replaceNode = (line, newId) => { line.params.nodeIds = line.params.nodeIds.map(id => id === c.nodeId ? newId : id); };
+    replaceNode(c.l1, ids[0]); replaceNode(c.l2, ids[ids.length - 1]);
+    const curveId = nextCurveId();
+    for (let i = 0; i < ids.length - 1; i++) addObject('line', { nodeIds: [ids[i], ids[i + 1]], curveId });
+    objects.filter(o => o.type === 'polyface' && o.params.nodeIds.includes(c.nodeId)).forEach(f => {
+      const loop = f.params.nodeIds, i = loop.indexOf(c.nodeId), n = loop.length;
+      const prev = loop[(i - 1 + n) % n], next = loop[(i + 1) % n];
+      let rep = null;
+      if (prev === c.oA && next === c.oB) rep = ids.slice();
+      else if (prev === c.oB && next === c.oA) rep = ids.slice().reverse();
+      if (!rep) return;
+      f.params.nodeIds = loop.slice(0, i).concat(rep, loop.slice(i + 1));
+      rebuildMesh(f);
+    });
+    rebuildMesh(c.l1); rebuildMesh(c.l2);
+    pruneOrphanNodes();
+    cancelDraw();
   }
 
   function selectAll() { setSelection(objects.slice()); }
@@ -2949,7 +3204,7 @@
     if ((e.ctrlKey && e.key.toLowerCase() === 'y') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'z')) { e.preventDefault(); doRedo(); }
     if (!e.ctrlKey && !e.metaKey && !isTypingTarget()) {
       if (e.shiftKey && e.key.toLowerCase() === 'r') { repeatLast(); e.preventDefault(); return; }
-      const map = { s:'select', l:'line', r:'rect', c:'circle', e:'erase', p:'extrude', m:'move', g:'guide', t:'rrect', o:'polygon', a:'arc2', q:'arc3', f:'freehand', w:'rotate', k:'scale' };
+      const map = { s:'select', l:'line', r:'rect', c:'circle', e:'erase', p:'extrude', m:'move', g:'guide', t:'rrect', o:'polygon', a:'arc2', q:'arc3', f:'freehand', w:'rotate', k:'scale', d:'offset', i:'fillet' };
       const t = map[e.key.toLowerCase()];
       if (t) setTool(t);
     }
