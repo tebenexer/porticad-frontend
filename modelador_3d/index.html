@@ -1870,10 +1870,11 @@
     const segment = addObject('line', { nodeIds: [drawStartNodeId, endNodeId] });
     chainLineObjs.push(segment);
     checkFaceSplit(drawStartNodeId, endNodeId);
+    autoCloseFaces(drawStartNodeId, endNodeId);
     const closesLoop = chainOrigin && finalPt.distanceTo(chainOrigin) < 1e-6 && chainPoints.length >= 3;
     if (closesLoop) {
       const planar = detectPolygonOrientation(chainPoints);
-      if (planar) {
+      if (planar && !objects.some(o => o.type === 'polyface' && faceNodeKey(o.params.nodeIds) === faceNodeKey(chainNodeIds))) {
         // The perimeter lines just committed (chainLineObjs) already reference these same
         // nodes, so they stay glued to the face automatically — no manual sync needed.
         addObject('polyface', { nodeIds: chainNodeIds.slice(), orientation: planar.orientation, base: planar.base }, 0);
@@ -3205,6 +3206,7 @@
     const p = groundPoint(e.clientX, e.clientY);
     if (p) statusCoordsEl.textContent = 'x: ' + p.x.toFixed(2) + '  z: ' + p.z.toFixed(2);
 
+    if (currentTool === 'select' && !selectDragStart) eraseHover(e.clientX, e.clientY, 6);
     if (currentTool === 'select' && selectDragStart) {
       const dx = e.clientX - selectDragStart.x, dy = e.clientY - selectDragStart.y;
       if (!boxSelectActive && Math.hypot(dx, dy) > BOX_SELECT_THRESHOLD_PX) boxSelectActive = true;
@@ -3338,7 +3340,7 @@
         finalizeBoxSelect(selectDragStart.x, selectDragStart.y, e.clientX, e.clientY);
         hideMarquee();
       } else {
-        setSelection(expandGroups(curveMates(pickObject(e.clientX, e.clientY))));
+        selectPartAt(e.clientX, e.clientY, false, e.shiftKey);
       }
       selectDragStart = null;
       boxSelectActive = false;
@@ -3583,6 +3585,124 @@
     } else removeObject(o);
   }
 
+  // ── Cerrar caras solas: al dibujar una línea que completa un lazo plano de aristas, se crea la cara ──
+  // (también cuando se borró una arista y se vuelve a dibujar). Se recorre, en cada plano posible que
+  // contiene la arista nueva, la cara que queda a cada lado.
+  function faceNodeKey(ids) { return ids.slice().sort((x, y) => x - y).join(','); }
+  function autoCloseFaces(a, b) {
+    if (a == null || b == null || a === b) return 0;
+    const adj = new Map();
+    const link = (u, v) => { if (!adj.has(u)) adj.set(u, new Set()); adj.get(u).add(v); };
+    objects.forEach(o => { if (o.type === 'line') { const [u, v] = o.params.nodeIds; if (u !== v) { link(u, v); link(v, u); } } });
+    if (!adj.has(a) || !adj.has(b)) return 0;
+    const A = nodePos(a), B = nodePos(b);
+    const ex0 = B.clone().sub(A);
+    if (ex0.lengthSq() < 1e-12) return 0;
+    ex0.normalize();
+    // planos candidatos: los que forman la arista nueva con cada vecino de sus extremos
+    const planes = [];
+    const addPlane = c => {
+      const n = ex0.clone().cross(nodePos(c).sub(A));
+      if (n.length() < 1e-6) return;
+      n.normalize();
+      if (planes.some(q => Math.abs(Math.abs(q.n.dot(n)) - 1) < 1e-6)) return;
+      planes.push({ n });
+    };
+    adj.get(b).forEach(c => { if (c !== a) addPlane(c); });
+    adj.get(a).forEach(c => { if (c !== b) addPlane(c); });
+    const existing = new Set(objects.filter(o => o.type === 'polyface').map(o => faceNodeKey(o.params.nodeIds)));
+    const baseLine = lineBetween(a, b);
+    const meta = baseLine ? bodyMeta(baseLine) : null;
+    let made = 0;
+    const EPS = 1e-4;
+    planes.forEach(({ n }) => {
+      const onPlane = id => Math.abs(n.dot(nodePos(id).sub(A))) < EPS;
+      const ey = n.clone().cross(ex0);
+      const P = new Map();
+      const pos2 = id => { if (!P.has(id)) { const d = nodePos(id).sub(A); P.set(id, [d.dot(ex0), d.dot(ey)]); } return P.get(id); };
+      const nbrs = id => Array.from(adj.get(id) || []).filter(onPlane);
+      const walk = (u, v) => {
+        const loop = [u];
+        let prev = u, cur = v;
+        for (let step = 0; step < 80; step++) {
+          if (cur === u) {
+            // terminó: ¿volvió por la arista inicial?
+            return loop;
+          }
+          if (loop.includes(cur)) return null;      // lazo no simple
+          loop.push(cur);
+          const pc = pos2(cur), pp = pos2(prev);
+          const r = Math.atan2(pp[1] - pc[1], pp[0] - pc[0]);
+          let best = null, bestAng = Infinity;
+          for (const w of nbrs(cur)) {
+            if (w === prev) continue;
+            const pw = pos2(w);
+            let ang = r - Math.atan2(pw[1] - pc[1], pw[0] - pc[0]);
+            ang = ((ang % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+            if (ang < 1e-9) ang = 2 * Math.PI;
+            if (ang < bestAng) { bestAng = ang; best = w; }
+          }
+          if (best == null) return null;               // arista colgando: no hay lazo
+          prev = cur; cur = best;
+        }
+        return null;
+      };
+      [[a, b], [b, a]].forEach(([u, v]) => {
+        const loop = walk(u, v);
+        if (!loop || loop.length < 3) return;
+        let area = 0;
+        for (let i = 0; i < loop.length; i++) { const p1 = pos2(loop[i]), p2 = pos2(loop[(i + 1) % loop.length]); area += p1[0] * p2[1] - p2[0] * p1[1]; }
+        if (area <= 1e-6) return;                      // cara exterior (sin acotar)
+        const key = faceNodeKey(loop);
+        if (existing.has(key)) return;
+        // plano y base de la cara nueva
+        const P0 = nodePos(loop[0]);
+        let orientation, base;
+        const AX = [['xz', 'y'], ['zy', 'x'], ['xy', 'z']];
+        const hit = AX.find(([, c]) => Math.abs(Math.abs(n[c]) - 1) < 1e-6);
+        if (hit) { orientation = hit[0]; base = POLYFACE_BASES[orientation].z.dot(P0); }
+        else {
+          const xv = ex0.clone();
+          const yv = n.clone().cross(xv);
+          orientation = orientationKey(xv, yv, n.clone());
+          base = POLYFACE_BASES[orientation].z.dot(P0);
+        }
+        existing.add(key);
+        addObject('polyface', { nodeIds: loop, orientation, base }, 0, meta);
+        made++;
+      });
+    });
+    return made;
+  }
+
+  // Seleccionar partes: la arista bajo el cursor (se «abre» el cuerpo si hace falta); con doble clic sobre
+  // un cuerpo, solo la cara tocada. Un clic sobre una cara de un cuerpo entero sigue seleccionándolo entero.
+  function selectPartAt(clientX, clientY, dbl, additive) {
+    const merge = list => setSelection(additive ? Array.from(new Set(selectedObjects.concat(list))) : list);
+    const cand = nearestEdge(clientX, clientY, 6);
+    if (cand && !isLockedByGroup(cand.obj)) {
+      if (cand.kind === 'body') {
+        pushUndo();
+        explodeBody(cand.obj);
+        const l = lineBetween(nodeAt(cand.a), nodeAt(cand.b));
+        if (l) { merge(curveMates(l)); return true; }
+        return true;
+      }
+      merge(expandGroups(curveMates(cand.obj)));
+      return true;
+    }
+    const obj = pickObject(clientX, clientY);
+    if (obj && dbl && isBody(obj) && !isLockedByGroup(obj)) {
+      pushUndo();
+      explodeBody(obj);
+      const f = pickObject(clientX, clientY);
+      merge(f ? [f] : []);
+      return true;
+    }
+    merge(expandGroups(curveMates(obj)));
+    return false;
+  }
+
   // ── Elegir qué arista se va a borrar: la más cercana al cursor (en píxeles) que no esté tapada ──
   const ERASE_EDGE_PX = 9;
   function segScreenDist(px, py, a, b) {
@@ -3618,14 +3738,15 @@
     }
     return segs;
   }
-  function nearestEdge(clientX, clientY) {
+  function nearestEdge(clientX, clientY, maxPx) {
+    const lim = maxPx || ERASE_EDGE_PX;
     const r = dom.getBoundingClientRect(), px = clientX - r.left, py = clientY - r.top;
     let best = null;
     const consider = (a, b, make) => {
       if (behindCamera(a) || behindCamera(b)) return;
       const sa = projectToScreen(a, r), sb = projectToScreen(b, r);
       const { d, t } = segScreenDist(px, py, sa, sb);
-      if (d > ERASE_EDGE_PX || (best && d >= best.d)) return;
+      if (d > lim || (best && d >= best.d)) return;
       const pt = a.clone().lerp(b, t);
       if (edgeOccluded(pt)) return;
       best = { d, a, b, ...make() };
@@ -3660,8 +3781,8 @@
   }
 
   // Vista previa en naranja de la arista que se borraría.
-  function eraseHover(clientX, clientY) {
-    const cand = nearestEdge(clientX, clientY);
+  function eraseHover(clientX, clientY, maxPx) {
+    const cand = nearestEdge(clientX, clientY, maxPx);
     setPreview(cand ? buildPreviewShape([cand.a, cand.b], false, false) : null);
   }
 
@@ -3897,6 +4018,7 @@
   dom.addEventListener('dblclick', (e) => {
     if (currentTool !== 'select') return;
     const o = pickObject(e.clientX, e.clientY);
+    if (o && isBody(o) && !(o.gid && o.gid !== editingGroup)) { selectPartAt(e.clientX, e.clientY, true, false); return; }
     if (o && o.gid && o.gid !== editingGroup) enterGroup(o.gid);
     else if (!o && editingGroup != null) exitGroupEdit();
   });
