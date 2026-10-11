@@ -471,7 +471,7 @@
 
   // Every 'line'/'polyface' object that references node `id` — used to cascade a move.
   function objectsUsingNode(id) {
-    return objects.filter(o => (o.type === 'line' || o.type === 'polyface') && o.params.nodeIds.includes(id));
+    return objects.filter(o => (o.type === 'line' || o.type === 'polyface') && (o.params.nodeIds.includes(id) || (o.params.holes && o.params.holes.some(h => h.includes(id)))));
   }
   function nodeMoved(id) { objectsUsingNode(id).forEach(rebuildMesh); }
 
@@ -482,6 +482,7 @@
       // A polyface's top-edge nodes stay alive even if every line using them was erased —
       // they're still needed to keep tracking the solid's top surface (see spawnPolyfaceTopEdges).
       if (o.type === 'polyface' && o.params.topNodeIds) o.params.topNodeIds.forEach(id => used.add(id));
+      if (o.type === 'polyface' && o.params.holes) o.params.holes.forEach(h => h.forEach(id => used.add(id)));
     });
     Array.from(nodes.keys()).forEach(id => { if (!used.has(id)) nodes.delete(id); });
   }
@@ -815,10 +816,11 @@
     }
   }
 
-  function buildPolyfaceMesh(points, height, orientation, base, lift, noEdges) {
+  function buildPolyfaceMesh(points, height, orientation, base, lift, noEdges, holes) {
     orientation = orientation || 'xz';
     base = base || 0;
     const shape = new THREE.Shape(points.map(p => new THREE.Vector2(p[0], p[1])));
+    if (holes && holes.length) shape.holes = holes.map(h => new THREE.Path(h.map(p => new THREE.Vector2(p[0], p[1]))));
     const mat = new THREE.MeshStandardMaterial({ color: COLOR_DEFAULT, side: THREE.DoubleSide });
     const geo = height > 0
       ? new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false })
@@ -843,7 +845,7 @@
     if (obj.type === 'guide') return buildGuideMesh(new THREE.Vector3(...obj.params.a), new THREE.Vector3(...obj.params.b));
     if (obj.type === 'rect') return buildRectMesh(obj.params.x1, obj.params.z1, obj.params.x2, obj.params.z2, obj.height, obj.params.baseY, obj.params.lift);
     if (obj.type === 'circle') return buildCircleMesh(obj.params.cx, obj.params.cz, obj.params.radius, obj.height, obj.params.baseY, obj.params.lift);
-    if (obj.type === 'polyface') return buildPolyfaceMesh(polyfacePoints2D(obj), obj.height, obj.params.orientation, obj.params.base, obj.params.lift, obj.height > 0 && !!obj.params.topNodeIds);
+    if (obj.type === 'polyface') return buildPolyfaceMesh(polyfacePoints2D(obj), obj.height, obj.params.orientation, obj.params.base, obj.params.lift, obj.height > 0 && !!obj.params.topNodeIds, (obj.params.holes || []).map(h => h.map(id => polyfaceTo2D(obj.params.orientation || 'xz', nodePos(id)))));
     if (obj.type === 'solid') return buildSolidMesh(obj.params.verts, obj.params.tris);
   }
 
@@ -898,6 +900,14 @@
       // but leaves the face's other edges standing (now bounding nothing).
       const [a, b] = obj.params.nodeIds;
       facesUsingEdge(a, b).forEach(removeObject);
+      // Un agujero (cara «recortada» en otra) se cierra si se borra una de sus aristas.
+      objects.forEach(f => {
+        if (f.type === 'polyface' && f.params.holes && f.params.holes.some(h => areAdjacentInLoop(h, a, b))) {
+          f.params.holes = f.params.holes.filter(h => !areAdjacentInLoop(h, a, b));
+          if (!f.params.holes.length) delete f.params.holes;
+          rebuildMesh(f);
+        }
+      });
     }
     scene.remove(obj.mesh);
     disposeMesh(obj.mesh);
@@ -1126,10 +1136,14 @@
   function pickObjectWithFace(clientX, clientY) {
     const hits = raycastAll(clientX, clientY);
     if (!hits.length) return null;
-    const faceHit = hits.find(h => {
-      const ref = objRefOf(h);
-      return ref && ref.type !== 'line' && ref.type !== 'guide';
-    }) || hits[0];
+    const isFaceHit = h => { const ref = objRefOf(h); return ref && ref.type !== 'line' && ref.type !== 'guide'; };
+    let faceHit = hits.find(isFaceHit) || hits[0];
+    // Caras superpuestas (una figura dibujada sobre otra cara): gana la más pequeña, la de «encima».
+    if (isFaceHit(faceHit)) {
+      const area = h => { const sz = new THREE.Box3().setFromObject(objRefOf(h).mesh).getSize(new THREE.Vector3()); return sz.x * sz.y + sz.y * sz.z + sz.x * sz.z; };
+      const near = hits.filter(h => isFaceHit(h) && h.distance <= faceHit.distance + 0.03);
+      if (near.length > 1) faceHit = near.reduce((a, b) => area(b) < area(a) - 1e-6 ? b : a);
+    }
     const obj = objRefOf(faceHit);
     if (!obj) return null;
     return { obj, normal: faceHit.face ? faceHit.face.normal.clone() : null, point: faceHit.point.clone() };
@@ -1860,8 +1874,12 @@
     const loopB = loop.slice(hi).concat(loop.slice(0, lo + 1));
     const topOf = new Map();
     if (face.params.topNodeIds) face.params.nodeIds.forEach((id, k) => topOf.set(id, face.params.topNodeIds[k]));
+    const orient = face.params.orientation || 'xz';
+    const inLoop = (L, id) => pointInPoly2D(polyfaceTo2D(orient, nodePos(id)), L.map(k => polyfaceTo2D(orient, nodePos(k))));
     [loopA, loopB].forEach(L => {
       const params = { nodeIds: L, orientation: face.params.orientation, base: face.params.base };
+      const hs = (face.params.holes || []).filter(h => inLoop(L, h[0]));
+      if (hs.length) params.holes = hs.map(h => h.slice());
       if (topOf.size) params.topNodeIds = L.map(id => topOf.get(id));   // cada mitad conserva su borde superior
       addObject('polyface', params, face.height);
     });
@@ -2053,8 +2071,20 @@
   function applyRepeat() { if (repeatPending) { typedValue = repeatPending; repeatPending = ''; } }
 
   // First-point resolution: geometry snap if any, else the ground plane.
+  // Si el cursor está sobre una cara plana horizontal (p. ej. la tapa de un cuerpo), se dibuja sobre ella.
+  function horizontalFacePoint(clientX, clientY) {
+    const hit = pickObjectWithFace(clientX, clientY);
+    if (!hit || !hit.obj || hit.obj.hidden) return null;
+    const o = hit.obj;
+    if (o.type === 'polyface' && !(o.height > 0) && (o.params.orientation || 'xz') === 'xz') {
+      const y = nodePos(o.params.nodeIds[0]).y;
+      if (Math.abs(y) < 1e-6) return null;      // el suelo se trata como siempre
+      return new THREE.Vector3(hit.point.x, y, hit.point.z);
+    }
+    return null;
+  }
   function resolveStartPoint(clientX, clientY) {
-    const raw = groundPoint(clientX, clientY);
+    const raw = horizontalFacePoint(clientX, clientY) || groundPoint(clientX, clientY);
     if (!raw) return null;
     const g = resolveGeometrySnap(raw, clientX, clientY);
     if (g) return { point: g.point.clone(), snapped: true, kind: g.kind, nodeId: g.nodeId };
@@ -3489,8 +3519,33 @@
     const pl = wallPlane(nodePos(a), nodePos(b), nodePos(d));
     return addObject('polyface', { nodeIds: [a, b, c, d], orientation: pl.orientation, base: pl.base }, 0, meta);
   }
+  function pointInPoly2D(pt, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, yi] = poly[i], [xj, yj] = poly[j];
+      if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+  // Si la base de un cuerpo cae por completo dentro de otra cara plana coplanar, esa cara se «recorta»
+  // (agujero) y la base propia sobra: las paredes nacen directamente del borde, como al empujar una cara
+  // dibujada sobre otra en SketchUp.
+  function imprintOnHost(baseIds, orientation, b0) {
+    const orient = orientation || 'xz';
+    const pts = baseIds.map(id => polyfaceTo2D(orient, nodePos(id)));
+    const host = objects.find(f => f.type === 'polyface' && !(f.height > 0) &&
+      (f.params.orientation || 'xz') === orient && Math.abs((f.params.base || 0) - b0) < 1e-4 &&
+      !f.params.nodeIds.some(id => baseIds.includes(id)) &&
+      pointInPoly2D(pts[0], f.params.nodeIds.map(id => polyfaceTo2D(orient, nodePos(id)))) &&
+      pts.every(q => pointInPoly2D(q, f.params.nodeIds.map(id => polyfaceTo2D(orient, nodePos(id))))) &&
+      !(f.params.holes || []).some(h => { const hp = h.map(id => polyfaceTo2D(orient, nodePos(id))); return pts.some(q => pointInPoly2D(q, hp)); }));
+    if (!host) return false;
+    host.params.holes = (host.params.holes || []).concat([baseIds.slice()]);
+    rebuildMesh(host);
+    return true;
+  }
   function shellFromPrism(baseIds, topIds, orientation, b0, h, meta) {
-    addObject('polyface', { nodeIds: baseIds.slice(), orientation, base: b0 }, 0, meta);
+    if (!imprintOnHost(baseIds, orientation, b0)) addObject('polyface', { nodeIds: baseIds.slice(), orientation, base: b0 }, 0, meta);
     addObject('polyface', { nodeIds: topIds.slice(), orientation, base: b0 + h }, 0, meta);
     const n = baseIds.length;
     for (let i = 0; i < n; i++) { const j = (i + 1) % n; addWallFace(baseIds[i], baseIds[j], topIds[j], topIds[i], meta); }
@@ -3556,6 +3611,7 @@
   }
   // Une dos caras planas que comparten la arista a–b en una sola (lo contrario de dividir una cara).
   function mergeFacesAcrossEdge(fA, fB, a, b) {
+    if ((fA.params.holes && fA.params.holes.length) || (fB.params.holes && fB.params.holes.length)) return null;
     const hasDir = (L, x, y) => { const n = L.length; for (let i = 0; i < n; i++) if (L[i] === x && L[(i + 1) % n] === y) return true; return false; };
     const A = fA.params.nodeIds.slice(); let B = fB.params.nodeIds.slice();
     if (!hasDir(A, a, b)) { if (!hasDir(A, b, a)) return null; const t = a; a = b; b = t; }
@@ -4645,6 +4701,7 @@
           updateSection();
         }
         data.objects.forEach(o => addObject(o.type, o.params, o.height || 0, { layer: o.layer || 0, hidden: !!o.hidden, gid: o.gid || 0 }));
+        objects.filter(isBody).forEach(o => explodeBody(o));   // archivos antiguos: los cuerpos de una pieza se abren en sus partes
         applyAllDisplay();
         refreshPanel();
         currentFilename = file.name;
