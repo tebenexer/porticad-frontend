@@ -164,6 +164,21 @@
       <button id="btnClearGuides">Limpiar guías</button>
     </div>
   </div>
+  <div class="menu-item">
+    <button class="menu-btn" id="editMenuBtn">Editar</button>
+    <div class="menu-dropdown" id="editMenuDropdown">
+      <button id="btnCopy">Copiar <span class="key">Ctrl+C</span></button>
+      <button id="btnPaste">Pegar <span class="key">Ctrl+V</span></button>
+      <button id="btnPasteInPlace">Pegar en el mismo lugar <span class="key">Ctrl+Alt+V</span></button>
+      <div style="height:1px;background:#30363d;margin:4px 0"></div>
+      <button id="btnSelectAll">Seleccionar todo <span class="key">Ctrl+A</span></button>
+      <button id="btnInvertSel">Invertir selección</button>
+      <div style="height:1px;background:#30363d;margin:4px 0"></div>
+      <button id="btnFlipX">Voltear en X (rojo)</button>
+      <button id="btnFlipZ">Voltear en Z (verde)</button>
+      <button id="btnFlipY">Voltear en Y (azul)</button>
+    </div>
+  </div>
   <div class="menubar-sep"></div>
   <button class="menubar-btn" id="btnUndo" title="Deshacer (Ctrl+Z)" disabled>
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/></svg>
@@ -212,6 +227,12 @@
     </button>
     <button class="tool-btn" data-tool="move" title="Mover (M)">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+    </button>
+    <button class="tool-btn" data-tool="rotate" title="Rotar con transportador (W): centro, referencia, ángulo. Ctrl = copiar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 3 21 9 15 9"/></svg>
+    </button>
+    <button class="tool-btn" data-tool="scale" title="Escalar (K): base, referencia, nuevo tamaño. Ctrl = copiar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="12" width="9" height="9" rx="1"/><path d="M12 12l9-9"/><polyline points="15 3 21 3 21 9"/></svg>
     </button>
     <div class="tool-sep"></div>
     <button class="tool-btn" data-tool="guide" title="Cinta métrica / guía (G)">
@@ -561,11 +582,34 @@
   // extrudes toward +Y), 'zy' (wall at x=base, points=[z,y], extrudes toward +X), 'xy'
   // (wall at z=base, points=[x,y], extrudes toward +Z). `base` is the polygon's offset
   // along whichever world axis is perpendicular to its plane.
-  const POLYFACE_BASES = {
+  // Rotated / mirrored faces (Rotate, Flip, Scale tools) get an orientation key of the form
+  // 'm:' + 9 numbers (x, y, z basis vectors); the Proxy below builds those bases on demand so
+  // every existing POLYFACE_BASES[orientation] lookup keeps working unchanged.
+  const POLYFACE_NAMED = {
     xz: { x: new THREE.Vector3(1,0,0), y: new THREE.Vector3(0,0,1), z: new THREE.Vector3(0,1,0) },
     zy: { x: new THREE.Vector3(0,0,1), y: new THREE.Vector3(0,1,0), z: new THREE.Vector3(1,0,0) },
     xy: { x: new THREE.Vector3(1,0,0), y: new THREE.Vector3(0,1,0), z: new THREE.Vector3(0,0,1) },
   };
+  const POLYFACE_BASES = new Proxy(POLYFACE_NAMED, {
+    get(t, k) {
+      if (typeof k === 'string' && k.startsWith('m:') && !(k in t)) {
+        const n = k.slice(2).split(',').map(Number);
+        if (n.length === 9 && n.every(isFinite)) {
+          t[k] = { x: new THREE.Vector3(n[0], n[1], n[2]), y: new THREE.Vector3(n[3], n[4], n[5]), z: new THREE.Vector3(n[6], n[7], n[8]) };
+        }
+      }
+      return t[k];
+    }
+  });
+  function orientationKey(bx, by, bz) {
+    const arr = [bx, by, bz].flatMap(v => [v.x, v.y, v.z]).map(c => Math.round(c * 1e6) / 1e6 + 0);
+    for (const name of ['xz', 'zy', 'xy']) {
+      const b = POLYFACE_NAMED[name];
+      const ref = [b.x, b.y, b.z].flatMap(v => [v.x, v.y, v.z]);
+      if (ref.every((c, i) => Math.abs(c - arr[i]) < 1e-6)) return name;
+    }
+    return 'm:' + arr.join(',');
+  }
   function polyfaceOffsetVector(orientation, offset) {
     const b = POLYFACE_BASES[orientation] || POLYFACE_BASES.xz;
     return b.z.clone().multiplyScalar(offset);
@@ -839,6 +883,9 @@
     polygon: 'Clic en el centro, clic en un vértice. Escribe 8s + Enter para cambiar el número de lados (o flechas ↑↓); escribe un radio + Enter para un valor exacto.',
     arc2: 'Clic en el inicio, clic en el fin de la cuerda, mueve para la flecha (la altura del arco) y clic. Escribe valores exactos + Enter.',
     arc3: 'Clic en el inicio, clic en un punto por donde pasa el arco, clic en el fin.',
+    rotate: 'Selecciona antes lo que quieres rotar (o haz clic sobre una figura). Clic en el centro, clic para la dirección de referencia, mueve para el ángulo (se ajusta cada 15°) y clic — o escribe grados + Enter. Ctrl = rotar una copia. Gira sobre el eje vertical.',
+    scale: 'Selecciona antes lo que quieres escalar. Clic en el punto base, clic en un punto de referencia, mueve para el nuevo tamaño y clic — o escribe el factor (2, 0.5) + Enter. Ctrl = escalar una copia.',
+    paste: 'Mueve el cursor para ubicar la copia (engancha a puntos) y haz clic para soltarla. Esc cancela.',
     freehand: 'Mantén el botón presionado y dibuja a mano; al soltar se simplifica en segmentos. Termina sobre el inicio para cerrar y crear una cara.',
     erase: 'Haz clic sobre una figura para borrarla.',
     extrude: 'Pasa el cursor para ver resaltada la cara exacta. Clic para agarrarla, mueve el mouse (la cara sigue al cursor), clic de nuevo para soltar — o escribe un número + Enter. Esc cancela.',
@@ -854,7 +901,7 @@
     cancelDraw();
     currentTool = tool;
     document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
-    const names = { select:'Seleccionar', line:'Línea', rect:'Rectángulo', rrect:'Rectángulo rotado', circle:'Círculo', polygon:'Polígono', arc2:'Arco 2 puntos', arc3:'Arco 3 puntos', freehand:'Mano alzada', erase:'Borrador', extrude:'Extruir', move:'Mover', guide:'Cinta métrica' };
+    const names = { select:'Seleccionar', line:'Línea', rect:'Rectángulo', rrect:'Rectángulo rotado', circle:'Círculo', polygon:'Polígono', arc2:'Arco 2 puntos', arc3:'Arco 3 puntos', freehand:'Mano alzada', rotate:'Rotar', scale:'Escalar', paste:'Pegar', erase:'Borrador', extrude:'Extruir', move:'Mover', guide:'Cinta métrica' };
     statusToolEl.textContent = names[tool];
     hintEl.textContent = TOOL_HINTS[tool];
     viewport.classList.toggle('drawing', DRAW_TOOLS.includes(tool));
@@ -1772,6 +1819,10 @@
     typedValue = '';
     shapePts = [];
     freehandPts = null;
+    editPts = [];
+    transformCopy = false;
+    hideGhost();
+    abortPaste();
     hideVCB();
     lastLineEndPoint = null;
     lastLineEndNodeId = null;
@@ -2183,6 +2234,339 @@
     repeatPending = typed;
   }
 
+
+  // ═════════════ Edit tools: rotate / scale / flip / copy-paste ═════════════
+  // One transform engine (a 4x4 matrix: rotation about the vertical axis, uniform scale, mirror,
+  // translation) is applied to any mix of objects. Shared nodes move once; faces re-derive their
+  // plane basis/offset/height from the matrix, so rotated or mirrored faces keep extruding right.
+  const EDIT_TOOLS = ['rotate', 'scale', 'paste'];
+  let editPts = [];          // rotate: [center, reference]; scale: [base, reference]
+  let transformCopy = false; // Ctrl toggles: transform a copy and leave the original
+  let ghostGroup = null;
+  let clipboard = null;
+  let pasteState = null;     // { objs, snapshot, baseline, nodeBase }
+
+  const AX_X = new THREE.Vector3(1, 0, 0), AX_Y = new THREE.Vector3(0, 1, 0), AX_Z = new THREE.Vector3(0, 0, 1);
+  function matScale(M) { return Math.cbrt(Math.abs(M.determinant())); }
+
+  function convertRectToPolyface(o) {
+    const { x1, z1, x2, z2 } = o.params, y = o.params.baseY || 0;
+    const ids = [[x1, z1], [x2, z1], [x2, z2], [x1, z2]].map(([x, z]) => createNode(new THREE.Vector3(x, y, z)).id);
+    o.type = 'polyface';
+    o.params = { nodeIds: ids, orientation: 'xz', base: y };
+  }
+  function convertCircleToPolyface(o) {
+    const { cx, cz, radius } = o.params, y = o.params.baseY || 0;
+    const ids = circlePoints(new THREE.Vector3(cx, y, cz), radius, 48).map(q => createNode(q).id);
+    o.type = 'polyface';
+    o.params = { nodeIds: ids, orientation: 'xz', base: y };
+  }
+  // Can a rect stay a parametric rect under M? (axis-aligned result, and not an upside-down extrusion)
+  function rectStaysParametric(o, M) {
+    const ex = AX_X.clone().transformDirection(M), ey = AX_Y.clone().transformDirection(M), ez = AX_Z.clone().transformDirection(M);
+    const e = 1 - 1e-6;
+    const aligned = Math.abs(ey.y) > e && ((Math.abs(ex.x) > e && Math.abs(ez.z) > e) || (Math.abs(ex.z) > e && Math.abs(ez.x) > e));
+    return aligned && !(ey.y < 0 && o.height > 0);
+  }
+  function circleStaysParametric(o, M) {
+    const ey = AX_Y.clone().transformDirection(M);
+    return !(ey.y < 0 && o.height > 0);
+  }
+
+  function transformPolyface(face, M, k) {
+    const o = face.params.orientation || 'xz';
+    const b = POLYFACE_BASES[o] || POLYFACE_BASES.xz;
+    const bx = b.x.clone().transformDirection(M), by = b.y.clone().transformDirection(M), bz = b.z.clone().transformDirection(M);
+    const p0 = b.z.clone().multiplyScalar(face.params.base || 0).applyMatrix4(M);
+    face.params.base = bz.dot(p0);
+    face.params.orientation = orientationKey(bx, by, bz);
+    face.height *= k;
+  }
+
+  function applyMatrixToObjects(objs, M) {
+    const k = matScale(M);
+    objs.forEach(o => {
+      if (o.type === 'rect' && !rectStaysParametric(o, M)) convertRectToPolyface(o);
+      else if (o.type === 'circle' && !circleStaysParametric(o, M)) convertCircleToPolyface(o);
+    });
+    const ids = new Set();
+    objs.forEach(o => {
+      if (o.type === 'line' || o.type === 'polyface') {
+        o.params.nodeIds.forEach(i => ids.add(i));
+        (o.params.topNodeIds || []).forEach(i => ids.add(i));
+      }
+    });
+    objs.forEach(o => {
+      if (o.type === 'polyface') transformPolyface(o, M, k);
+      else if (o.type === 'guide') {
+        o.params.a = new THREE.Vector3(...o.params.a).applyMatrix4(M).toArray();
+        o.params.b = new THREE.Vector3(...o.params.b).applyMatrix4(M).toArray();
+      } else if (o.type === 'rect') {
+        const y = o.params.baseY || 0;
+        const a = new THREE.Vector3(o.params.x1, y, o.params.z1).applyMatrix4(M);
+        const c = new THREE.Vector3(o.params.x2, y, o.params.z2).applyMatrix4(M);
+        o.params.x1 = a.x; o.params.z1 = a.z; o.params.x2 = c.x; o.params.z2 = c.z; o.params.baseY = a.y;
+        o.height *= k;
+      } else if (o.type === 'circle') {
+        const c = new THREE.Vector3(o.params.cx, o.params.baseY || 0, o.params.cz).applyMatrix4(M);
+        o.params.cx = c.x; o.params.cz = c.z; o.params.baseY = c.y; o.params.radius *= k;
+        o.height *= k;
+      }
+    });
+    ids.forEach(id => setNodePos(id, nodePos(id).applyMatrix4(M)));
+    const touched = new Set(objs);
+    ids.forEach(id => objectsUsingNode(id).forEach(x => touched.add(x)));
+    touched.forEach(rebuildMesh);
+  }
+
+  // Duplicates objects with fresh nodes (so the copy is independent of the original).
+  function cloneObjects(objs) {
+    const idMap = new Map();
+    const mapId = id => { if (!idMap.has(id)) idMap.set(id, createNode(nodePos(id)).id); return idMap.get(id); };
+    const curveMap = new Map(); let nc = nextCurveId();
+    return objs.map(o => {
+      const p = JSON.parse(JSON.stringify(o.params));
+      if (p.nodeIds) p.nodeIds = p.nodeIds.map(mapId);
+      if (p.topNodeIds) p.topNodeIds = p.topNodeIds.map(mapId);
+      if (p.curveId) { if (!curveMap.has(p.curveId)) curveMap.set(p.curveId, nc++); p.curveId = curveMap.get(p.curveId); }
+      return addObject(o.type, p, o.height);
+    });
+  }
+
+  function selectionBox() {
+    const box = new THREE.Box3();
+    selectedObjects.forEach(o => box.expandByObject(o.mesh));
+    return box;
+  }
+
+  function flipSelection(axis) {
+    if (!selectedObjects.length) { statusCoordsEl.textContent = 'Selecciona algo para voltear.'; return; }
+    const c = selectionBox().getCenter(new THREE.Vector3());
+    const sc = axis === 'x' ? new THREE.Vector3(-1, 1, 1) : axis === 'y' ? new THREE.Vector3(1, -1, 1) : new THREE.Vector3(1, 1, -1);
+    const M = new THREE.Matrix4().makeTranslation(c.x, c.y, c.z).multiply(new THREE.Matrix4().makeScale(sc.x, sc.y, sc.z)).multiply(new THREE.Matrix4().makeTranslation(-c.x, -c.y, -c.z));
+    pushUndo();
+    applyMatrixToObjects(selectedObjects, M);
+    setSelection(selectedObjects.slice());
+  }
+
+  // ── live ghost of the selection under a candidate matrix (no model mutation until commit) ──
+  function hideGhost() {
+    if (ghostGroup) { scene.remove(ghostGroup); disposeMesh(ghostGroup); ghostGroup = null; }
+  }
+  function showGhost(M) {
+    hideGhost();
+    ghostGroup = new THREE.Group();
+    selectedObjects.forEach(o => {
+      const m = meshFor(o);
+      m.traverse(n => {
+        if (n.material && n.material.color && !n.userData.isEdgeOverlay) { n.material.color.setHex(COLOR_SELECTED); n.material.transparent = true; n.material.opacity = 0.6; }
+        n.raycast = () => {};
+      });
+      ghostGroup.add(m);
+    });
+    ghostGroup.matrixAutoUpdate = false;
+    ghostGroup.matrix.copy(M);
+    ghostGroup.updateMatrixWorld(true);
+    scene.add(ghostGroup);
+  }
+
+  function buildProtractor(center, radius, a0, a1) {
+    const g = new THREE.Group();
+    const y = center.y + 0.004;
+    const mk = (pts, color, opacity) => { const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color, transparent: true, opacity: opacity == null ? 1 : opacity })); l.raycast = () => {}; return l; };
+    const P = (a, r) => new THREE.Vector3(center.x + r * Math.cos(a), y, center.z + r * Math.sin(a));
+    const ring = []; for (let i = 0; i <= 72; i++) ring.push(P(i / 72 * Math.PI * 2, radius));
+    g.add(mk(ring, 0x8b949e, 0.7));
+    for (let d = 0; d < 360; d += 15) { const a = d * Math.PI / 180; const inner = (d % 45 === 0) ? 0.88 : 0.94; g.add(mk([P(a, radius * inner), P(a, radius)], 0x8b949e, 0.8)); }
+    g.add(mk([new THREE.Vector3(center.x, y, center.z), P(a0, radius)], 0xe6edf3));
+    if (a1 != null) {
+      g.add(mk([new THREE.Vector3(center.x, y, center.z), P(a1, radius)], AXIS_COLOR_NONE));
+      let d = a1 - a0; while (d > Math.PI) d -= 2 * Math.PI; while (d <= -Math.PI) d += 2 * Math.PI;
+      const arc = []; for (let i = 0; i <= 24; i++) arc.push(P(a0 + d * i / 24, radius * 0.6));
+      g.add(mk(arc, AXIS_COLOR_NONE));
+    }
+    return g;
+  }
+
+  // ── Rotate / Scale: compute both the preview and what a click/Enter commits ──
+  function computeEditStep(clientX, clientY) {
+    const out = { advance: null, M: null, preview: null, label: null, measure: '', resolved: null };
+    const t = currentTool, n = editPts.length;
+    if (n === 0) {
+      const sp = resolveStartPoint(clientX, clientY);
+      if (sp) { out.advance = sp.point; out.resolved = sp; }
+      return out;
+    }
+    const c = editPts[0];
+    const res = resolvePlanarGeom(clientX, clientY, c.y);
+    const q = res ? res.point : c.clone();
+    if (n === 1) {
+      if (q.distanceTo(c) > 1e-6) out.advance = q;
+      out.resolved = res;
+      out.preview = t === 'rotate' ? buildProtractor(c, Math.max(q.distanceTo(c), 0.3), Math.atan2(q.z - c.z, q.x - c.x), null)
+                                   : buildPreviewShape([c, q], false, false);
+      out.label = t === 'rotate' ? 'Dirección de referencia' : 'Distancia de referencia';
+      out.measure = c.distanceTo(q).toFixed(2);
+      return out;
+    }
+    const ref = editPts[1];
+    const nums = typedNums();
+    if (t === 'rotate') {
+      const a0 = Math.atan2(ref.z - c.z, ref.x - c.x), a1 = Math.atan2(q.z - c.z, q.x - c.x);
+      let d = a1 - a0; while (d > Math.PI) d -= 2 * Math.PI; while (d <= -Math.PI) d += 2 * Math.PI;
+      let deg = d * 180 / Math.PI;
+      if (nums.length) deg = nums[0];
+      else { const snapped = Math.round(deg / 15) * 15; if (Math.abs(deg - snapped) < 3) deg = snapped; }
+      const rad = deg * Math.PI / 180;
+      out.M = new THREE.Matrix4().makeTranslation(c.x, c.y, c.z)
+        .multiply(new THREE.Matrix4().makeRotationY(-rad))
+        .multiply(new THREE.Matrix4().makeTranslation(-c.x, -c.y, -c.z));
+      out.preview = buildProtractor(c, Math.max(ref.distanceTo(c), 0.3), a0, a0 + rad);
+      out.label = 'Ángulo'; out.measure = (Math.round(deg * 10) / 10) + '°';
+    } else {
+      const d0 = ref.distanceTo(c);
+      let f = nums.length ? nums[0] : q.distanceTo(c) / Math.max(d0, 1e-6);
+      if (!isFinite(f) || Math.abs(f) < 0.001) f = 0.001;
+      out.M = new THREE.Matrix4().makeTranslation(c.x, c.y, c.z)
+        .multiply(new THREE.Matrix4().makeScale(f, f, f))
+        .multiply(new THREE.Matrix4().makeTranslation(-c.x, -c.y, -c.z));
+      out.preview = buildPreviewShape([c, ref.clone().sub(c).multiplyScalar(Math.max(f, 0.001)).add(c)], false, false);
+      out.label = 'Factor'; out.measure = '×' + (Math.round(f * 1000) / 1000);
+    }
+    return out;
+  }
+
+  function commitTransform(M) {
+    pushUndo();
+    let targets = selectedObjects.slice();
+    if (transformCopy) targets = cloneObjects(targets);
+    applyMatrixToObjects(targets, M);
+    cancelDraw();
+    setSelection(targets);
+  }
+
+  function editVcbActive() {
+    return (currentTool === 'rotate' || currentTool === 'scale') && editPts.length === 2 && selectedObjects.length > 0;
+  }
+
+  function refreshEditPreview() {
+    const t = currentTool;
+    if (t === 'paste') { movePaste(); return; }
+    if (t !== 'rotate' && t !== 'scale') return;
+    hideGhost();
+    if (!selectedObjects.length) { clearPreview(); hideVCB(); hideSnapMarker(); return; }
+    const st = computeEditStep(lastMouseX, lastMouseY);
+    if (editPts.length === 0) {
+      if (st.resolved && st.resolved.snapped) showSnapMarker(st.advance, snapColorFor(st.resolved.kind), st.resolved.kind); else hideSnapMarker();
+      hideVCB();
+      return;
+    }
+    if (st.resolved && st.resolved.snapped && !typedValue) showSnapMarker(st.resolved.point, snapColorFor(st.resolved.kind), st.resolved.kind); else hideSnapMarker();
+    setPreview(st.preview);
+    if (st.M) showGhost(st.M);
+    if (st.label) setVCB(st.label + (transformCopy ? ' · copia' : ''), st.measure);
+  }
+
+  function editClick(clientX, clientY) {
+    lastMouseX = clientX; lastMouseY = clientY;
+    const t = currentTool;
+    if (t === 'paste') { commitPaste(clientX, clientY); return; }
+    if (!selectedObjects.length) {
+      const o = pickObject(clientX, clientY);
+      if (o) { setSelection(curveMates(o)); refreshEditPreview(); }
+      return;
+    }
+    const st = computeEditStep(clientX, clientY);
+    if (editPts.length < 2) {
+      if (st.advance) { editPts.push(st.advance.clone()); typedValue = ''; refreshEditPreview(); }
+      return;
+    }
+    if (st.M) commitTransform(st.M);
+  }
+  function editEnter() { editClick(lastMouseX, lastMouseY); }
+
+  // ── Copy / Paste ──
+  function copySelection() {
+    const sel = selectedObjects.slice();
+    if (!sel.length) { statusCoordsEl.textContent = 'Selecciona algo para copiar.'; return; }
+    const ids = new Set();
+    sel.forEach(o => { if (o.type === 'line' || o.type === 'polyface') { o.params.nodeIds.forEach(i => ids.add(i)); (o.params.topNodeIds || []).forEach(i => ids.add(i)); } });
+    const box = selectionBox();
+    clipboard = {
+      nodes: Array.from(ids).map(id => ({ ...nodes.get(id) })),
+      objects: sel.map(o => ({ type: o.type, params: JSON.parse(JSON.stringify(o.params)), height: o.height })),
+      anchor: new THREE.Vector3((box.min.x + box.max.x) / 2, box.min.y, (box.min.z + box.max.z) / 2),
+    };
+    statusCoordsEl.textContent = 'Copiado: ' + sel.length + ' objeto(s). Ctrl+V para pegar.';
+  }
+
+  function instantiateClipboard() {
+    const idMap = new Map();
+    clipboard.nodes.forEach(n => idMap.set(n.id, createNode(n).id));
+    const curveMap = new Map(); let nc = nextCurveId();
+    return clipboard.objects.map(d => {
+      const p = JSON.parse(JSON.stringify(d.params));
+      if (p.nodeIds) p.nodeIds = p.nodeIds.map(i => idMap.get(i));
+      if (p.topNodeIds) p.topNodeIds = p.topNodeIds.map(i => idMap.get(i));
+      if (p.curveId) { if (!curveMap.has(p.curveId)) curveMap.set(p.curveId, nc++); p.curveId = curveMap.get(p.curveId); }
+      return addObject(d.type, p, d.height);
+    });
+  }
+
+  function startPaste(inPlace) {
+    if (!clipboard) { statusCoordsEl.textContent = 'No hay nada copiado.'; return; }
+    setTool('paste'); // also cancels any draw in progress
+    const snapshot = snapshotState();
+    const objs = instantiateClipboard();
+    setSelection(objs);
+    if (inPlace) {
+      undoStack.push(snapshot); if (undoStack.length > UNDO_LIMIT) undoStack.shift(); redoStack = []; updateUndoRedoButtons();
+      setTool('select');
+      setSelection(objs);
+      return;
+    }
+    const ids = new Set();
+    objs.forEach(o => { if (o.type === 'line' || o.type === 'polyface') { o.params.nodeIds.forEach(i => ids.add(i)); (o.params.topNodeIds || []).forEach(i => ids.add(i)); } });
+    pasteState = {
+      objs, snapshot,
+      baseline: objs.map(o => ({ params: JSON.parse(JSON.stringify(o.params)), height: o.height, type: o.type })),
+      nodeBase: Array.from(ids).map(id => ({ id, pos: nodePos(id) })),
+    };
+    movePaste();
+  }
+
+  function movePaste() {
+    if (!pasteState) return;
+    const sp = resolveStartPoint(lastMouseX, lastMouseY);
+    const pt = sp ? sp.point : clipboard.anchor.clone();
+    if (sp && sp.snapped) showSnapMarker(sp.point, snapColorFor(sp.kind), sp.kind); else hideSnapMarker();
+    pasteState.objs.forEach((o, i) => { o.params = JSON.parse(JSON.stringify(pasteState.baseline[i].params)); o.height = pasteState.baseline[i].height; });
+    pasteState.nodeBase.forEach(({ id, pos }) => setNodePos(id, pos));
+    const d = pt.clone().sub(clipboard.anchor);
+    applyMatrixToObjects(pasteState.objs, new THREE.Matrix4().makeTranslation(d.x, d.y, d.z));
+    setSelection(pasteState.objs.slice());
+  }
+
+  function commitPaste(clientX, clientY) {
+    if (!pasteState) return;
+    lastMouseX = clientX; lastMouseY = clientY;
+    movePaste();
+    const { snapshot, objs } = pasteState;
+    pasteState = null;
+    undoStack.push(snapshot); if (undoStack.length > UNDO_LIMIT) undoStack.shift(); redoStack = []; updateUndoRedoButtons();
+    setTool('select');
+    setSelection(objs);
+  }
+  function abortPaste() {
+    if (!pasteState) return;
+    const snap = pasteState.snapshot;
+    pasteState = null;
+    restoreState(snap);
+  }
+
+  function selectAll() { setSelection(objects.slice()); }
+  function invertSelection() { const cur = new Set(selectedObjects); setSelection(objects.filter(o => !cur.has(o))); }
+
   const dom = renderer.domElement;
 
   dom.addEventListener('contextmenu', e => e.preventDefault());
@@ -2269,6 +2653,8 @@
       }
       return;
     }
+
+    if (EDIT_TOOLS.includes(currentTool)) { editClick(e.clientX, e.clientY); return; }
 
     if (SHAPE_TOOLS.includes(currentTool)) {
       if (currentTool === 'freehand') freehandStart(e.clientX, e.clientY);
@@ -2396,6 +2782,8 @@
       refreshRectCirclePreview();
     } else if (SHAPE_TOOLS.includes(currentTool)) {
       refreshShapePreview();
+    } else if (EDIT_TOOLS.includes(currentTool)) {
+      refreshEditPreview();
     }
 
     if (currentTool === 'extrude') {
@@ -2487,8 +2875,10 @@
     const vcbExtrude = currentTool === 'extrude' && !!extrudeObj;
     const vcbRectCircle = (currentTool === 'rect' || currentTool === 'circle') && drawStage === 1;
     const vcbShape = SHAPE_TOOLS.includes(currentTool) && shapeVcbActive();
+    const vcbEdit = editVcbActive();
     const refreshVcbPreview = () => {
-      if (vcbLine) refreshLinePreview();
+      if (vcbEdit) refreshEditPreview();
+      else if (vcbLine) refreshLinePreview();
       else if (vcbGuide) refreshGuidePreview();
       else if (vcbOffset) refreshOffsetPreview();
       else if (vcbRectCircle) refreshRectCirclePreview();
@@ -2501,7 +2891,7 @@
       e.preventDefault();
       return;
     }
-    if ((vcbLine || vcbGuide || vcbOffset || vcbExtrude || vcbRectCircle || vcbShape) && !isTypingTarget()) {
+    if ((vcbLine || vcbGuide || vcbOffset || vcbExtrude || vcbRectCircle || vcbShape || vcbEdit) && !isTypingTarget()) {
       const allowSep = vcbRectCircle || vcbShape;
       const lastCh = typedValue.slice(-1);
       const okMinus = e.key === '-' && (typedValue === '' || lastCh === ',' || lastCh === ';');
@@ -2519,7 +2909,9 @@
         return;
       }
       if (e.key === 'Enter') {
-        if (vcbRectCircle) {
+        if (vcbEdit) {
+          editEnter();
+        } else if (vcbRectCircle) {
           commitRectCircle(lastMouseX, lastMouseY);
         } else if (vcbShape) {
           shapeEnter();
@@ -2543,6 +2935,13 @@
         selectedObjects.slice().forEach(o => removeObject(o));
       }
     }
+    if (e.key === 'Control' && !e.repeat && (currentTool === 'rotate' || currentTool === 'scale')) { transformCopy = !transformCopy; refreshEditPreview(); }
+    if (e.ctrlKey && !isTypingTarget()) {
+      const kk = e.key.toLowerCase();
+      if (kk === 'c') { e.preventDefault(); copySelection(); }
+      else if (kk === 'v') { e.preventDefault(); startPaste(e.altKey); }
+      else if (kk === 'a') { e.preventDefault(); selectAll(); }
+    }
     if (e.ctrlKey && e.key.toLowerCase() === 'n') { e.preventDefault(); doNew(); }
     if (e.ctrlKey && e.key.toLowerCase() === 'o') { e.preventDefault(); doOpen(); }
     if (e.ctrlKey && e.key.toLowerCase() === 's') { e.preventDefault(); doSave(); }
@@ -2550,7 +2949,7 @@
     if ((e.ctrlKey && e.key.toLowerCase() === 'y') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'z')) { e.preventDefault(); doRedo(); }
     if (!e.ctrlKey && !e.metaKey && !isTypingTarget()) {
       if (e.shiftKey && e.key.toLowerCase() === 'r') { repeatLast(); e.preventDefault(); return; }
-      const map = { s:'select', l:'line', r:'rect', c:'circle', e:'erase', p:'extrude', m:'move', g:'guide', t:'rrect', o:'polygon', a:'arc2', q:'arc3', f:'freehand' };
+      const map = { s:'select', l:'line', r:'rect', c:'circle', e:'erase', p:'extrude', m:'move', g:'guide', t:'rrect', o:'polygon', a:'arc2', q:'arc3', f:'freehand', w:'rotate', k:'scale' };
       const t = map[e.key.toLowerCase()];
       if (t) setTool(t);
     }
@@ -2559,15 +2958,29 @@
   // ───────────────────────── File menu ─────────────────────────
   const fileMenuBtn = document.getElementById('fileMenuBtn');
   const fileMenuDropdown = document.getElementById('fileMenuDropdown');
-  fileMenuBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    fileMenuDropdown.classList.toggle('show');
-    fileMenuBtn.classList.toggle('open');
+  const editMenuBtn = document.getElementById('editMenuBtn');
+  const editMenuDropdown = document.getElementById('editMenuDropdown');
+  function closeMenus() {
+    [fileMenuDropdown, editMenuDropdown].forEach(d => d.classList.remove('show'));
+    [fileMenuBtn, editMenuBtn].forEach(b => b.classList.remove('open'));
+  }
+  [[fileMenuBtn, fileMenuDropdown], [editMenuBtn, editMenuDropdown]].forEach(([btn, dd]) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const wasOpen = dd.classList.contains('show');
+      closeMenus();
+      if (!wasOpen) { dd.classList.add('show'); btn.classList.add('open'); }
+    });
   });
-  document.addEventListener('click', () => {
-    fileMenuDropdown.classList.remove('show');
-    fileMenuBtn.classList.remove('open');
-  });
+  document.addEventListener('click', closeMenus);
+  document.getElementById('btnCopy').addEventListener('click', copySelection);
+  document.getElementById('btnPaste').addEventListener('click', () => startPaste(false));
+  document.getElementById('btnPasteInPlace').addEventListener('click', () => startPaste(true));
+  document.getElementById('btnSelectAll').addEventListener('click', selectAll);
+  document.getElementById('btnInvertSel').addEventListener('click', invertSelection);
+  document.getElementById('btnFlipX').addEventListener('click', () => flipSelection('x'));
+  document.getElementById('btnFlipZ').addEventListener('click', () => flipSelection('z'));
+  document.getElementById('btnFlipY').addEventListener('click', () => flipSelection('y'));
 
   function doNew() {
     if (objects.length && !confirm('¿Descartar el dibujo actual y empezar uno nuevo?')) return;
