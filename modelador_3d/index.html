@@ -1333,7 +1333,13 @@
     const delta = typedValue !== '' ? (parseFloat(typedValue) || 0) : computePushDelta(extrudeHitPoint, extrudeWorldNormal, clientX, clientY);
     const orientation = extrudeObj.params.orientation || 'xz';
     const base = extrudeObj.params.base || 0;
-    if (extrudeWallIndex !== null) {
+    if (extrudeShell) {
+      const wn = extrudeWorldNormal;
+      extrudeNodeSnapshot.forEach(({ id, pos }) => setNodePos(id, pos.clone().addScaledVector(wn, delta)));
+      const bz = (POLYFACE_BASES[orientation] || POLYFACE_BASES.xz).z;
+      extrudeObj.params.base = extrudeShell.base + wn.dot(bz) * delta;
+      extrudeNodeSnapshot.forEach(({ id }) => nodeMoved(id));
+    } else if (extrudeWallIndex !== null) {
       const newPts = offsetPolygonEdge(extrudeBasePoints, extrudeWallIndex, delta);
       const nodeIds = extrudeObj.params.nodeIds;
       newPts.forEach((p, idx) => setNodePos(nodeIds[idx], polyfaceTo3D(orientation, base, p[0], p[1])));
@@ -1373,6 +1379,10 @@
       rebuildMesh(extrudeObj);
     }
     commitPendingUndo();
+    const finished = extrudeObj, wasShell = !!extrudeShell;
+    // Un cuerpo nace ya dividido en sus partes (caras y aristas), como en SketchUp.
+    if (finished && !wasShell && objects.includes(finished) && isBody(finished)) { explodeBody(finished); setSelection([]); pruneOrphanNodes(); }
+    extrudeShell = null;
     extrudeObj = null;
     extrudeSnapshotParams = null;
     extrudeWallIndex = null;
@@ -1691,6 +1701,7 @@
   let extrudeBaseValue = 0;
   let extrudeWallIndex = null;  // set instead of extrudeField when pushing one wall of a polyface
   let extrudeBasePoints = null; // snapshot of polyface 2D points at drag start, for offsetPolygonEdge's math
+  let extrudeShell = null;        // empujar una cara que forma parte de un cuerpo abierto: se mueven sus nodos y las paredes se estiran
   let extrudeNodeSnapshot = null; // [{id, pos}] snapshot of the face's nodes at drag start, for Escape-revert
   let extrudeSnapshotHeight = 0;   // full pre-grab snapshot, restored if the grab is cancelled (Escape)
   let extrudeSnapshotParams = null;
@@ -1961,6 +1972,7 @@
       rebuildMesh(extrudeObj);
     }
     extrudeObj = null;
+    extrudeShell = null;
     extrudeSnapshotParams = null;
     controls.enabled = true;
     selectDragStart = null;
@@ -3136,6 +3148,7 @@
       if (!hit || hit.obj.type === 'line' || hit.obj.type === 'guide' || hit.obj.type === 'solid') return;
       if (isLockedByGroup(hit.obj)) { statusCoordsEl.textContent = 'Abre el grupo con doble clic para editar su contenido.'; return; }
       const faceKind = determineFace(hit.obj, hit.point);
+      const shellOK = hit.obj.type === 'polyface' && !(hit.obj.height > 0) && shellFaceAttached(hit.obj);
       const wallMatch = /^wall(\d+)$/.exec(faceKind);
       pendingUndoSnapshot = snapshotState();
       extrudeObj = hit.obj;
@@ -3144,7 +3157,13 @@
       extrudeSnapshotHeight = hit.obj.height;
       extrudeSnapshotParams = JSON.parse(JSON.stringify(hit.obj.params));
       typedValue = '';
-      if (wallMatch) {
+      extrudeShell = null;
+      if (shellOK) {
+        extrudeShell = { base: hit.obj.params.base || 0 };
+        extrudeWallIndex = null; extrudeBasePoints = null;
+        extrudeNodeSnapshot = snapshotPolyfaceNodes(hit.obj);
+        extrudeWorldNormal = worldNormalForFace(hit.obj, 'top', hit.point);
+      } else if (wallMatch) {
         extrudeWallIndex = parseInt(wallMatch[1], 10);
         extrudeBasePoints = polyfacePoints2D(hit.obj);
         extrudeNodeSnapshot = snapshotPolyfaceNodes(hit.obj);
@@ -3585,6 +3604,38 @@
     } else removeObject(o);
   }
 
+  // ¿Es esta cara plana la tapa de un cuerpo abierto? (cada una de sus aristas la comparte una cara perpendicular)
+  function shellFaceAttached(face) {
+    const ids = face.params.nodeIds, n = ids.length;
+    if (n < 3) return false;
+    const nf = (POLYFACE_BASES[face.params.orientation || 'xz'] || POLYFACE_BASES.xz).z;
+    for (let i = 0; i < n; i++) {
+      const a = ids[i], b = ids[(i + 1) % n];
+      const nb = objects.find(g => g !== face && g.type === 'polyface' && !(g.height > 0) &&
+        areAdjacentInLoop(g.params.nodeIds, a, b) &&
+        Math.abs((POLYFACE_BASES[g.params.orientation || 'xz'] || POLYFACE_BASES.xz).z.dot(nf)) < 1e-3);
+      if (!nb) return false;
+    }
+    return true;
+  }
+  function faceEdgeLines(face) {
+    const ids = face.params.nodeIds, out = [];
+    for (let i = 0; i < ids.length; i++) { const l = lineBetween(ids[i], ids[(i + 1) % ids.length]); if (l) out.push(l); }
+    return out;
+  }
+  // Toda la geometría conectada (por nodos compartidos) con la dada.
+  function connectedGeometry(seed) {
+    const seen = new Set(), todo = [seed], out = [];
+    const nodeIdsOf = o => (o.type === 'line' || o.type === 'polyface') ? o.params.nodeIds.concat(o.params.topNodeIds || []) : [];
+    while (todo.length) {
+      const o = todo.pop();
+      if (seen.has(o)) continue;
+      seen.add(o); out.push(o);
+      nodeIdsOf(o).forEach(id => objectsUsingNode(id).forEach(x => { if (!seen.has(x) && !x.hidden && !isLockedByGroup(x)) todo.push(x); }));
+    }
+    return out;
+  }
+
   // ── Cerrar caras solas: al dibujar una línea que completa un lazo plano de aristas, se crea la cara ──
   // (también cuando se borró una arista y se vuelve a dibujar). Se recorre, en cada plano posible que
   // contiene la arista nueva, la cara que queda a cada lado.
@@ -4014,11 +4065,19 @@
     refreshPanel();
   }
 
+  // Triple clic con Seleccionar: toda la geometría conectada.
+  dom.addEventListener('click', (e) => {
+    if (currentTool !== 'select' || e.detail !== 3) return;
+    const o = pickObject(e.clientX, e.clientY);
+    if (o && !isLockedByGroup(o)) setSelection(connectedGeometry(o));
+  });
+
   // Doble clic con Seleccionar: abre el grupo bajo el cursor; fuera de él, lo cierra.
   dom.addEventListener('dblclick', (e) => {
     if (currentTool !== 'select') return;
     const o = pickObject(e.clientX, e.clientY);
     if (o && isBody(o) && !(o.gid && o.gid !== editingGroup)) { selectPartAt(e.clientX, e.clientY, true, false); return; }
+    if (o && o.type === 'polyface' && !(o.height > 0) && !(o.gid && o.gid !== editingGroup)) { setSelection([o].concat(faceEdgeLines(o))); return; }
     if (o && o.gid && o.gid !== editingGroup) enterGroup(o.gid);
     else if (!o && editingGroup != null) exitGroupEdit();
   });
