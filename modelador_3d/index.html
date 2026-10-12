@@ -363,16 +363,41 @@
 
   // ───────────────────────── Grid + axes ─────────────────────────
   const GRID_SIZE = 40, GRID_DIV = 40;
-  const grid = new THREE.GridHelper(GRID_SIZE, GRID_DIV, 0x30363d, 0x21262d);
-  // La cuadrícula y los ejes se dibujan primero y sin escribir profundidad: así nunca compiten
-  // (z-fighting) con las caras y líneas que se apoyan en el suelo.
-  grid.material.depthWrite = false;
+  // Cuadrícula infinita: un plano enorme con shader. Las líneas se calculan por píxel, cambian de escala
+  // (1, 10, 100…) según el zoom y se desvanecen hacia el horizonte, así siempre hay más malla al acercar,
+  // alejar o desplazar la vista. Se dibuja primero y sin escribir profundidad: nunca compite con las caras.
+  const gridUniforms = {
+    uCam: { value: new THREE.Vector3() }, uScale: { value: 10 },
+    uBg: { value: new THREE.Color(0x0d1117) }, uMinor: { value: new THREE.Color(0x1d232b) }, uMajor: { value: new THREE.Color(0x343c46) },
+  };
+  const grid = new THREE.Mesh(
+    new THREE.PlaneGeometry(200000, 200000).rotateX(-Math.PI / 2),
+    new THREE.ShaderMaterial({
+      uniforms: gridUniforms, depthWrite: false, side: THREE.DoubleSide, extensions: { derivatives: true },
+      vertexShader: 'varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }',
+      fragmentShader: [
+        'varying vec3 vW; uniform vec3 uCam; uniform float uScale; uniform vec3 uBg; uniform vec3 uMinor; uniform vec3 uMajor;',
+        'float gl(vec2 p, float size){ vec2 q = p/size; vec2 fw = fwidth(q); vec2 g = abs(fract(q-0.5)-0.5)/max(fw,vec2(1e-6));',
+        '  float l = 1.0 - min(min(g.x,g.y),1.0); float f = max(fw.x,fw.y); return l * (1.0 - smoothstep(0.2,0.5,f)); }',
+        'void main(){',
+        '  float L = log2(max(uScale,1e-4)*0.2)/log2(10.0); float e = floor(L); float f = L - e;',
+        '  float s0 = pow(10.0,e);',
+        '  float a0 = gl(vW.xz,s0)*(1.0-f); float a1 = gl(vW.xz,s0*10.0); float a2 = gl(vW.xz,s0*100.0)*f;',
+        '  float fade = 1.0 - smoothstep(uScale*6.0, uScale*45.0, length(vW.xz-uCam.xz));',
+        '  vec3 c = mix(uBg, uMinor, a0*fade); c = mix(c, uMajor, max(a1,a2)*fade*0.9);',
+        '  gl_FragColor = vec4(c,1.0);',
+        '}',
+      ].join('\n'),
+    })
+  );
   grid.renderOrder = -2;
+  grid.raycast = () => {};
+  grid.frustumCulled = false;
   scene.add(grid);
 
   function makeAxisLine(dir, color) {
     const geo = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(0,0,0), dir.clone().multiplyScalar(GRID_SIZE/2)
+      new THREE.Vector3(0,0,0), dir.clone().multiplyScalar(dir.y ? 60 : 20000)
     ]);
     const mat = new THREE.LineBasicMaterial({ color, linewidth: 2, depthWrite: false });
     const line = new THREE.Line(geo, mat);
@@ -1664,7 +1689,7 @@
   function showAxisGuide(anchor, axisKey, color) {
     const dir = axisKey === 'x' ? AXIS_X_DIR : axisKey === 'y' ? AXIS_Y_DIR : AXIS_Z_DIR;
     const geo = new THREE.BufferGeometry().setFromPoints([
-      anchor.clone().addScaledVector(dir, -GRID_SIZE), anchor.clone().addScaledVector(dir, GRID_SIZE)
+      anchor.clone().addScaledVector(dir, -500), anchor.clone().addScaledVector(dir, 500)
     ]);
     axisGuideMesh = new THREE.Line(geo, new THREE.LineDashedMaterial({ color, dashSize: 0.35, gapSize: 0.22, transparent: true, opacity: 0.75 }));
     axisGuideMesh.computeLineDistances();
@@ -2202,7 +2227,7 @@
     }
     if (closed) {
       const planar = detectPolygonOrientation(pts);
-      if (planar) addObject('polyface', { nodeIds: ids.slice(), orientation: planar.orientation, base: planar.base }, 0);
+      if (planar) { addObject('polyface', { nodeIds: ids.slice(), orientation: planar.orientation, base: planar.base }, 0); imprintOnHost(ids, planar.orientation, planar.base); }
     }
     return true;
   }
@@ -2251,17 +2276,12 @@
     if (currentTool === 'rect') {
       const { end, w, d } = computeRectEnd(clientX, clientY);
       if (w < 1e-3 || d < 1e-3) return;
-      rememberTyped(); pushUndo();
-      const params = { x1: drawStart.x, z1: drawStart.z, x2: end.x, z2: end.z };
-      if (Math.abs(drawStart.y) > 1e-9) params.baseY = drawStart.y;
-      addObject('rect', params, 0);
+      const y = drawStart.y;
+      commitShape([new THREE.Vector3(drawStart.x, y, drawStart.z), new THREE.Vector3(end.x, y, drawStart.z), new THREE.Vector3(end.x, y, end.z), new THREE.Vector3(drawStart.x, y, end.z)], true, false);
     } else {
       const { r } = computeCircleRadius(clientX, clientY);
       if (r < 1e-3) return;
-      rememberTyped(); pushUndo();
-      const params = { cx: drawStart.x, cz: drawStart.z, radius: r };
-      if (Math.abs(drawStart.y) > 1e-9) params.baseY = drawStart.y;
-      addObject('circle', params, 0);
+      commitShape(circlePoints(new THREE.Vector3(drawStart.x, drawStart.y, drawStart.z), r, 32), true, true);
     }
     cancelDraw();
   }
@@ -3532,6 +3552,8 @@
   // dibujada sobre otra en SketchUp.
   function imprintOnHost(baseIds, orientation, b0) {
     const orient = orientation || 'xz';
+    const key = faceNodeKey(baseIds);
+    if (objects.some(f => f.type === 'polyface' && f.params.holes && f.params.holes.some(h => faceNodeKey(h) === key))) return 'done';
     const pts = baseIds.map(id => polyfaceTo2D(orient, nodePos(id)));
     const host = objects.find(f => f.type === 'polyface' && !(f.height > 0) &&
       (f.params.orientation || 'xz') === orient && Math.abs((f.params.base || 0) - b0) < 1e-4 &&
@@ -3551,6 +3573,20 @@
     for (let i = 0; i < n; i++) { const j = (i + 1) % n; addWallFace(baseIds[i], baseIds[j], topIds[j], topIds[i], meta); }
   }
 
+  // Figuras planas antiguas (rectángulo/círculo de una pieza): se abren en aristas + cara.
+  function flatShapeToParts(o) {
+    if (!o || o.height > 0 || (o.type !== 'rect' && o.type !== 'circle')) return false;
+    const meta = bodyMeta(o), y = o.params.baseY || 0;
+    let pts, curve = false;
+    if (o.type === 'rect') { const { x1, z1, x2, z2 } = o.params; pts = [[x1, z1], [x2, z1], [x2, z2], [x1, z2]].map(([x, z]) => new THREE.Vector3(x, y, z)); }
+    else { pts = circlePoints(new THREE.Vector3(o.params.cx, y, o.params.cz), o.params.radius, 32); curve = true; }
+    removeObject(o);
+    const ids = pts.map(q => nodeIdAt(q)), cid = curve ? nextCurveId() : null;
+    ids.forEach((id, i) => ensureLine(id, ids[(i + 1) % ids.length], meta, cid));
+    addObject('polyface', { nodeIds: ids, orientation: 'xz', base: y }, 0, meta);
+    imprintOnHost(ids, 'xz', y);
+    return true;
+  }
   function isBody(o) { return !!o && o.height > 0 && (o.type === 'rect' || o.type === 'circle' || o.type === 'polyface'); }
 
   // Convierte el cuerpo en sus caras sueltas + aristas reales. Devuelve true si lo hizo.
@@ -4701,7 +4737,8 @@
           updateSection();
         }
         data.objects.forEach(o => addObject(o.type, o.params, o.height || 0, { layer: o.layer || 0, hidden: !!o.hidden, gid: o.gid || 0 }));
-        objects.filter(isBody).forEach(o => explodeBody(o));   // archivos antiguos: los cuerpos de una pieza se abren en sus partes
+        objects.filter(o => (o.type === 'rect' || o.type === 'circle') && !(o.height > 0)).forEach(flatShapeToParts);
+    objects.filter(isBody).forEach(o => explodeBody(o));   // archivos antiguos: los cuerpos de una pieza se abren en sus partes
         applyAllDisplay();
         refreshPanel();
         currentFilename = file.name;
@@ -4737,6 +4774,10 @@
       const near = Math.max(0.05, d * 0.02), far = Math.max(300, d * 120);
       if (Math.abs(near - camera.near) > camera.near * 0.05 || Math.abs(far - camera.far) > camera.far * 0.05) { camera.near = near; camera.far = far; camera.updateProjectionMatrix(); }
     }
+    // La malla infinita sigue a la cámara: escala según el zoom (perspectiva: distancia; ortogonal: alto visible).
+    gridUniforms.uCam.value.copy(camera.position);
+    gridUniforms.uScale.value = camera === orthoCam ? (orthoCam.top - orthoCam.bottom) / orthoCam.zoom * 1.1 : Math.max(camera.position.distanceTo(controls.target), 0.05);
+    if (camera === orthoCam) gridUniforms.uCam.value.set(controls.target.x, 0, controls.target.z);
     renderer.render(scene, camera);
   }
   animate();
