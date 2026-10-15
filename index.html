@@ -442,7 +442,21 @@
   .rtoggle:hover { background: var(--blue-dim); color: var(--blue-text); }
   .rtoggle.on { border-color: var(--border); color: var(--text); background: white; }
   .rtoggle .swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
-  .rtoggle .check { margin-left: auto; font-size: 13px; }
+  /* Toggle switch (interruptor) */
+  .rtoggle .check {
+    margin-left: auto; flex-shrink: 0; position: relative;
+    width: 34px; height: 18px; border-radius: 9px;
+    background: #b6c2d1; font-size: 0; color: transparent;
+    transition: background 0.18s;
+  }
+  .rtoggle .check::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 14px; height: 14px; border-radius: 50%; background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+    transition: transform 0.18s;
+  }
+  .rtoggle.on .check { background: var(--blue); }
+  .rtoggle.on .check::after { transform: translateX(16px); }
 
   /* ── Sección panel ────────────────────────────────── */
   .radio-opt {
@@ -1563,33 +1577,33 @@ _fbAuth.onAuthStateChanged(user => {
 
       <!-- TAB: Modelo -->
       <div id="tab-props">
-        <div class="section-title">Etiquetas en canvas</div>
-        <div class="rtoggle" id="tog-letiq-nudos" onclick="toggleEtiqNudos()" title="Mostrar/ocultar números de nudos">
+        <div class="section-title">Etiquetas de la pizarra</div>
+        <div class="rtoggle on" id="tog-letiq-nudos" onclick="toggleEtiqNudos()" title="Mostrar/ocultar números de nudos">
           <div class="swatch" style="background:#dd3333"></div>
           Etiquetas de nudos
-          <span class="check" id="chk-etiq-nudos">✔</span>
+          <span class="check" id="chk-etiq-nudos"></span>
         </div>
         <div class="rtoggle on" id="tog-letiq-barras" onclick="toggleEtiqBarras()" title="Mostrar/ocultar números de barras">
           <div class="swatch" style="background:#5090d0"></div>
           Etiquetas de barras
-          <span class="check" id="chk-etiq-barras">✔</span>
+          <span class="check" id="chk-etiq-barras"></span>
         </div>
         <div class="rtoggle on" id="tog-letiq-seccion" onclick="toggleEtiqSeccion()" title="Mostrar/ocultar nombre de sección en barras">
           <div class="swatch" style="background:#93c5fd"></div>
           Nombre de sección
-          <span class="check" id="chk-etiq-seccion">✔</span>
+          <span class="check" id="chk-etiq-seccion"></span>
         </div>
 
         <div class="section-title">Visibilidad de cargas</div>
         <div class="rtoggle on" id="tog-cargas-punt" onclick="toggleCargasPunt()" title="Mostrar/ocultar cargas puntuales">
           <div class="swatch" style="background:#dd2222"></div>
           Cargas puntuales
-          <span class="check" id="chk-cargas-punt">✔</span>
+          <span class="check" id="chk-cargas-punt"></span>
         </div>
         <div class="rtoggle on" id="tog-cargas-dist" onclick="toggleCargasDist()" title="Mostrar/ocultar cargas distribuidas">
           <div class="swatch" style="background:#e03232"></div>
           Cargas distribuidas
-          <span class="check" id="chk-cargas-dist">✔</span>
+          <span class="check" id="chk-cargas-dist"></span>
         </div>
 
         <div class="section-title">Escala de visualización</div>
@@ -2663,37 +2677,29 @@ function onFuenteDiagChange() {
 function toggleEtiqNudos() {
   mostrarEtiqNudos = !mostrarEtiqNudos;
   const el = document.getElementById('tog-letiq-nudos');
-  const chk = document.getElementById('chk-etiq-nudos');
   el.classList.toggle('on', mostrarEtiqNudos);
-  chk.textContent = mostrarEtiqNudos ? '✔' : '';
   draw();
 }
 function toggleEtiqBarras() {
   mostrarEtiqBarras = !mostrarEtiqBarras;
   const el = document.getElementById('tog-letiq-barras');
-  const chk = document.getElementById('chk-etiq-barras');
   el.classList.toggle('on', mostrarEtiqBarras);
-  chk.textContent = mostrarEtiqBarras ? '✔' : '';
   draw();
 }
 function toggleEtiqSeccion() {
   mostrarEtiqSeccion = !mostrarEtiqSeccion;
   const el  = document.getElementById('tog-letiq-seccion');
-  const chk = document.getElementById('chk-etiq-seccion');
   el.classList.toggle('on', mostrarEtiqSeccion);
-  chk.textContent = mostrarEtiqSeccion ? '✔' : '';
   draw();
 }
 function toggleCargasPunt() {
   mostrarCargasPunt = !mostrarCargasPunt;
   document.getElementById('tog-cargas-punt').classList.toggle('on', mostrarCargasPunt);
-  document.getElementById('chk-cargas-punt').textContent = mostrarCargasPunt ? '✔' : '';
   draw();
 }
 function toggleCargasDist() {
   mostrarCargasDist = !mostrarCargasDist;
   document.getElementById('tog-cargas-dist').classList.toggle('on', mostrarCargasDist);
-  document.getElementById('chk-cargas-dist').textContent = mostrarCargasDist ? '✔' : '';
   draw();
 }
 
