@@ -1144,13 +1144,6 @@ _fbAuth.onAuthStateChanged(user => {
     </button>
 
     <!-- Selec / Mover / Copiar / Pegar / Undo / Redo como botones compactos en topbar -->
-    <button class="tbtn tb-act" id="act-sel"    onclick="setMode('selbox')" data-tip="Seleccionar (arrastra)">
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="3" y="3" width="10" height="10" rx="1" stroke-dasharray="3 2"/>
-        <polyline points="15,13 20,18" stroke-width="2.5"/><line x1="18" y1="21" x2="21" y2="18"/>
-      </svg>
-      <span style="font-size:10px;font-weight:600">Selec.</span>
-    </button>
     <button class="tbtn tb-act" id="btn-pan-2d" onclick="toggle2DPan()" data-tip="Modo mano — arrastrar para mover el canvas (útil en móvil)">
       <span style="font-size:14px;line-height:1;">✋</span>
       <span style="font-size:10px;font-weight:600">Pan</span>
@@ -1333,6 +1326,24 @@ _fbAuth.onAuthStateChanged(user => {
 
   </div>
   <div class="tool-panel">
+
+    <!-- Seleccionar: cursor con marco de selección por ventana -->
+    <div class="tool-btn" id="tool-selbox" data-tip="Seleccionar (arrastra)" onclick="setMode('selbox')">
+      <svg viewBox="0 0 24 24" fill="none">
+        <!-- Marco de selección -->
+        <rect x="2.5" y="2.5" width="11" height="11" rx="1" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2.6 2" opacity="0.9"/>
+        <!-- Esquinas del marco -->
+        <rect x="1.5" y="1.5" width="2.4" height="2.4" fill="currentColor"/>
+        <rect x="12.1" y="1.5" width="2.4" height="2.4" fill="currentColor"/>
+        <rect x="1.5" y="12.1" width="2.4" height="2.4" fill="currentColor"/>
+        <!-- Puntero -->
+        <path d="M10.5 10.5 L10.5 22 L13.4 19.2 L15.7 23.4 L18.1 22.2 L15.8 18 L19.8 18 Z"
+              fill="currentColor" stroke="var(--surface)" stroke-width="1.1" stroke-linejoin="round" paint-order="stroke"/>
+      </svg>
+      <span class="tool-label">Selec.</span>
+    </div>
+
+    <div class="tool-sep"></div>
 
     <!-- Nudo -->
     <div class="tool-btn" id="tool-nudo" data-tip="Agregar Nudo" onclick="setMode('nudo')">
