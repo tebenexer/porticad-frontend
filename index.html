@@ -732,9 +732,49 @@
     font-size: 12px; color: var(--muted);
     width: 90px; flex-shrink: 0; line-height: 1.3;
   }
-  .scale-row input[type=range] {
-    flex: 1; height: 4px; accent-color: var(--blue);
-    cursor: pointer;
+  .scale-row input[type=range] { flex: 1; }
+
+  /* ── Slider neumórfico: riel con relieve, ranura hundida, relleno azul y perilla redonda ── */
+  .scale-row input[type=range], #art-izq, #art-der {
+    --f1: #6cc0ff; --f2: #1e90ff; --f3: #1573d6;   /* relleno (arriba, centro, abajo) */
+    --p: 0.5;                                       /* posición 0–1, la mantiene neoSyncRangos() */
+    -webkit-appearance: none; appearance: none;
+    height: 26px; margin: 0 6px 0 4px; padding: 0; background: transparent; cursor: pointer; outline: none;
+  }
+  #art-izq { --f1: #ff9a9a; --f2: #e05050; --f3: #bf3434; }
+  #art-der { --f1: #8fa8ff; --f2: #4466ee; --f3: #2f4bc2; }
+  .scale-row input[type=range]::-webkit-slider-runnable-track, #art-izq::-webkit-slider-runnable-track, #art-der::-webkit-slider-runnable-track {
+    height: 10px; border-radius: 6px;
+    background:
+      linear-gradient(180deg, var(--f1), var(--f2) 50%, var(--f3)) 0 0 / calc(11px + (100% - 22px) * var(--p)) 100% no-repeat,
+      #dcdde2;
+    box-shadow: inset 0 2px 3px rgba(0,0,0,0.30), inset 0 -1px 0 rgba(255,255,255,0.6),
+                0 0 0 3px #eceef2, 0 0 0 4px #d3d5db, 0 2px 4px 3px rgba(0,0,0,0.10);
+  }
+  .scale-row input[type=range]::-moz-range-track, #art-izq::-moz-range-track, #art-der::-moz-range-track {
+    height: 10px; border-radius: 6px; background: #dcdde2;
+    box-shadow: inset 0 2px 3px rgba(0,0,0,0.30), inset 0 -1px 0 rgba(255,255,255,0.6),
+                0 0 0 3px #eceef2, 0 0 0 4px #d3d5db, 0 2px 4px 3px rgba(0,0,0,0.10);
+  }
+  .scale-row input[type=range]::-moz-range-progress, #art-izq::-moz-range-progress, #art-der::-moz-range-progress {
+    height: 10px; border-radius: 6px 0 0 6px; background: linear-gradient(180deg, var(--f1), var(--f2) 50%, var(--f3));
+  }
+  .scale-row input[type=range]::-webkit-slider-thumb, #art-izq::-webkit-slider-thumb, #art-der::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 22px; height: 22px; margin-top: -6px; border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.10);
+    background: radial-gradient(circle at 50% 35%, #fbfbfd 0%, #e9eaee 45%, #d2d4da 100%);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.25),
+                inset 0 1px 1px #fff, inset 0 0 0 5px rgba(255,255,255,0.35), inset 0 -2px 3px rgba(0,0,0,0.10);
+    transition: transform 0.12s;
+  }
+  .scale-row input[type=range]::-moz-range-thumb, #art-izq::-moz-range-thumb, #art-der::-moz-range-thumb {
+    width: 20px; height: 20px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.10);
+    background: radial-gradient(circle at 50% 35%, #fbfbfd 0%, #e9eaee 45%, #d2d4da 100%);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.25), inset 0 1px 1px #fff, inset 0 0 0 5px rgba(255,255,255,0.35);
+  }
+  .scale-row input[type=range]:active::-webkit-slider-thumb, #art-izq:active::-webkit-slider-thumb, #art-der:active::-webkit-slider-thumb { transform: scale(1.08); }
+  .scale-row input[type=range]:focus-visible::-webkit-slider-thumb, #art-izq:focus-visible::-webkit-slider-thumb, #art-der:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px rgba(30,144,255,0.45), 0 3px 6px rgba(0,0,0,0.35), inset 0 1px 1px #fff;
   }
   .scale-val { display: none; }
 
@@ -2339,7 +2379,7 @@ _fbAuth.onAuthStateChanged(user => {
           <div class="section-title">Extremo izquierdo — artIzq</div>
           <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
             <input type="range" id="art-izq" min="0" max="1" step="0.01" value="0"
-                   oninput="onArtChange('izq')" style="flex:1; accent-color:#e05050;" />
+                   oninput="onArtChange('izq')" style="flex:1;" />
             <span id="art-izq-val" style="font-family:var(--mono); font-size:14px; font-weight:700; color:#e05050; min-width:38px; text-align:right;">0.00</span>
           </div>
           <!-- Botones rápidos izq -->
@@ -2351,7 +2391,7 @@ _fbAuth.onAuthStateChanged(user => {
           <div class="section-title">Extremo derecho — artDer</div>
           <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
             <input type="range" id="art-der" min="0" max="1" step="0.01" value="0"
-                   oninput="onArtChange('der')" style="flex:1; accent-color:#4466ee;" />
+                   oninput="onArtChange('der')" style="flex:1;" />
             <span id="art-der-val" style="font-family:var(--mono); font-size:14px; font-weight:700; color:#4466ee; min-width:38px; text-align:right;">0.00</span>
           </div>
           <!-- Botones rápidos der -->
@@ -11595,6 +11635,19 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function hideTip() { tip.style.display = 'none'; }
+
+  // Relleno de los sliders neumórficos: guarda la posición (0–1) en --p
+  function neoSync(el) {
+    const mn = parseFloat(el.min) || 0, mx = el.max === '' ? 100 : parseFloat(el.max);
+    const p = mx > mn ? (parseFloat(el.value) - mn) / (mx - mn) : 0;
+    const t = Math.max(0, Math.min(1, p)).toFixed(4);
+    if (el.dataset.neo !== t) { el.dataset.neo = t; el.style.setProperty('--p', t); }
+  }
+  const neoSel = '.scale-row input[type=range], #art-izq, #art-der';
+  function neoSyncTodos() { document.querySelectorAll(neoSel).forEach(neoSync); }
+  document.addEventListener('input', e => { if (e.target.matches && e.target.matches(neoSel)) neoSync(e.target); });
+  neoSyncTodos();
+  setInterval(neoSyncTodos, 400);   // por si el código cambia un valor (cargar proyecto, restablecer…)
 
   document.querySelectorAll('.scale-row input[type=range]').forEach(sl => {
     sl.addEventListener('mouseenter', () => showTip(sl));
