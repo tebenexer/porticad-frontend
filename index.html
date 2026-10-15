@@ -3681,9 +3681,10 @@ function draw() {
 
 function drawGrid() {
   const step = zoom;
+  const claro = canvasEsClaro();
 
   // Líneas verticales — rosadas como en tkinter (fill="pink")
-  ctx.strokeStyle = 'rgba(220,160,180,0.28)';
+  ctx.strokeStyle = claro ? 'rgba(200,90,130,0.30)' : 'rgba(220,160,180,0.28)';
   ctx.lineWidth = 0.5;
   ctx.setLineDash([2, 4]);
   for (let x = panX % step; x < cv.width; x += step) {
@@ -3693,7 +3694,7 @@ function drawGrid() {
   }
 
   // Líneas horizontales — azul claro (fill="lightblue")
-  ctx.strokeStyle = 'rgba(140,190,230,0.28)';
+  ctx.strokeStyle = claro ? 'rgba(60,120,190,0.30)' : 'rgba(140,190,230,0.28)';
   for (let y = panY % step; y < cv.height; y += step) {
     const yReal = Math.round((panY - y) / zoom);
     if (yReal === 0) continue;
@@ -3702,22 +3703,22 @@ function drawGrid() {
   ctx.setLineDash([]);
 
   // Eje Y (x=0) — rojo, dash
-  ctx.strokeStyle = 'rgba(240,100,100,0.8)';
+  ctx.strokeStyle = claro ? 'rgba(200,40,40,0.85)' : 'rgba(240,100,100,0.8)';
   ctx.lineWidth = 1.5;
   ctx.setLineDash([12, 6]);
   ctx.beginPath(); ctx.moveTo(panX, 0); ctx.lineTo(panX, cv.height); ctx.stroke();
 
   // Eje X (y=0) — azul claro, dash
-  ctx.strokeStyle = 'rgba(100,160,240,0.8)';
+  ctx.strokeStyle = claro ? 'rgba(30,90,200,0.85)' : 'rgba(100,160,240,0.8)';
   ctx.beginPath(); ctx.moveTo(0, panY); ctx.lineTo(cv.width, panY); ctx.stroke();
   ctx.setLineDash([]);
 
   // Origen
-  ctx.fillStyle   = 'white';
-  ctx.strokeStyle = 'rgba(200,220,240,0.9)';
+  ctx.fillStyle   = claro ? '#1f2937' : 'white';
+  ctx.strokeStyle = claro ? 'rgba(31,41,55,0.9)' : 'rgba(200,220,240,0.9)';
   ctx.lineWidth   = 1.5;
   ctx.beginPath(); ctx.arc(panX, panY, 6, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = 'rgba(200,220,240,0.85)';
+  ctx.fillStyle = claro ? 'rgba(31,41,55,0.9)' : 'rgba(200,220,240,0.85)';
   ctx.font = 'bold 13px Consolas, monospace';
   ctx.fillText('(0,0)', panX + 9, panY + 15);
 }
@@ -3790,7 +3791,7 @@ function _dibujarLineaPreview(x1, y1, x2, y2, orig) {
     ctx.font        = 'bold 12px Consolas, monospace';
     const tw = ctx.measureText(label).width + 10;
     ctx.fillRect(mx_ - tw/2, my_ - 11, tw, 16);
-    ctx.fillStyle   = '#aaddff';
+    ctx.fillStyle   = canvasEsClaro() ? '#1d4e89' : '#aaddff';
     ctx.textAlign   = 'center';
     ctx.fillText(label, mx_, my_ + 2);
     ctx.textAlign   = 'left';
@@ -3850,7 +3851,7 @@ function drawBarras() {
         const len = Math.sqrt(dx*dx+dy*dy);
         if (len > 0) {
           const perpX = -dy/len * 20, perpY = dx/len * 20;
-          ctx.fillStyle = 'rgba(200,230,255,0.95)';
+          ctx.fillStyle = canvasEsClaro() ? '#1f3a5f' : 'rgba(200,230,255,0.95)';
           ctx.font      = '12px Consolas, monospace';
           ctx.textAlign = 'center';
           ctx.fillText(p.name, mx_ + perpX, my_ + perpY);
@@ -9617,20 +9618,32 @@ function cerrarSettings() {
 const _CBG_COLORS = { dark:'#1a1a2e', blue1:'#1e3a5f', blue2:'#0C42C2' };
 const _CBG_DEFAULT = '#1e3a5f';
 
+// ¿La pizarra actual es clara? (para ajustar cuadrícula, ejes y textos del lienzo)
+function canvasEsClaro() {
+  const c = getComputedStyle(document.documentElement).getPropertyValue('--canvas-bg').trim();
+  const m = /^#([0-9a-f]{6})$/i.exec(c);
+  if (!m) return false;
+  const n = parseInt(m[1], 16);
+  const lum = (0.299*((n>>16)&255) + 0.587*((n>>8)&255) + 0.114*(n&255)) / 255;
+  return lum > 0.6;
+}
+
 function setCanvasBg(color) {
   document.documentElement.style.setProperty('--canvas-bg', color);
   localStorage.setItem('porticad_canvas_bg', color);
   refreshCbgBorders();
+  if (typeof draw === 'function') { try { draw(); } catch(e) {} }
 }
 
 function refreshCbgBorders() {
   const current = getComputedStyle(document.documentElement).getPropertyValue('--canvas-bg').trim();
-  const ids = { '#1a1a2e':'cbg-dark', '#1e3a5f':'cbg-blue1', '#0c42c2':'cbg-blue2', '#0C42C2':'cbg-blue2', '#04290d':'cbg-green', '#04290D':'cbg-green', '#1c0340':'cbg-purple', '#1C0340':'cbg-purple' };
-  ['cbg-dark','cbg-blue1','cbg-blue2','cbg-green','cbg-purple'].forEach(id => {
+  const ids = { '#1a1a2e':'cbg-dark', '#1e3a5f':'cbg-blue1', '#0c42c2':'cbg-blue2', '#04290d':'cbg-green', '#1c0340':'cbg-purple',
+    '#f7f8fa':'cbg-l-white', '#e3e7ec':'cbg-l-gray', '#f6efdc':'cbg-l-cream', '#dff0e4':'cbg-l-mint', '#dce9f7':'cbg-l-blue' };
+  ['cbg-dark','cbg-blue1','cbg-blue2','cbg-green','cbg-purple','cbg-l-white','cbg-l-gray','cbg-l-cream','cbg-l-mint','cbg-l-blue'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.borderColor = 'transparent';
   });
-  const activeId = ids[current.toLowerCase()] || ids[current];
+  const activeId = ids[current.toLowerCase()];
   if (activeId) {
     const el = document.getElementById(activeId);
     if (el) el.style.borderColor = '#58a6ff';
@@ -10693,7 +10706,7 @@ setApoyoPreset('empotrado');
   <div style="font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:10px; padding-bottom:4px; border-bottom:1px solid var(--border); margin-top:4px;">
     Color de pizarra
   </div>
-  <div style="display:flex; gap:10px; margin-bottom:14px; align-items:center;">
+  <div style="display:flex; gap:10px; margin-bottom:14px; align-items:center; flex-wrap:wrap;">
     <button onclick="setCanvasBg('#1a1a2e')" id="cbg-dark" title="Gris oscuro" style="
       width:38px; height:38px; border-radius:7px; border:2px solid transparent;
       background:#1a1a2e; cursor:pointer; transition:border-color .15s;
@@ -10722,6 +10735,36 @@ setApoyoPreset('empotrado');
       width:38px; height:38px; border-radius:7px; border:2px solid transparent;
       background:#1C0340; cursor:pointer; transition:border-color .15s;
       box-shadow:0 2px 6px rgba(0,0,0,0.4);"
+      onmouseover="this.style.borderColor='#8b949e'" onmouseout="refreshCbgBorders()">
+    </button>
+    <button onclick="setCanvasBg('#F7F8FA')" id="cbg-l-white" title="Blanco pizarra (#F7F8FA)" style="
+      width:38px; height:38px; border-radius:7px; border:2px solid transparent;
+      background:#F7F8FA; cursor:pointer; transition:border-color .15s;
+      box-shadow:0 2px 6px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(0,0,0,0.12);"
+      onmouseover="this.style.borderColor='#8b949e'" onmouseout="refreshCbgBorders()">
+    </button>
+    <button onclick="setCanvasBg('#E3E7EC')" id="cbg-l-gray" title="Gris claro (#E3E7EC)" style="
+      width:38px; height:38px; border-radius:7px; border:2px solid transparent;
+      background:#E3E7EC; cursor:pointer; transition:border-color .15s;
+      box-shadow:0 2px 6px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(0,0,0,0.12);"
+      onmouseover="this.style.borderColor='#8b949e'" onmouseout="refreshCbgBorders()">
+    </button>
+    <button onclick="setCanvasBg('#F6EFDC')" id="cbg-l-cream" title="Crema (#F6EFDC)" style="
+      width:38px; height:38px; border-radius:7px; border:2px solid transparent;
+      background:#F6EFDC; cursor:pointer; transition:border-color .15s;
+      box-shadow:0 2px 6px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(0,0,0,0.12);"
+      onmouseover="this.style.borderColor='#8b949e'" onmouseout="refreshCbgBorders()">
+    </button>
+    <button onclick="setCanvasBg('#DFF0E4')" id="cbg-l-mint" title="Menta claro (#DFF0E4)" style="
+      width:38px; height:38px; border-radius:7px; border:2px solid transparent;
+      background:#DFF0E4; cursor:pointer; transition:border-color .15s;
+      box-shadow:0 2px 6px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(0,0,0,0.12);"
+      onmouseover="this.style.borderColor='#8b949e'" onmouseout="refreshCbgBorders()">
+    </button>
+    <button onclick="setCanvasBg('#DCE9F7')" id="cbg-l-blue" title="Azul claro (#DCE9F7)" style="
+      width:38px; height:38px; border-radius:7px; border:2px solid transparent;
+      background:#DCE9F7; cursor:pointer; transition:border-color .15s;
+      box-shadow:0 2px 6px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(0,0,0,0.12);"
       onmouseover="this.style.borderColor='#8b949e'" onmouseout="refreshCbgBorders()">
     </button>
     <span id="cbg-label" style="font-size:11px; color:var(--muted); font-family:var(--mono);"></span>
