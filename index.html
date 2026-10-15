@@ -314,6 +314,14 @@
     background: var(--canvas-bg);
   }
   canvas { display: block; cursor: crosshair; }
+  /* Reglas de la pizarra (superior y derecha) */
+  .regla { position: absolute; display: none; z-index: 40; user-select: none; }
+  #regla-sup { top: 0; left: 0; }
+  #regla-der { right: 0; }
+  .canvas-wrap.rul-top .canvas-coords { top: 32px; }
+  .canvas-wrap.rul-top #combo-legend  { top: 32px !important; }
+  .canvas-wrap.rul-right #combo-legend { right: 54px !important; }
+  .canvas-wrap.rul-right #info-bar     { right: 56px !important; }
   .canvas-hint {
     position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
     font-size: 15px; color: #a0b4cc;
@@ -1501,6 +1509,8 @@ _fbAuth.onAuthStateChanged(user => {
   <!-- Canvas principal -->
   <div class="canvas-wrap" id="wrap">
     <canvas id="cv" style="touch-action:none;"></canvas>
+    <canvas id="regla-sup" class="regla"></canvas>
+    <canvas id="regla-der" class="regla"></canvas>
     <div class="canvas-hint" id="hint">Modo nudo — clic para agregar</div>
     <div class="canvas-coords" id="coords">x: 0.00  y: 0.00</div>
     <!-- Leyenda de combos flotante en canvas -->
@@ -3408,6 +3418,14 @@ cv.addEventListener('wheel', e => {
   draw();
 }, { passive: false });
 
+['regla-sup','regla-der'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('wheel', e => {
+    e.preventDefault();
+    cv.dispatchEvent(new WheelEvent('wheel', { deltaY: e.deltaY, clientX: e.clientX, clientY: e.clientY, cancelable: true }));
+  }, { passive: false });
+});
+
 cv.addEventListener('click', e => {
   if (e.button !== 0 || e.altKey) return;
   const r  = cv.getBoundingClientRect();
@@ -3683,6 +3701,7 @@ function draw() {
   }
 
   renderNudosFijados();
+  drawReglas();
 }
 
 function drawGrid() {
@@ -9691,6 +9710,125 @@ function coloresCuadricula() {
   return val;
 }
 
+// ═══════════════════════════════════════════════════════
+// REGLAS DE LA PIZARRA (superior y derecha)
+// ═══════════════════════════════════════════════════════
+var _reglaSup, _reglaDer;   // true/false; undefined hasta que arranca la app
+const REGLA_H = 24, REGLA_W = 48;
+
+function _pasoRegla(zoomPx) {
+  // paso "bonito" (1, 2, 5 × 10^n) con ≥ ~70 px entre marcas mayores
+  const raw = 70 / zoomPx, pot = Math.pow(10, Math.floor(Math.log10(raw)));
+  const m = raw / pot;
+  const mant = m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10;
+  const paso = mant * pot;
+  const sub = mant === 2 ? 4 : 5;
+  return { paso, menor: paso / sub };
+}
+function _fmtRegla(v, paso) {
+  const dec = Math.max(0, -Math.floor(Math.log10(paso) + 1e-9));
+  const t = (Math.abs(v) < paso * 1e-6 ? 0 : v).toFixed(Math.min(dec, 4));
+  return t;
+}
+function _prepRegla(c, w, h) {
+  const dpr = window.devicePixelRatio || 1;
+  if (c.width !== Math.round(w*dpr) || c.height !== Math.round(h*dpr)) {
+    c.width = Math.round(w*dpr); c.height = Math.round(h*dpr);
+    c.style.width = w + 'px'; c.style.height = h + 'px';
+  }
+  const g = c.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  return g;
+}
+
+function drawReglas() {
+  const cs = document.getElementById('regla-sup');
+  const cd = document.getElementById('regla-der');
+  if (!cs || !cd) return;
+  const wrapEl = cv.parentElement;
+  wrapEl.classList.toggle('rul-top',   !!_reglaSup);
+  wrapEl.classList.toggle('rul-right', !!_reglaDer);
+  cs.style.display = _reglaSup ? 'block' : 'none';
+  cd.style.display = _reglaDer ? 'block' : 'none';
+  if (!_reglaSup && !_reglaDer) return;
+
+  const W = cv.width, H = cv.height;
+  const gc = coloresCuadricula();
+  const bg = _cbgRgb();
+  const neutro = gc.claro ? [20, 28, 40] : [255, 255, 255];
+  const k = 0.14;
+  const fondo = 'rgb(' + [0,1,2].map(i => Math.round(bg[i]*(1-k) + neutro[i]*k)).join(',') + ')';
+  const tinta = gc.texto;
+  const { paso, menor } = _pasoRegla(zoom);
+  const top = _reglaSup ? REGLA_H : 0;
+
+  // ── Regla superior (eje X) ──
+  if (_reglaSup) {
+    const g = _prepRegla(cs, W, REGLA_H);
+    g.fillStyle = fondo; g.fillRect(0, 0, W, REGLA_H);
+    g.strokeStyle = tinta; g.fillStyle = tinta; g.lineWidth = 1;
+    g.font = '10px Consolas, monospace'; g.textBaseline = 'top'; g.textAlign = 'left';
+    const x0 = mx(0), x1 = mx(W);
+    for (let v = Math.floor(x0/menor)*menor; v <= x1 + menor; v += menor) {
+      const px = Math.round(wx(v)) + 0.5;
+      const esMayor = Math.abs(v/paso - Math.round(v/paso)) < 1e-6;
+      g.globalAlpha = esMayor ? 0.9 : 0.5;
+      g.beginPath(); g.moveTo(px, REGLA_H); g.lineTo(px, REGLA_H - (esMayor ? 11 : 5)); g.stroke();
+      if (esMayor) { g.globalAlpha = 1; g.fillText(_fmtRegla(Math.round(v/paso)*paso, paso), px + 3, 2); }
+    }
+    g.globalAlpha = 0.6; g.beginPath(); g.moveTo(0, REGLA_H - 0.5); g.lineTo(W, REGLA_H - 0.5); g.stroke();
+    // marcador del cursor
+    const cx = wx(cursorMundo.x);
+    if (cx >= 0 && cx <= W) { g.globalAlpha = 1; g.strokeStyle = '#dc2626'; g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(Math.round(cx)+0.5, 0); g.lineTo(Math.round(cx)+0.5, REGLA_H); g.stroke(); }
+    g.globalAlpha = 1;
+  }
+
+  // ── Regla derecha (eje Y) ──
+  if (_reglaDer) {
+    const hh = H - top;
+    cd.style.top = top + 'px';
+    const g = _prepRegla(cd, REGLA_W, hh);
+    g.fillStyle = fondo; g.fillRect(0, 0, REGLA_W, hh);
+    g.strokeStyle = tinta; g.fillStyle = tinta; g.lineWidth = 1;
+    g.font = '10px Consolas, monospace'; g.textBaseline = 'middle'; g.textAlign = 'right';
+    const yTop = my(top), yBot = my(H);
+    for (let v = Math.floor(yBot/menor)*menor; v <= yTop + menor; v += menor) {
+      const py = Math.round(wy(v) - top) + 0.5;
+      if (py < -10 || py > hh + 10) continue;
+      const esMayor = Math.abs(v/paso - Math.round(v/paso)) < 1e-6;
+      g.globalAlpha = esMayor ? 0.9 : 0.5;
+      g.beginPath(); g.moveTo(0, py); g.lineTo(esMayor ? 11 : 5, py); g.stroke();
+      if (esMayor) { g.globalAlpha = 1; g.fillText(_fmtRegla(Math.round(v/paso)*paso, paso), REGLA_W - 4, py - 7); }
+    }
+    g.globalAlpha = 0.6; g.beginPath(); g.moveTo(0.5, 0); g.lineTo(0.5, hh); g.stroke();
+    const cy = wy(cursorMundo.y) - top;
+    if (cy >= 0 && cy <= hh) { g.globalAlpha = 1; g.strokeStyle = '#dc2626'; g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(0, Math.round(cy)+0.5); g.lineTo(REGLA_W, Math.round(cy)+0.5); g.stroke(); }
+    g.globalAlpha = 1;
+  }
+}
+
+function toggleRegla(cual) {
+  if (cual === 'sup') _reglaSup = !_reglaSup; else _reglaDer = !_reglaDer;
+  try { localStorage.setItem('porticad_regla_' + cual, (cual === 'sup' ? _reglaSup : _reglaDer) ? '1' : '0'); } catch(e) {}
+  refrescarSwitchReglas();
+  draw();
+}
+function refrescarSwitchReglas() {
+  const a = document.getElementById('tog-regla-sup'), b = document.getElementById('tog-regla-der');
+  if (a) a.classList.toggle('on', !!_reglaSup);
+  if (b) b.classList.toggle('on', !!_reglaDer);
+}
+(function initReglas() {
+  let a = '1', b = '1';
+  try { a = localStorage.getItem('porticad_regla_sup') ?? '1'; b = localStorage.getItem('porticad_regla_der') ?? '1'; } catch(e) {}
+  _reglaSup = a !== '0'; _reglaDer = b !== '0';
+  refrescarSwitchReglas();
+  if (typeof draw === 'function') { try { draw(); } catch(e) {} }
+})();
+
 // Texto de coordenadas sobre la pizarra, con contraste según el color elegido
 function aplicarContrasteUI() {
   document.documentElement.style.setProperty('--canvas-coords', coloresCuadricula().texto);
@@ -10838,6 +10976,21 @@ setApoyoPreset('empotrado');
       onmouseover="this.style.borderColor='#8b949e'" onmouseout="refreshCbgBorders()">
     </button>
     <span id="cbg-label" style="font-size:11px; color:var(--muted); font-family:var(--mono);"></span>
+  </div>
+
+  <!-- Reglas de la pizarra -->
+  <div style="font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid var(--border);">
+    Reglas de la pizarra
+  </div>
+  <div style="margin-bottom:14px;">
+    <div class="rtoggle on" id="tog-regla-sup" onclick="toggleRegla('sup')" title="Mostrar/ocultar la regla superior (eje X)">
+      Regla superior (X)
+      <span class="check"></span>
+    </div>
+    <div class="rtoggle on" id="tog-regla-der" onclick="toggleRegla('der')" title="Mostrar/ocultar la regla derecha (eje Y)">
+      Regla derecha (Y)
+      <span class="check"></span>
+    </div>
   </div>
 
   <!-- Backend URL -->
