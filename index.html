@@ -320,8 +320,8 @@
   #regla-der { right: 0; }
   .canvas-wrap.rul-top .canvas-coords { top: 32px; }
   .canvas-wrap.rul-top #combo-legend  { top: 32px !important; }
-  .canvas-wrap.rul-right #combo-legend { right: 54px !important; }
-  .canvas-wrap.rul-right #info-bar     { right: 56px !important; }
+  .canvas-wrap.rul-right #combo-legend { right: 32px !important; }
+  .canvas-wrap.rul-right #info-bar     { right: 34px !important; }
   .canvas-hint {
     position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
     font-size: 15px; color: #a0b4cc;
@@ -463,7 +463,7 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.35);
     transition: transform 0.18s;
   }
-  .rtoggle.on .check { background: var(--blue); }
+  .rtoggle.on .check { background: #22a559; }
   .rtoggle.on .check::after { transform: translateX(16px); }
 
   /* ── Sección panel ────────────────────────────────── */
@@ -9714,7 +9714,7 @@ function coloresCuadricula() {
 // REGLAS DE LA PIZARRA (superior y derecha)
 // ═══════════════════════════════════════════════════════
 var _reglaSup, _reglaDer;   // true/false; undefined hasta que arranca la app
-const REGLA_H = 24, REGLA_W = 48;
+const REGLA_H = 24, REGLA_W = 24;
 
 function _pasoRegla(zoomPx) {
   // paso "bonito" (1, 2, 5 × 10^n) con ≥ ~70 px entre marcas mayores
@@ -9792,7 +9792,7 @@ function drawReglas() {
     const g = _prepRegla(cd, REGLA_W, hh);
     g.fillStyle = fondo; g.fillRect(0, 0, REGLA_W, hh);
     g.strokeStyle = tinta; g.fillStyle = tinta; g.lineWidth = 1;
-    g.font = '10px Consolas, monospace'; g.textBaseline = 'middle'; g.textAlign = 'right';
+    g.font = '10px Consolas, monospace'; g.textBaseline = 'top'; g.textAlign = 'left';
     const yTop = my(top), yBot = my(H);
     for (let v = Math.floor(yBot/menor)*menor; v <= yTop + menor; v += menor) {
       const py = Math.round(wy(v) - top) + 0.5;
@@ -9800,7 +9800,10 @@ function drawReglas() {
       const esMayor = Math.abs(v/paso - Math.round(v/paso)) < 1e-6;
       g.globalAlpha = esMayor ? 0.9 : 0.5;
       g.beginPath(); g.moveTo(0, py); g.lineTo(esMayor ? 11 : 5, py); g.stroke();
-      if (esMayor) { g.globalAlpha = 1; g.fillText(_fmtRegla(Math.round(v/paso)*paso, paso), REGLA_W - 4, py - 7); }
+      if (esMayor) {   // número en vertical, sobre la marca
+        g.globalAlpha = 1; g.save(); g.translate(2, py - 3); g.rotate(-Math.PI / 2);
+        g.fillText(_fmtRegla(Math.round(v/paso)*paso, paso), 0, 0); g.restore();
+      }
     }
     g.globalAlpha = 0.6; g.beginPath(); g.moveTo(0.5, 0); g.lineTo(0.5, hh); g.stroke();
     const cy = wy(cursorMundo.y) - top;
