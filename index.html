@@ -324,7 +324,7 @@
   .canvas-coords {
     position: absolute; top: 10px; left: 10px;
     font-size: 15px; font-family: var(--mono);
-    color: #88aacc; pointer-events: none;
+    color: var(--canvas-coords, #88aacc); pointer-events: none;
   }
 
   /* ── Right panel ──────────────────────────────────────── */
@@ -3681,10 +3681,10 @@ function draw() {
 
 function drawGrid() {
   const step = zoom;
-  const claro = canvasEsClaro();
+  const gc = coloresCuadricula();
 
   // Líneas verticales — rosadas como en tkinter (fill="pink")
-  ctx.strokeStyle = claro ? 'rgba(200,90,130,0.30)' : 'rgba(220,160,180,0.28)';
+  ctx.strokeStyle = gc.vertical;
   ctx.lineWidth = 0.5;
   ctx.setLineDash([2, 4]);
   for (let x = panX % step; x < cv.width; x += step) {
@@ -3694,7 +3694,7 @@ function drawGrid() {
   }
 
   // Líneas horizontales — azul claro (fill="lightblue")
-  ctx.strokeStyle = claro ? 'rgba(60,120,190,0.30)' : 'rgba(140,190,230,0.28)';
+  ctx.strokeStyle = gc.horizontal;
   for (let y = panY % step; y < cv.height; y += step) {
     const yReal = Math.round((panY - y) / zoom);
     if (yReal === 0) continue;
@@ -3703,22 +3703,22 @@ function drawGrid() {
   ctx.setLineDash([]);
 
   // Eje Y (x=0) — rojo, dash
-  ctx.strokeStyle = claro ? 'rgba(200,40,40,0.85)' : 'rgba(240,100,100,0.8)';
+  ctx.strokeStyle = gc.ejeY;
   ctx.lineWidth = 1.5;
   ctx.setLineDash([12, 6]);
   ctx.beginPath(); ctx.moveTo(panX, 0); ctx.lineTo(panX, cv.height); ctx.stroke();
 
   // Eje X (y=0) — azul claro, dash
-  ctx.strokeStyle = claro ? 'rgba(30,90,200,0.85)' : 'rgba(100,160,240,0.8)';
+  ctx.strokeStyle = gc.ejeX;
   ctx.beginPath(); ctx.moveTo(0, panY); ctx.lineTo(cv.width, panY); ctx.stroke();
   ctx.setLineDash([]);
 
   // Origen
-  ctx.fillStyle   = claro ? '#1f2937' : 'white';
-  ctx.strokeStyle = claro ? 'rgba(31,41,55,0.9)' : 'rgba(200,220,240,0.9)';
+  ctx.fillStyle   = gc.origen;
+  ctx.strokeStyle = gc.origenBorde;
   ctx.lineWidth   = 1.5;
   ctx.beginPath(); ctx.arc(panX, panY, 6, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = claro ? 'rgba(31,41,55,0.9)' : 'rgba(200,220,240,0.85)';
+  ctx.fillStyle = gc.texto;
   ctx.font = 'bold 13px Consolas, monospace';
   ctx.fillText('(0,0)', panX + 9, panY + 15);
 }
@@ -9628,9 +9628,72 @@ function canvasEsClaro() {
   return lum > 0.6;
 }
 
+// ── Colores de cuadrícula/ejes con contraste calculado según la pizarra ──
+function _cbgRgb() {
+  const c = getComputedStyle(document.documentElement).getPropertyValue('--canvas-bg').trim();
+  const m = /^#([0-9a-f]{6})$/i.exec(c);
+  if (!m) return [26, 26, 46];
+  const n = parseInt(m[1], 16);
+  return [(n>>16)&255, (n>>8)&255, n&255];
+}
+function _relLum(rgb) {
+  const f = v => { v /= 255; return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); };
+  return 0.2126*f(rgb[0]) + 0.7152*f(rgb[1]) + 0.0722*f(rgb[2]);
+}
+function _contraste(a, b) {
+  const la = _relLum(a), lb = _relLum(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+// Alfa mínimo con el que 'tinte' sobre 'bg' alcanza el contraste 'objetivo' (o null si no llega)
+function _alfaParaContraste(bg, tinte, objetivo) {
+  for (let a = 0.12; a <= 1.0001; a += 0.02) {
+    const mix = [0,1,2].map(i => bg[i]*(1-a) + tinte[i]*a);
+    if (_contraste(bg, mix) >= objetivo) return Math.round(a*100)/100;
+  }
+  return null;
+}
+// Devuelve 'rgba(...)' con el tinte deseado y, si el tinte no logra el contraste (p.ej. azul sobre azul),
+// cae a blanco/negro según la pizarra.
+function _colorContraste(bg, tinte, neutro, objetivo) {
+  let a = _alfaParaContraste(bg, tinte, objetivo);
+  if (a !== null) return `rgba(${tinte[0]},${tinte[1]},${tinte[2]},${a})`;
+  a = _alfaParaContraste(bg, neutro, objetivo);
+  if (a === null) a = 1;
+  return `rgba(${neutro[0]},${neutro[1]},${neutro[2]},${a})`;
+}
+let _gridCache = { key: '', val: null };
+function coloresCuadricula() {
+  const bg = _cbgRgb();
+  const key = bg.join(',');
+  if (_gridCache.key === key) return _gridCache.val;
+  const claro = _relLum(bg) > 0.3;   // más claro que gris medio → líneas oscuras
+  const neutro = claro ? [20, 28, 40] : [255, 255, 255];
+  const T = claro
+    ? { v:[190,70,120], h:[40,100,180], ey:[200,30,30], ex:[20,80,200] }
+    : { v:[235,150,175], h:[140,195,240], ey:[255,110,110], ex:[120,175,255] };
+  const val = {
+    claro,
+    vertical:   _colorContraste(bg, T.v,  neutro, 2.4),   // cuadrícula (tenue pero visible)
+    horizontal: _colorContraste(bg, T.h,  neutro, 2.4),
+    ejeY:       _colorContraste(bg, T.ey, neutro, 3.6),   // ejes (bien marcados)
+    ejeX:       _colorContraste(bg, T.ex, neutro, 3.6),
+    origen:     claro ? '#1f2937' : '#ffffff',
+    origenBorde: _colorContraste(bg, neutro, neutro, 6),
+    texto:      _colorContraste(bg, neutro, neutro, 7)
+  };
+  _gridCache = { key, val };
+  return val;
+}
+
+// Texto de coordenadas sobre la pizarra, con contraste según el color elegido
+function aplicarContrasteUI() {
+  document.documentElement.style.setProperty('--canvas-coords', coloresCuadricula().texto);
+}
+
 function setCanvasBg(color) {
   document.documentElement.style.setProperty('--canvas-bg', color);
   localStorage.setItem('porticad_canvas_bg', color);
+  aplicarContrasteUI();
   refreshCbgBorders();
   if (typeof draw === 'function') { try { draw(); } catch(e) {} }
 }
@@ -9655,6 +9718,7 @@ function refreshCbgBorders() {
 (function initCanvasBg() {
   const saved = localStorage.getItem('porticad_canvas_bg') || _CBG_DEFAULT;
   document.documentElement.style.setProperty('--canvas-bg', saved);
+  aplicarContrasteUI();
 })();
 
 // ═══════════════════════════════════════════════════════
