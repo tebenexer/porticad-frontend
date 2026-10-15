@@ -1184,10 +1184,6 @@ _fbAuth.onAuthStateChanged(user => {
     </button>
 
     <!-- Selec / Mover / Copiar / Pegar / Undo / Redo como botones compactos en topbar -->
-    <button class="tbtn tb-act" id="btn-pan-2d" onclick="toggle2DPan()" data-tip="Modo mano — arrastrar para mover el canvas (útil en móvil)">
-      <span style="font-size:14px;line-height:1;">✋</span>
-      <span style="font-size:10px;font-weight:600">Pan</span>
-    </button>
     <button class="tbtn tb-act disabled" id="act-mover"  onclick="activarMover()"    data-tip="Mover selección">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/>
@@ -1381,6 +1377,17 @@ _fbAuth.onAuthStateChanged(user => {
               fill="currentColor" stroke="var(--surface)" stroke-width="1.1" stroke-linejoin="round" paint-order="stroke"/>
       </svg>
       <span class="tool-label">Selec.</span>
+    </div>
+
+    <!-- Pan (mano): arrastrar para mover la vista -->
+    <div class="tool-btn" id="btn-pan-2d" data-tip="Pan — arrastra para mover la vista" onclick="toggle2DPan()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8.2 12.4V6.3a1.55 1.55 0 0 1 3.1 0V11"/>
+        <path d="M11.3 10.6V4.6a1.55 1.55 0 0 1 3.1 0v6"/>
+        <path d="M14.4 10.8V6a1.55 1.55 0 0 1 3.1 0v5.6"/>
+        <path d="M17.5 9.4a1.55 1.55 0 0 1 3.1 0v5.2c0 4.2-2.9 7.2-6.8 7.2h-1.3c-2.2 0-3.7-.8-5-2.2L3.8 15.9a1.6 1.6 0 0 1 2.3-2.2l2.1 1.9"/>
+      </svg>
+      <span class="tool-label">Pan</span>
     </div>
 
     <div class="tool-sep"></div>
@@ -9528,8 +9535,6 @@ function toggle2DPan() {
   const btn = document.getElementById('btn-pan-2d');
   if (btn) {
     btn.classList.toggle('active', panMode2D);
-    btn.style.borderColor = panMode2D ? '#22c55e' : '';
-    btn.style.color       = panMode2D ? '#22c55e' : '';
   }
   cv.style.cursor = panMode2D ? 'grab' : '';
   if (panMode2D) setMsg('Modo Pan activo — arrastra para mover el canvas');
