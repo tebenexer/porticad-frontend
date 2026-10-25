@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diagrama de Interacción Biaxial — PortiCAD Multi-Tools</title>
+<link rel="icon" href="/favicon.png" type="image/png" />
+<link rel="shortcut icon" href="/favicon.png" />
+<script>
+// Carga de Plotly con CDN alternativos. Si tienes el archivo en tu servidor, pon su ruta primero en la lista.
+window.plotlyReady = new Promise(function(resolve, reject){
+  var urls = [
+    'https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.2/plotly.min.js',
+    'https://unpkg.com/plotly.js-dist-min@2.35.2/plotly.min.js'
+  ], i = 0;
+  (function next(){
+    if (window.Plotly) return resolve();
+    if (i >= urls.length) return reject(new Error('No se pudo cargar Plotly desde ningún CDN'));
+    var s = document.createElement('script');
+    s.src = urls[i++];
+    s.onload = function(){ window.Plotly ? resolve() : next(); };
+    s.onerror = function(){ s.remove(); next(); };
+    document.head.appendChild(s);
+  })();
+});
+</script>
+<script>
+(function(){ var t=null; try{ t=localStorage.getItem('porticad-theme'); }catch(e){}
+  if(t!=='dark'&&t!=='light') t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';
+  document.documentElement.setAttribute('data-theme',t); })();
+</script>
+<style>
+  :root{
+    --bg:#f4f6f9; --panel:#ffffff; --text:#1c2430; --muted:#6b7686; --border:#dde2ea;
+    --accent:#1f6feb; --accent-soft:#e8f0fe; --ok:#1a7f4b; --bad:#c62828; --warn:#b26a00;
+    --grid:#cfd6e0; --wirec:#1e283c; --wirea:0.3;
+  }
+  :root[data-theme="dark"]{--bg:#0f141b; --panel:#171e28; --text:#e6ebf2; --muted:#93a0b3; --border:#2a3442;
+      --accent:#5aa2ff; --accent-soft:#1b2a40; --ok:#4cc38a; --bad:#ff7b72; --warn:#e3b341;
+      --grid:#2f3b4b; --wirec:#dce6f5; --wirea:0.14;
+    color-scheme:dark}
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.4}
+  header{padding:14px 20px;border-bottom:1px solid var(--border);background:var(--panel);display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  header h1{font-size:18px;margin:0;font-weight:650}
+  .theme-sw{margin-left:auto;display:flex;flex-direction:row;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer;user-select:none}
+  .theme-sw input{position:absolute;opacity:0;pointer-events:none}
+  .theme-sw .track{width:42px;height:24px;border-radius:999px;background:var(--border);position:relative;transition:background .2s;flex:none}
+  .theme-sw .track::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:transform .2s}
+  .theme-sw input:checked + .track{background:var(--accent)}
+  .theme-sw input:checked + .track::after{transform:translateX(18px)}
+  .theme-sw input:focus-visible + .track{outline:2px solid var(--accent);outline-offset:2px}
+  header span{color:var(--muted);font-size:13px}
+  .app{display:grid;grid-template-columns:580px minmax(0,1fr) 330px;gap:12px;padding:12px;align-items:start}
+  .col{display:flex;flex-direction:column;gap:12px;min-width:0}
+  .col-left{display:grid;grid-template-columns:1fr 1fr;align-items:stretch}
+  @media (max-width:1500px){.app{grid-template-columns:580px minmax(0,1fr)}.col-right{grid-column:1 / -1;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}}
+  @media (max-width:1050px){.app{grid-template-columns:1fr}}
+  @media (max-width:640px){.col-left{grid-template-columns:1fr}}
+  .statusbar{position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;align-items:center;gap:16px;padding:8px 16px;background:var(--panel);border-top:1px solid var(--border);box-shadow:0 -4px 14px rgba(0,0,0,.08);min-height:52px}
+  .sb-title{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:650;white-space:nowrap}
+  .sb-items{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;min-width:0}
+  .sb-items .it{display:flex;flex-direction:column;line-height:1.15;font-variant-numeric:tabular-nums}
+  .sb-items .it small{font-size:11px;color:var(--muted)}
+  .sb-items .it b{font-size:14px;font-weight:600}
+  .sb-items .tag{padding:3px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:600}
+  body{padding-bottom:64px}
+  @media (max-width:640px){.statusbar{flex-direction:column;align-items:flex-start;gap:4px}}
+  .verbar{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:8px 28px;flex-wrap:wrap;padding:10px 18px;color:#fff;border-bottom:1px solid rgba(0,0,0,.15);transition:background .25s}
+  .verbar.ok{background:#1a7f4b}.verbar.bad{background:#c62828}.verbar.warn{background:#b26a00}
+  :root[data-theme="dark"] .verbar.ok{background:#166a3f}:root[data-theme="dark"] .verbar.bad{background:#a82323}:root[data-theme="dark"] .verbar.warn{background:#8f5600}
+  .vb-main{display:flex;flex-direction:column;line-height:1.2;min-width:260px;max-width:520px}
+  .vb-label{font-size:11px;letter-spacing:.07em;text-transform:uppercase;opacity:.8;font-weight:650}
+  #status{font-size:16px;font-weight:700}
+  .vb-items{display:flex;flex-wrap:wrap;gap:6px 22px;margin-left:auto}
+  .vb-items .it{display:flex;flex-direction:column;line-height:1.15;font-variant-numeric:tabular-nums}
+  .vb-items .it small{font-size:11px;opacity:.8}
+  .vb-items .it b{font-size:14px;font-weight:600}
+  .rows{display:flex;flex-direction:column;gap:7px}
+  .rows label{flex-direction:row;align-items:center;justify-content:space-between;gap:10px;color:var(--text);font-size:13px}
+  .rows input[type=number],.rows select{width:76px;flex:none;text-align:right;padding:5px 7px}
+  #dSel{width:160px !important}
+  .rows input:disabled{opacity:.7}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .card h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;font-weight:650}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+  input[type=number],select{width:100%;padding:7px 8px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font:inherit;font-size:14px}
+  input[type=number]:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .checks{display:flex;flex-direction:column;gap:6px}
+  .checks label{flex-direction:row;align-items:center;gap:8px;color:var(--text);font-size:13px}
+  .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  button{font:inherit;font-size:13px;padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);cursor:pointer}
+  button:hover{border-color:var(--accent);color:var(--accent)}
+  .err{display:none;margin-top:10px;padding:8px 10px;border-radius:8px;background:rgba(198,40,40,.12);color:var(--bad);font-size:13px}
+  #plot3d{width:100%;height:calc(100vh - 235px);min-height:520px;max-height:900px}
+  .below{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:14px}
+  #plot2d{width:100%;height:300px}
+  #sec{margin-bottom:10px} #sec svg{width:100%;height:auto;max-height:230px;display:block}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}
+  .kv dt{color:var(--muted)} .kv dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+  .status{padding:10px 12px;border-radius:10px;font-weight:600;margin-bottom:10px;font-size:14px}
+  .status.ok{background:rgba(26,127,75,.14);color:var(--ok)}
+  .status.bad{background:rgba(198,40,40,.14);color:var(--bad)}
+  .status.warn{background:rgba(178,106,0,.14);color:var(--warn)}
+  .readout{min-height:110px}
+  .hint{color:var(--muted);font-size:13px}
+  .note{color:var(--muted);font-size:12px;margin-top:8px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Diagrama de interacción biaxial</h1>
+  <span>Columna rectangular · ACI 318 · superficie 3D φPn – φMx – φMy</span>
+  <label class="theme-sw" title="Cambiar entre modo claro y oscuro">
+    <span id="themeLbl">Modo oscuro</span>
+    <input type="checkbox" id="themeSw" role="switch" aria-label="Modo oscuro">
+    <span class="track"></span>
+  </label>
+</header>
+<div class="verbar warn" id="verbar">
+  <div class="vb-main"><span class="vb-label">Verificación</span><span id="status">—</span></div>
+  <div class="vb-items" id="results"></div>
+</div>
+
+
+<div class="app">
+  <!-- Panel izquierdo: datos de entrada -->
+  <div class="col col-left">
+    <div class="card">
+      <h2>Sección</h2>
+      <div id="sec"></div>
+      <div class="rows">
+        <label>b, horizontal (cm)<input type="number" id="b" value="60" min="10" step="1"></label>
+        <label>h, vertical (cm)<input type="number" id="h" value="40" min="10" step="1"></label>
+        <label>Recubrimiento libre (cm)<input type="number" id="rec" value="4" min="0" step="0.5"></label>
+        <label>Paso del ángulo
+          <select id="angStep"><option value="5">5°</option><option value="10" selected>10°</option><option value="15">15°</option></select>
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Refuerzo y materiales</h2>
+      <div class="rows">
+        <label>Barras cara horiz. (nH)<input type="number" id="nH" value="4" min="2" step="1"></label>
+        <label>Barras cara vert. (nV)<input type="number" id="nV" value="3" min="2" step="1"></label>
+        <label>Varilla
+          <select id="dSel">
+            <optgroup label="Pulgadas (ASTM A615)">
+              <option value="9.525">#3 · 3/8" (9.5 mm)</option>
+              <option value="12.7">#4 · 1/2" (12.7 mm)</option>
+              <option value="15.875">#5 · 5/8" (15.9 mm)</option>
+              <option value="19.05">#6 · 3/4" (19.1 mm)</option>
+              <option value="22.225">#7 · 7/8" (22.2 mm)</option>
+              <option value="25.4">#8 · 1" (25.4 mm)</option>
+              <option value="28.65">#9 · 1 1/8" (28.7 mm)</option>
+              <option value="32.26">#10 · 1 1/4" (32.3 mm)</option>
+              <option value="35.81">#11 · 1 3/8" (35.8 mm)</option>
+            </optgroup>
+            <optgroup label="Milímetros">
+              <option value="6">Ø6 mm</option>
+              <option value="8">Ø8 mm</option>
+              <option value="10">Ø10 mm</option>
+              <option value="12" selected>Ø12 mm</option>
+              <option value="16">Ø16 mm</option>
+              <option value="20">Ø20 mm</option>
+              <option value="25">Ø25 mm</option>
+              <option value="32">Ø32 mm</option>
+            </optgroup>
+            <option value="custom">Otro (mm)…</option>
+          </select>
+        </label>
+        <label id="rowDcustom" style="display:none">Diámetro Ø (mm)<input type="number" id="d" value="12" min="4" step="0.1"></label>
+        <label>Total de barras<input type="number" id="nTot" disabled></label>
+        <label>f'c (MPa)<input type="number" id="fc" value="21" min="10" step="0.5"></label>
+        <label>fy (MPa)<input type="number" id="fy" value="500" min="200" step="10"></label>
+        <label>Tope φPn,máx (× φPo)<input type="number" id="capF" value="0.80" min="0.5" max="1" step="0.01"></label>
+      </div>
+      <div class="note">Tope ACI 318: 0.80 φPo (estribos). Tu código de Octave aplicaba 0.8 × 0.8 = 0.64; para reproducirlo pon 0.64.</div>
+    </div>
+
+    <div class="card">
+      <h2>Solicitación última</h2>
+      <div class="rows">
+        <label>Pu (kN)<input type="number" id="Pu" value="1000" step="10"></label>
+        <label>Mux (kN·m)<input type="number" id="Mux" value="100" step="5"></label>
+        <label>Muy (kN·m)<input type="number" id="Muy" value="50" step="5"></label>
+      </div>
+      <div class="note">Mx = momento por excentricidad en la dirección horizontal (b); My = en la vertical (h).</div>
+    </div>
+
+    <div class="card">
+      <h2>Vista</h2>
+      <div class="checks">
+        <label><input type="checkbox" id="vDesign" checked> Superficie de diseño (φ)</label>
+        <label><input type="checkbox" id="vNominal" checked> Superficie nominal (sin φ)</label>
+        <label><input type="checkbox" id="vWire" checked> Malla (meridianos y paralelos)</label>
+        <label><input type="checkbox" id="vSlice" checked> Contorno a nivel Pu</label>
+        <label><input type="checkbox" id="vDemand" checked> Punto de demanda</label>
+      </div>
+      <div class="btns">
+        <button id="btnReset" type="button">Restablecer valores</button>
+        <button id="btnCam" type="button">Restablecer cámara</button>
+        <button id="btnCsv" type="button">Exportar CSV</button>
+      </div>
+      <div class="err" id="err"></div>
+    </div>
+  </div>
+
+  <!-- Panel central: gráfica -->
+  <div class="col col-center">
+    <div class="card" style="padding:8px">
+      <div id="plot3d"></div>
+    </div>
+  </div>
+
+  <!-- Panel derecho: resultados -->
+  <div class="col col-right">
+    <div class="card">
+      <h2>Corte horizontal a Pu</h2>
+      <div id="plot2d"></div>
+    </div>
+  </div>
+</div>
+
+<div class="statusbar" id="statusbar">
+  <span class="sb-title">Punto bajo el cursor</span>
+  <div id="readout" class="sb-items"><span class="hint">Pasa el cursor sobre la superficie para ver los valores de ese punto.</span></div>
+</div>
+
+<script>
+// ===================== MOTOR DE CÁLCULO (unidades internas: m, MPa, MN) =====================
+// ENGINE START
+function beta1Of(fc){
+  if (fc <= 28) return 0.85;
+  if (fc <= 55) return 0.85 - 0.05 * (fc - 28) / 7;
+  return 0.65;
+}
+
+function barLayout(p){
+  const rEje = p.rec + p.d / 2;
+  const x1 = -p.b / 2 + rEje, y1 = -p.h / 2 + rEje;
+  const dx = (p.b - 2 * rEje) / (p.nH - 1);
+  const dy = (p.h - 2 * rEje) / (p.nV - 1);
+  const bars = [];
+  for (let i = 0; i < p.nH; i++) {
+    const x = x1 + dx * i;
+    if (i === 0 || i === p.nH - 1) {
+      for (let j = 0; j < p.nV; j++) bars.push([x, y1 + dy * j]);
+    } else {
+      bars.push([x, y1]);
+      bars.push([x, p.h / 2 - rEje]);
+    }
+  }
+  return bars;
+}
+
+// Recorta un polígono conservando x >= xcut (Sutherland–Hodgman)
+function clipHalf(poly, xcut){
+  const out = [];
+  for (let i = 0; i < poly.length; i++) {
+    const A = poly[i], B = poly[(i + 1) % poly.length];
+    const ina = A[0] >= xcut, inb = B[0] >= xcut;
+    if (ina) out.push(A);
+    if (ina !== inb) {
+      const t = (xcut - A[0]) / (B[0] - A[0]);
+      out.push([xcut, A[1] + t * (B[1] - A[1])]);
+    }
+  }
+  return out;
+}
+
+function areaCentroid(poly){
+  let s = 0, sx = 0, sy = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const [x0, y0] = poly[i], [x1, y1] = poly[(i + 1) % poly.length];
+    const cr = x0 * y1 - x1 * y0;
+    s += cr; sx += (x0 + x1) * cr; sy += (y0 + y1) * cr;
+  }
+  const A = s / 2;
+  return { A, cx: sx / (6 * A), cy: sy / (6 * A) };
+}
+
+function computeDiagram(p){
+  const Es = 200e3, ecu = 0.003;
+  const b1 = beta1Of(p.fc), ety = p.fy / Es;
+  const As = Math.PI * p.d * p.d / 4;
+  const bars = barLayout(p);
+  const corners = [[p.b/2, p.h/2], [-p.b/2, p.h/2], [-p.b/2, -p.h/2], [p.b/2, -p.h/2]];
+  const angles = [];
+  for (let a = 0; a <= 360 + 1e-9; a += p.angStep) angles.push(a);
+  const NC = 30, NJ = angles.length;
+  const mk = () => Array.from({length: NC}, () => new Array(NJ).fill(0));
+  const D = {
+    angles, NC, NJ, b1, ety, As, bars, nBars: bars.length,
+    NX: mk(), NY: mk(), NZ: mk(),          // nominal (kN, kN·m)
+    X: mk(), Y: mk(), Z: mk(),             // diseño
+    PHI: mk(), ET: mk(), CC: mk()          // φ, εt, c (m)
+  };
+
+  angles.forEach((ang, j) => {
+    const th = ang * Math.PI / 180, cs = Math.cos(th), sn = Math.sin(th);
+    const rot = q => [cs * q[0] - sn * q[1], sn * q[0] + cs * q[1]];
+    const cr = corners.map(rot), br = bars.map(rot);
+    const xs = cr.map(q => q[0]);
+    const maxX = Math.max(...xs), diag = maxX - Math.min(...xs);
+
+    const C = [];
+    for (let k = 0; k < 30; k++) {
+      if (k < 15) C.push(diag * 0.001 + diag / 15 * k);
+      else if (k < 25) C.push(C[14] + diag * 2 / 10 * (k - 14));
+      else C.push(C[24] + diag * 4 / 10 * (k - 24));
+    }
+
+    const Pd = [];
+    for (let k = 0; k < NC; k++) {
+      const c = C[k], a = b1 * c, xcut = maxX - a;
+      const poly = clipHalf(cr, xcut);
+      const g = areaCentroid(poly);
+      let Ac = g.A, nx = g.A * g.cx, ny = g.A * g.cy;
+      let minStrain = Infinity;
+      const sig = new Array(br.length);
+
+      for (let m = 0; m < br.length; m++) {
+        const xr = br[m][0];
+        if (xr >= xcut) { Ac -= As; nx -= As * xr; ny -= As * br[m][1]; }
+        const eps = ecu * (xr - (maxX - c)) / c;
+        if (eps < minStrain) minStrain = eps;
+        sig[m] = Math.max(-p.fy, Math.min(p.fy, Es * eps));
+      }
+      const xc = nx / Ac, yc = ny / Ac;                       // centroide neto, marco rotado
+      const Xconc = cs * xc + sn * yc, Yconc = -sn * xc + cs * yc; // marco original
+
+      const Fc = 0.85 * p.fc * Ac;
+      let P = Fc, Mx = Fc * Xconc, My = Fc * Yconc;
+      for (let m = 0; m < bars.length; m++) {
+        const F = sig[m] * As;
+        P += F; Mx += F * bars[m][0]; My += F * bars[m][1];
+      }
+
+      const et = -minStrain;
+      let phi;
+      if (et <= ety) phi = 0.65;
+      else if (et < ety + 0.003) phi = 0.65 + 0.25 * (et - ety) / 0.003;
+      else phi = 0.90;
+
+      D.NX[k][j] = Mx * 1000; D.NY[k][j] = My * 1000; D.NZ[k][j] = P * 1000;
+      D.X[k][j] = phi * Mx * 1000; D.Y[k][j] = phi * My * 1000; Pd.push(phi * P * 1000);
+      D.PHI[k][j] = phi; D.ET[k][j] = et; D.CC[k][j] = c;
+    }
+    const cap = p.capF * Math.max(...Pd);
+    for (let k = 0; k < NC; k++) D.Z[k][j] = Math.min(Pd[k], cap);
+  });
+
+  D.Po = (0.85 * p.fc * (p.b * p.h - D.nBars * As) + p.fy * D.nBars * As) * 1000;
+  D.capMax = Math.max(...D.Z.map(r => Math.max(...r)));
+  D.Pmin = Math.min(...D.Z.map(r => Math.min(...r)));
+  return D;
+}
+
+// Contorno φMx–φMy al nivel Pu
+function sliceAt(D, Pu){
+  const pts = [];
+  for (let j = 0; j < D.NJ; j++) {
+    let best = null;
+    for (let k = 0; k < D.NC - 1; k++) {
+      const P0 = D.Z[k][j], P1 = D.Z[k + 1][j];
+      if ((P0 - Pu) * (P1 - Pu) <= 0 && P0 !== P1) {
+        const t = (Pu - P0) / (P1 - P0);
+        const x = D.X[k][j] + t * (D.X[k + 1][j] - D.X[k][j]);
+        const y = D.Y[k][j] + t * (D.Y[k + 1][j] - D.Y[k][j]);
+        const r = Math.hypot(x, y);
+        if (!best || r > best.r) best = { x, y, r };
+      }
+    }
+    if (!best) return { ok: false, pts: [] };
+    pts.push([best.x, best.y]);
+  }
+  return { ok: true, pts };
+}
+
+// Capacidad (radio) del contorno en la dirección (mx, my)
+function rayCapacity(pts, mx, my){
+  let rBest = null;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [px, py] = pts[i], [qx, qy] = pts[i + 1];
+    const ex = qx - px, ey = qy - py;
+    const det = -mx * ey + ex * my;
+    if (Math.abs(det) < 1e-12) continue;
+    const r = (-px * ey + ex * py) / det;
+    const s = (mx * py - my * px) / det;
+    if (r > 0 && s >= -1e-9 && s <= 1 + 1e-9 && (rBest === null || r > rBest)) rBest = r;
+  }
+  return rBest;   // factor sobre (mx,my)
+}
+// ENGINE END
+
+// ===================== INTERFAZ =====================
+const DEFAULTS = { b:60, h:40, rec:4, angStep:10, nH:4, nV:3, d:12, fc:21, fy:500, capF:0.80, Pu:1000, Mux:100, Muy:50 };
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let D = null, P = null, SL = null, timer = null, plotReady = false;
+
+function readParams(){
+  const g = id => parseFloat($(id).value);
+  return {
+    b: g('b') / 100, h: g('h') / 100, rec: g('rec') / 100, d: g('d') / 1000,
+    nH: Math.round(g('nH')), nV: Math.round(g('nV')),
+    fc: g('fc'), fy: g('fy'), capF: g('capF'), angStep: g('angStep'),
+    Pu: g('Pu'), Mux: g('Mux'), Muy: g('Muy')
+  };
+}
+function validate(p){
+  for (const [k, v] of Object.entries(p)) if (!isFinite(v)) return 'Completa todos los campos con valores numéricos.';
+  if (p.nH < 2 || p.nV < 2) return 'Se necesitan al menos 2 barras en cada dirección (nH y nV ≥ 2).';
+  if (p.b <= 0 || p.h <= 0 || p.d <= 0 || p.fc <= 0 || p.fy <= 0) return 'Las dimensiones, el diámetro y las resistencias deben ser positivos.';
+  const rEje = p.rec + p.d / 2;
+  if (p.b - 2 * rEje <= 0 || p.h - 2 * rEje <= 0) return 'El recubrimiento y el diámetro no caben en la sección.';
+  const sepX = (p.b - 2 * rEje) / (p.nH - 1), sepY = (p.h - 2 * rEje) / (p.nV - 1);
+  if (Math.min(sepX, sepY) < p.d) return 'Las barras se solapan: reduce el número o el diámetro.';
+  if (p.capF <= 0 || p.capF > 1) return 'El factor de tope debe estar entre 0 y 1.';
+  return null;
+}
+
+const f0 = v => v.toLocaleString('es', {maximumFractionDigits: 0});
+const f1 = v => v.toLocaleString('es', {minimumFractionDigits: 1, maximumFractionDigits: 1});
+const f2 = v => v.toLocaleString('es', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+function update(){
+  const p = readParams();
+  $('nTot').value = (isFinite(p.nH) && isFinite(p.nV) && p.nH >= 2 && p.nV >= 2) ? (2 * p.nV + 2 * (p.nH - 2)) : '';
+  const err = validate(p);
+  const el = $('err');
+  if (err) { el.textContent = err; el.style.display = 'block'; return; }
+  el.style.display = 'none';
+  P = p;
+  D = computeDiagram(p);
+  SL = sliceAt(D, p.Pu);
+  renderPlot3D();
+  renderPlot2D();
+  renderSection();
+  renderResults();
+}
+function schedule(){ clearTimeout(timer); timer = setTimeout(update, 120); }
+
+// ---------- 3D ----------
+function wireframe(){
+  const x = [], y = [], z = [];
+  for (let j = 0; j < D.NJ; j++) {
+    for (let k = 0; k < D.NC; k++) { x.push(D.X[k][j]); y.push(D.Y[k][j]); z.push(D.Z[k][j]); }
+    x.push(null); y.push(null); z.push(null);
+  }
+  for (let k = 0; k < D.NC; k++) {
+    for (let j = 0; j < D.NJ; j++) { x.push(D.X[k][j]); y.push(D.Y[k][j]); z.push(D.Z[k][j]); }
+    x.push(null); y.push(null); z.push(null);
+  }
+  return { x, y, z };
+}
+
+function renderPlot3D(){
+  const vm = Math.max(...D.NX.flat().map(Math.abs), ...D.NY.flat().map(Math.abs)) * 1.05;
+  const zmin = Math.min(...D.NZ.flat(), 0), zmax = Math.max(...D.NZ.flat()) * 1.08;
+  const traces = [];
+
+  traces.push({
+    type: 'surface', name: 'Diseño', x: D.X, y: D.Y, z: D.Z,
+    surfacecolor: D.Z, cmin: D.Pmin, cmax: D.capMax, opacity: 0.96, visible: $('vDesign').checked,
+    colorscale: [[0,'#2b3a8c'],[0.35,'#2a9d8f'],[0.7,'#e9c46a'],[1,'#e76f51']],
+    colorbar: { title: { text: 'φPn (kN)', font: { color: css('--text') } }, thickness: 12, len: 0.6, tickfont: { color: css('--muted') }, outlinewidth: 0 },
+    lighting: { ambient: 0.65, diffuse: 0.85, specular: 0.25, roughness: 0.6, fresnel: 0.2 },
+    hovertemplate: '<b>Diseño (φ)</b><br>φMx: %{x:,.1f} kN·m<br>φMy: %{y:,.1f} kN·m<br>φPn: %{z:,.1f} kN<br>'+'<extra></extra>'
+  });
+  traces.push({
+    type: 'surface', name: 'Nominal', x: D.NX, y: D.NY, z: D.NZ,
+    surfacecolor: D.NZ.map(r => r.map(() => 0)), colorscale: [[0,'#2a9d8f'],[1,'#2a9d8f']], showscale: false,
+    opacity: 0.16, visible: $('vNominal').checked, lighting: { ambient: 0.9, diffuse: 0.3, specular: 0 },
+    hovertemplate: '<b>Nominal</b><br>Mnx: %{x:,.1f} kN·m<br>Mny: %{y:,.1f} kN·m<br>Pn: %{z:,.1f} kN<br>'+'<extra></extra>'
+  });
+  const w = wireframe();
+  traces.push({ type: 'scatter3d', mode: 'lines', name: 'Malla', x: w.x, y: w.y, z: w.z, hoverinfo: 'skip',
+    line: { color: css('--wirec'), width: 1.2 }, opacity: css('--wirea') * 1, visible: $('vWire').checked, showlegend: false });
+
+  const sx = SL.ok ? SL.pts.map(q => q[0]) : [], sy = SL.ok ? SL.pts.map(q => q[1]) : [], sz = sx.map(() => P.Pu);
+  traces.push({ type: 'scatter3d', mode: 'lines', name: 'Contorno a Pu', x: sx, y: sy, z: sz,
+    line: { color: '#ff9f1c', width: 6 }, visible: $('vSlice').checked,
+    hovertemplate: '<b>Contorno a Pu</b><br>φMx: %{x:,.1f} kN·m<br>φMy: %{y:,.1f} kN·m<br>Pu: %{z:,.1f} kN<extra></extra>' });
+
+  traces.push({ type: 'scatter3d', mode: 'lines+markers', name: 'Demanda',
+    x: [0, P.Mux], y: [0, P.Muy], z: [0, P.Pu],
+    line: { color: '#e5334b', width: 5 }, marker: { size: [0.1, 8], color: '#e5334b', symbol: 'diamond', line: { color: '#fff', width: 1 } },
+    visible: $('vDemand').checked,
+    hovertemplate: '<b>Demanda</b><br>Mux: %{x:,.1f} kN·m<br>Muy: %{y:,.1f} kN·m<br>Pu: %{z:,.1f} kN<extra></extra>' });
+
+  const ax = (title, range) => ({
+    title: { text: title, font: { color: css('--text'), size: 13 } }, range,
+    gridcolor: css('--grid'), zerolinecolor: css('--text'), zerolinewidth: 3, linecolor: css('--grid'),
+    tickfont: { color: css('--muted'), size: 10 }, backgroundcolor: 'rgba(0,0,0,0)', showbackground: false, separatethousands: true
+  });
+  const layout = {
+    paper_bgcolor: 'rgba(0,0,0,0)', margin: { l: 0, r: 0, t: 10, b: 0 }, uirevision: 'keep',
+    legend: { orientation: 'h', x: 0.01, y: 0.99, font: { color: css('--text') } },
+    hoverlabel: { font: { size: 13 }, align: 'left' },
+    scene: {
+      xaxis: ax('φMx (kN·m)', [-vm, vm]), yaxis: ax('φMy (kN·m)', [-vm, vm]), zaxis: ax('φPn (kN)', [zmin * 1.05, zmax]),
+      aspectmode: 'manual', aspectratio: { x: 1, y: 1, z: 1.1 },
+      camera: window.__cam || { eye: { x: 1.55, y: -1.65, z: 0.95 } }
+    }
+  };
+  const config = { responsive: true, displaylogo: false, toImageButtonOptions: { filename: 'diagrama_interaccion_biaxial', scale: 2 } };
+  window.__defaultCam = { eye: { x: 1.55, y: -1.65, z: 0.95 } };
+  Plotly.react('plot3d', traces, layout, config).then(gd => {
+    if (!plotReady) { plotReady = true; bindHover(gd); }
+  }).catch(e => showFatal('Error al dibujar: ' + (e && e.message || e)));
+}
+
+function nearestGrid(arrX, arrY, arrZ, x, y, z){
+  let best = null, bd = Infinity;
+  const sx = 1 / (Math.max(...arrX.flat().map(Math.abs)) || 1), sz = 1 / (Math.max(...arrZ.flat().map(Math.abs)) || 1);
+  for (let k = 0; k < D.NC; k++) for (let j = 0; j < D.NJ; j++) {
+    const d = ((arrX[k][j] - x) * sx) ** 2 + ((arrY[k][j] - y) * sx) ** 2 + ((arrZ[k][j] - z) * sz) ** 2;
+    if (d < bd) { bd = d; best = [k, j]; }
+  }
+  return best;
+}
+
+function bindHover(gd){
+  gd.on('plotly_hover', ev => {
+    const pt = ev.points && ev.points[0];
+    if (!pt || (pt.curveNumber !== 0 && pt.curveNumber !== 1)) return;
+    const nominal = pt.curveNumber === 1;
+    const [k, j] = nearestGrid(nominal ? D.NX : D.X, nominal ? D.NY : D.Y, nominal ? D.NZ : D.Z, pt.x, pt.y, pt.z);
+    const mx = nominal ? D.NX[k][j] : D.X[k][j], my = nominal ? D.NY[k][j] : D.Y[k][j], pz = nominal ? D.NZ[k][j] : D.Z[k][j];
+    const pre = nominal ? '' : 'φ';
+    const it = (l, v) => `<div class="it"><small>${l}</small><b>${v}</b></div>`;
+    $('readout').innerHTML = `<span class="tag">${nominal ? 'Nominal' : 'Diseño'}</span>` +
+      it(pre + 'Mx', f1(mx) + ' kN·m') + it(pre + 'My', f1(my) + ' kN·m') + it('Resultante', f1(Math.hypot(mx, my)) + ' kN·m') +
+      it(pre + 'Pn', f1(pz) + ' kN') + it('Ángulo', D.angles[j].toFixed(0) + '°') + it('c', f1(D.CC[k][j] * 100) + ' cm') +
+      it('εt', D.ET[k][j].toFixed(5)) + it('φ', D.PHI[k][j].toFixed(3));
+  });
+  gd.on('plotly_unhover', () => {});
+}
+
+// ---------- 2D: corte a Pu ----------
+function renderPlot2D(){
+  const traces = [];
+  if (SL.ok) {
+    traces.push({ type: 'scatter', mode: 'lines', x: SL.pts.map(q => q[0]), y: SL.pts.map(q => q[1]), fill: 'toself',
+      fillcolor: 'rgba(31,111,235,.14)', line: { color: css('--accent'), width: 2.5 }, name: 'φMn a Pu',
+      hovertemplate: 'φMx: %{x:,.1f} kN·m<br>φMy: %{y:,.1f} kN·m<extra>Capacidad</extra>' });
+  }
+  traces.push({ type: 'scatter', mode: 'markers', x: [P.Mux], y: [P.Muy], name: 'Demanda',
+    marker: { size: 11, color: '#e5334b', symbol: 'diamond', line: { color: '#fff', width: 1 } },
+    hovertemplate: 'Mux: %{x:,.1f} kN·m<br>Muy: %{y:,.1f} kN·m<extra>Demanda</extra>' });
+  const layout = {
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', margin: { l: 52, r: 12, t: 8, b: 44 },
+    showlegend: false, font: { color: css('--text') },
+    xaxis: { title: 'φMx (kN·m)', gridcolor: css('--grid'), zerolinecolor: css('--muted'), tickfont: { color: css('--muted') } },
+    yaxis: { title: 'φMy (kN·m)', gridcolor: css('--grid'), zerolinecolor: css('--muted'), tickfont: { color: css('--muted') }, scaleanchor: 'x', scaleratio: 1 }
+  };
+  Plotly.react('plot2d', traces, layout, { responsive: true, displaylogo: false, displayModeBar: false });
+}
+
+// ---------- Sección ----------
+function renderSection(){
+  const W = 320, H = 260, pad = 26;
+  const s = Math.min((W - 2 * pad) / P.b, (H - 2 * pad) / P.h);
+  const w = P.b * s, h = P.h * s, ox = (W - w) / 2, oy = (H - h) / 2;
+  const bars = barLayout(P);
+  const rr = Math.max(P.d / 2 * s, 3);
+  const stir = Math.max(P.rec * s, 1.5);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,sans-serif">`;
+  svg += `<rect x="${ox}" y="${oy}" width="${w}" height="${h}" fill="${css('--accent-soft')}" stroke="${css('--text')}" stroke-width="1.5"/>`;
+  svg += `<rect x="${ox + stir}" y="${oy + stir}" width="${w - 2 * stir}" height="${h - 2 * stir}" fill="none" stroke="${css('--muted')}" stroke-width="1" stroke-dasharray="3 3"/>`;
+  bars.forEach(([x, y]) => {
+    svg += `<circle cx="${ox + w / 2 + x * s}" cy="${oy + h / 2 - y * s}" r="${rr}" fill="${css('--text')}"/>`;
+  });
+  svg += `<text x="${W / 2}" y="${H - 6}" text-anchor="middle" font-size="11" fill="${css('--muted')}">b = ${(P.b * 100).toFixed(0)} cm</text>`;
+  svg += `<text transform="translate(10 ${H / 2}) rotate(-90)" text-anchor="middle" font-size="11" fill="${css('--muted')}">h = ${(P.h * 100).toFixed(0)} cm</text>`;
+  svg += `<text x="${ox + w + 4}" y="${oy + h / 2 + 4}" font-size="11" fill="${css('--muted')}">x</text>`;
+  svg += `<text x="${W / 2 - 3}" y="${oy - 6}" font-size="11" fill="${css('--muted')}">y</text></svg>`;
+  $('sec').innerHTML = svg;
+}
+
+// ---------- Resultados ----------
+function renderResults(){
+  const Ag = P.b * P.h, Ast = D.nBars * D.As;
+  const st = $('status');
+  let cls, msg;
+  const Mu = Math.hypot(P.Mux, P.Muy);
+
+  if (P.Pu > D.capMax + 1e-9) { cls = 'bad'; msg = `NO CUMPLE · Pu excede φPn,máx = ${f0(D.capMax)} kN`; }
+  else if (P.Pu < D.Pmin - 1e-9) { cls = 'bad'; msg = `NO CUMPLE · tracción mayor que la capacidad (${f0(D.Pmin)} kN)`; }
+  else if (!SL.ok) { cls = 'warn'; msg = 'No se pudo trazar el contorno a este nivel de Pu'; }
+  else if (Mu < 1e-9) { cls = 'ok'; msg = `CUMPLE · carga axial pura (Pu ≤ ${f0(D.capMax)} kN)`; }
+  else {
+    const r = rayCapacity(SL.pts, P.Mux, P.Muy);
+    if (r === null) { cls = 'warn'; msg = 'No se pudo calcular la relación demanda/capacidad'; }
+    else {
+      const dcr = 1 / r;
+      cls = dcr <= 1 ? 'ok' : 'bad';
+      msg = `${dcr <= 1 ? 'CUMPLE' : 'NO CUMPLE'} · demanda/capacidad = ${dcr.toFixed(3)} (φMn = ${f1(Mu * r)} kN·m en la dirección de Mu)`;
+    }
+  }
+  $('verbar').className = 'verbar ' + cls; st.textContent = msg;
+
+  const it = (l, v) => `<div class="it"><small>${l}</small><b>${v}</b></div>`;
+  $('results').innerHTML =
+    it('Barras', `${D.nBars} Ø${+(P.d * 1000).toFixed(2)} mm`) + it('Ast', f2(Ast * 1e4) + ' cm²') +
+    it('ρ = Ast/Ag', (Ast / Ag * 100).toFixed(2) + ' %') + it('β₁', D.b1.toFixed(3)) + it('εy', D.ety.toFixed(5)) +
+    it('Po', f0(D.Po) + ' kN') + it('φPn,máx', f0(D.capMax) + ' kN') + it('Tracción máx. φPn', f0(D.Pmin) + ' kN');
+}
+
+// ---------- Eventos ----------
+function syncDiam(){
+  const sel = $('dSel'), custom = sel.value === 'custom';
+  $('rowDcustom').style.display = custom ? 'flex' : 'none';
+  if (!custom) $('d').value = sel.value;
+}
+function setDiamFromValue(mm){
+  const sel = $('dSel'); let found = false;
+  for (const o of sel.options) if (o.value !== 'custom' && Math.abs(parseFloat(o.value) - mm) < 1e-6) { sel.value = o.value; found = true; }
+  if (!found) sel.value = 'custom';
+  syncDiam(); if (!found) $('d').value = mm;
+}
+$('dSel').addEventListener('change', () => { syncDiam(); schedule(); });
+['b','h','rec','angStep','nH','nV','d','fc','fy','capF','Pu','Mux','Muy'].forEach(id => $(id).addEventListener('input', schedule));
+['vDesign','vNominal','vWire','vSlice','vDemand'].forEach(id => $(id).addEventListener('change', () => { if (D) renderPlot3D(); }));
+$('btnReset').addEventListener('click', () => { for (const [k, v] of Object.entries(DEFAULTS)) $(k).value = v; setDiamFromValue(DEFAULTS.d); window.__cam = null; update(); });
+$('btnCam').addEventListener('click', () => { Plotly.relayout('plot3d', { 'scene.camera': { eye: { x: 1.55, y: -1.65, z: 0.95 }, up: { x: 0, y: 0, z: 1 }, center: { x: 0, y: 0, z: 0 } } }); });
+$('btnCsv').addEventListener('click', () => {
+  if (!D) return;
+  const rows = ['angulo_deg;c_cm;phi;eps_t;Pn_kN;Mnx_kNm;Mny_kNm;phiPn_kN;phiMnx_kNm;phiMny_kNm'];
+  for (let j = 0; j < D.NJ; j++) for (let k = 0; k < D.NC; k++)
+    rows.push([D.angles[j], D.CC[k][j] * 100, D.PHI[k][j], D.ET[k][j], D.NZ[k][j], D.NX[k][j], D.NY[k][j], D.Z[k][j], D.X[k][j], D.Y[k][j]]
+      .map(v => (+v).toFixed(5)).join(';'));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\ufeff' + rows.join('\n')], { type: 'text/csv' }));
+  a.download = 'diagrama_interaccion_biaxial.csv'; a.click(); URL.revokeObjectURL(a.href);
+});
+function applyTheme(t, save){
+  document.documentElement.setAttribute('data-theme', t);
+  $('themeSw').checked = (t === 'dark');
+  if (save) { try { localStorage.setItem('porticad-theme', t); } catch (e) {} }
+  if (D) { renderPlot3D(); renderPlot2D(); renderSection(); }
+}
+$('themeSw').checked = document.documentElement.getAttribute('data-theme') === 'dark';
+$('themeSw').addEventListener('change', e => applyTheme(e.target.checked ? 'dark' : 'light', true));
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+  let saved = null; try { saved = localStorage.getItem('porticad-theme'); } catch (_) {}
+  if (!saved) applyTheme(e.matches ? 'dark' : 'light', false);
+});
+
+function showFatal(msg){
+  const el = $('err'); el.style.display = 'block';
+  el.innerHTML = '<b>No se pudo mostrar el gráfico.</b> ' + msg;
+  $('plot3d').innerHTML = '<div style="padding:24px;color:var(--bad)">' + msg + '</div>';
+}
+window.plotlyReady.then(() => {
+  try {
+    update();
+    Plotly.Plots && setTimeout(() => {
+      const c = document.querySelector('#plot3d canvas');
+      if (!c && !$('plot3d').querySelector('.gl-container')) showFatal('Tu navegador no pudo iniciar WebGL (necesario para el 3D). Activa la aceleración por hardware en el navegador.');
+    }, 2500);
+  } catch (e) { showFatal('Error: ' + e.message); }
+}).catch(e => showFatal(e.message + '. Revisa tu conexión a internet o descarga plotly.min.js y colócalo junto al HTML.'));
+</script>
+</body>
+</html>
