@@ -184,6 +184,11 @@
   .secnom { margin: 0; font: 500 13px var(--f-cond); color: var(--muted); }
   #sec { width: 100%; height: auto; display: block; }
   #sec .sh { fill: color-mix(in srgb, var(--accent) 18%, var(--panel)); stroke: var(--ink); stroke-width: 1.6; stroke-linejoin: round; fill-rule: evenodd; }
+  #sec .sh.horm { fill: url(#horm); }
+  #sec .hbase { fill: color-mix(in srgb, var(--ink) 9%, var(--panel)); }
+  #sec .hgr * { fill: color-mix(in srgb, var(--ink) 55%, var(--panel)); stroke: none; }
+  /* Último resultado válido atenuado mientras algún dato está incompleto o es inválido */
+  .obsoleto #tabs, .obsoleto .readout .stats, .obsoleto #pcr, .obsoleto #plot, .sec-obsoleta #sec { opacity: 0.45; }
   #sec .sh.disc { stroke-dasharray: 5 4; }
   #sec .cota line, #sec .guia line { stroke: var(--muted); stroke-width: 1; }
   #sec .guia circle { fill: var(--ink); stroke: none; }
@@ -919,7 +924,8 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
 
     $('msg').textContent = error || '';
     if (error) {
-      estado.res = null; limpiarStats();
+      // Se conservan los últimos resultados válidos (atenuados) para que no desaparezcan modos ni valores
+      if (!estado.res) limpiarStats();
     } else {
       estado.res = res;
       estado.modo = Math.min(estado.modo, res.modos.length - 1);
@@ -936,6 +942,7 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
       if (uni.S !== 'MPa') htmlSig += `<br><small>= ${Number(sigMPa.toPrecision(4)).toLocaleString('en-US')} MPa</small>`;
       $('sSig').innerHTML = htmlSig;
     }
+    document.body.classList.toggle('obsoleto', !!error && !!estado.res);
     renderTabs();
     dibujar();
   }
@@ -960,6 +967,18 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
   }
 
   /* ---------- Sección de la columna con sus medidas ---------- */
+  // Textura de hormigón: matriz de mortero con agregados (grava) y poros, patrón determinista
+  const PATRON_HORM = (() => {
+    let s = 7; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    const W = 48; let o = '';
+    for (let i = 0; i < 46; i++) {                       // agregados angulosos
+      const x = rnd() * W, y = rnd() * W, r = 1 + rnd() * 2.6, n = 5 + Math.floor(rnd() * 3);
+      const pts = []; for (let k = 0; k < n; k++) { const a = k / n * 6.2832 + rnd() * 0.6, q = r * (0.65 + rnd() * 0.5); pts.push((x + Math.cos(a) * q).toFixed(1) + ',' + (y + Math.sin(a) * q * 0.8).toFixed(1)); }
+      o += `<polygon points="${pts.join(' ')}" fill-opacity="${(0.12 + rnd() * 0.3).toFixed(2)}"/>`;
+    }
+    for (let i = 0; i < 70; i++) o += `<circle cx="${(rnd() * W).toFixed(1)}" cy="${(rnd() * W).toFixed(1)}" r="${(0.3 + rnd() * 0.5).toFixed(2)}" fill-opacity="${(0.35 + rnd() * 0.35).toFixed(2)}"/>`;
+    return `<defs><pattern id="horm" width="${W}" height="${W}" patternUnits="userSpaceOnUse"><rect width="${W}" height="${W}" class="hbase"/><g class="hgr">${o}</g></pattern></defs>`;
+  })();
   const NOMBRES_SEC = { rect: 'Rectangular', circ: 'Circular', perfil: 'Perfil I', manual: 'Manual (A e I)' };
   function dibujarSeccion(g) {
     const W = 300, cx = 116, cy = 94, M = 130, lx = 192;   // M: lado máximo del dibujo; lx: columna de rótulos
@@ -967,9 +986,12 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
     const hueca = (tipo === 'rect' && $('hr').checked) || (tipo === 'circ' && $('hc').checked);
     $('secNombre').textContent = NOMBRES_SEC[tipo] + (hueca ? ' hueca' : '');
     if (!g || g.error) {
+      document.body.classList.toggle('sec-obsoleta', !!estado.secOk);
+      if (estado.secOk) return;           // se conserva el último dibujo válido, atenuado
       $('sec').innerHTML = `<text class="vacio" x="${W / 2}" y="110" text-anchor="middle">Revise las dimensiones</text>`;
       return;
     }
+    document.body.classList.remove('sec-obsoleta'); estado.secOk = true;
     const v = g.v;
     const f1 = x => x.toFixed(1);
     const dim = (nombre, x) => `${nombre} = ${Number(x.toPrecision(4))} ${uni.L}`;
@@ -991,10 +1013,10 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
       const x0 = cx - pw / 2, x1 = cx + pw / 2, y0 = cy - ph / 2, y1 = cy + ph / 2;
       if (hueca) {
         const tt = v.t * sc;
-        forma = `<path class="sh" d="M${f1(x0)} ${f1(y0)}H${f1(x1)}V${f1(y1)}H${f1(x0)}ZM${f1(x0 + tt)} ${f1(y0 + tt)}V${f1(y1 - tt)}H${f1(x1 - tt)}V${f1(y0 + tt)}Z"/>`;
+        forma = `<path class="sh horm" d="M${f1(x0)} ${f1(y0)}H${f1(x1)}V${f1(y1)}H${f1(x0)}ZM${f1(x0 + tt)} ${f1(y0 + tt)}V${f1(y1 - tt)}H${f1(x1 - tt)}V${f1(y0 + tt)}Z"/>`;
         cotas += guia(x1 - tt / 2, y0 + ph * 0.28, dim('t', v.t));
       } else {
-        forma = `<rect class="sh" x="${f1(x0)}" y="${f1(y0)}" width="${f1(pw)}" height="${f1(ph)}"/>`;
+        forma = `<rect class="sh horm" x="${f1(x0)}" y="${f1(y0)}" width="${f1(pw)}" height="${f1(ph)}"/>`;
       }
       cotas += cotaH(x0, x1, y1 + 18, y1, dim('b', v.b)) + cotaV(x0 - 18, y0, y1, x0, dim('h', v.h));
       eje = [x0 - 8, x1 + 8];
@@ -1003,10 +1025,10 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
       const circ = rad => `M${f1(cx - rad)} ${f1(cy)}a${f1(rad)} ${f1(rad)} 0 1 0 ${f1(2 * rad)} 0a${f1(rad)} ${f1(rad)} 0 1 0 ${f1(-2 * rad)} 0Z`;
       if (hueca) {
         const r = v.di * sc / 2, ang = Math.PI / 5;
-        forma = `<path class="sh" d="${circ(R)}${circ(r)}"/>`;
+        forma = `<path class="sh horm" d="${circ(R)}${circ(r)}"/>`;
         cotas += guia(cx + r * Math.cos(ang), cy - r * Math.sin(ang), dim('di', v.di));
       } else {
-        forma = `<circle class="sh" cx="${f1(cx)}" cy="${f1(cy)}" r="${f1(R)}"/>`;
+        forma = `<circle class="sh horm" cx="${f1(cx)}" cy="${f1(cy)}" r="${f1(R)}"/>`;
       }
       cotas += cotaH(cx - R, cx + R, cy + R + 18, cy, dim('D', v.D));
       eje = [cx - R - 8, cx + R + 8];
@@ -1020,13 +1042,13 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
       eje = [x0 - 8, x1 + 8];
     } else {
       // Sección manual: solo se conocen A e I
-      forma = `<rect class="sh disc" x="${f1(cx - 74)}" y="${f1(cy - 48)}" width="148" height="96" rx="6"/>`
+      forma = `<rect class="sh horm disc" x="${f1(cx - 74)}" y="${f1(cy - 48)}" width="148" height="96" rx="6"/>`
             + tx(cx, cy - 4, `A = ${fmtSci(g.A)} ${uni.L}²`, 'middle', ' class="lt"')
             + tx(cx, cy + 16, `I = ${fmtSci(g.I)} ${uni.L}⁴`, 'middle', ' class="lt"');
     }
     const ejeSvg = eje ? `<line class="eje" x1="${f1(eje[0])}" y1="${cy}" x2="${f1(eje[1])}" y2="${cy}"/>` : '';
     const leyenda = eje ? `<line class="eje" x1="10" y1="226" x2="38" y2="226"/>${tx(44, 230, 'Eje de flexión (I)', 'start', ' class="lg"')}` : '';
-    $('sec').innerHTML = forma + ejeSvg + cotas + leyenda;
+    $('sec').innerHTML = PATRON_HORM + forma + ejeSvg + cotas + leyenda;
   }
 
   /* ---------- Dibujo ---------- */
