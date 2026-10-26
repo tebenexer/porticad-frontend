@@ -117,6 +117,17 @@
   }
   .info:hover, .info[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
   .info:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* Fila b | intercambiar | h */
+  .fila-bh { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: end; }
+  .fila-bh .f { align-self: end; }
+  .swap {
+    width: 36px; height: 36px; padding: 0; display: grid; place-items: center; cursor: pointer;
+    border: 1px solid var(--rule); background: var(--field); color: var(--muted); border-radius: 4px;
+  }
+  .swap svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .swap:hover { border-color: var(--accent); color: var(--accent); }
+  .swap:active { background: color-mix(in srgb, var(--accent) 16%, var(--field)); }
+  .swap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   #ayuda {
     position: fixed; z-index: 50; max-width: 240px; padding: 8px 10px; border-radius: 5px; pointer-events: none;
     background: var(--ink); color: var(--panel); font: 400 12.5px/1.4 var(--f-body);
@@ -206,8 +217,11 @@
         </select>
 
         <div class="grid" data-sec="rect">
-          <label class="f"><span class="lbl">Base b</span><span class="inp"><input id="b" type="text" inputmode="decimal" value="0.2"><i>m</i></span></label>
-          <div class="f"><span class="lbl conayuda"><label for="h">Altura h</label><button type="button" class="info" aria-label="Más información sobre la altura h" aria-expanded="false" data-info="Flexión en el plano de h: I = b·h³/12. Para estudiar el otro eje, intercambie b y h.">i</button></span><span class="inp"><input id="h" type="text" inputmode="decimal" value="0.2"><i>m</i></span></div>
+          <div class="fila-bh">
+            <label class="f"><span class="lbl">Base b</span><span class="inp"><input id="b" type="text" inputmode="decimal" value="0.2"><i>m</i></span></label>
+            <button type="button" class="swap" id="swap" aria-label="Intercambiar b y h" data-info="Intercambiar b y h"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h14M13.5 2.5 17 6l-3.5 3.5"/><path d="M17 14H3M6.5 10.5 3 14l3.5 3.5"/></svg></button>
+            <div class="f"><span class="lbl conayuda"><label for="h">Altura h</label><button type="button" class="info" aria-label="Más información sobre la altura h" aria-expanded="false" data-info="Flexión en el plano de h: I = b·h³/12. Para estudiar el otro eje, intercambie b y h con el botón de flechas.">i</button></span><span class="inp"><input id="h" type="text" inputmode="decimal" value="0.2"><i>m</i></span></div>
+          </div>
           <label class="chk"><input type="checkbox" id="hr">Sección hueca</label>
           <label class="f"><span class="lbl">Espesor de pared t</span><span class="inp"><input id="t" type="text" inputmode="decimal" value="0.01" disabled><i>m</i></span></label>
         </div>
@@ -897,8 +911,7 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
     ayudaDe = btn;
     ayuda.textContent = btn.dataset.info;
     ayuda.hidden = false;
-    btn.setAttribute('aria-expanded', 'true');
-    btn.setAttribute('aria-describedby', 'ayuda');
+    if (btn.classList.contains('info')) { btn.setAttribute('aria-expanded', 'true'); btn.setAttribute('aria-describedby', 'ayuda'); }
     const r = btn.getBoundingClientRect(), ancho = document.documentElement.clientWidth, alto = window.innerHeight;
     const w = ayuda.offsetWidth, h = ayuda.offsetHeight;
     const left = Math.min(Math.max(r.left + r.width / 2 - w / 2, 8), Math.max(8, ancho - w - 8));
@@ -908,19 +921,26 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
     ayuda.style.top = top + 'px';
   }
   function ocultarAyuda() {
-    if (ayudaDe) { ayudaDe.setAttribute('aria-expanded', 'false'); ayudaDe.removeAttribute('aria-describedby'); }
+    if (ayudaDe && ayudaDe.classList.contains('info')) { ayudaDe.setAttribute('aria-expanded', 'false'); ayudaDe.removeAttribute('aria-describedby'); }
     ayudaDe = null; ayudaFija = false; ayuda.hidden = true;
   }
-  document.querySelectorAll('.info').forEach(b => {
+  document.querySelectorAll('.info, .swap').forEach(b => {
     b.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse' && !ayudaFija) mostrarAyuda(b); });
     b.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && !ayudaFija) ocultarAyuda(); });
     b.addEventListener('focus', () => { if (!ayudaFija) mostrarAyuda(b); });
     b.addEventListener('blur', ocultarAyuda);
-    b.addEventListener('click', e => {
+    if (b.classList.contains('info')) b.addEventListener('click', e => {
       e.stopPropagation();
       if (ayudaDe === b && ayudaFija) ocultarAyuda();
       else { mostrarAyuda(b); ayudaFija = true; }
     });
+  });
+
+  /* Intercambiar b y h (se intercambia el texto tal cual, también si es una operación) */
+  $('swap').addEventListener('click', () => {
+    const eb = $('b'), eh = $('h');
+    const tmp = eb.value; eb.value = eh.value; eh.value = tmp;
+    recalcular();
   });
   document.addEventListener('click', ocultarAyuda);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') ocultarAyuda(); });
