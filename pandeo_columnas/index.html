@@ -62,7 +62,9 @@
   .top p { margin: 0; color: var(--muted); font-size: 14px; }
 
   /* Interruptor de tema */
-  .tema { margin-left: auto; align-self: center; display: inline-flex; align-items: center; gap: 10px; padding: 2px 0; background: none; border: 0; color: var(--ink); font: 500 13px var(--f-cond); cursor: pointer; }
+  .unidades { margin-left: auto; align-self: center; display: inline-flex; align-items: center; gap: 8px; font: 500 13px var(--f-cond); color: var(--muted); }
+  .unidades select { width: auto; padding: 5px 8px; font-size: 13px; }
+  .tema { align-self: center; display: inline-flex; align-items: center; gap: 10px; padding: 2px 0; background: none; border: 0; color: var(--ink); font: 500 13px var(--f-cond); cursor: pointer; }
   .tema .pista { position: relative; width: 40px; height: 22px; border-radius: 11px; background: var(--field); border: 1px solid var(--rule); flex: none; }
   .tema .pista::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--muted); }
   .tema[aria-checked="true"] .pista { background: var(--accent); border-color: var(--accent); }
@@ -200,7 +202,26 @@
 <div class="wrap">
   <header class="panel top">
     <h1>Pandeo de columnas</h1>
-    <p>Carga crítica de Euler por elementos finitos de viga, con la forma deformada de cada modo. Unidades: m y kN.</p>
+    <p>Carga crítica de Euler por elementos finitos de viga, con la forma deformada de cada modo.</p>
+    <label class="unidades" title="Al cambiar de unidades, los valores de los campos se convierten">
+      <span>Unidades</span>
+      <select id="unidades">
+        <optgroup label="Sistema internacional">
+          <option value="si-m-kn" selected>m, kN (kN/m²)</option>
+          <option value="si-mm-n">mm, N (MPa)</option>
+          <option value="si-cm-kn">cm, kN (kN/cm²)</option>
+        </optgroup>
+        <optgroup label="Técnico">
+          <option value="tec-m-tf">m, tf (tf/m²)</option>
+          <option value="tec-cm-kgf">cm, kgf (kgf/cm²)</option>
+        </optgroup>
+        <optgroup label="Imperial">
+          <option value="imp-in-kip">in, kip (ksi)</option>
+          <option value="imp-ft-kip">ft, kip (kip/ft²)</option>
+          <option value="imp-in-lb">in, lb (psi)</option>
+        </optgroup>
+      </select>
+    </label>
     <button type="button" id="tema" class="tema" role="switch" aria-checked="false"><span>Modo oscuro</span><span class="pista" aria-hidden="true"></span></button>
   </header>
 
@@ -218,31 +239,31 @@
 
         <div class="grid" data-sec="rect">
           <div class="fila-bh">
-            <label class="f"><span class="lbl">Base b</span><span class="inp"><input id="b" type="text" inputmode="decimal" value="0.2"><i>m</i></span></label>
+            <label class="f"><span class="lbl">Base b</span><span class="inp"><input id="b" type="text" inputmode="decimal" value="0.2"><i data-u="L">m</i></span></label>
             <button type="button" class="swap" id="swap" aria-label="Intercambiar b y h" data-info="Intercambiar b y h"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h14M13.5 2.5 17 6l-3.5 3.5"/><path d="M17 14H3M6.5 10.5 3 14l3.5 3.5"/></svg></button>
-            <div class="f"><span class="lbl conayuda"><label for="h">Altura h</label><button type="button" class="info" aria-label="Más información sobre la altura h" aria-expanded="false" data-info="Flexión en el plano de h: I = b·h³/12. Para estudiar el otro eje, intercambie b y h con el botón de flechas.">i</button></span><span class="inp"><input id="h" type="text" inputmode="decimal" value="0.2"><i>m</i></span></div>
+            <div class="f"><span class="lbl conayuda"><label for="h">Altura h</label><button type="button" class="info" aria-label="Más información sobre la altura h" aria-expanded="false" data-info="Flexión en el plano de h: I = b·h³/12. Para estudiar el otro eje, intercambie b y h con el botón de flechas.">i</button></span><span class="inp"><input id="h" type="text" inputmode="decimal" value="0.2"><i data-u="L">m</i></span></div>
           </div>
           <label class="chk"><input type="checkbox" id="hr">Sección hueca</label>
-          <label class="f"><span class="lbl">Espesor de pared t</span><span class="inp"><input id="t" type="text" inputmode="decimal" value="0.01" disabled><i>m</i></span></label>
+          <label class="f"><span class="lbl">Espesor de pared t</span><span class="inp"><input id="t" type="text" inputmode="decimal" value="0.01" disabled><i data-u="L">m</i></span></label>
         </div>
 
         <div class="grid" data-sec="circ" hidden>
-          <label class="f"><span class="lbl">Diámetro D</span><span class="inp"><input id="D" type="text" inputmode="decimal" value="0.2"><i>m</i></span></label>
+          <label class="f"><span class="lbl">Diámetro D</span><span class="inp"><input id="D" type="text" inputmode="decimal" value="0.2"><i data-u="L">m</i></span></label>
           <span></span>
           <label class="chk"><input type="checkbox" id="hc">Sección hueca</label>
-          <label class="f"><span class="lbl">Diámetro interior di</span><span class="inp"><input id="di" type="text" inputmode="decimal" value="0.18" disabled><i>m</i></span></label>
+          <label class="f"><span class="lbl">Diámetro interior di</span><span class="inp"><input id="di" type="text" inputmode="decimal" value="0.18" disabled><i data-u="L">m</i></span></label>
         </div>
 
         <div class="grid" data-sec="perfil" hidden>
-          <label class="f"><span class="lbl">Ancho de ala B</span><span class="inp"><input id="Bi" type="text" inputmode="decimal" value="0.15"><i>m</i></span></label>
-          <label class="f"><span class="lbl">Altura total H</span><span class="inp"><input id="Hi" type="text" inputmode="decimal" value="0.3"><i>m</i></span></label>
-          <label class="f"><span class="lbl">Espesor de ala tf</span><span class="inp"><input id="tf" type="text" inputmode="decimal" value="0.0107"><i>m</i></span></label>
-          <label class="f"><span class="lbl">Espesor de alma tw</span><span class="inp"><input id="tw" type="text" inputmode="decimal" value="0.0071"><i>m</i></span></label>
+          <label class="f"><span class="lbl">Ancho de ala B</span><span class="inp"><input id="Bi" type="text" inputmode="decimal" value="0.15"><i data-u="L">m</i></span></label>
+          <label class="f"><span class="lbl">Altura total H</span><span class="inp"><input id="Hi" type="text" inputmode="decimal" value="0.3"><i data-u="L">m</i></span></label>
+          <label class="f"><span class="lbl">Espesor de ala tf</span><span class="inp"><input id="tf" type="text" inputmode="decimal" value="0.0107"><i data-u="L">m</i></span></label>
+          <label class="f"><span class="lbl">Espesor de alma tw</span><span class="inp"><input id="tw" type="text" inputmode="decimal" value="0.0071"><i data-u="L">m</i></span></label>
         </div>
 
         <div class="grid" data-sec="manual" hidden>
-          <label class="f"><span class="lbl">Área A</span><span class="inp"><input id="Av" type="text" inputmode="decimal" value="0.04"><i>m²</i></span></label>
-          <label class="f"><span class="lbl">Inercia I</span><span class="inp"><input id="Iv" type="text" inputmode="decimal" value="1.3333e-4"><i>m⁴</i></span></label>
+          <label class="f"><span class="lbl">Área A</span><span class="inp"><input id="Av" type="text" inputmode="decimal" value="0.04"><i data-u="A">m²</i></span></label>
+          <label class="f"><span class="lbl">Inercia I</span><span class="inp"><input id="Iv" type="text" inputmode="decimal" value="1.3333e-4"><i data-u="I">m⁴</i></span></label>
         </div>
 
         <p class="readgeo" id="readgeo"></p>
@@ -260,8 +281,8 @@
               <option value="custom">Personalizado</option>
             </select>
           </label>
-          <label class="f"><span class="lbl">Módulo E</span><span class="inp"><input id="E" type="text" inputmode="decimal" value="2e8"><i>kN/m²</i></span></label>
-          <label class="f"><span class="lbl">Longitud L</span><span class="inp"><input id="L" type="text" inputmode="decimal" value="3"><i>m</i></span></label>
+          <label class="f"><span class="lbl">Módulo E</span><span class="inp"><input id="E" type="text" inputmode="decimal" value="2e8"><i data-u="E">kN/m²</i></span></label>
+          <label class="f"><span class="lbl">Longitud L</span><span class="inp"><input id="L" type="text" inputmode="decimal" value="3"><i data-u="L">m</i></span></label>
           <div class="f"><span class="lbl conayuda"><label for="n">N° de elementos</label><button type="button" class="info" aria-label="Más información sobre el número de elementos" aria-expanded="false" data-info="Entero entre 1 y 100. Con más elementos el resultado es más preciso, sobre todo en los modos superiores.">i</button></span><span class="inp"><input id="n" type="text" inputmode="numeric" value="10"></span></div>
         </div>
         <p class="note" style="margin-top:10px">Los campos aceptan operaciones: 0.2*1.5, 2^3, sqrt(2), pi/4, 2e8. Se evalúan al salir del campo o con Enter.</p>
@@ -316,7 +337,7 @@
   <section class="panel readout" aria-label="Resultados" aria-live="polite">
     <div class="pcr">
       <h2 class="cap">Carga crítica Pcr</h2>
-      <div class="val"><output id="pcr">—</output><span class="u">kN</span></div>
+      <div class="val"><output id="pcr">—</output><span class="u" id="uP">kN</span></div>
     </div>
     <dl class="stats">
       <div><dt>Factor de longitud efectiva K</dt><dd id="sK">—</dd></div>
@@ -680,6 +701,34 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
 (function () {
   const $ = id => document.getElementById(id);
   const estado = { res: null, modo: 0, L: 3 };
+
+  /* ---------- Sistemas de unidades ----------
+     lm = metros por unidad de longitud, fk = kN por unidad de fuerza.
+     El cálculo interno es siempre en m y kN; los campos y resultados usan el sistema elegido. */
+  const UNIDADES = {
+    'si-m-kn':    { L: 'm',  F: 'kN',  S: 'kN/m²',   lm: 1,      fk: 1 },
+    'si-mm-n':    { L: 'mm', F: 'N',   S: 'MPa',     lm: 0.001,  fk: 0.001 },
+    'si-cm-kn':   { L: 'cm', F: 'kN',  S: 'kN/cm²',  lm: 0.01,   fk: 1 },
+    'tec-m-tf':   { L: 'm',  F: 'tf',  S: 'tf/m²',   lm: 1,      fk: 9.80665 },
+    'tec-cm-kgf': { L: 'cm', F: 'kgf', S: 'kgf/cm²', lm: 0.01,   fk: 0.00980665 },
+    'imp-in-kip': { L: 'in', F: 'kip', S: 'ksi',     lm: 0.0254, fk: 4.4482216152605 },
+    'imp-ft-kip': { L: 'ft', F: 'kip', S: 'kip/ft²', lm: 0.3048, fk: 4.4482216152605 },
+    'imp-in-lb':  { L: 'in', F: 'lb',  S: 'psi',     lm: 0.0254, fk: 0.0044482216152605 }
+  };
+  const CAMPOS_LONG = ['b', 'h', 't', 'D', 'di', 'Bi', 'Hi', 'tf', 'tw', 'L'];
+  let uni = UNIDADES['si-m-kn'];          // los valores iniciales de los campos están en m y kN
+  // Redondea a 'sig' cifras; si el valor está a menos de 1e-7 de uno de 6 cifras (ida y vuelta de unidades), usa ese
+  const fmtNum = (x, sig = 9) => {
+    const fino = Number(x.toPrecision(sig)), corto = Number(x.toPrecision(6));
+    return String(Math.abs(corto - x) <= 1e-7 * Math.abs(x) ? corto : fino);
+  };
+  const factorE = s => s.fk / (s.lm * s.lm);            // (unidad de esfuerzo) → kN/m²
+  const eUsuario = kNm2 => kNm2 / factorE(uni);          // kN/m² → unidad de esfuerzo actual
+  function rotularUnidades() {
+    const m = { L: uni.L, A: uni.L + '²', I: uni.L + '⁴', E: uni.S };
+    document.querySelectorAll('[data-u]').forEach(e => { e.textContent = m[e.dataset.u]; });
+    $('uP').textContent = uni.F;
+  }
   const ETQ = { b: 'b', h: 'h', t: 't', D: 'D', di: 'di', Bi: 'B', Hi: 'H', tf: 'tf', tw: 'tw', Av: 'A', Iv: 'I', E: 'Módulo E', L: 'Longitud L', n: 'N° de elementos' };
   const SUP = { '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
 
@@ -760,8 +809,31 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
   function sincronizarMaterial() {
     const v = evaluarMatematica($('E').value);
     const sel = $('mat');
-    const op = Array.from(sel.options).find(o => o.value !== 'custom' && Number(o.value) === v);
+    const op = v === null ? null : Array.from(sel.options).find(o => {
+      if (o.value === 'custom') return false;
+      const ref = eUsuario(Number(o.value));
+      return Math.abs(v - ref) <= 1e-5 * ref;
+    });
     sel.value = op ? op.value : 'custom';
+  }
+
+  /* ---------- Cambio de unidades: convierte el contenido de los campos ---------- */
+  function cambiarUnidades(id) {
+    const nueva = UNIDADES[id];
+    if (!nueva || nueva === uni) return;
+    const a = uni.lm / nueva.lm;                         // longitud: unidad vieja → nueva
+    const fE = factorE(uni) / factorE(nueva);            // esfuerzo: unidad vieja → nueva
+    const conv = (campo, f) => { const el = $(campo), v = evaluarMatematica(el.value); if (v !== null) el.value = fmtNum(v * f); };
+    CAMPOS_LONG.forEach(c => conv(c, a));
+    conv('Av', a * a);
+    conv('Iv', a ** 4);
+    const preset = $('mat').value !== 'custom';
+    if (!preset) conv('E', fE);
+    uni = nueva;
+    if (preset) $('E').value = fmtNum(eUsuario(Number($('mat').value)), 7);
+    rotularUnidades();
+    try { localStorage.setItem('pandeo-unidades', id); } catch (e) { /* sin almacenamiento */ }
+    recalcular();
   }
 
   /* ---------- Apoyos ---------- */
@@ -785,7 +857,7 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
   function recalcular() {
     const g = geometria();
     const E = leerCampo('E'), L = leerCampo('L'), nn = leerCampo('n');
-    $('readgeo').innerHTML = g.A ? `A = <b>${fmtSci(g.A)}</b> m² · I = <b>${fmtSci(g.I)}</b> m⁴` : '';
+    $('readgeo').innerHTML = g.A ? `A = <b>${fmtSci(g.A)}</b> ${uni.L}² · I = <b>${fmtSci(g.I)}</b> ${uni.L}⁴` : '';
     if (L > 0) estado.L = L;
 
     let error = null;
@@ -797,7 +869,8 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
     let res = null;
     if (!error) {
       try {
-        res = pandeo({ E, A: g.A, I: g.I, L, n: Math.trunc(nn), b1: flags(1), b2: flags(2), nModos: 3 });
+        // El cálculo interno se hace en m y kN
+        res = pandeo({ E: E * factorE(uni), A: g.A * uni.lm ** 2, I: g.I * uni.lm ** 4, L: L * uni.lm, n: Math.trunc(nn), b1: flags(1), b2: flags(2), nModos: 3 });
       } catch (e) { res = { ok: false, msg: 'No se pudo completar el cálculo. Revise los datos.' }; }
       if (!res.ok) error = res.msg;
     }
@@ -810,12 +883,16 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
       estado.modo = Math.min(estado.modo, res.modos.length - 1);
       const m = res.modos[0];
       const Le = m.K * L, r = Math.sqrt(g.I / g.A);
-      $('pcr').textContent = fmtP(m.P);
+      const P = m.P / uni.fk;                                   // Pcr en la unidad de fuerza elegida
+      const sigMPa = m.P / (g.A * uni.lm ** 2) / 1000;          // kN/m² → MPa
+      $('pcr').textContent = fmtP(P);
       $('sK').innerHTML = celda(m.K.toFixed(3));
-      $('sLe').innerHTML = celda(fmtSci(Le), 'm');
-      $('sR').innerHTML = celda(fmtSci(r), 'm');
+      $('sLe').innerHTML = celda(fmtSci(Le), uni.L);
+      $('sR').innerHTML = celda(fmtSci(r), uni.L);
       $('sEsb').innerHTML = celda((Le / r).toFixed(1));
-      $('sSig').innerHTML = celda(Number((m.P / g.A / 1000).toPrecision(4)).toLocaleString('en-US'), 'MPa');
+      let htmlSig = celda(Number((P / g.A).toPrecision(4)).toLocaleString('en-US'), uni.S);
+      if (uni.S !== 'MPa') htmlSig += `<br><small>= ${Number(sigMPa.toPrecision(4)).toLocaleString('en-US')} MPa</small>`;
+      $('sSig').innerHTML = htmlSig;
     }
     renderTabs();
     dibujar();
@@ -830,7 +907,7 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'tab';
       b.setAttribute('aria-pressed', String(i === estado.modo));
-      b.innerHTML = `<span>Modo ${i + 1}</span><b>${fmtP(m.P)} kN</b>`;
+      b.innerHTML = `<span>Modo ${i + 1}</span><b>${fmtP(m.P / uni.fk)} ${uni.F}</b>`;
       b.addEventListener('click', () => {
         estado.modo = i;
         box.querySelectorAll('.tab').forEach((t, j) => t.setAttribute('aria-pressed', String(j === i)));
@@ -875,7 +952,7 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
       const y = y0 - t * H;
       s += `<line class="g" x1="52" x2="430" y1="${y}" y2="${y}"/><text class="tx" x="46" y="${y + 4}" text-anchor="end">${(t * L).toFixed(2)}</text>`;
     }
-    s += `<text class="tx" x="46" y="${y1 - 18}" text-anchor="end">x [m]</text>`;
+    s += `<text class="tx" x="46" y="${y1 - 18}" text-anchor="end">x [${uni.L}]</text>`;
 
     const xb = m ? cx + m.vn[0] * esc : cx;
     const xt = m ? cx + m.vn[m.vn.length - 1] * esc : cx;
@@ -993,14 +1070,19 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
   ['hr', 'hc'].forEach(id => $(id).addEventListener('change', () => { habilitarHuecos(); recalcular(); }));
   ['bc1', 'bc2'].forEach(id => $(id).addEventListener('change', () => { actualizarRestricciones(); recalcular(); }));
   ['b1ux', 'b1uy', 'b1th', 'b2ux', 'b2uy', 'b2th'].forEach(id => $(id).addEventListener('change', recalcular));
-  $('mat').addEventListener('change', () => { if ($('mat').value !== 'custom') $('E').value = $('mat').value; recalcular(); });
+  $('mat').addEventListener('change', () => { if ($('mat').value !== 'custom') $('E').value = fmtNum(eUsuario(Number($('mat').value)), 7); recalcular(); });
+  $('unidades').addEventListener('change', () => cambiarUnidades($('unidades').value));
   $('amp').addEventListener('input', () => { $('ampv').textContent = $('amp').value + ' %'; dibujar(); });
   $('nodos').addEventListener('change', dibujar);
 
   cambiarSeccion();
   habilitarHuecos();
   actualizarRestricciones();
-  recalcular();
+  rotularUnidades();
+  let guardada = null;
+  try { guardada = localStorage.getItem('pandeo-unidades'); } catch (e) { /* sin almacenamiento */ }
+  if (guardada && UNIDADES[guardada] && guardada !== 'si-m-kn') { $('unidades').value = guardada; cambiarUnidades(guardada); }
+  else recalcular();
 })();
 </script>
 </body>
