@@ -53,12 +53,19 @@ window.plotlyReady = new Promise(function(resolve, reject){
   .theme-sw input:checked + .track::after{transform:translateX(18px)}
   .theme-sw input:focus-visible + .track{outline:2px solid var(--accent);outline-offset:2px}
   header span{color:var(--muted);font-size:13px}
-  .app{display:grid;grid-template-columns:580px minmax(0,1fr) 330px;gap:12px;padding:12px;align-items:start}
+  .app{display:grid;grid-template-columns:340px minmax(0,1fr) 330px;gap:12px;padding:12px;align-items:start}
   .col{display:flex;flex-direction:column;gap:12px;min-width:0}
-  .col-left{display:grid;grid-template-columns:1fr 1fr;align-items:stretch}
-  @media (max-width:1500px){.app{grid-template-columns:580px minmax(0,1fr)}.col-right{grid-column:1 / -1;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}}
+  .tabcard{padding:10px 14px 14px}
+  .tablist{display:flex;gap:2px;border-bottom:1px solid var(--border);margin:0 -4px 12px}
+  .tab{flex:1;padding:8px 6px;border:0;border-bottom:2px solid transparent;border-radius:6px 6px 0 0;background:none;color:var(--muted);font:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:-1px}
+  .tab:hover{color:var(--text);border-color:var(--border);background:none}
+  .tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .tabpanel[hidden]{display:none}
+  .tabpanel .btns{margin-top:12px}
+  .col-left .err{margin-top:0}
+  @media (max-width:1500px){.app{grid-template-columns:340px minmax(0,1fr)}.col-right{grid-column:1 / -1;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}}
   @media (max-width:1050px){.app{grid-template-columns:1fr}}
-  @media (max-width:640px){.col-left{grid-template-columns:1fr}}
   .statusbar{position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;align-items:center;gap:16px;padding:8px 16px;background:var(--panel);border-top:1px solid var(--border);box-shadow:0 -4px 14px rgba(0,0,0,.08);min-height:52px}
   .sb-title{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:650;white-space:nowrap}
   .sb-items{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;min-width:0}
@@ -129,8 +136,9 @@ window.plotlyReady = new Promise(function(resolve, reject){
 <div class="app">
   <!-- Panel izquierdo: datos de entrada -->
   <div class="col col-left">
-    <div class="card">
-      <h2>Sección</h2>
+    <div class="card tabcard">
+      <div class="tablist" role="tablist" aria-label="Datos de entrada"><button type="button" role="tab" class="tab on" id="tSec-b" aria-controls="tSec" aria-selected="true" tabindex="0">Sección</button><button type="button" role="tab" class="tab" id="tRef-b" aria-controls="tRef" aria-selected="false" tabindex="-1">Refuerzo</button><button type="button" role="tab" class="tab" id="tSol-b" aria-controls="tSol" aria-selected="false" tabindex="-1">Cargas</button><button type="button" role="tab" class="tab" id="tVis-b" aria-controls="tVis" aria-selected="false" tabindex="-1">Vista</button></div>
+      <div class="tabpanel" role="tabpanel" id="tSec" aria-labelledby="tSec-b">
       <div id="sec"></div>
       <div class="rows">
         <label>b, horizontal (cm)<input type="number" id="b" value="60" min="10" step="1"></label>
@@ -140,10 +148,8 @@ window.plotlyReady = new Promise(function(resolve, reject){
           <select id="angStep"><option value="5">5°</option><option value="10" selected>10°</option><option value="15">15°</option></select>
         </label>
       </div>
-    </div>
-
-    <div class="card">
-      <h2>Refuerzo y materiales</h2>
+      </div>
+      <div class="tabpanel" role="tabpanel" id="tRef" aria-labelledby="tRef-b" hidden>
       <div class="rows">
         <label>Barras cara horiz. (nH)<input type="number" id="nH" value="4" min="2" step="1"></label>
         <label>Barras cara vert. (nV)<input type="number" id="nV" value="3" min="2" step="1"></label>
@@ -180,20 +186,16 @@ window.plotlyReady = new Promise(function(resolve, reject){
         <label>Tope φPn,máx (× φPo)<input type="number" id="capF" value="0.80" min="0.5" max="1" step="0.01"></label>
       </div>
       <div class="note">Tope ACI 318: 0.80 φPo (estribos). Tu código de Octave aplicaba 0.8 × 0.8 = 0.64; para reproducirlo pon 0.64.</div>
-    </div>
-
-    <div class="card">
-      <h2>Solicitación última</h2>
+      </div>
+      <div class="tabpanel" role="tabpanel" id="tSol" aria-labelledby="tSol-b" hidden>
       <div class="rows">
         <label>Pu (kN)<input type="number" id="Pu" value="1000" step="10"></label>
         <label>Mux (kN·m)<input type="number" id="Mux" value="100" step="5"></label>
         <label>Muy (kN·m)<input type="number" id="Muy" value="50" step="5"></label>
       </div>
       <div class="note">Mx = momento por excentricidad en la dirección horizontal (b); My = en la vertical (h).</div>
-    </div>
-
-    <div class="card">
-      <h2>Vista</h2>
+      </div>
+      <div class="tabpanel" role="tabpanel" id="tVis" aria-labelledby="tVis-b" hidden>
       <div class="checks">
         <label><input type="checkbox" id="vDesign" checked> Superficie de diseño (φ)</label>
         <label><input type="checkbox" id="vNominal" checked> Superficie nominal (sin φ)</label>
@@ -206,8 +208,10 @@ window.plotlyReady = new Promise(function(resolve, reject){
         <button id="btnCam" type="button">Restablecer cámara</button>
         <button id="btnCsv" type="button">Exportar CSV</button>
       </div>
-      <div class="err" id="err"></div>
+
+      </div>
     </div>
+    <div class="err" id="err"></div>
   </div>
 
   <!-- Panel central: gráfica -->
@@ -652,6 +656,32 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e =
   let saved = null; try { saved = localStorage.getItem('porticad-theme'); } catch (_) {}
   if (!saved) applyTheme(e.matches ? 'dark' : 'light', false);
 });
+
+
+// ---------- Pestañas del panel izquierdo ----------
+(function(){
+  const tabs = Array.from(document.querySelectorAll('.tablist .tab'));
+  function select(i, focus){
+    tabs.forEach((t, k) => {
+      const on = k === i;
+      t.classList.toggle('on', on); t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+    if (focus) tabs[i].focus();
+    try { localStorage.setItem('porticad-biaxial-tab', i); } catch (e) {}
+  }
+  tabs.forEach((t, i) => {
+    t.addEventListener('click', () => select(i));
+    t.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight') { e.preventDefault(); select((i + 1) % tabs.length, true); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); select((i + tabs.length - 1) % tabs.length, true); }
+      else if (e.key === 'Home') { e.preventDefault(); select(0, true); }
+      else if (e.key === 'End') { e.preventDefault(); select(tabs.length - 1, true); }
+    });
+  });
+  let saved = 0; try { saved = parseInt(localStorage.getItem('porticad-biaxial-tab'), 10) || 0; } catch (e) {}
+  if (saved > 0 && saved < tabs.length) select(saved);
+})();
 
 function showFatal(msg){
   const el = $('err'); el.style.display = 'block';
