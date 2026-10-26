@@ -62,6 +62,11 @@ window.plotlyReady = new Promise(function(resolve, reject){
   .tab.on{color:var(--accent);border-bottom-color:var(--accent)}
   .tab:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   .tabpanel[hidden]{display:none}
+  .tab{padding:8px 3px;font-size:12.5px}
+  .sliders{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+  .slh{display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px}
+  .slh b{font-variant-numeric:tabular-nums;font-weight:600;color:var(--accent)}
+  input[type=range]{width:100%;accent-color:var(--accent)}
   .tabpanel .btns{margin-top:12px}
   .col-left .err{margin-top:0}
   @media (max-width:1500px){.app{grid-template-columns:340px minmax(0,1fr)}.col-right{grid-column:1 / -1;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}}
@@ -156,7 +161,7 @@ window.plotlyReady = new Promise(function(resolve, reject){
   <!-- Panel izquierdo: datos de entrada -->
   <div class="col col-left">
     <div class="card tabcard">
-      <div class="tablist" role="tablist" aria-label="Datos de entrada"><button type="button" role="tab" class="tab on" id="tSec-b" aria-controls="tSec" aria-selected="true" tabindex="0">Sección</button><button type="button" role="tab" class="tab" id="tRef-b" aria-controls="tRef" aria-selected="false" tabindex="-1">Refuerzo</button><button type="button" role="tab" class="tab" id="tSol-b" aria-controls="tSol" aria-selected="false" tabindex="-1">Cargas</button><button type="button" role="tab" class="tab" id="tVis-b" aria-controls="tVis" aria-selected="false" tabindex="-1">Vista</button></div>
+      <div class="tablist" role="tablist" aria-label="Datos de entrada"><button type="button" role="tab" class="tab on" id="tSec-b" aria-controls="tSec" aria-selected="true" tabindex="0">Sección</button><button type="button" role="tab" class="tab" id="tRef-b" aria-controls="tRef" aria-selected="false" tabindex="-1">Refuerzo</button><button type="button" role="tab" class="tab" id="tSol-b" aria-controls="tSol" aria-selected="false" tabindex="-1">Cargas</button><button type="button" role="tab" class="tab" id="tVis-b" aria-controls="tVis" aria-selected="false" tabindex="-1">Vista</button><button type="button" role="tab" class="tab" id="tEje-b" aria-controls="tEje" aria-selected="false" tabindex="-1">Ejes</button></div>
       <div class="tabpanel" role="tabpanel" id="tSec" aria-labelledby="tSec-b">
       <div id="sec"></div>
       <div class="rows">
@@ -228,6 +233,46 @@ window.plotlyReady = new Promise(function(resolve, reject){
         <button id="btnCsv" type="button">Exportar CSV</button>
       </div>
 
+      </div>
+      <div class="tabpanel" role="tabpanel" id="tEje" aria-labelledby="tEje-b" hidden>
+        <div class="rows">
+          <label>Modo de visualización
+            <select id="axMode" style="width:170px">
+              <option value="std">Estándar</option>
+              <option value="fit">Ajustado al diseño</option>
+              <option value="wide">Ampliado</option>
+              <option value="cube">Cubo</option>
+              <option value="tall">Alto</option>
+              <option value="data">Escala real</option>
+              <option value="custom" disabled>Personalizado</option>
+            </select>
+          </label>
+          <label>Rango base
+            <select id="axBase" style="width:170px"><option value="nom">Todo (nominal)</option><option value="dis">Solo diseño</option></select>
+          </label>
+        </div>
+        <div class="sliders">
+          <div class="slr"><div class="slh"><span>Extensión de Mx y My</span><b id="axSMv">100 %</b></div><input type="range" id="axSM" min="30" max="250" step="5" value="100"></div>
+          <div class="slr"><div class="slh"><span>Extensión del eje P</span><b id="axSPv">100 %</b></div><input type="range" id="axSP" min="30" max="250" step="5" value="100"></div>
+          <div class="slr"><div class="slh"><span>Altura de la caja (P)</span><b id="axAspv">1.10</b></div><input type="range" id="axAsp" min="0.4" max="2.5" step="0.05" value="1.1"></div>
+        </div>
+        <div class="checks" style="margin-top:10px">
+          <label><input type="checkbox" id="axData"> Escala real (misma unidad en los tres ejes)</label>
+          <label><input type="checkbox" id="axGrid" checked> Malla de los ejes</label>
+          <label><input type="checkbox" id="axBg"> Planos de fondo</label>
+          <label><input type="checkbox" id="axTicks" checked> Números de los ejes</label>
+          <label><input type="checkbox" id="axZero" checked> Líneas de los ejes en el origen</label>
+        </div>
+        <div class="rows" style="margin-top:10px">
+          <label>Paso de malla M (kN·m)
+            <select id="axStepM"><option value="auto">Auto</option><option>50</option><option>100</option><option>200</option><option>250</option><option>500</option></select>
+          </label>
+          <label>Paso de malla P (kN)
+            <select id="axStepP"><option value="auto">Auto</option><option>250</option><option>500</option><option>1000</option><option>2000</option></select>
+          </label>
+        </div>
+        <div class="btns"><button id="btnAxReset" type="button">Restablecer ejes</button></div>
+        <div class="note">La malla, los números y las líneas también se aplican a los cortes.</div>
       </div>
     </div>
     <div class="err" id="err"></div>
@@ -501,8 +546,16 @@ function wireframe(){
 }
 
 function renderPlot3D(){
-  const vm = Math.max(...D.NX.flat().map(Math.abs), ...D.NY.flat().map(Math.abs)) * 1.05;
-  const zmin = Math.min(...D.NZ.flat(), 0), zmax = Math.max(...D.NZ.flat()) * 1.08;
+  const o = axRead();
+  let vm, zlo, zhi;
+  if (o.base === 'dis') {
+    vm = Math.max(...D.X.flat().map(Math.abs), ...D.Y.flat().map(Math.abs)) * 1.1;
+    zlo = Math.min(...D.Z.flat(), 0) * 1.1; zhi = D.capMax * 1.08;
+  } else {
+    vm = Math.max(...D.NX.flat().map(Math.abs), ...D.NY.flat().map(Math.abs)) * 1.05;
+    zlo = Math.min(...D.NZ.flat(), 0) * 1.05; zhi = Math.max(...D.NZ.flat()) * 1.08;
+  }
+  vm *= o.sM / 100; zhi *= o.sP / 100;
   const traces = [];
 
   traces.push({
@@ -534,18 +587,20 @@ function renderPlot3D(){
     visible: $('vDemand').checked,
     hovertemplate: '<b>Demanda</b><br>Mux: %{x:,.1f} kN·m<br>Muy: %{y:,.1f} kN·m<br>Pu: %{z:,.1f} kN<extra></extra>' });
 
-  const ax = (title, range) => ({
+  const ax = (title, range, step) => ({
     title: { text: title, font: { color: css('--text'), size: 13 } }, range,
-    gridcolor: css('--grid'), zerolinecolor: css('--text'), zerolinewidth: 3, linecolor: css('--grid'),
-    tickfont: { color: css('--muted'), size: 10 }, backgroundcolor: 'rgba(0,0,0,0)', showbackground: false, separatethousands: true
+    showgrid: o.grid, gridcolor: css('--grid'), zeroline: o.zero, zerolinecolor: css('--text'), zerolinewidth: 3, linecolor: css('--grid'),
+    showticklabels: o.ticks, tickfont: { color: css('--muted'), size: 10 },
+    backgroundcolor: css('--grid'), showbackground: o.bg, separatethousands: true,
+    ...(step !== 'auto' ? { dtick: parseFloat(step), tickmode: 'linear', tick0: 0 } : {})
   });
   const layout = {
     paper_bgcolor: 'rgba(0,0,0,0)', margin: { l: 0, r: 0, t: 10, b: 0 }, uirevision: 'keep',
     legend: { orientation: 'h', x: 0.01, y: 0.99, font: { color: css('--text') } },
     hoverlabel: { font: { size: 13 }, align: 'left' },
     scene: {
-      xaxis: ax('φMx (kN·m)', [-vm, vm]), yaxis: ax('φMy (kN·m)', [-vm, vm]), zaxis: ax('φPn (kN)', [zmin * 1.05, zmax]),
-      aspectmode: 'manual', aspectratio: { x: 1, y: 1, z: 1.1 },
+      xaxis: ax('φMx (kN·m)', [-vm, vm], o.stepM), yaxis: ax('φMy (kN·m)', [-vm, vm], o.stepM), zaxis: ax('φPn (kN)', [zlo, zhi], o.stepP),
+      ...(o.data ? { aspectmode: 'data' } : { aspectmode: 'manual', aspectratio: { x: 1, y: 1, z: o.asp } }),
       camera: window.__cam || { eye: { x: 1.55, y: -1.65, z: 0.95 } }
     }
   };
@@ -689,8 +744,9 @@ function cutSpec(key, big){
     const mx = Math.max(...c.x.map(Math.abs), mu) * 1.12, py0 = Math.min(...c.z), py1 = Math.max(...c.z), pp = (py1 - py0) * 0.06;
     rng = { x: [-mx, mx], y: [Math.min(py0, 0) - pp, py1 + pp] };
   }
-  const ax = t => ({ title: { text: big ? t : '', font: { color: txt, size: fs + 1 } }, gridcolor: grid, zerolinecolor: mut, linecolor: grid,
-    tickfont: { color: mut, size: fs }, automargin: true });
+  const ao = axRead();
+  const ax = t => ({ title: { text: big ? t : '', font: { color: txt, size: fs + 1 } }, showgrid: ao.grid, gridcolor: grid, zeroline: ao.zero, zerolinecolor: mut, linecolor: grid,
+    showticklabels: ao.ticks, tickfont: { color: mut, size: fs }, automargin: true });
   const layout = {
     paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: txt },
     margin: big ? { l: 70, r: 20, t: 10, b: 60 } : { l: 44, r: 10, t: 8, b: 30 },
@@ -844,6 +900,62 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e =
   if (!saved) applyTheme(e.matches ? 'dark' : 'light', false);
 });
 
+
+
+// ---------- Ejes y mallas ----------
+const AXDEF = { mode: 'std', base: 'nom', sM: 100, sP: 100, asp: 1.1, data: false, grid: true, bg: false, ticks: true, zero: true, stepM: 'auto', stepP: 'auto' };
+const AXMODES = {
+  std:  { base: 'nom', sM: 100, sP: 100, asp: 1.1, data: false },
+  fit:  { base: 'dis', sM: 100, sP: 100, asp: 1.1, data: false },
+  wide: { base: 'nom', sM: 150, sP: 130, asp: 1.1, data: false },
+  cube: { base: 'nom', sM: 100, sP: 100, asp: 1.0, data: false },
+  tall: { base: 'nom', sM: 100, sP: 100, asp: 1.9, data: false },
+  data: { base: 'nom', sM: 100, sP: 100, asp: 1.1, data: true }
+};
+function axRead(){
+  const g = id => $(id);
+  return {
+    mode: g('axMode').value, base: g('axBase').value,
+    sM: parseFloat(g('axSM').value), sP: parseFloat(g('axSP').value), asp: parseFloat(g('axAsp').value),
+    data: g('axData').checked, grid: g('axGrid').checked, bg: g('axBg').checked, ticks: g('axTicks').checked, zero: g('axZero').checked,
+    stepM: g('axStepM').value, stepP: g('axStepP').value
+  };
+}
+function axWrite(o){
+  $('axMode').value = o.mode; $('axBase').value = o.base;
+  $('axSM').value = o.sM; $('axSP').value = o.sP; $('axAsp').value = o.asp;
+  $('axData').checked = o.data; $('axGrid').checked = o.grid; $('axBg').checked = o.bg; $('axTicks').checked = o.ticks; $('axZero').checked = o.zero;
+  $('axStepM').value = o.stepM; $('axStepP').value = o.stepP;
+  axLabels();
+}
+function axLabels(){
+  $('axSMv').textContent = $('axSM').value + ' %'; $('axSPv').textContent = $('axSP').value + ' %';
+  $('axAspv').textContent = parseFloat($('axAsp').value).toFixed(2);
+  $('axAsp').disabled = $('axData').checked;
+}
+function axSave(){ try { localStorage.setItem('porticad-biaxial-axes', JSON.stringify(axRead())); } catch (e) {} }
+function axApply(cutsToo){
+  axLabels(); axSave();
+  if (D) { renderPlot3D(); if (cutsToo) renderPlot2D(); }
+}
+$('axMode').addEventListener('change', () => {
+  const m = AXMODES[$('axMode').value]; if (!m) return;
+  axWrite(Object.assign(axRead(), m, { mode: $('axMode').value }));
+  axApply(false);
+  // aleja la cámara cuando la caja es muy alta para que se vea completa
+  const k = { data: 2.7, tall: 1.3 }[$('axMode').value] || 1;
+  Plotly.relayout('plot3d', { 'scene.camera': { eye: { x: 1.55 * k, y: -1.65 * k, z: 0.95 * k }, up: { x: 0, y: 0, z: 1 }, center: { x: 0, y: 0, z: 0 } } });
+});
+['axBase','axSM','axSP','axAsp','axData','axStepM','axStepP'].forEach(id => $(id).addEventListener('input', () => {
+  $('axMode').value = 'custom'; axApply(false);
+}));
+['axGrid','axBg','axTicks','axZero'].forEach(id => $(id).addEventListener('change', () => axApply(true)));
+$('btnAxReset').addEventListener('click', () => { axWrite(AXDEF); axApply(true); });
+(function(){
+  let o = null;
+  try { o = JSON.parse(localStorage.getItem('porticad-biaxial-axes')); } catch (e) {}
+  axWrite(Object.assign({}, AXDEF, (o && typeof o === 'object') ? o : {}));
+})();
 
 // ---------- Pestañas del panel izquierdo ----------
 (function(){
