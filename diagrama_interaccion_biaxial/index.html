@@ -104,7 +104,25 @@ window.plotlyReady = new Promise(function(resolve, reject){
   .err{display:none;margin-top:10px;padding:8px 10px;border-radius:8px;background:rgba(198,40,40,.12);color:var(--bad);font-size:13px}
   #plot3d{width:100%;height:calc(100vh - 235px);min-height:520px;max-height:900px}
   .below{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:14px}
-  #plot2d{width:100%;height:300px}
+  #plot2d{width:100%;height:240px}
+  .pills{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+  .pill{padding:4px 10px;border:1px solid var(--border);border-radius:999px;background:var(--bg);color:var(--muted);font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+  .pill:hover{border-color:var(--accent);color:var(--accent)}
+  .pill.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .pill:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .miniwrap{position:relative;cursor:zoom-in;border-radius:8px;border:1px solid var(--border);background:var(--bg)}
+  .miniwrap:hover{border-color:var(--accent)}
+  .miniwrap:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .miniwrap .expand{position:absolute;top:6px;right:8px;font-size:11px;font-weight:600;color:var(--muted);background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:2px 7px;pointer-events:none}
+  .miniwrap:hover .expand{color:var(--accent);border-color:var(--accent)}
+  .cutcap{color:var(--muted);font-size:12px;margin-top:8px;line-height:1.4}
+  .modal{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(8,12,18,.62)}
+  .modal[hidden]{display:none}
+  .modal-box{width:min(1150px,96vw);height:min(90vh,860px);display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 16px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  .modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .modal-head .pills{margin-bottom:6px}
+  .modal-title{font-size:17px;font-weight:650;margin:2px 0}
+  #cutBig{flex:1;min-height:0;margin-top:6px}
   #sec{margin-bottom:10px} #sec svg{width:100%;height:auto;max-height:230px;display:block}
   .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}
   .kv dt{color:var(--muted)} .kv dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
@@ -224,9 +242,26 @@ window.plotlyReady = new Promise(function(resolve, reject){
   <!-- Panel derecho: resultados -->
   <div class="col col-right">
     <div class="card">
-      <h2>Corte horizontal a Pu</h2>
-      <div id="plot2d"></div>
+      <h2>Cortes del diagrama</h2>
+      <div class="pills" id="cutTabs" role="tablist" aria-label="Cortes"></div>
+      <div class="miniwrap" id="miniWrap" role="button" tabindex="0" title="Clic para ampliar" aria-label="Ampliar el corte">
+        <div id="plot2d"></div>
+        <span class="expand">⤢ Ampliar</span>
+      </div>
+      <div class="cutcap" id="cutCap"></div>
     </div>
+  </div>
+</div>
+
+<div class="modal" id="cutModal" hidden role="dialog" aria-modal="true" aria-label="Corte ampliado">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="pills" id="modalTabs" role="tablist" aria-label="Cortes"></div>
+      <button type="button" id="cutClose" aria-label="Cerrar">Cerrar ✕</button>
+    </div>
+    <div class="modal-title" id="modalTitle"></div>
+    <div class="cutcap" id="modalCap"></div>
+    <div id="cutBig"></div>
   </div>
 </div>
 
@@ -547,25 +582,160 @@ function bindHover(gd){
   gd.on('plotly_unhover', () => {});
 }
 
-// ---------- 2D: corte a Pu ----------
-function renderPlot2D(){
-  const traces = [];
-  if (SL.ok) {
-    traces.push({ type: 'scatter', mode: 'lines', x: SL.pts.map(q => q[0]), y: SL.pts.map(q => q[1]), fill: 'toself',
-      fillcolor: 'rgba(31,111,235,.14)', line: { color: css('--accent'), width: 2.5 }, name: 'φMn a Pu',
-      hovertemplate: 'φMx: %{x:,.1f} kN·m<br>φMy: %{y:,.1f} kN·m<extra>Capacidad</extra>' });
-  }
-  traces.push({ type: 'scatter', mode: 'markers', x: [P.Mux], y: [P.Muy], name: 'Demanda',
-    marker: { size: 11, color: '#e5334b', symbol: 'diamond', line: { color: '#fff', width: 1 } },
-    hovertemplate: 'Mux: %{x:,.1f} kN·m<br>Muy: %{y:,.1f} kN·m<extra>Demanda</extra>' });
-  const layout = {
-    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', margin: { l: 52, r: 12, t: 8, b: 44 },
-    showlegend: false, font: { color: css('--text') },
-    xaxis: { title: 'φMx (kN·m)', gridcolor: css('--grid'), zerolinecolor: css('--muted'), tickfont: { color: css('--muted') } },
-    yaxis: { title: 'φMy (kN·m)', gridcolor: css('--grid'), zerolinecolor: css('--muted'), tickfont: { color: css('--muted') }, scaleanchor: 'x', scaleratio: 1 }
-  };
-  Plotly.react('plot2d', traces, layout, { responsive: true, displaylogo: false, displayModeBar: false });
+// ---------- Cortes del diagrama (mini + ampliado) ----------
+const CUTS = [
+  { k: 'pu',  tab: 'A Pu',    title: 'Corte horizontal a Pu (φMx – φMy)',
+    cap: 'Contorno de capacidad φMx–φMy al nivel de la carga axial Pu. Si la demanda (♦) queda dentro del contorno, la sección cumple.' },
+  { k: 'mxp', tab: 'Mx–P',    title: 'Corte vertical con My = 0 (φMx – φPn)',
+    cap: 'Plano My = 0: flexión uniaxial en la dirección x. Es la curva P–M clásica; en trazo punteado la nominal (sin φ).' },
+  { k: 'myp', tab: 'My–P',    title: 'Corte vertical con Mx = 0 (φMy – φPn)',
+    cap: 'Plano Mx = 0: flexión uniaxial en la dirección y, con la misma lectura que el corte Mx–P.' },
+  { k: 'dir', tab: 'Dir. Mu', title: 'Corte vertical en la dirección del momento Mu',
+    cap: 'Plano vertical que contiene la dirección de Mu. Muestra la capacidad real en la dirección de la demanda: la relación entre ◆ y ● es la relación demanda/capacidad.' },
+  { k: 'p0',  tab: 'P = 0',   title: 'Corte horizontal a P = 0 (flexión pura)',
+    cap: 'Capacidad a flexión pura (sin carga axial). El contorno punteado es el de Pu, para ver cuánto lo reduce la compresión.' }
+];
+let curCut = 'pu';
+
+function meridianCurve(arrX, jA, jB){
+  const x = [], z = [];
+  for (let k = 0; k < D.NC; k++) { x.push(arrX[k][jA]); z.push(D.Z[k][jA]); }
+  for (let k = D.NC - 1; k >= 0; k--) { x.push(arrX[k][jB]); z.push(D.Z[k][jB]); }
+  x.push(x[0]); z.push(z[0]);
+  return { x, z };
 }
+function meridianNominal(arrX, jA, jB){
+  const x = [], z = [];
+  for (let k = 0; k < D.NC; k++) { x.push(arrX[k][jA]); z.push(D.NZ[k][jA]); }
+  for (let k = D.NC - 1; k >= 0; k--) { x.push(arrX[k][jB]); z.push(D.NZ[k][jB]); }
+  x.push(x[0]); z.push(z[0]);
+  return { x, z };
+}
+function dirCurve(ux, uy){
+  let lo = -Infinity, hi = Infinity;
+  for (let j = 0; j < D.NJ; j++) {
+    lo = Math.max(lo, Math.min(...D.Z.map(r => r[j])));
+    hi = Math.min(hi, Math.max(...D.Z.map(r => r[j])));
+  }
+  const pos = [], neg = [], L = 80;
+  for (let i = 0; i < L; i++) {
+    const Pl = lo + (hi - lo) * i / (L - 1);
+    const sl = sliceAt(D, Pl);
+    if (!sl.ok) continue;
+    const rp = rayCapacity(sl.pts, ux, uy), rn = rayCapacity(sl.pts, -ux, -uy);
+    if (rp === null || rn === null) continue;
+    pos.push([rp, Pl]); neg.push([-rn, Pl]);
+  }
+  if (!pos.length) return null;
+  const pts = [[0, lo], ...pos, [0, hi], ...neg.slice().reverse(), [0, lo]];
+  return { x: pts.map(q => q[0]), z: pts.map(q => q[1]) };
+}
+
+function cutSpec(key, big){
+  const txt = css('--text'), mut = css('--muted'), grid = css('--grid'), acc = css('--accent');
+  const fs = big ? 13 : 10;
+  const demand = (x, y, name, hov) => ({ type: 'scatter', mode: 'markers', x: [x], y: [y], name,
+    marker: { size: big ? 13 : 9, color: '#e5334b', symbol: 'diamond', line: { color: '#fff', width: 1 } }, hovertemplate: hov });
+  const curve = (x, y, name, hov) => ({ type: 'scatter', mode: 'lines', x, y, name, fill: 'toself', fillcolor: 'rgba(31,111,235,.14)',
+    line: { color: acc, width: big ? 3 : 2.2 }, hovertemplate: hov });
+  const mu = Math.hypot(P.Mux, P.Muy);
+  const traces = []; let xt, yt, equal = false, note = null;
+
+  if (key === 'pu' || key === 'p0') {
+    const lvl = key === 'pu' ? P.Pu : 0, sl = key === 'pu' ? SL : sliceAt(D, 0);
+    if (!sl.ok) return { msg: 'No se pudo trazar este corte con los datos actuales.' };
+    traces.push(curve(sl.pts.map(q => q[0]), sl.pts.map(q => q[1]), key === 'pu' ? 'φMn a Pu' : 'φMn a P = 0',
+      'φMx: %{x:,.1f} kN·m<br>φMy: %{y:,.1f} kN·m<extra>Capacidad</extra>'));
+    if (key === 'p0' && SL.ok) traces.push({ type: 'scatter', mode: 'lines', x: SL.pts.map(q => q[0]), y: SL.pts.map(q => q[1]), name: 'Contorno a Pu',
+      line: { color: mut, width: big ? 2 : 1.5, dash: 'dash' }, hovertemplate: 'φMx: %{x:,.1f}<br>φMy: %{y:,.1f}<extra>Contorno a Pu</extra>' });
+    if (key === 'pu') {
+      const r = mu > 1e-9 ? rayCapacity(sl.pts, P.Mux, P.Muy) : null;
+      if (r !== null) {
+        traces.push({ type: 'scatter', mode: 'lines', x: [0, P.Mux * r], y: [0, P.Muy * r], name: 'Dirección de Mu', line: { color: mut, width: 1, dash: 'dot' }, hoverinfo: 'skip' });
+        traces.push({ type: 'scatter', mode: 'markers', x: [P.Mux * r], y: [P.Muy * r], name: 'Capacidad en dir. Mu',
+          marker: { size: big ? 11 : 7, color: '#ff9f1c', line: { color: '#fff', width: 1 } },
+          hovertemplate: 'φMx: %{x:,.1f} kN·m<br>φMy: %{y:,.1f} kN·m<extra>Capacidad en la dirección de Mu</extra>' });
+      }
+      traces.push(demand(P.Mux, P.Muy, 'Demanda', 'Mux: %{x:,.1f} kN·m<br>Muy: %{y:,.1f} kN·m<extra>Demanda</extra>'));
+    }
+    xt = 'φMx (kN·m)'; yt = 'φMy (kN·m)'; equal = true;
+  } else if (key === 'mxp' || key === 'myp') {
+    const st = D.angles[1] - D.angles[0], isX = key === 'mxp';
+    const jA = Math.round((isX ? 0 : 90) / st), jB = Math.round((isX ? 180 : 270) / st);
+    const arr = isX ? D.X : D.Y, arrN = isX ? D.NX : D.NY, nm = isX ? 'Mx' : 'My';
+    const c = meridianCurve(arr, jA, jB), n = meridianNominal(arrN, jA, jB);
+    traces.push({ type: 'scatter', mode: 'lines', x: n.x, y: n.z, name: 'Nominal', line: { color: '#2a9d8f', width: big ? 2 : 1.4, dash: 'dash' },
+      hovertemplate: 'Mn: %{x:,.1f} kN·m<br>Pn: %{y:,.1f} kN<extra>Nominal</extra>' });
+    traces.push(curve(c.x, c.z, 'Diseño', 'φ' + nm + ': %{x:,.1f} kN·m<br>φPn: %{y:,.1f} kN<extra>Diseño</extra>'));
+    traces.push(demand(isX ? P.Mux : P.Muy, P.Pu, 'Demanda (proyección)', nm + 'u: %{x:,.1f} kN·m<br>Pu: %{y:,.1f} kN<extra>Demanda proyectada</extra>'));
+    xt = 'φ' + nm + ' (kN·m)'; yt = 'φPn (kN)';
+  } else if (key === 'dir') {
+    const ux = mu > 1e-9 ? P.Mux / mu : 1, uy = mu > 1e-9 ? P.Muy / mu : 0;
+    const c = dirCurve(ux, uy);
+    if (!c) return { msg: 'No se pudo trazar este corte con los datos actuales.' };
+    traces.push(curve(c.x, c.z, 'Capacidad', 'φM: %{x:,.1f} kN·m<br>φPn: %{y:,.1f} kN<extra>Capacidad</extra>'));
+    const r = SL.ok && mu > 1e-9 ? rayCapacity(SL.pts, ux, uy) : null;
+    if (r !== null) traces.push({ type: 'scatter', mode: 'markers', x: [r], y: [P.Pu], name: 'Capacidad a Pu',
+      marker: { size: big ? 11 : 7, color: '#ff9f1c', line: { color: '#fff', width: 1 } }, hovertemplate: 'φM: %{x:,.1f} kN·m<br>Pu: %{y:,.1f} kN<extra>Capacidad a Pu</extra>' });
+    traces.push(demand(mu, P.Pu, 'Demanda', 'Mu: %{x:,.1f} kN·m<br>Pu: %{y:,.1f} kN<extra>Demanda</extra>'));
+    const th = mu > 1e-9 ? Math.atan2(P.Muy, P.Mux) * 180 / Math.PI : 0;
+    xt = 'φM en dirección θ = ' + th.toFixed(1) + '° (kN·m)'; yt = 'φPn (kN)';
+  }
+  const ax = t => ({ title: { text: big ? t : '', font: { color: txt, size: fs + 1 } }, gridcolor: grid, zerolinecolor: mut, linecolor: grid,
+    tickfont: { color: mut, size: fs }, automargin: true });
+  const layout = {
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: txt },
+    margin: big ? { l: 70, r: 20, t: 10, b: 60 } : { l: 44, r: 10, t: 8, b: 30 },
+    showlegend: big, legend: { orientation: 'h', y: 1.06, x: 0, font: { size: 12 } },
+    xaxis: ax(xt), yaxis: Object.assign(ax(yt), equal ? { scaleanchor: 'x', scaleratio: 1 } : {}),
+    hoverlabel: { font: { size: 13 } }
+  };
+  return { traces, layout };
+}
+
+function plotCut(el, key, big){
+  const spec = cutSpec(key, big);
+  if (spec.msg) { Plotly.purge(el); el.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px">' + spec.msg + '</div>'; return; }
+  const cfg = big ? { responsive: true, displaylogo: false, toImageButtonOptions: { filename: 'corte_' + key, scale: 2 } }
+                  : { responsive: true, staticPlot: true };
+  if (!big) spec.traces.forEach(t => { t.hoverinfo = 'skip'; delete t.hovertemplate; });
+  Plotly.react(el, spec.traces, spec.layout, cfg);
+}
+
+function tabsHtml(){
+  return CUTS.map(c => `<button type="button" role="tab" class="pill${c.k === curCut ? ' on' : ''}" data-cut="${c.k}" aria-selected="${c.k === curCut}">${c.tab}</button>`).join('');
+}
+function modalOpen(){ return !$('cutModal').hidden; }
+function renderPlot2D(){
+  if (!D) return;
+  const cut = CUTS.find(c => c.k === curCut);
+  $('cutTabs').innerHTML = tabsHtml();
+  $('cutCap').textContent = cut.cap;
+  plotCut($('plot2d'), curCut, false);
+  if (modalOpen()) {
+    $('modalTabs').innerHTML = tabsHtml();
+    $('modalTitle').textContent = cut.title;
+    $('modalCap').textContent = cut.cap;
+    plotCut($('cutBig'), curCut, true);
+  }
+}
+function setCut(k){ curCut = k; renderPlot2D(); }
+function openCut(){
+  if (!D) return;
+  $('cutModal').hidden = false; document.body.style.overflow = 'hidden';
+  renderPlot2D(); $('cutClose').focus();
+}
+function closeCut(){
+  if (!modalOpen()) return;
+  Plotly.purge($('cutBig')); $('cutModal').hidden = true; document.body.style.overflow = '';
+  $('miniWrap').focus();
+}
+['cutTabs', 'modalTabs'].forEach(id => $(id).addEventListener('click', e => { const b = e.target.closest('[data-cut]'); if (b) setCut(b.dataset.cut); }));
+$('miniWrap').addEventListener('click', openCut);
+$('miniWrap').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCut(); } });
+$('cutClose').addEventListener('click', closeCut);
+$('cutModal').addEventListener('click', e => { if (e.target === $('cutModal')) closeCut(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCut(); });
 
 // ---------- Sección ----------
 function renderSection(){
