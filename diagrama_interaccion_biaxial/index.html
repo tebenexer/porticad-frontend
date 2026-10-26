@@ -123,6 +123,7 @@ window.plotlyReady = new Promise(function(resolve, reject){
   .modal-head .pills{margin-bottom:6px}
   .modal-title{font-size:17px;font-weight:650;margin:2px 0}
   #cutBig{flex:1;min-height:0;margin-top:6px}
+  .modal-box{overflow:hidden}
   #sec{margin-bottom:10px} #sec svg{width:100%;height:auto;max-height:230px;display:block}
   .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}
   .kv dt{color:var(--muted)} .kv dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
@@ -631,6 +632,11 @@ function dirCurve(ux, uy){
   return { x: pts.map(q => q[0]), z: pts.map(q => q[1]) };
 }
 
+function pairRanges(){
+  const m = Math.max(...D.NX.flat().map(Math.abs), ...D.NY.flat().map(Math.abs)) * 1.08;
+  const pmax = Math.max(...D.NZ.flat()), pmin = Math.min(...D.NZ.flat()), pad = (pmax - pmin) * 0.05;
+  return { x: [-m, m], y: [pmin - pad, pmax + pad] };
+}
 function cutSpec(key, big){
   const txt = css('--text'), mut = css('--muted'), grid = css('--grid'), acc = css('--accent');
   const fs = big ? 13 : 10;
@@ -639,7 +645,7 @@ function cutSpec(key, big){
   const curve = (x, y, name, hov) => ({ type: 'scatter', mode: 'lines', x, y, name, fill: 'toself', fillcolor: 'rgba(31,111,235,.14)',
     line: { color: acc, width: big ? 3 : 2.2 }, hovertemplate: hov });
   const mu = Math.hypot(P.Mux, P.Muy);
-  const traces = []; let xt, yt, equal = false, note = null;
+  const traces = []; let xt, yt, equal = false, rng = null;
 
   if (key === 'pu' || key === 'p0') {
     const lvl = key === 'pu' ? P.Pu : 0, sl = key === 'pu' ? SL : sliceAt(D, 0);
@@ -668,7 +674,7 @@ function cutSpec(key, big){
       hovertemplate: 'Mn: %{x:,.1f} kN·m<br>Pn: %{y:,.1f} kN<extra>Nominal</extra>' });
     traces.push(curve(c.x, c.z, 'Diseño', 'φ' + nm + ': %{x:,.1f} kN·m<br>φPn: %{y:,.1f} kN<extra>Diseño</extra>'));
     traces.push(demand(isX ? P.Mux : P.Muy, P.Pu, 'Demanda (proyección)', nm + 'u: %{x:,.1f} kN·m<br>Pu: %{y:,.1f} kN<extra>Demanda proyectada</extra>'));
-    xt = 'φ' + nm + ' (kN·m)'; yt = 'φPn (kN)';
+    xt = 'φ' + nm + ' (kN·m)'; yt = 'φPn (kN)'; rng = pairRanges();
   } else if (key === 'dir') {
     const ux = mu > 1e-9 ? P.Mux / mu : 1, uy = mu > 1e-9 ? P.Muy / mu : 0;
     const c = dirCurve(ux, uy);
@@ -680,6 +686,8 @@ function cutSpec(key, big){
     traces.push(demand(mu, P.Pu, 'Demanda', 'Mu: %{x:,.1f} kN·m<br>Pu: %{y:,.1f} kN<extra>Demanda</extra>'));
     const th = mu > 1e-9 ? Math.atan2(P.Muy, P.Mux) * 180 / Math.PI : 0;
     xt = 'φM en dirección θ = ' + th.toFixed(1) + '° (kN·m)'; yt = 'φPn (kN)';
+    const mx = Math.max(...c.x.map(Math.abs), mu) * 1.12, py0 = Math.min(...c.z), py1 = Math.max(...c.z), pp = (py1 - py0) * 0.06;
+    rng = { x: [-mx, mx], y: [Math.min(py0, 0) - pp, py1 + pp] };
   }
   const ax = t => ({ title: { text: big ? t : '', font: { color: txt, size: fs + 1 } }, gridcolor: grid, zerolinecolor: mut, linecolor: grid,
     tickfont: { color: mut, size: fs }, automargin: true });
@@ -687,15 +695,22 @@ function cutSpec(key, big){
     paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: txt },
     margin: big ? { l: 70, r: 20, t: 10, b: 60 } : { l: 44, r: 10, t: 8, b: 30 },
     showlegend: big, legend: { orientation: 'h', y: 1.06, x: 0, font: { size: 12 } },
-    xaxis: ax(xt), yaxis: Object.assign(ax(yt), equal ? { scaleanchor: 'x', scaleratio: 1 } : {}),
+    xaxis: Object.assign(ax(xt), rng ? { range: rng.x } : {}),
+    yaxis: Object.assign(ax(yt), equal ? { scaleanchor: 'x', scaleratio: 1 } : {}, rng ? { range: rng.y } : {}),
     hoverlabel: { font: { size: 13 } }
   };
-  return { traces, layout };
+  return { traces, layout, vertical: !equal };
 }
 
 function plotCut(el, key, big){
   const spec = cutSpec(key, big);
   if (spec.msg) { Plotly.purge(el); el.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px">' + spec.msg + '</div>'; return; }
+  if (big) {
+    Plotly.purge(el);
+    const box = el.parentElement, h = el.clientHeight || box.clientHeight;
+    el.style.width = spec.vertical ? Math.min(box.clientWidth, Math.round(h * 1.0)) + 'px' : '100%';
+    el.style.margin = '6px auto 0';
+  }
   const cfg = big ? { responsive: true, displaylogo: false, toImageButtonOptions: { filename: 'corte_' + key, scale: 2 } }
                   : { responsive: true, staticPlot: true };
   if (!big) spec.traces.forEach(t => { t.hoverinfo = 'skip'; delete t.hovertemplate; });
@@ -736,6 +751,8 @@ $('miniWrap').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key 
 $('cutClose').addEventListener('click', closeCut);
 $('cutModal').addEventListener('click', e => { if (e.target === $('cutModal')) closeCut(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCut(); });
+let rzT = null;
+window.addEventListener('resize', () => { if (modalOpen()) { clearTimeout(rzT); rzT = setTimeout(renderPlot2D, 150); } });
 
 // ---------- Sección ----------
 function renderSection(){
