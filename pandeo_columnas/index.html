@@ -1048,7 +1048,10 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
     }
     const ejeSvg = eje ? `<line class="eje" x1="${f1(eje[0])}" y1="${cy}" x2="${f1(eje[1])}" y2="${cy}"/>` : '';
     const leyenda = eje ? `<line class="eje" x1="10" y1="226" x2="38" y2="226"/>${tx(44, 230, 'Eje de flexión (I)', 'start', ' class="lg"')}` : '';
-    $('sec').innerHTML = PATRON_HORM + forma + ejeSvg + cotas + leyenda;
+    // La textura de hormigón solo se aplica si el material seleccionado es Concreto
+    const concreto = $('mat').value === '2.5e7' && tipo !== 'perfil';
+    if (!concreto) forma = forma.replace(/ horm/g, '');
+    $('sec').innerHTML = (concreto ? PATRON_HORM : '') + forma + ejeSvg + cotas + leyenda;
   }
 
   /* ---------- Dibujo ---------- */
