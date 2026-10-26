@@ -176,7 +176,21 @@
   .tab b { font: 500 12px var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
   .tab[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   .tab[aria-pressed="true"] b { color: inherit; }
-  .plotbox { position: relative; flex: 1; min-height: 0; background: var(--plot); border-block: 1px solid var(--rule); }
+  .plotbody { display: flex; flex: 1; min-height: 0; border-block: 1px solid var(--rule); }
+  .plotbox { position: relative; flex: 1; min-width: 0; min-height: 0; background: var(--plot); }
+  /* Contenedor de la sección de la columna, dentro de "Forma de pandeo" */
+  .seccard { flex: none; width: 284px; display: flex; flex-direction: column; gap: 6px; padding: 14px; background: var(--panel); border-right: 1px solid var(--rule); overflow-y: auto; min-height: 0; }
+  .seccard .cap { margin: 0; }
+  .secnom { margin: 0; font: 500 13px var(--f-cond); color: var(--muted); }
+  #sec { width: 100%; height: auto; display: block; }
+  #sec .sh { fill: color-mix(in srgb, var(--accent) 18%, var(--panel)); stroke: var(--ink); stroke-width: 1.6; stroke-linejoin: round; fill-rule: evenodd; }
+  #sec .sh.disc { stroke-dasharray: 5 4; }
+  #sec .cota line, #sec .guia line { stroke: var(--muted); stroke-width: 1; }
+  #sec .guia circle { fill: var(--ink); stroke: none; }
+  #sec .cota text, #sec .lt { fill: var(--ink); font: 12px var(--f-mono); }
+  #sec .eje { stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 9 3 2 3; }
+  #sec .lg { fill: var(--muted); font: 11px var(--f-cond); }
+  #sec .vacio { fill: var(--muted); font: 13px var(--f-body); }
   #plot { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   #plot .g { stroke: var(--grid); stroke-width: 1; }
   #plot .tx { fill: var(--muted); font: 11px var(--f-mono); }
@@ -195,13 +209,20 @@
   .plotfoot .lbl b { color: var(--ink); font-family: var(--f-mono); font-weight: 500; }
   input[type="range"] { width: 100%; accent-color: var(--accent); }
 
-  @media (max-width: 900px) {
+  @media (max-width: 1100px) {
     html, body { height: auto; }
     .wrap { height: auto; min-height: 0; grid-template-rows: none; }
     .layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
     .side { overflow: visible; }
-    .plotbox { flex: none; height: min(70vh, 560px); }
+    .plotbody { flex: none; }
+    .plotbox { height: min(70vh, 560px); }
     .readout { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 700px) {
+    .plotbody { flex-direction: column; }
+    .seccard { width: auto; border-right: 0; border-bottom: 1px solid var(--rule); }
+    #sec { max-width: 340px; margin: 0 auto; }
+    .plotbox { flex: none; width: 100%; }
   }
   @media (prefers-reduced-motion: no-preference) {
     .inp, .tab { transition: border-color 0.15s, background-color 0.15s; }
@@ -336,8 +357,15 @@
         <h2 class="cap">Forma de pandeo</h2>
         <div id="tabs" class="tabs"></div>
       </div>
-      <div class="plotbox">
-        <svg id="plot" viewBox="0 0 460 540" role="img" aria-label="Columna con su forma deformada en el modo de pandeo seleccionado"></svg>
+      <div class="plotbody">
+        <aside class="seccard" aria-label="Sección de la columna">
+          <h3 class="cap">Sección de la columna</h3>
+          <svg id="sec" viewBox="0 0 300 240" role="img" aria-label="Sección transversal de la columna con sus medidas"></svg>
+          <p class="secnom" id="secNombre">Rectangular</p>
+        </aside>
+        <div class="plotbox">
+          <svg id="plot" viewBox="0 0 460 540" role="img" aria-label="Columna con su forma deformada en el modo de pandeo seleccionado"></svg>
+        </div>
       </div>
       <div class="plotfoot">
         <label class="f amp"><span class="lbl">Amplitud dibujada: <b id="ampv">12 %</b> de L</span><input type="range" id="amp" min="2" max="40" value="12" step="1"></label>
@@ -806,7 +834,7 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
       A = 2 * Bi * tf + (Hi - 2 * tf) * tw;
       I = (Bi * Hi ** 3 - (Bi - tw) * (Hi - 2 * tf) ** 3) / 12;
     } else { A = v.Av; I = v.Iv; }
-    return { A, I };
+    return { A, I, tipo, v };
   }
 
   function cambiarSeccion() {
@@ -869,6 +897,7 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
 
   function recalcular() {
     const g = geometria();
+    dibujarSeccion(g);
     const E = leerCampo('E'), L = leerCampo('L'), nn = leerCampo('n');
     $('readgeo').innerHTML = g.A ? `A = <b>${fmtSci(g.A)}</b> ${uni.L}² · I = <b>${fmtSci(g.I)}</b> ${uni.L}⁴` : '';
     if (L > 0) estado.L = L;
@@ -928,6 +957,76 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
       });
       box.appendChild(b);
     });
+  }
+
+  /* ---------- Sección de la columna con sus medidas ---------- */
+  const NOMBRES_SEC = { rect: 'Rectangular', circ: 'Circular', perfil: 'Perfil I', manual: 'Manual (A e I)' };
+  function dibujarSeccion(g) {
+    const W = 300, cx = 116, cy = 94, M = 130, lx = 192;   // M: lado máximo del dibujo; lx: columna de rótulos
+    const tipo = $('tipo').value;
+    const hueca = (tipo === 'rect' && $('hr').checked) || (tipo === 'circ' && $('hc').checked);
+    $('secNombre').textContent = NOMBRES_SEC[tipo] + (hueca ? ' hueca' : '');
+    if (!g || g.error) {
+      $('sec').innerHTML = `<text class="vacio" x="${W / 2}" y="110" text-anchor="middle">Revise las dimensiones</text>`;
+      return;
+    }
+    const v = g.v;
+    const f1 = x => x.toFixed(1);
+    const dim = (nombre, x) => `${nombre} = ${Number(x.toPrecision(4))} ${uni.L}`;
+    const ln = (x1, y1, x2, y2) => `<line x1="${f1(x1)}" y1="${f1(y1)}" x2="${f1(x2)}" y2="${f1(y2)}"/>`;
+    const tx = (x, y, txt, ancla = 'middle', extra = '') => `<text x="${f1(x)}" y="${f1(y)}" text-anchor="${ancla}"${extra}>${txt}</text>`;
+    // Cota horizontal (debajo de la figura) y vertical (a su izquierda)
+    const cotaH = (xa, xb, y, yRef, txt) =>
+      `<g class="cota">${ln(xa, yRef, xa, y + 4)}${ln(xb, yRef, xb, y + 4)}${ln(xa, y, xb, y)}${ln(xa, y - 4, xa, y + 4)}${ln(xb, y - 4, xb, y + 4)}${tx((xa + xb) / 2, y + 15, txt)}</g>`;
+    const cotaV = (x, ya, yb, xRef, txt) => {
+      const ym = (ya + yb) / 2;
+      return `<g class="cota">${ln(xRef, ya, x - 4, ya)}${ln(xRef, yb, x - 4, yb)}${ln(x, ya, x, yb)}${ln(x - 4, ya, x + 4, ya)}${ln(x - 4, yb, x + 4, yb)}${tx(x - 6, ym, txt, 'middle', ` transform="rotate(-90 ${f1(x - 6)} ${f1(ym)})"`)}</g>`;
+    };
+    // Línea de referencia con punto desde la figura hasta un rótulo a la derecha
+    const guia = (xa, ya, txt) => `<g class="guia">${ln(xa, ya, lx - 4, ya)}<circle cx="${f1(xa)}" cy="${f1(ya)}" r="2"/></g>${tx(lx, ya + 4, txt, 'start', ' class="lt"')}`;
+
+    let forma = '', cotas = '', eje = null;     // eje: [x0, x1] del eje de flexión (horizontal por el centroide)
+    if (tipo === 'rect') {
+      const sc = M / Math.max(v.b, v.h), pw = v.b * sc, ph = v.h * sc;
+      const x0 = cx - pw / 2, x1 = cx + pw / 2, y0 = cy - ph / 2, y1 = cy + ph / 2;
+      if (hueca) {
+        const tt = v.t * sc;
+        forma = `<path class="sh" d="M${f1(x0)} ${f1(y0)}H${f1(x1)}V${f1(y1)}H${f1(x0)}ZM${f1(x0 + tt)} ${f1(y0 + tt)}V${f1(y1 - tt)}H${f1(x1 - tt)}V${f1(y0 + tt)}Z"/>`;
+        cotas += guia(x1 - tt / 2, y0 + ph * 0.28, dim('t', v.t));
+      } else {
+        forma = `<rect class="sh" x="${f1(x0)}" y="${f1(y0)}" width="${f1(pw)}" height="${f1(ph)}"/>`;
+      }
+      cotas += cotaH(x0, x1, y1 + 18, y1, dim('b', v.b)) + cotaV(x0 - 18, y0, y1, x0, dim('h', v.h));
+      eje = [x0 - 8, x1 + 8];
+    } else if (tipo === 'circ') {
+      const sc = M / v.D, R = M / 2;
+      const circ = rad => `M${f1(cx - rad)} ${f1(cy)}a${f1(rad)} ${f1(rad)} 0 1 0 ${f1(2 * rad)} 0a${f1(rad)} ${f1(rad)} 0 1 0 ${f1(-2 * rad)} 0Z`;
+      if (hueca) {
+        const r = v.di * sc / 2, ang = Math.PI / 5;
+        forma = `<path class="sh" d="${circ(R)}${circ(r)}"/>`;
+        cotas += guia(cx + r * Math.cos(ang), cy - r * Math.sin(ang), dim('di', v.di));
+      } else {
+        forma = `<circle class="sh" cx="${f1(cx)}" cy="${f1(cy)}" r="${f1(R)}"/>`;
+      }
+      cotas += cotaH(cx - R, cx + R, cy + R + 18, cy, dim('D', v.D));
+      eje = [cx - R - 8, cx + R + 8];
+    } else if (tipo === 'perfil') {
+      const sc = M / Math.max(v.Bi, v.Hi), pw = v.Bi * sc, ph = v.Hi * sc, tf = v.tf * sc, tw = v.tw * sc;
+      const x0 = cx - pw / 2, x1 = cx + pw / 2, y0 = cy - ph / 2, y1 = cy + ph / 2, wl = cx - tw / 2, wr = cx + tw / 2;
+      const pts = [[x0, y0], [x1, y0], [x1, y0 + tf], [wr, y0 + tf], [wr, y1 - tf], [x1, y1 - tf], [x1, y1], [x0, y1], [x0, y1 - tf], [wl, y1 - tf], [wl, y0 + tf], [x0, y0 + tf]];
+      forma = `<polygon class="sh" points="${pts.map(p => f1(p[0]) + ',' + f1(p[1])).join(' ')}"/>`;
+      cotas += guia(x1, y0 + tf / 2, dim('tf', v.tf)) + guia(wr, cy + ph * 0.22, dim('tw', v.tw))
+             + cotaH(x0, x1, y1 + 18, y1, dim('B', v.Bi)) + cotaV(x0 - 18, y0, y1, x0, dim('H', v.Hi));
+      eje = [x0 - 8, x1 + 8];
+    } else {
+      // Sección manual: solo se conocen A e I
+      forma = `<rect class="sh disc" x="${f1(cx - 74)}" y="${f1(cy - 48)}" width="148" height="96" rx="6"/>`
+            + tx(cx, cy - 4, `A = ${fmtSci(g.A)} ${uni.L}²`, 'middle', ' class="lt"')
+            + tx(cx, cy + 16, `I = ${fmtSci(g.I)} ${uni.L}⁴`, 'middle', ' class="lt"');
+    }
+    const ejeSvg = eje ? `<line class="eje" x1="${f1(eje[0])}" y1="${cy}" x2="${f1(eje[1])}" y2="${cy}"/>` : '';
+    const leyenda = eje ? `<line class="eje" x1="10" y1="226" x2="38" y2="226"/>${tx(44, 230, 'Eje de flexión (I)', 'start', ' class="lg"')}` : '';
+    $('sec').innerHTML = forma + ejeSvg + cotas + leyenda;
   }
 
   /* ---------- Dibujo ---------- */
