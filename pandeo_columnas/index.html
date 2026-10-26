@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pandeo de Columnas — PortiCAD Multi-Tools</title>
+<link rel="icon" href="/favicon.png" type="image/png" />
+<link rel="shortcut icon" href="/favicon.png" />
+<script>
+(function(){ var t=null; try{ t=localStorage.getItem('porticad-theme'); }catch(e){}
+  if(t!=='dark'&&t!=='light') t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';
+  document.documentElement.setAttribute('data-theme',t); })();
+</script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  /* Layout: franja de resultados arriba; debajo, datos a la izquierda y plano de la columna a la derecha. */
+  :root {
+    --bg: #eef1f5;
+    --panel: #ffffff;
+    --ink: #142235;
+    --muted: #55677c;
+    --rule: #d6dde6;
+    --field: #f6f8fb;
+    --grid: #e4eaf1;
+    --plot: #fbfcfe;
+    --accent: #1c4f8f;
+    --on-accent: #ffffff;
+    --mark: #d1431b;
+    --bad: #b42318;
+    --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --f-cond: "IBM Plex Sans Condensed", "IBM Plex Sans", system-ui, sans-serif;
+    --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1520; --panel: #141f2d; --ink: #e6edf6; --muted: #93a4b8; --rule: #26354a;
+      --field: #0f1926; --grid: #1c2a3b; --plot: #101b29; --accent: #6aa5ee; --on-accent: #0b1522;
+      --mark: #ff8057; --bad: #ff8f7a; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1520; --panel: #141f2d; --ink: #e6edf6; --muted: #93a4b8; --rule: #26354a;
+    --field: #0f1926; --grid: #1c2a3b; --plot: #101b29; --accent: #6aa5ee; --on-accent: #0b1522;
+    --mark: #ff8057; --bad: #ff8f7a; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 400 15px/1.45 var(--f-body);
+    margin: 0;
+    padding-block: 12px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  html, body { height: 100%; }
+  /* Estructura: panel superior, (datos | gráfica) al centro, panel inferior de resultados. */
+  .wrap { height: 100%; min-height: 640px; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 12px; }
+  .top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 20px; padding: 12px 18px; }
+  h1 { font: 600 24px/1.1 var(--f-cond); letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+  .top p { margin: 0; color: var(--muted); font-size: 14px; }
+
+  /* Interruptor de tema */
+  .tema { margin-left: auto; align-self: center; display: inline-flex; align-items: center; gap: 10px; padding: 2px 0; background: none; border: 0; color: var(--ink); font: 500 13px var(--f-cond); cursor: pointer; }
+  .tema .pista { position: relative; width: 40px; height: 22px; border-radius: 11px; background: var(--field); border: 1px solid var(--rule); flex: none; }
+  .tema .pista::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--muted); }
+  .tema[aria-checked="true"] .pista { background: var(--accent); border-color: var(--accent); }
+  .tema[aria-checked="true"] .pista::after { left: 20px; background: var(--on-accent); }
+  .tema:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .tema .pista, .tema .pista::after { transition: left 0.15s, background-color 0.15s; }
+  }
+  .cap { font: 600 12px/1.2 var(--f-cond); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+
+  .panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; min-width: 0; }
+  .blk { padding: 16px 18px; border-top: 1px solid var(--rule); }
+  .blk:first-child { border-top: 0; }
+
+  /* Franja de resultados */
+  .readout { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 36px; padding: 14px 20px; align-items: center; }
+  .pcr .cap { margin-bottom: 8px; }
+  .pcr .val { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  output#pcr { font: 600 clamp(30px, 6vw, 46px)/1 var(--f-mono); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .pcr .u { font: 500 16px var(--f-mono); color: var(--muted); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px 20px; margin: 0; }
+  .stats div { min-width: 0; }
+  .stats dt { font: 500 12px/1.2 var(--f-cond); color: var(--muted); margin-bottom: 3px; }
+  .stats dd { margin: 0; font: 500 15px var(--f-mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .stats dd small { color: var(--muted); font-size: 12px; }
+  .msg { grid-column: 1 / -1; margin: 0; color: var(--bad); font-size: 14px; }
+  .msg:empty { display: none; }
+  .note { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 70ch; }
+  .readout .note { grid-column: 1 / -1; }
+
+  /* Distribución principal */
+  .layout { display: grid; grid-template-columns: 400px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 12px; min-height: 0; }
+  .side { overflow-y: auto; min-height: 0; }
+  .plotp { display: flex; flex-direction: column; min-height: 0; }
+  .plothead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 12px 16px; }
+  .plothead .cap { margin: 0; }
+
+  /* Campos */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-top: 12px; }
+  .grid[hidden] { display: none; }
+  .span-all { grid-column: 1 / -1; }
+  .f { display: grid; gap: 4px; min-width: 0; align-content: start; }
+  .lbl { font: 500 12.5px/1.2 var(--f-cond); color: var(--muted); }
+  .inp { display: flex; align-items: center; border: 1px solid var(--rule); background: var(--field); border-radius: 4px; min-width: 0; }
+  .inp:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+  .inp.bad { border-color: var(--bad); }
+  .inp input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font: 500 14px var(--f-mono); padding: 8px 9px; }
+  .inp input:disabled { opacity: 0.45; }
+  .inp i { font: normal 12px var(--f-mono); color: var(--muted); padding-right: 9px; white-space: nowrap; }
+  select {
+    width: 100%; font: 500 14px var(--f-body); color: var(--ink); background: var(--field);
+    border: 1px solid var(--rule); border-radius: 4px; padding: 8px 9px;
+  }
+  select:focus-visible, input[type="range"]:focus-visible, .tab:focus-visible, input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  select:disabled { opacity: 0.5; }
+  .chk { display: flex; align-items: center; gap: 7px; font-size: 14px; cursor: pointer; }
+  .chk input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+  .readgeo { margin: 12px 0 0; font: 400 12.5px/1.5 var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .readgeo b { color: var(--ink); font-weight: 500; }
+
+  .bc { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; }
+  .apoyo { display: grid; gap: 10px; align-content: start; }
+  .apoyo .nom { font: 600 13px var(--f-cond); }
+  .chks { display: flex; gap: 14px; flex-wrap: wrap; }
+
+  /* Gráfica */
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tab {
+    display: grid; gap: 2px; text-align: left; cursor: pointer; padding: 7px 12px;
+    border: 1px solid var(--rule); background: var(--field); color: var(--ink); border-radius: 4px; font: 500 13px var(--f-cond);
+  }
+  .tab b { font: 500 12px var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .tab[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .tab[aria-pressed="true"] b { color: inherit; }
+  .plotbox { position: relative; flex: 1; min-height: 0; background: var(--plot); border-block: 1px solid var(--rule); }
+  #plot { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #plot .g { stroke: var(--grid); stroke-width: 1; }
+  #plot .tx { fill: var(--muted); font: 11px var(--f-mono); }
+  #plot .vacio { fill: var(--muted); font: 13px var(--f-body); }
+  #plot .und { stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 6 4; }
+  #plot .def { stroke: var(--mark); stroke-width: 2.8; fill: none; stroke-linejoin: round; stroke-linecap: round; }
+  #plot .nd { fill: var(--plot); stroke: var(--mark); stroke-width: 1.7; }
+  #plot .sup * { stroke: var(--ink); stroke-width: 1.4; fill: none; }
+  #plot .sup circle { fill: var(--plot); }
+  #plot .arr { stroke: var(--ink); stroke-width: 2; }
+  #plot .arr-h { fill: var(--ink); }
+  #plot .pl { fill: var(--ink); font: 600 14px var(--f-mono); }
+  .plotfoot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 10px 16px; }
+  .plotfoot .amp { flex: 1 1 220px; max-width: 340px; }
+  .plotfoot .note { flex: 1 1 100%; }
+  .plotfoot .lbl b { color: var(--ink); font-family: var(--f-mono); font-weight: 500; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+  @media (max-width: 900px) {
+    html, body { height: auto; }
+    .wrap { height: auto; min-height: 0; grid-template-rows: none; }
+    .layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+    .side { overflow: visible; }
+    .plotbox { flex: none; height: min(70vh, 560px); }
+    .readout { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .inp, .tab { transition: border-color 0.15s, background-color 0.15s; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="panel top">
+    <h1>Pandeo de columnas</h1>
+    <p>Carga crítica de Euler por elementos finitos de viga, con la forma deformada de cada modo. Unidades: m y kN.</p>
+    <button type="button" id="tema" class="tema" role="switch" aria-checked="false"><span>Modo oscuro</span><span class="pista" aria-hidden="true"></span></button>
+  </header>
+
+
+  <main class="layout">
+    <form class="panel side" id="datos" autocomplete="off" onsubmit="return false">
+      <div class="blk">
+        <h2 class="cap">Sección transversal</h2>
+        <select id="tipo" aria-label="Tipo de sección">
+          <option value="rect">Rectangular</option>
+          <option value="circ">Circular</option>
+          <option value="perfil">Perfil I</option>
+          <option value="manual">Manual (A e I)</option>
+        </select>
+
+        <div class="grid" data-sec="rect">
+          <label class="f"><span class="lbl">Base b</span><span class="inp"><input id="b" type="text" inputmode="decimal" value="0.2"><i>m</i></span></label>
+          <label class="f"><span class="lbl">Altura h (flexión en el plano de h)</span><span class="inp"><input id="h" type="text" inputmode="decimal" value="0.2"><i>m</i></span></label>
+          <label class="chk"><input type="checkbox" id="hr">Sección hueca</label>
+          <label class="f"><span class="lbl">Espesor de pared t</span><span class="inp"><input id="t" type="text" inputmode="decimal" value="0.01" disabled><i>m</i></span></label>
+        </div>
+
+        <div class="grid" data-sec="circ" hidden>
+          <label class="f"><span class="lbl">Diámetro D</span><span class="inp"><input id="D" type="text" inputmode="decimal" value="0.2"><i>m</i></span></label>
+          <span></span>
+          <label class="chk"><input type="checkbox" id="hc">Sección hueca</label>
+          <label class="f"><span class="lbl">Diámetro interior di</span><span class="inp"><input id="di" type="text" inputmode="decimal" value="0.18" disabled><i>m</i></span></label>
+        </div>
+
+        <div class="grid" data-sec="perfil" hidden>
+          <label class="f"><span class="lbl">Ancho de ala B</span><span class="inp"><input id="Bi" type="text" inputmode="decimal" value="0.15"><i>m</i></span></label>
+          <label class="f"><span class="lbl">Altura total H</span><span class="inp"><input id="Hi" type="text" inputmode="decimal" value="0.3"><i>m</i></span></label>
+          <label class="f"><span class="lbl">Espesor de ala tf</span><span class="inp"><input id="tf" type="text" inputmode="decimal" value="0.0107"><i>m</i></span></label>
+          <label class="f"><span class="lbl">Espesor de alma tw</span><span class="inp"><input id="tw" type="text" inputmode="decimal" value="0.0071"><i>m</i></span></label>
+        </div>
+
+        <div class="grid" data-sec="manual" hidden>
+          <label class="f"><span class="lbl">Área A</span><span class="inp"><input id="Av" type="text" inputmode="decimal" value="0.04"><i>m²</i></span></label>
+          <label class="f"><span class="lbl">Inercia I</span><span class="inp"><input id="Iv" type="text" inputmode="decimal" value="1.3333e-4"><i>m⁴</i></span></label>
+        </div>
+
+        <p class="readgeo" id="readgeo"></p>
+      </div>
+
+      <div class="blk">
+        <h2 class="cap">Material y modelo</h2>
+        <div class="grid" style="margin-top:0">
+          <label class="f span-all"><span class="lbl">Material</span>
+            <select id="mat">
+              <option value="2e8">Acero (E = 200 GPa)</option>
+              <option value="7e7">Aluminio (E = 70 GPa)</option>
+              <option value="2.5e7">Concreto (E = 25 GPa)</option>
+              <option value="1e7">Madera (E = 10 GPa)</option>
+              <option value="custom">Personalizado</option>
+            </select>
+          </label>
+          <label class="f"><span class="lbl">Módulo E</span><span class="inp"><input id="E" type="text" inputmode="decimal" value="2e8"><i>kN/m²</i></span></label>
+          <label class="f"><span class="lbl">Longitud L</span><span class="inp"><input id="L" type="text" inputmode="decimal" value="3"><i>m</i></span></label>
+          <label class="f"><span class="lbl">N° de elementos (1 a 100)</span><span class="inp"><input id="n" type="text" inputmode="numeric" value="10"></span></label>
+        </div>
+        <p class="note" style="margin-top:10px">Los campos aceptan operaciones: 0.2*1.5, 2^3, sqrt(2), pi/4, 2e8. Se evalúan al salir del campo o con Enter.</p>
+      </div>
+
+      <div class="blk">
+        <h2 class="cap">Condiciones de borde</h2>
+        <div class="bc">
+          <div class="apoyo" role="group" aria-label="Apoyo en la base">
+            <span class="nom">Base (x = 0)</span>
+            <select id="bc1">
+              <option>Libre</option><option>Empotrado</option><option selected>Fijo</option><option>Móvil</option><option>Personalizado</option>
+            </select>
+            <div class="chks">
+              <label class="chk"><input type="checkbox" id="b1ux">Ux</label>
+              <label class="chk"><input type="checkbox" id="b1uy">Uy</label>
+              <label class="chk"><input type="checkbox" id="b1th">θ</label>
+            </div>
+          </div>
+          <div class="apoyo" role="group" aria-label="Apoyo en el tope">
+            <span class="nom">Tope (x = L)</span>
+            <select id="bc2">
+              <option>Libre</option><option>Empotrado</option><option selected>Fijo</option><option>Móvil</option><option>Personalizado</option>
+            </select>
+            <div class="chks">
+              <label class="chk"><input type="checkbox" id="b2ux">Ux</label>
+              <label class="chk"><input type="checkbox" id="b2uy">Uy</label>
+              <label class="chk"><input type="checkbox" id="b2th">θ</label>
+            </div>
+          </div>
+        </div>
+        <p class="note" style="margin-top:12px">Ux es el desplazamiento axial, Uy el transversal y θ el giro. Ux no modifica Pcr.</p>
+      </div>
+    </form>
+
+    <section class="panel plotp" aria-label="Forma de pandeo">
+      <div class="plothead">
+        <h2 class="cap">Forma de pandeo</h2>
+        <div id="tabs" class="tabs"></div>
+      </div>
+      <div class="plotbox">
+        <svg id="plot" viewBox="0 0 460 540" role="img" aria-label="Columna con su forma deformada en el modo de pandeo seleccionado"></svg>
+      </div>
+      <div class="plotfoot">
+        <label class="f amp"><span class="lbl">Amplitud dibujada: <b id="ampv">12 %</b> de L</span><input type="range" id="amp" min="2" max="40" value="12" step="1"></label>
+        <label class="chk"><input type="checkbox" id="nodos" checked>Mostrar nodos</label>
+        <p class="note">Forma modal normalizada. La amplitud es relativa y no representa un desplazamiento real: el pandeo lineal solo da la forma, no su tamaño.</p>
+      </div>
+    </section>
+  </main>
+
+  <section class="panel readout" aria-label="Resultados" aria-live="polite">
+    <div class="pcr">
+      <h2 class="cap">Carga crítica Pcr</h2>
+      <div class="val"><output id="pcr">—</output><span class="u">kN</span></div>
+    </div>
+    <dl class="stats">
+      <div><dt>Factor de longitud efectiva K</dt><dd id="sK">—</dd></div>
+      <div><dt>Longitud efectiva Le</dt><dd id="sLe">—</dd></div>
+      <div><dt>Radio de giro r</dt><dd id="sR">—</dd></div>
+      <div><dt>Esbeltez Le / r</dt><dd id="sEsb">—</dd></div>
+      <div><dt>Esfuerzo crítico σcr</dt><dd id="sSig">—</dd></div>
+    </dl>
+    <p class="msg" id="msg" role="alert"></p>
+    <p class="note">Pcr elástico lineal (Euler). Compruebe que σcr quede por debajo del límite de proporcionalidad del material; si no, la columna pandea en rango inelástico y Pcr real es menor.</p>
+  </section>
+</div>
+
+<script>
+/* ================= Evaluador de expresiones (sin eval) ================= */
+const FUNCIONES = {
+  sin: Math.sin, cos: Math.cos, tan: Math.tan,
+  asin: Math.asin, acos: Math.acos, atan: Math.atan,
+  sqrt: Math.sqrt, abs: Math.abs, ln: Math.log, log: Math.log10, exp: Math.exp
+};
+const CONSTANTES = { pi: Math.PI, e: Math.E };
+const tiene = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
+/** Devuelve un número, o null si el texto está vacío o no es una expresión válida. */
+function evaluarMatematica(texto) {
+  const s = String(texto == null ? '' : texto).trim().replace(/,/g, '.').replace(/\*\*/g, '^');
+  if (!s) return null;
+
+  const re = /\s*(?:(\d+\.?\d*(?:e[+-]?\d+)?|\.\d+(?:e[+-]?\d+)?)|([A-Za-z_]\w*)|([-+*\/^()]))/y;
+  const tok = [];
+  let pos = 0;
+  while (pos < s.length) {
+    re.lastIndex = pos;
+    const m = re.exec(s);
+    if (!m) return null;
+    if (m[1] !== undefined) tok.push({ t: 'n', v: parseFloat(m[1]) });
+    else if (m[2] !== undefined) tok.push({ t: 'i', v: m[2].toLowerCase() });
+    else tok.push({ t: 'o', v: m[3] });
+    pos = re.lastIndex;
+  }
+
+  let i = 0;
+  const op = c => tok[i] && tok[i].t === 'o' && tok[i].v === c;
+  const fallo = () => { throw new Error('expr'); };
+
+  function expr() {
+    let v = term();
+    while (op('+') || op('-')) { const o = tok[i++].v; const r = term(); v = o === '+' ? v + r : v - r; }
+    return v;
+  }
+  function term() {
+    let v = unario();
+    while (op('*') || op('/')) { const o = tok[i++].v; const r = unario(); v = o === '*' ? v * r : v / r; }
+    return v;
+  }
+  function unario() {
+    if (op('-')) { i++; return -unario(); }
+    if (op('+')) { i++; return unario(); }
+    return potencia();
+  }
+  function potencia() {
+    const b = primario();
+    if (op('^')) { i++; return Math.pow(b, unario()); }
+    return b;
+  }
+  function primario() {
+    const t = tok[i++];
+    if (!t) fallo();
+    if (t.t === 'n') return t.v;
+    if (t.t === 'i') {
+      if (op('(')) {
+        if (!tiene(FUNCIONES, t.v)) fallo();
+        i++;
+        const a = expr();
+        if (!op(')')) fallo();
+        i++;
+        return FUNCIONES[t.v](a);
+      }
+      if (tiene(CONSTANTES, t.v)) return CONSTANTES[t.v];
+      fallo();
+    }
+    if (t.v === '(') {
+      const v = expr();
+      if (!op(')')) fallo();
+      i++;
+      return v;
+    }
+    fallo();
+  }
+
+  try {
+    const r = expr();
+    if (i !== tok.length) return null;
+    return Number.isFinite(r) ? r : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/* ================= Autovalores de matriz simétrica (tred2 + tql2) ================= */
+function eigSimetrica(A, n) {
+  const V = A.map(r => Float64Array.from(r));
+  const d = new Float64Array(n), e = new Float64Array(n);
+
+  // Reducción de Householder a forma tridiagonal
+  for (let j = 0; j < n; j++) d[j] = V[n - 1][j];
+  for (let i = n - 1; i > 0; i--) {
+    let scale = 0, h = 0;
+    for (let k = 0; k < i; k++) scale += Math.abs(d[k]);
+    if (scale === 0) {
+      e[i] = d[i - 1];
+      for (let j = 0; j < i; j++) { d[j] = V[i - 1][j]; V[i][j] = 0; V[j][i] = 0; }
+    } else {
+      for (let k = 0; k < i; k++) { d[k] /= scale; h += d[k] * d[k]; }
+      let f = d[i - 1];
+      let g = Math.sqrt(h);
+      if (f > 0) g = -g;
+      e[i] = scale * g;
+      h = h - f * g;
+      d[i - 1] = f - g;
+      for (let j = 0; j < i; j++) e[j] = 0;
+      for (let j = 0; j < i; j++) {
+        f = d[j];
+        V[j][i] = f;
+        g = e[j] + V[j][j] * f;
+        for (let k = j + 1; k <= i - 1; k++) { g += V[k][j] * d[k]; e[k] += V[k][j] * f; }
+        e[j] = g;
+      }
+      f = 0;
+      for (let j = 0; j < i; j++) { e[j] /= h; f += e[j] * d[j]; }
+      const hh = f / (h + h);
+      for (let j = 0; j < i; j++) e[j] -= hh * d[j];
+      for (let j = 0; j < i; j++) {
+        f = d[j]; g = e[j];
+        for (let k = j; k <= i - 1; k++) V[k][j] -= (f * e[k] + g * d[k]);
+        d[j] = V[i - 1][j];
+        V[i][j] = 0;
+      }
+    }
+    d[i] = h;
+  }
+  for (let i = 0; i < n - 1; i++) {
+    V[n - 1][i] = V[i][i];
+    V[i][i] = 1;
+    const h = d[i + 1];
+    if (h !== 0) {
+      for (let k = 0; k <= i; k++) d[k] = V[k][i + 1] / h;
+      for (let j = 0; j <= i; j++) {
+        let g = 0;
+        for (let k = 0; k <= i; k++) g += V[k][i + 1] * V[k][j];
+        for (let k = 0; k <= i; k++) V[k][j] -= g * d[k];
+      }
+    }
+    for (let k = 0; k <= i; k++) V[k][i + 1] = 0;
+  }
+  for (let j = 0; j < n; j++) { d[j] = V[n - 1][j]; V[n - 1][j] = 0; }
+  V[n - 1][n - 1] = 1;
+  e[0] = 0;
+
+  // Algoritmo QL implícito
+  for (let i = 1; i < n; i++) e[i - 1] = e[i];
+  e[n - 1] = 0;
+  let f = 0, tst1 = 0;
+  const eps = Math.pow(2, -52);
+  for (let l = 0; l < n; l++) {
+    tst1 = Math.max(tst1, Math.abs(d[l]) + Math.abs(e[l]));
+    let m = l;
+    while (m < n) { if (Math.abs(e[m]) <= eps * tst1) break; m++; }
+    if (m > l) {
+      let iter = 0;
+      do {
+        iter++;
+        let g = d[l];
+        let p = (d[l + 1] - g) / (2 * e[l]);
+        let r = Math.hypot(p, 1);
+        if (p < 0) r = -r;
+        d[l] = e[l] / (p + r);
+        d[l + 1] = e[l] * (p + r);
+        const dl1 = d[l + 1];
+        let h = g - d[l];
+        for (let i = l + 2; i < n; i++) d[i] -= h;
+        f += h;
+        p = d[m];
+        let c = 1, c2 = c, c3 = c;
+        const el1 = e[l + 1];
+        let s = 0, s2 = 0;
+        for (let i = m - 1; i >= l; i--) {
+          c3 = c2; c2 = c; s2 = s;
+          g = c * e[i];
+          h = c * p;
+          r = Math.hypot(p, e[i]);
+          e[i + 1] = s * r;
+          s = e[i] / r;
+          c = p / r;
+          p = c * d[i] - s * g;
+          d[i + 1] = h + s * (c * g + s * d[i]);
+          for (let k = 0; k < n; k++) {
+            h = V[k][i + 1];
+            V[k][i + 1] = s * V[k][i] + c * h;
+            V[k][i] = c * V[k][i] - s * h;
+          }
+        }
+        p = -s * s2 * c3 * el1 * e[l] / dl1;
+        e[l] = s * p;
+        d[l] = c * p;
+      } while (Math.abs(e[l]) > eps * tst1 && iter < 200);
+    }
+    d[l] = d[l] + f;
+    e[l] = 0;
+  }
+  return { d, V };
+}
+
+/* ================= Cholesky (triangular inferior) ================= */
+function cholesky(A, m) {
+  const L = Array.from({ length: m }, () => new Float64Array(m));
+  for (let i = 0; i < m; i++) {
+    for (let j = 0; j <= i; j++) {
+      let s = A[i][j];
+      for (let k = 0; k < j; k++) s -= L[i][k] * L[j][k];
+      if (i === j) {
+        if (!(s > 1e-11 * A[i][i])) return null;   // matriz no definida positiva: mecanismo
+        L[i][i] = Math.sqrt(s);
+      } else {
+        L[i][j] = s / L[j][j];
+      }
+    }
+  }
+  return L;
+}
+
+/** Resuelve L X = B (sustitución hacia adelante), devuelve X. */
+function resolverInferior(L, B, m) {
+  const X = Array.from({ length: m }, () => new Float64Array(m));
+  for (let i = 0; i < m; i++) {
+    const Xi = X[i], Bi = B[i], Li = L[i];
+    for (let c = 0; c < m; c++) Xi[c] = Bi[c];
+    for (let k = 0; k < i; k++) {
+      const lik = Li[k];
+      if (lik === 0) continue;
+      const Xk = X[k];
+      for (let c = 0; c < m; c++) Xi[c] -= lik * Xk[c];
+    }
+    const dii = Li[i];
+    for (let c = 0; c < m; c++) Xi[c] /= dii;
+  }
+  return X;
+}
+
+/* ================= Pandeo de columna por elementos finitos =================
+   Se resuelve K·φ = λ·Kg·φ para los grados de libertad de flexión (v, θ).
+   Los grados axiales (Ux) no tienen rigidez geométrica y no cambian Pcr.
+   Se trabaja adimensional (EI = 1, L = 1):  Pcr = λ · E·I / L²
+   p = { E, A, I, L, n, b1:{uy,th}, b2:{uy,th}, nModos }                      */
+function pandeo(p) {
+  const { E, I, L, n } = p;
+  const nModos = p.nModos || 3;
+  const N = 2 * (n + 1), l = 1 / n;
+
+  const K = Array.from({ length: N }, () => new Float64Array(N));
+  const G = Array.from({ length: N }, () => new Float64Array(N));
+  const c = 1 / (l * l * l), cg = 1 / (30 * l);
+  const k4 = [
+    [12, 6 * l, -12, 6 * l],
+    [6 * l, 4 * l * l, -6 * l, 2 * l * l],
+    [-12, -6 * l, 12, -6 * l],
+    [6 * l, 2 * l * l, -6 * l, 4 * l * l]
+  ];
+  const g4 = [
+    [36, 3 * l, -36, 3 * l],
+    [3 * l, 4 * l * l, -3 * l, -l * l],
+    [-36, -3 * l, 36, -3 * l],
+    [3 * l, -l * l, -3 * l, 4 * l * l]
+  ];
+  for (let e = 0; e < n; e++) {
+    const b = 2 * e;
+    for (let a = 0; a < 4; a++) for (let d = 0; d < 4; d++) {
+      K[b + a][b + d] += k4[a][d] * c;
+      G[b + a][b + d] += g4[a][d] * cg;
+    }
+  }
+
+  const fijo = new Array(N).fill(false);
+  if (p.b1.uy) fijo[0] = true;
+  if (p.b1.th) fijo[1] = true;
+  if (p.b2.uy) fijo[2 * n] = true;
+  if (p.b2.th) fijo[2 * n + 1] = true;
+  const libres = [];
+  for (let i = 0; i < N; i++) if (!fijo[i]) libres.push(i);
+  const m = libres.length;
+  if (m === 0) return { ok: false, msg: 'No quedan grados de libertad libres: la columna está totalmente restringida.' };
+
+  const Kr = libres.map(i => Float64Array.from(libres, j => K[i][j]));
+  const Gr = libres.map(i => Float64Array.from(libres, j => G[i][j]));
+
+  const Lc = cholesky(Kr, m);
+  if (!Lc) return { ok: false, msg: 'Sistema inestable: los apoyos permiten un movimiento de cuerpo rígido (mecanismo). Agregue restricciones.' };
+
+  // C = Lc⁻¹ · Kg · Lc⁻ᵀ  (simétrica); sus autovalores son μ = 1/λ
+  const X = resolverInferior(Lc, Gr, m);
+  const Xt = Array.from({ length: m }, (_, i) => Float64Array.from({ length: m }, (_, j) => X[j][i]));
+  const Y = resolverInferior(Lc, Xt, m);
+  const C = Array.from({ length: m }, (_, i) => Float64Array.from({ length: m }, (_, j) => 0.5 * (Y[i][j] + Y[j][i])));
+
+  const { d, V } = eigSimetrica(C, m);
+  const idx = Array.from(d.keys()).sort((a, b) => d[b] - d[a]);
+  const dmax = d[idx[0]];
+  if (!(dmax > 1e-12)) return { ok: false, msg: 'Sistema inestable: no existe carga crítica de compresión.' };
+
+  const modos = [];
+  const ns = 14; // subdivisiones por elemento para dibujar la curva
+  for (const k of idx) {
+    if (modos.length >= nModos) break;
+    if (d[k] < dmax * 1e-9) break;
+    const lam = 1 / d[k];
+
+    // φ = Lc⁻ᵀ ψ
+    const phi = new Float64Array(m);
+    for (let i = m - 1; i >= 0; i--) {
+      let s = V[i][k];
+      for (let j = i + 1; j < m; j++) s -= Lc[j][i] * phi[j];
+      phi[i] = s / Lc[i][i];
+    }
+    const full = new Float64Array(N);
+    libres.forEach((g, j) => { full[g] = phi[j]; });
+
+    // Interpolación de Hermite dentro de cada elemento
+    const cxr = [], cyr = [];
+    for (let e = 0; e < n; e++) {
+      const v1 = full[2 * e], t1 = full[2 * e + 1], v2 = full[2 * e + 2], t2 = full[2 * e + 3];
+      const jmax = e === n - 1 ? ns : ns - 1;
+      for (let j = 0; j <= jmax; j++) {
+        const s = j / ns;
+        const N1 = 1 - 3 * s * s + 2 * s ** 3, N2 = s - 2 * s * s + s ** 3;
+        const N3 = 3 * s * s - 2 * s ** 3, N4 = -s * s + s ** 3;
+        cxr.push((e + s) / n);
+        cyr.push(N1 * v1 + N2 * l * t1 + N3 * v2 + N4 * l * t2);
+      }
+    }
+    // Normalizar: desplazamiento máximo = 1 (positivo)
+    let mx = 0, sgn = 1;
+    for (const y of cyr) if (Math.abs(y) > mx) { mx = Math.abs(y); sgn = y >= 0 ? 1 : -1; }
+    const f = mx > 0 ? sgn / mx : 1;
+    const vn = [], tn = [];
+    for (let i = 0; i <= n; i++) { vn.push(full[2 * i] * f); tn.push(full[2 * i + 1] * f); }
+
+    modos.push({
+      lam,
+      P: lam * E * I / (L * L),
+      K: Math.PI / Math.sqrt(lam),   // factor de longitud efectiva
+      vn, tn,
+      cx: cxr, cy: cyr.map(y => y * f)
+    });
+  }
+  return { ok: true, modos };
+}
+
+if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo, eigSimetrica };
+
+/* ================= Interfaz ================= */
+(function () {
+  const $ = id => document.getElementById(id);
+  const estado = { res: null, modo: 0, L: 3 };
+  const ETQ = { b: 'b', h: 'h', t: 't', D: 'D', di: 'di', Bi: 'B', Hi: 'H', tf: 'tf', tw: 'tw', Av: 'A', Iv: 'I', E: 'Módulo E', L: 'Longitud L', n: 'N° de elementos' };
+  const SUP = { '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
+
+  /* ---------- Formato ---------- */
+  function fmtSci(x) {
+    if (!Number.isFinite(x)) return '—';
+    if (x === 0) return '0';
+    const a = Math.abs(x);
+    if (a >= 1e-3 && a < 1e6) return String(Number(x.toPrecision(5)));
+    const [m, e] = x.toExponential(4).split('e');
+    return m + '×10' + String(parseInt(e, 10)).replace(/./g, c => SUP[c] || c);
+  }
+  const fmtP = x => x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
+  const celda = (valor, unidad) => `${valor}${unidad ? ' <small>' + unidad + '</small>' : ''}`;
+
+  /* ---------- Lectura de campos ---------- */
+  function leerCampo(id) {
+    const txt = $(id).value;
+    const v = evaluarMatematica(txt);
+    $(id).parentElement.classList.toggle('bad', v === null && txt.trim() !== '');
+    return v;
+  }
+  const esNumeroPlano = s => /^\s*[+-]?(\d+[.,]?\d*|[.,]\d+)(e[+-]?\d+)?\s*$/i.test(s);
+  function confirmar(inp) {
+    const v = evaluarMatematica(inp.value);
+    if (v !== null && !esNumeroPlano(inp.value)) inp.value = String(Number(v.toPrecision(6)));
+    if (inp.id === 'E') sincronizarMaterial();
+  }
+
+  /* ---------- Sección transversal ---------- */
+  function geometria() {
+    const tipo = $('tipo').value;
+    let ids;
+    if (tipo === 'rect') { ids = ['b', 'h']; if ($('hr').checked) ids.push('t'); }
+    else if (tipo === 'circ') { ids = ['D']; if ($('hc').checked) ids.push('di'); }
+    else if (tipo === 'perfil') ids = ['Bi', 'Hi', 'tf', 'tw'];
+    else ids = ['Av', 'Iv'];
+
+    const v = {}, faltan = [];
+    for (const id of ids) { const x = leerCampo(id); if (x === null) faltan.push(ETQ[id]); else v[id] = x; }
+    if (faltan.length) return { error: 'Complete o corrija: ' + faltan.join(', ') + '.' };
+    if (Object.values(v).some(x => x <= 0)) return { error: 'Las dimensiones de la sección deben ser mayores que cero.' };
+
+    let A, I;
+    if (tipo === 'rect') {
+      const { b, h } = v;
+      if ($('hr').checked) {
+        const bi = b - 2 * v.t, hi = h - 2 * v.t;
+        if (bi <= 0 || hi <= 0) return { error: 'El espesor t debe ser menor que la mitad de b y de h.' };
+        A = b * h - bi * hi; I = (b * h ** 3 - bi * hi ** 3) / 12;
+      } else { A = b * h; I = b * h ** 3 / 12; }
+    } else if (tipo === 'circ') {
+      const { D } = v;
+      if ($('hc').checked) {
+        if (v.di >= D) return { error: 'El diámetro interior di debe ser menor que D.' };
+        A = Math.PI / 4 * (D ** 2 - v.di ** 2); I = Math.PI / 64 * (D ** 4 - v.di ** 4);
+      } else { A = Math.PI * D ** 2 / 4; I = Math.PI * D ** 4 / 64; }
+    } else if (tipo === 'perfil') {
+      const { Bi, Hi, tf, tw } = v;
+      if (2 * tf >= Hi) return { error: 'Las alas (2·tf) no caben en la altura H.' };
+      if (tw >= Bi) return { error: 'El espesor del alma tw debe ser menor que el ancho B.' };
+      A = 2 * Bi * tf + (Hi - 2 * tf) * tw;
+      I = (Bi * Hi ** 3 - (Bi - tw) * (Hi - 2 * tf) ** 3) / 12;
+    } else { A = v.Av; I = v.Iv; }
+    return { A, I };
+  }
+
+  function cambiarSeccion() {
+    const tipo = $('tipo').value;
+    document.querySelectorAll('[data-sec]').forEach(g => { g.hidden = g.dataset.sec !== tipo; });
+  }
+  function habilitarHuecos() {
+    $('t').disabled = !$('hr').checked;
+    $('di').disabled = !$('hc').checked;
+  }
+
+  /* ---------- Material ---------- */
+  function sincronizarMaterial() {
+    const v = evaluarMatematica($('E').value);
+    const sel = $('mat');
+    const op = Array.from(sel.options).find(o => o.value !== 'custom' && Number(o.value) === v);
+    sel.value = op ? op.value : 'custom';
+  }
+
+  /* ---------- Apoyos ---------- */
+  const TIPOS = { 'Libre': [0, 0, 0], 'Empotrado': [1, 1, 1], 'Fijo': [1, 1, 0], 'Móvil': [0, 1, 0] };
+  function actualizarRestricciones() {
+    [[1, 'bc1'], [2, 'bc2']].forEach(([k, sid]) => {
+      const tipo = $(sid).value;
+      const ids = ['b' + k + 'ux', 'b' + k + 'uy', 'b' + k + 'th'];
+      if (tipo === 'Personalizado') ids.forEach(i => { $(i).disabled = false; });
+      else ids.forEach((i, j) => { $(i).checked = !!TIPOS[tipo][j]; $(i).disabled = true; });
+    });
+  }
+  const flags = k => ({ ux: $('b' + k + 'ux').checked, uy: $('b' + k + 'uy').checked, th: $('b' + k + 'th').checked });
+
+  /* ---------- Cálculo y resultados ---------- */
+  function limpiarStats() {
+    $('pcr').textContent = '—';
+    ['sK', 'sLe', 'sR', 'sEsb', 'sSig'].forEach(id => { $(id).textContent = '—'; });
+  }
+
+  function recalcular() {
+    const g = geometria();
+    const E = leerCampo('E'), L = leerCampo('L'), nn = leerCampo('n');
+    $('readgeo').innerHTML = g.A ? `A = <b>${fmtSci(g.A)}</b> m² · I = <b>${fmtSci(g.I)}</b> m⁴` : '';
+    if (L > 0) estado.L = L;
+
+    let error = null;
+    if (g.error) error = g.error;
+    else if (E === null || E <= 0) error = 'Módulo E: ingrese un valor mayor que cero.';
+    else if (L === null || L <= 0) error = 'Longitud L: ingrese un valor mayor que cero.';
+    else if (nn === null || Math.trunc(nn) < 1 || Math.trunc(nn) > 100) error = 'N° de elementos: use un entero entre 1 y 100.';
+
+    let res = null;
+    if (!error) {
+      try {
+        res = pandeo({ E, A: g.A, I: g.I, L, n: Math.trunc(nn), b1: flags(1), b2: flags(2), nModos: 3 });
+      } catch (e) { res = { ok: false, msg: 'No se pudo completar el cálculo. Revise los datos.' }; }
+      if (!res.ok) error = res.msg;
+    }
+
+    $('msg').textContent = error || '';
+    if (error) {
+      estado.res = null; limpiarStats();
+    } else {
+      estado.res = res;
+      estado.modo = Math.min(estado.modo, res.modos.length - 1);
+      const m = res.modos[0];
+      const Le = m.K * L, r = Math.sqrt(g.I / g.A);
+      $('pcr').textContent = fmtP(m.P);
+      $('sK').innerHTML = celda(m.K.toFixed(3));
+      $('sLe').innerHTML = celda(fmtSci(Le), 'm');
+      $('sR').innerHTML = celda(fmtSci(r), 'm');
+      $('sEsb').innerHTML = celda((Le / r).toFixed(1));
+      $('sSig').innerHTML = celda(Number((m.P / g.A / 1000).toPrecision(4)).toLocaleString('en-US'), 'MPa');
+    }
+    renderTabs();
+    dibujar();
+  }
+
+  /* ---------- Selector de modo ---------- */
+  function renderTabs() {
+    const box = $('tabs');
+    box.innerHTML = '';
+    const modos = estado.res ? estado.res.modos : [];
+    modos.forEach((m, i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'tab';
+      b.setAttribute('aria-pressed', String(i === estado.modo));
+      b.innerHTML = `<span>Modo ${i + 1}</span><b>${fmtP(m.P)} kN</b>`;
+      b.addEventListener('click', () => {
+        estado.modo = i;
+        box.querySelectorAll('.tab').forEach((t, j) => t.setAttribute('aria-pressed', String(j === i)));
+        dibujar();
+      });
+      box.appendChild(b);
+    });
+  }
+
+  /* ---------- Dibujo ---------- */
+  // Símbolo de apoyo en (px, py). d = +1 dibuja hacia abajo (base), -1 hacia arriba (tope).
+  function soporte(px, py, d, r) {
+    const p = []; let ext = 0;
+    const suelo = (yy, w) => {
+      p.push(`<line x1="${px - w}" x2="${px + w}" y1="${yy}" y2="${yy}"/>`);
+      for (let k = 0; k <= 6; k++) {
+        const x = px - w + k * (2 * w / 6);
+        p.push(`<line x1="${x.toFixed(1)}" y1="${yy}" x2="${(x - 6).toFixed(1)}" y2="${yy + d * 7}"/>`);
+      }
+    };
+    if (r.uy && r.th) { suelo(py, 26); ext = 8; }
+    else if (r.uy) {
+      p.push(`<path d="M${px} ${py} L${px - 11} ${py + d * 18} L${px + 11} ${py + d * 18} Z"/>`);
+      if (!r.ux) { p.push(`<circle cx="${px}" cy="${py + d * 22}" r="4"/>`); suelo(py + d * 26, 22); ext = 34; }
+      else { suelo(py + d * 18, 22); ext = 26; }
+    } else if (r.th) {
+      p.push(`<line x1="${px - 16}" x2="${px + 16}" y1="${py}" y2="${py}"/>`);
+      p.push(`<circle cx="${px - 8}" cy="${py + d * 4.5}" r="3.5"/><circle cx="${px + 8}" cy="${py + d * 4.5}" r="3.5"/>`);
+      suelo(py + d * 12, 22); ext = 20;
+    }
+    return { svg: `<g class="sup">${p.join('')}</g>`, ext };
+  }
+
+  function dibujar() {
+    const y0 = 470, y1 = 118, H = y0 - y1, cx = 240;
+    const esc = Number($('amp').value) / 100 * H;
+    const L = estado.L || 1;
+    const m = estado.res ? estado.res.modos[estado.modo] : null;
+    let s = '';
+
+    for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+      const y = y0 - t * H;
+      s += `<line class="g" x1="52" x2="430" y1="${y}" y2="${y}"/><text class="tx" x="46" y="${y + 4}" text-anchor="end">${(t * L).toFixed(2)}</text>`;
+    }
+    s += `<text class="tx" x="46" y="${y1 - 18}" text-anchor="end">x [m]</text>`;
+
+    const xb = m ? cx + m.vn[0] * esc : cx;
+    const xt = m ? cx + m.vn[m.vn.length - 1] * esc : cx;
+    const sb = soporte(xb, y0, 1, flags(1)), st = soporte(xt, y1, -1, flags(2));
+    s += sb.svg + st.svg;
+
+    const tip = y1 - st.ext - 6;
+    s += `<line class="arr" x1="${xt}" x2="${xt}" y1="${tip - 48}" y2="${tip - 9}"/>`
+      + `<path class="arr-h" d="M${xt} ${tip} L${xt - 5.5} ${tip - 11} L${xt + 5.5} ${tip - 11} Z"/>`
+      + `<text class="pl" x="${xt + 10}" y="${tip - 28}">P</text>`;
+
+    s += `<line class="und" x1="${cx}" x2="${cx}" y1="${y0}" y2="${y1}"/>`;
+    if (m) {
+      const pts = m.cx.map((xr, i) => `${(cx + m.cy[i] * esc).toFixed(1)},${(y0 - xr * H).toFixed(1)}`);
+      s += `<polyline class="def" points="${pts.join(' ')}"/>`;
+      if ($('nodos').checked) {
+        const n = m.vn.length - 1;
+        s += m.vn.map((v, i) => `<circle class="nd" cx="${(cx + v * esc).toFixed(1)}" cy="${(y0 - i / n * H).toFixed(1)}" r="3.2"/>`).join('');
+      }
+    } else {
+      s += `<text class="vacio" x="${cx + 26}" y="${(y0 + y1) / 2}">Sin resultado</text>`;
+    }
+    $('plot').innerHTML = s;
+  }
+
+  /* ---------- Tema claro / oscuro ---------- */
+  const raiz = document.documentElement;
+  const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  const temaActual = () => raiz.dataset.theme || (mq && mq.matches ? 'dark' : 'light');
+  const marcarInterruptor = () => $('tema').setAttribute('aria-checked', String(temaActual() === 'dark'));
+  function fijarTema(t) {
+    raiz.dataset.theme = t;
+    marcarInterruptor();
+    try { localStorage.setItem('porticad-theme', t); } catch (e) { /* sin almacenamiento: solo vale en esta sesión */ }
+  }
+  (function iniciarTema() {
+    let t = null;
+    try { t = localStorage.getItem('porticad-theme'); } catch (e) { /* sin almacenamiento */ }
+    if (t === 'dark' || t === 'light') raiz.dataset.theme = t;
+    marcarInterruptor();
+    if (mq && mq.addEventListener) mq.addEventListener('change', marcarInterruptor);
+  })();
+  $('tema').addEventListener('click', () => fijarTema(temaActual() === 'dark' ? 'light' : 'dark'));
+
+  /* ---------- Eventos ---------- */
+  let timer = null;
+  const programar = () => { clearTimeout(timer); timer = setTimeout(recalcular, 140); };
+  const campos = () => Array.from(document.querySelectorAll('.inp input')).filter(i => !i.disabled && !i.closest('[hidden]'));
+
+  document.addEventListener('input', e => {
+    const t = e.target;
+    if (t.matches && t.matches('.inp input')) { if (t.id === 'E') sincronizarMaterial(); programar(); }
+  });
+  document.addEventListener('focusout', e => {
+    const t = e.target;
+    if (t.matches && t.matches('.inp input')) { confirmar(t); recalcular(); }
+  });
+  document.addEventListener('keydown', e => {
+    const t = e.target;
+    if (e.key === 'Enter' && t.matches && t.matches('.inp input')) {
+      e.preventDefault();
+      confirmar(t); recalcular();
+      const lista = campos(), i = lista.indexOf(t);
+      if (i >= 0 && i < lista.length - 1) lista[i + 1].focus(); else t.blur();
+    }
+  });
+
+  $('tipo').addEventListener('change', () => { cambiarSeccion(); recalcular(); });
+  ['hr', 'hc'].forEach(id => $(id).addEventListener('change', () => { habilitarHuecos(); recalcular(); }));
+  ['bc1', 'bc2'].forEach(id => $(id).addEventListener('change', () => { actualizarRestricciones(); recalcular(); }));
+  ['b1ux', 'b1uy', 'b1th', 'b2ux', 'b2uy', 'b2th'].forEach(id => $(id).addEventListener('change', recalcular));
+  $('mat').addEventListener('change', () => { if ($('mat').value !== 'custom') $('E').value = $('mat').value; recalcular(); });
+  $('amp').addEventListener('input', () => { $('ampv').textContent = $('amp').value + ' %'; dibujar(); });
+  $('nodos').addEventListener('change', dibujar);
+
+  cambiarSeccion();
+  habilitarHuecos();
+  actualizarRestricciones();
+  recalcular();
+})();
+</script>
+</body>
+</html>
