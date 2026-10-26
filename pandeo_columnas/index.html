@@ -185,6 +185,11 @@
   #sec { width: 100%; height: auto; display: block; }
   #sec .sh { fill: color-mix(in srgb, var(--accent) 18%, var(--panel)); stroke: var(--ink); stroke-width: 1.6; stroke-linejoin: round; fill-rule: evenodd; }
   #sec .sh.horm { fill: url(#horm); }
+  #sec .sh.mader { fill: url(#mader); }
+  #sec .mbase { fill: color-mix(in srgb, #c08a4c 55%, var(--panel)); }
+  #sec .mgr path { fill: none; stroke: color-mix(in srgb, #5a3512 80%, var(--panel)); }
+  #sec .hnudo { fill: color-mix(in srgb, #4a2c0e 70%, var(--panel)); }
+  #sec .hanillo { fill: none; stroke: color-mix(in srgb, #5a3512 70%, var(--panel)); stroke-width: 0.7; }
   #sec .hbase { fill: color-mix(in srgb, var(--ink) 9%, var(--panel)); }
   #sec .hgr * { fill: color-mix(in srgb, var(--ink) 55%, var(--panel)); stroke: none; }
   /* Último resultado válido atenuado mientras algún dato está incompleto o es inválido */
@@ -979,6 +984,19 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
     for (let i = 0; i < 70; i++) o += `<circle cx="${(rnd() * W).toFixed(1)}" cy="${(rnd() * W).toFixed(1)}" r="${(0.3 + rnd() * 0.5).toFixed(2)}" fill-opacity="${(0.35 + rnd() * 0.35).toFixed(2)}"/>`;
     return `<defs><pattern id="horm" width="${W}" height="${W}" patternUnits="userSpaceOnUse"><rect width="${W}" height="${W}" class="hbase"/><g class="hgr">${o}</g></pattern></defs>`;
   })();
+  // Textura de madera: veta longitudinal ondulada con algún nudo, patrón determinista
+  const PATRON_MAD = (() => {
+    let s = 11; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    const W = 150, H = 120; let o = '';
+    for (let i = 0; i < 38; i++) {
+      const y = (i + 0.5) * H / 38 + (rnd() - 0.5) * 2, a = 0.8 + rnd() * 1.8, ph = rnd() * 6.28;
+      let d = `M0 ${y.toFixed(1)}`;
+      for (let x = 6; x <= W; x += 6) d += `L${x} ${(y + Math.sin(x / W * 6.283 + ph) * a).toFixed(1)}`;
+      o += `<path d="${d}" stroke-width="${(0.5 + rnd() * 0.9).toFixed(2)}" stroke-opacity="${(0.25 + rnd() * 0.45).toFixed(2)}"/>`;
+    }
+    for (const [kx, ky] of [[48, 34], [112, 88]]) o += `<ellipse cx="${kx}" cy="${ky}" rx="3.2" ry="1.9" class="hnudo"/><ellipse cx="${kx}" cy="${ky}" rx="6" ry="3.6" class="hanillo"/>`;
+    return `<defs><pattern id="mader" width="${W}" height="${H}" patternUnits="userSpaceOnUse"><rect width="${W}" height="${H}" class="mbase"/><g class="mgr">${o}</g></pattern></defs>`;
+  })();
   const NOMBRES_SEC = { rect: 'Rectangular', circ: 'Circular', perfil: 'Perfil I', manual: 'Manual (A e I)' };
   function dibujarSeccion(g) {
     const W = 300, cx = 116, cy = 94, M = 130, lx = 192;   // M: lado máximo del dibujo; lx: columna de rótulos
@@ -1049,9 +1067,9 @@ if (typeof module !== 'undefined') module.exports = { evaluarMatematica, pandeo,
     const ejeSvg = eje ? `<line class="eje" x1="${f1(eje[0])}" y1="${cy}" x2="${f1(eje[1])}" y2="${cy}"/>` : '';
     const leyenda = eje ? `<line class="eje" x1="10" y1="226" x2="38" y2="226"/>${tx(44, 230, 'Eje de flexión (I)', 'start', ' class="lg"')}` : '';
     // La textura de hormigón solo se aplica si el material seleccionado es Concreto
-    const concreto = $('mat').value === '2.5e7' && tipo !== 'perfil';
-    if (!concreto) forma = forma.replace(/ horm/g, '');
-    $('sec').innerHTML = (concreto ? PATRON_HORM : '') + forma + ejeSvg + cotas + leyenda;
+    const mat = $('mat').value, mader = mat === '1e7' && tipo !== 'perfil', concreto = mat === '2.5e7' && tipo !== 'perfil';
+    forma = forma.replace(/ horm/g, mader ? ' mader' : concreto ? ' horm' : '');
+    $('sec').innerHTML = (concreto ? PATRON_HORM : mader ? PATRON_MAD : '') + forma + ejeSvg + cotas + leyenda;
   }
 
   /* ---------- Dibujo ---------- */
