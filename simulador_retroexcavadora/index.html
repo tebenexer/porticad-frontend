@@ -324,7 +324,7 @@
       minZ: TRUCK_POS.z - BED_L / 2, maxZ: TRUCK_POS.z + BED_L / 2
     };
 
-    // modelo real (SketchUp -> OBJ) de la máquina: reemplaza chasis/orugas/torreta/cabina
+    // modelo real (OBJ) de la máquina: reemplaza chasis/orugas/torreta/cabina
     // "de fábrica" (queda la pluma-brazo-cuchara propia, articulada, salvo la cuchara real
     // que también se reengancha). Datos de calibración obtenidos analizando el .obj
     // (unidades = milímetros, eje Y = arriba).
@@ -340,7 +340,7 @@
 
     // Toda la cadena pluma->antebrazo->brazo->cuchara vive dentro de "Group44" en el
     // .obj (20 mallas: Mesh363..Mesh382), identificada pieza por pieza por el usuario
-    // mirando el modelo real en SketchUp:
+    // mirando el modelo real:
     //   pluma      = Mesh367, Mesh368, Mesh369, Mesh370
     //   antebrazo  = Mesh363 (antebrazo) + Mesh364 (botella hidráulica) + Mesh377..382 (letreros)
     //   brazo      = Mesh365 (brazo) + Mesh366 (botella hidráulica) + Mesh371,373,374,375,376 (mecanismo cuchara)
@@ -348,7 +348,7 @@
     // En vez de reorientar cada pieza por separado con ángulos "a mano" (lo que se venía
     // haciendo y nunca terminaba de cuadrar del todo), ahora todo Group44 se reensambla
     // como una sola pieza rígida con la MISMA transformación que ya usa el resto de la
-    // torreta (recentrado + MODEL_ROTATE_Y + escala) — queda tal cual salió de SketchUp,
+    // torreta (recentrado + MODEL_ROTATE_Y + escala) — queda tal cual salió del modelo,
     // ya armado. Las articulaciones se definen aparte, marcando puntos directamente
     // sobre este modelo ya ensamblado con el panel de picking (?debug=1).
     var BUCKET_MESH_NAMES = ['Mesh372'];
@@ -795,7 +795,7 @@
       machineRoot = mroot;
 
       // chasis/orugas/torreta/cabina "de referencia": se ven mientras carga el modelo
-      // real (OBJ de SketchUp) y se ocultan apenas ese modelo está listo.
+      // real (OBJ) y se ocultan apenas ese modelo está listo.
       // orugas
       var trackMat = new THREE.MeshStandardMaterial({ color: DARK, roughness: 0.8 });
       [-1, 1].forEach(function (side) {
@@ -834,7 +834,7 @@
       cabinGroup.add(glassFront);
 
       // cámara de cabina: montada en la torreta (sigue el giro, no la pluma).
-      // Posición calibrada dentro de la cabina real (modelo SketchUp) una vez cargado;
+      // Posición calibrada dentro de la cabina real (modelo real) una vez cargado;
       // este valor es el de referencia mientras se usa el chasis provisorio.
       camCabin.position.set(-0.13, 1.55, 1.1);
       camCabin.rotation.y = Math.PI; // mirar hacia +Z (donde está la pluma)
@@ -872,7 +872,7 @@
       armPlaceholderParts.push(extender.sleeve, extender.rod);
 
       // cuchara (bucket) — perfil curvo de referencia (BK); se reemplaza por la cuchara
-      // real del modelo SketchUp apenas termina de cargar (ver onRealModelLoaded).
+      // real del modelo apenas termina de cargar (ver onRealModelLoaded).
       bucketGroup = new THREE.Group();
       bucketGroup.rotation.x = -ctrl.bucket;
       extender.end.add(bucketGroup);
@@ -1028,7 +1028,7 @@
       if (truckFill) truckFill.scale.y = 0.001;
     }
 
-    // ---------- modelo real (SketchUp -> OBJ) ----------
+    // ---------- modelo real (OBJ) ----------
     // Reemplaza el chasis/orugas/torreta/cabina "de referencia" por el modelo real del
     // usuario. La torreta (Group43 en el .obj) viene soldada de fábrica con pluma+brazo+
     // cuchara incluidos; pluma y brazo se descartan (queda la propia, articulada), pero la
@@ -1094,7 +1094,7 @@
         // (confirmado por PCA de las orugas) para que la dirección de manejo coincida
         // con hacia dónde apuntan realmente las orugas. La misma transformación vale
         // para toda la torreta, cabina y ahora también el brazo/cuchara: es una sola
-        // pieza reensamblada tal cual salió de SketchUp.
+        // pieza reensamblada tal cual salió del modelo.
         o.geometry.translate(-MODEL_CHASSIS_X, isUpperWorks ? -MODEL_TURRET_BASE_Y : 0, -MODEL_CHASSIS_Z);
         o.geometry.rotateY(MODEL_ROTATE_Y);
         o.geometry.scale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);

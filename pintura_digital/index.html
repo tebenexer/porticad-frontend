@@ -322,7 +322,7 @@
       <button data-cmd="open">Abrir… <span class="key">Ctrl+O</span></button>
       <button data-cmd="importLayer">Importar imagen como capa…</button>
       <hr>
-      <button data-cmd="save">Guardar (.ora, compatible con Krita) <span class="key">Ctrl+S</span></button>
+      <button data-cmd="save">Guardar (.ora) <span class="key">Ctrl+S</span></button>
       <button data-cmd="exportPng">Exportar PNG <span class="key">Ctrl+Shift+E</span></button>
       <button data-cmd="exportJpg">Exportar JPG</button>
     </div>
@@ -1025,7 +1025,7 @@ function getTip(rgb, hardness, shape, size) {
 
 // ── Motor de trazo ──────────────────────────────────────────────────────────
 // Los toques se pintan en strokeCanvas con opacidad por "flujo"; la opacidad
-// del trazo se aplica al combinar con la capa (como el modo "wash" de Krita),
+// del trazo se aplica al combinar con la capa (efecto de lavado),
 // así el trazo no se acumula sobre sí mismo.
 function beginStroke(layer, pt, erase) {
   const b = Object.assign({}, toolSettings(erase ? 'eraser' : 'brush'));

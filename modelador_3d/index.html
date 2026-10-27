@@ -335,7 +335,7 @@
   controls.target.set(0, 0, 0);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  // Left button is reserved for drawing tools (SketchUp-style); orbit/pan use middle/right.
+  // Left button is reserved for drawing tools; orbit/pan use middle/right.
   controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.PAN };
 
   scene.add(new THREE.HemisphereLight(0xffffff, 0x30363d, 1.0));
@@ -426,7 +426,7 @@
     return linePoint.clone().addScaledVector(lineDir, t);
   }
 
-  // SketchUp-style axis inference: while drawing/dragging from `anchor`, lock onto whichever
+  // Axis inference: while drawing/dragging from `anchor`, lock onto whichever
   // of the red/green/blue axes (through anchor) the cursor's 3D ray currently passes closest to
   // on screen. Works regardless of anchor's height, so it also catches the blue (vertical) axis.
   const AXIS_X_DIR = new THREE.Vector3(1, 0, 0), AXIS_Y_DIR = new THREE.Vector3(0, 1, 0), AXIS_Z_DIR = new THREE.Vector3(0, 0, 1);
@@ -660,7 +660,7 @@
     });
   }
 
-  // Adds SketchUp-style black edge lines along every border of a solid (top/bottom
+  // Adds black edge lines along every border of a solid (top/bottom
   // perimeter + verticals). Raycasting is disabled on it so it never steals picks/faces.
   function attachEdges(mesh, thresholdAngle) {
     const edges = new THREE.LineSegments(
@@ -921,7 +921,7 @@
   function removeObject(obj) {
     if (!objects.includes(obj)) return; // already gone (e.g. cascaded away with its fill already)
     if (obj.type === 'line') {
-      // SketchUp-style: erasing an edge that bounds a face takes the face's fill with it,
+      // Erasing an edge that bounds a face takes the face's fill with it,
       // but leaves the face's other edges standing (now bounding nothing).
       const [a, b] = obj.params.nodeIds;
       facesUsingEdge(a, b).forEach(removeObject);
@@ -1419,7 +1419,7 @@
     }
     commitPendingUndo();
     const finished = extrudeObj, wasShell = !!extrudeShell;
-    // Un cuerpo nace ya dividido en sus partes (caras y aristas), como en SketchUp.
+    // Un cuerpo nace ya dividido en sus partes (caras y aristas).
     if (finished && !wasShell && objects.includes(finished) && isBody(finished)) { explodeBody(finished); setSelection([]); pruneOrphanNodes(); }
     extrudeShell = null;
     extrudeObj = null;
@@ -1564,7 +1564,7 @@
   // shared node to reuse when a new line/face is drawn onto it (null for a synthesized
   // vertex, e.g. rect/circle corners, or a solid's top layer, which don't correspond to a
   // single stored node). For a solid this is every corner at its base AND (if extruded) at
-  // its top, so a line can connect down to the ground or up to any corner, same as SketchUp.
+  // its top, so a line can connect down to the ground or up to any corner.
   function objectVertices(o) {
     if (o.type === 'line') return o.params.nodeIds.map(id => ({ point: nodePos(id), nodeId: id }));
     if (o.type === 'guide') return [{ point: new THREE.Vector3(...o.params.a), nodeId: null }, { point: new THREE.Vector3(...o.params.b), nodeId: null }];
@@ -1600,7 +1600,7 @@
     return [];
   }
 
-  // Priority: endpoint > midpoint > on-edge (matches SketchUp's inference order).
+  // Priority: endpoint > midpoint > on-edge (inference priority order).
   function resolveGeometrySnap(rawPoint, clientX, clientY) {
     let best = null;
     shownObjects().forEach(o => {
@@ -1632,7 +1632,7 @@
     return null;
   }
 
-  // ── Inference feedback (SketchUp/IngeTrazo style): a shape-coded marker per snap kind that
+  // ── Inference feedback: a shape-coded marker per snap kind that
   // keeps a constant on-screen size, a small label next to the cursor, and a long dashed guide
   // along the locked axis. All three live and die together via showSnapMarker/hideSnapMarker.
   const SNAP_SHAPE = { endpoint: 'square', midpoint: 'triangle', onedge: 'cross' };
@@ -1776,7 +1776,7 @@
     return p;
   }
 
-  // ── SketchUp-style "type a length" (VCB): after clicking a point, typing a number and
+  // ── "Type a length" entry: after clicking a point, typing a number and
   // pressing Enter places the line's next point exactly that far along whatever direction
   // (snap or axis-lock) is currently showing, instead of wherever the mouse happens to be.
   let typedValue = '';
@@ -1787,7 +1787,7 @@
 
   // Guide tool, offset mode: click an existing line/guide, move the mouse (or type a
   // value + Enter) to lay a new guide parallel to it at that perpendicular distance —
-  // same idea as SketchUp's Tape Measure offset.
+  // same idea as a tape-measure offset.
   let offsetSourceObj = null;
   let offsetBaseA = null, offsetBaseB = null; // snapshot of the source line's endpoints
   let lastOffsetVec = null;
@@ -3511,11 +3511,11 @@
     }
   });
 
-  // ═════════════ Cuerpos y aristas: borrar una arista como en SketchUp ═════════════
+  // ═════════════ Cuerpos y aristas: borrar una arista ═════════════
   // Un cuerpo extruido (rectángulo, círculo o polígono con altura) se guarda como UNA pieza paramétrica
   // (base + altura) para poder empujar/tirar de él. Para tocar una arista de verdad hay que «abrirlo»:
   // se convierte en sus caras planas sueltas (base, tapa y paredes) que comparten nodos y aristas, y
-  // entonces borrar la arista quita las dos caras que la tocan — igual que en SketchUp.
+  // entonces borrar la arista quita las dos caras que la tocan.
   function bodyMeta(o) { return { layer: o.layer || 0, hidden: !!o.hidden, gid: o.gid || 0 }; }
   function lineBetween(a, b) {
     return objects.find(x => x.type === 'line' && ((x.params.nodeIds[0] === a && x.params.nodeIds[1] === b) || (x.params.nodeIds[0] === b && x.params.nodeIds[1] === a)));
@@ -3549,7 +3549,7 @@
   }
   // Si la base de un cuerpo cae por completo dentro de otra cara plana coplanar, esa cara se «recorta»
   // (agujero) y la base propia sobra: las paredes nacen directamente del borde, como al empujar una cara
-  // dibujada sobre otra en SketchUp.
+  // dibujada sobre otra.
   function imprintOnHost(baseIds, orientation, b0) {
     const orient = orientation || 'xz';
     const key = faceNodeKey(baseIds);
@@ -3660,7 +3660,7 @@
   }
 
   // Borra una arista (y las demás de su curva). Cuerpo → se abre; dos caras coplanares → se unen;
-  // si no, se van las caras que la usaban (como SketchUp).
+  // si no, se van las caras que la usaban.
   function eraseEdgeLine(line) {
     if (!objects.includes(line)) return;
     const mates = curveMates(line);

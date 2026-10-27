@@ -14,14 +14,14 @@
    },
    {
     "name": "CrokisCAD 3D (Beta)",
-    "desc": "Dibujo tipo SketchUp · líneas, formas y extrusión en 3D",
+    "desc": "Dibujo en 3D · líneas, formas y extrusión",
     "color": "#f0b429",
     "icon": "<path d=\"M12 2L2 7l10 5 10-5-10-5z\"/><path d=\"M2 17l10 5 10-5\"/><path d=\"M2 12l10 5 10-5\"/>",
     "href": "https://porticad.app/modelador_3d"
    },
    {
     "name": "Pintura Digital (Beta)",
-    "desc": "Pintura tipo Krita · pinceles con presión, capas y .ora",
+    "desc": "Pintura digital · pinceles con presión, capas y .ora",
     "color": "#f783ac",
     "icon": "<path d=\"M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08\"/><path d=\"M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z\"/>",
     "href": "https://porticad.app/pintura_digital"
