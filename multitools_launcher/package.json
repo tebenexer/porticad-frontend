@@ -1,0 +1,11 @@
+{
+  "name": "multitools-launcher",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lanzador de herramientas de PortiCAD (multitools.porticad.app)",
+  "scripts": {
+    "start": "node server.js",
+    "build:tools": "node build_tools.js"
+  },
+  "engines": { "node": ">=18" }
+}
