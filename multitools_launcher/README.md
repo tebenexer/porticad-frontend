@@ -6,6 +6,8 @@ No modifica porticad.app: el panel Multi-Tools de allí sigue igual.
 ## Añadir o cambiar una herramienta
 1. Edita `MT_CATEGORIES` en `../index.html` (como siempre).
 2. Ejecuta `node build_tools.js` dentro de esta carpeta: regenera `tools.json`.
+   Las herramientas y renombres que son solo del lanzador (p. ej. «PortiCAD 2D» y el nombre
+   «Análisis Estructural») viven en `launcher_extras.json` y se aplican en cada regeneración.
 3. Commit y push a `main`.
 
 ## Railway

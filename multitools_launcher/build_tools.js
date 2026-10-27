@@ -1,4 +1,5 @@
 // Genera tools.json a partir de MT_CATEGORIES en ../index.html (fuente única).
+// Además aplica launcher_extras.json (renombres de categoría y herramientas solo del lanzador).
 // Uso: node build_tools.js   (ejecutar cada vez que se añada/cambie una herramienta en porticad.app)
 const fs = require('fs');
 const path = require('path');
@@ -16,5 +17,11 @@ const out = cats.map(c => ({
     href: ORIGIN + (t.href.startsWith('/') ? t.href : '/' + t.href)
   }))
 }));
+const extras = JSON.parse(fs.readFileSync(path.join(__dirname, 'launcher_extras.json'), 'utf8'));
+out.forEach(c => {
+  if (extras.categoryNames && extras.categoryNames[c.id]) c.name = extras.categoryNames[c.id];
+  const add = extras.prepend && extras.prepend[c.id];
+  if (add) c.tools = add.concat(c.tools.filter(t => !add.some(a => a.href === t.href)));
+});
 fs.writeFileSync(path.join(__dirname, 'tools.json'), JSON.stringify(out, null, 1) + '\n');
 console.log(out.length + ' categorías, ' + out.reduce((n, c) => n + c.tools.length, 0) + ' herramientas');

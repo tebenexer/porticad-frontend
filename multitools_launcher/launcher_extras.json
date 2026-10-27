@@ -1,0 +1,16 @@
+{
+  "categoryNames": {
+    "analisis3d": "Análisis Estructural"
+  },
+  "prepend": {
+    "analisis3d": [
+      {
+        "name": "PortiCAD 2D",
+        "desc": "Análisis de pórticos planos · reacciones y diagramas de momentos",
+        "color": "#34d399",
+        "icon": "<path d=\"M5 21V8h14v13\"/><line x1=\"3\" y1=\"21\" x2=\"21\" y2=\"21\"/><line x1=\"5\" y1=\"14\" x2=\"19\" y2=\"14\"/>",
+        "href": "https://porticad.app/"
+      }
+    ]
+  }
+}
