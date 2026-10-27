@@ -286,10 +286,10 @@
     var SWING_SPEED = 0.9, BOOM_SPEED = 0.7, ARM_SPEED = 0.8, BUCKET_SPEED = 1.1;
     // límites de giro de cada articulación (rad), medidos con el barrido de alcance de
     // la máquina propia: llega a ~-4 m bajo el nivel de la torreta y ~8 m de alcance.
-    var BOOM_MIN = -0.500, BOOM_MAX = 0.850;
-    var ANTEBRAZO_SPEED = 0.7, ANTEBRAZO_MIN = -1.700, ANTEBRAZO_MAX = 0.500; // articulación pluma-antebrazo
-    var ARM_MIN = -2.000, ARM_MAX = 0.400;
-    var BUCKET_MIN = -0.350, BUCKET_MAX = 2.930;
+    var BOOM_MIN = -0.500, BOOM_MAX = 1.200;
+    var ANTEBRAZO_SPEED = 0.7, ANTEBRAZO_MIN = -2.200, ANTEBRAZO_MAX = 0.900; // articulación pluma-antebrazo
+    var ARM_MIN = -2.600, ARM_MAX = 0.900;
+    var BUCKET_MIN = -0.600, BUCKET_MAX = 2.930;
     var DUMP_ANGLE = 1.35; // curl por encima de esto + arriba del terreno = vuelca
     var DRIVE_SPEED = 1.6, TURN_SPEED = 0.55;
     var EXT_SPEED = 0.7, EXT_MIN = 0, EXT_MAX = 1, EXT_STROKE = 0.85; // brazo telescópico (0=retraído, 1=extendido)
@@ -1040,6 +1040,8 @@
       addRam(turretPivot, 0.07, 0.048, boomSeg.root, [0, 0.74, 1.15], antebrazoSeg.root, [0, 0.38, 0.42]);
       addRam(turretPivot, 0.065, 0.045, antebrazoSeg.root, [0, 0.36, 1.0], armSeg.root, [0, 0.34, 0.38]);
       addRam(turretPivot, 0.06, 0.042, armSeg.root, [0, 0.34, 1.0], bucketGroup, [0, 0.36, -0.12]);
+      initBucketPts();
+      if (DEBUG_MODE) setupDebugPanel();
     }
 
     // ---------- extensor tipo boom (telescópico) ----------
@@ -1207,6 +1209,203 @@
       renderer.setSize(sz.w, sz.h);
     }
 
+    // ---------- límites de giro y contacto con la propia máquina ----------
+    // LIM guarda el rango de cada articulación (rad). El brazo además no puede
+    // atravesar el cuerpo de la máquina (orugas, bastidor, torreta, cabina) ni a sí
+    // mismo: cada frame se prueban puntos del brazo y la cuchara contra cajas del
+    // cuerpo; si el movimiento pedido provoca contacto, esa articulación se queda
+    // donde estaba (el resto sigue moviéndose). El suelo NO cuenta: se puede cavar.
+    var LIM = {
+      boom: { min: BOOM_MIN, max: BOOM_MAX },
+      antebrazo: { min: ANTEBRAZO_MIN, max: ANTEBRAZO_MAX },
+      arm: { min: ARM_MIN, max: ARM_MAX },
+      bucket: { min: BUCKET_MIN, max: BUCKET_MAX }
+    };
+    var LIM_DEFAULT = JSON.parse(JSON.stringify(LIM));
+    var limitFree = { boom: false, antebrazo: false, arm: false, bucket: false };
+    var selfCollisionOn = true, selfHit = null, lastBlock = null, lastBlockAt = 0;
+    var DEBUG_MODE = location.search.indexOf('debug=1') >= 0;
+
+    // cajas [x0,x1,y0,y1,z0,z1]
+    // en el marco de la máquina (no gira con la torreta): orugas y bastidor central
+    var BODY_BOXES = [
+      { n: 'oruga izq.', b: [-1.42, -0.82, 0.0, 0.8, -1.88, 1.88] },
+      { n: 'oruga der.', b: [0.82, 1.42, 0.0, 0.8, -1.88, 1.88] },
+      { n: 'bastidor', b: [-0.82, 0.82, 0.4, 0.85, -1.88, 1.88] }
+    ];
+    // en el marco de la torreta (gira con ella): cubierta, capó, contrapeso, tanque y cabina
+    var TURRET_BOXES = [
+      { n: 'cubierta', b: [-1.15, 1.15, -0.05, 0.16, -1.6, 1.15] },
+      { n: 'capó', b: [-0.93, 0.83, 0.16, 0.88, -1.3, -0.15] },
+      { n: 'contrapeso', b: [-1.08, 1.08, 0.16, 0.94, -1.96, -1.16] },
+      { n: 'tanque', b: [0.67, 1.29, 0.16, 0.71, -0.12, 0.88] },
+      { n: 'cabina', b: [-1.42, -0.14, 0.16, 1.8, -0.28, 1.25] }
+    ];
+    // vigas (marco propio de cada una), solo contra piezas que no son su vecina directa
+    var BOOM_BOX = { n: 'pluma', b: [-0.2, 0.2, -0.24, 0.68, 0.05, 1.95] };
+    var ANTE_BOX = { n: 'antebrazo', b: [-0.17, 0.17, -0.24, 0.34, 0.05, 1.45] };
+
+    var boomPts = [[0, -0.2, 0.6], [0, -0.2, 1.3], [0, -0.2, 2.1]];
+    var antePts = [[0, -0.22, 0.5], [0, -0.2, 1.0], [0, -0.15, 1.5]];
+    var armPts = [[0, -0.15, 0.6], [0, -0.15, 1.2], [0, -0.12, 1.7]];
+    var extPts = [[0, -0.1, 0.0], [0, 0.0, 0.0]];
+    var bucketPts = [];
+    function initBucketPts() {
+      [-0.4, 0, 0.4].forEach(function (x) { BK.forEach(function (p) { bucketPts.push([x, p.y, p.z]); }); });
+      bucketPts.push([0, 0.3, -0.12]);
+    }
+
+    var _cp = new THREE.Vector3(), _mp = new THREE.Vector3(), _tp = new THREE.Vector3(), _lp = new THREE.Vector3();
+    var CONTACT_MARGIN = 0.03;
+    function inBox(b, p, m) {
+      return p.x > b[0] - m && p.x < b[1] + m && p.y > b[2] - m && p.y < b[3] + m && p.z > b[4] - m && p.z < b[5] + m;
+    }
+    // ¿algún punto (en el marco de frameObj) toca el cuerpo o las vigas indicadas?
+    function hits(frameObj, pts, linkBoxes) {
+      for (var i = 0; i < pts.length; i++) {
+        _cp.set(pts[i][0], pts[i][1], pts[i][2]); frameObj.localToWorld(_cp);
+        _mp.copy(_cp); machineRoot.worldToLocal(_mp);
+        for (var a = 0; a < BODY_BOXES.length; a++) if (inBox(BODY_BOXES[a].b, _mp, CONTACT_MARGIN)) return BODY_BOXES[a].n;
+        _tp.copy(_cp); turretPivot.worldToLocal(_tp);
+        for (var c = 0; c < TURRET_BOXES.length; c++) if (inBox(TURRET_BOXES[c].b, _tp, CONTACT_MARGIN)) return TURRET_BOXES[c].n;
+        for (var d = 0; d < linkBoxes.length; d++) {
+          _lp.copy(_cp); linkBoxes[d].obj.worldToLocal(_lp);
+          if (inBox(linkBoxes[d].box.b, _lp, 0.0)) return linkBoxes[d].box.n;
+        }
+      }
+      return null;
+    }
+    var _tipW = new THREE.Vector3();
+    function selfContact() {
+      // el fondo del bloque de terreno también es un tope: no se puede cavar más abajo
+      bucketTip.getWorldPosition(_tipW);
+      if (_tipW.y < MIN_DEPTH - 0.02) return 'fondo del terreno';
+      return hits(boomSeg.root, boomPts, [])
+        || hits(antebrazoSeg.root, antePts, [])
+        || hits(armSeg.root, armPts, [{ obj: boomSeg.root, box: BOOM_BOX }])
+        || hits(extender.end, extPts, [{ obj: boomSeg.root, box: BOOM_BOX }, { obj: antebrazoSeg.root, box: ANTE_BOX }])
+        || hits(bucketGroup, bucketPts, [{ obj: boomSeg.root, box: BOOM_BOX }, { obj: antebrazoSeg.root, box: ANTE_BOX }]);
+    }
+    function applyPose() {
+      machineRoot.position.set(machine.x, 0, machine.z);
+      machineRoot.rotation.y = machine.heading;
+      turretPivot.rotation.y = ctrl.swing;
+      boomSeg.root.rotation.x = -ctrl.boom;
+      antebrazoSeg.root.rotation.x = -ctrl.antebrazo;
+      armSeg.root.rotation.x = -ctrl.arm;
+      extender.rodGroup.position.z = ctrl.ext * EXT_STROKE;
+      bucketGroup.rotation.x = -ctrl.bucket;
+      machineRoot.updateMatrixWorld(true);
+    }
+    var JOINT_KEYS = ['swing', 'boom', 'antebrazo', 'arm', 'bucket', 'ext'];
+    // aplica el movimiento pedido y, si provoca contacto nuevo, devuelve articulaciones
+    // a su valor anterior (de la última a la primera) hasta que deje de haber contacto
+    function resolveContact(prev) {
+      applyPose();
+      if (!selfCollisionOn) { selfHit = null; return; }
+      var hit = selfContact();
+      if (hit && !selfHit) {
+        var firstHit = hit;
+        for (var i = JOINT_KEYS.length - 1; i >= 0 && hit; i--) {
+          var k = JOINT_KEYS[i];
+          if (ctrl[k] === prev[k]) continue;
+          ctrl[k] = prev[k];
+          applyPose();
+          hit = selfContact();
+        }
+        lastBlock = hit || firstHit; lastBlockAt = performance.now();
+        hit = null;
+      }
+      selfHit = hit;
+    }
+
+    // ---------- modo debug (?debug=1): definir límites de articulaciones ----------
+    var debugUpdate = null;
+    function setupDebugPanel() {
+      var defs = [
+        { key: 'boom', label: 'A · Pluma', color: '#ff3b30' },
+        { key: 'antebrazo', label: 'B · Antebrazo', color: '#34c759' },
+        { key: 'arm', label: 'C · Brazo', color: '#0a84ff' },
+        { key: 'bucket', label: 'D · Cuchara', color: '#ff2d92' }
+      ];
+      var wrap = document.createElement('div');
+      wrap.id = 'debugPanel';
+      wrap.style.cssText = 'position:fixed;left:10px;top:245px;width:270px;max-height:calc(100vh - 440px);overflow:auto;z-index:50;background:rgba(13,17,23,.94);color:#e6edf3;border:1px solid #30363d;border-radius:8px;padding:8px 10px;font:11px/1.35 system-ui,sans-serif';
+      var btn = 'font-size:10px;padding:3px 6px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:4px;cursor:pointer';
+      wrap.innerHTML =
+        '<div style="font-weight:700;margin-bottom:4px;color:#f0b429">Debug · límites de articulaciones</div>' +
+        '<div style="color:#8b949e;margin-bottom:6px">Mové cada articulación con el control y marcá hasta dónde puede llegar. «Marcar» se aplica en vivo.</div>' +
+        defs.map(function (d) {
+          return '<div style="border-top:1px solid #30363d;padding-top:5px;margin-top:5px">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center"><b style="color:' + d.color + '">' + d.label + '</b>' +
+            '<label style="font-size:10px"><input type="checkbox" id="dbgFree_' + d.key + '"> sin límite</label></div>' +
+            '<input type="range" id="dbgSl_' + d.key + '" min="-3.2" max="3.2" step="0.01" style="width:100%">' +
+            '<div id="dbgVal_' + d.key + '" style="color:#8b949e;margin:2px 0"></div>' +
+            '<div style="display:flex;gap:4px"><button type="button" id="dbgMin_' + d.key + '" style="flex:1;' + btn + '">Marcar mínimo</button>' +
+            '<button type="button" id="dbgMax_' + d.key + '" style="flex:1;' + btn + '">Marcar máximo</button></div></div>';
+        }).join('') +
+        '<div style="border-top:1px solid #30363d;padding-top:5px;margin-top:6px">' +
+        '<label style="display:block"><input type="checkbox" id="dbgSelf" checked> contacto con la propia máquina</label>' +
+        '<label style="display:block"><input type="checkbox" id="dbgBoxes"> mostrar cajas de contacto</label>' +
+        '<div id="dbgHit" style="color:#f0b429;min-height:14px;margin:3px 0"></div></div>' +
+        '<div style="display:flex;gap:4px;margin-top:4px"><button type="button" id="dbgCopy" style="flex:1;font-size:10px;padding:5px;background:#58a6ff;color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">Copiar límites</button>' +
+        '<button type="button" id="dbgReset" style="flex:1;' + btn + '">Restablecer</button></div>' +
+        '<textarea id="dbgOut" readonly rows="6" style="width:100%;margin-top:5px;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:4px;font:10px monospace"></textarea>';
+      document.body.appendChild(wrap);
+      var f3 = function (v) { return v.toFixed(3); };
+      var dragging = null;
+      defs.forEach(function (d) {
+        var k = d.key;
+        var sl = document.getElementById('dbgSl_' + k);
+        sl.addEventListener('pointerdown', function () { dragging = k; });
+        window.addEventListener('pointerup', function () { dragging = null; });
+        sl.addEventListener('input', function () { ctrl[k] = parseFloat(sl.value); });
+        document.getElementById('dbgFree_' + k).addEventListener('change', function (e) { limitFree[k] = e.target.checked; });
+        document.getElementById('dbgMin_' + k).addEventListener('click', function () { LIM[k].min = ctrl[k]; });
+        document.getElementById('dbgMax_' + k).addEventListener('click', function () { LIM[k].max = ctrl[k]; });
+      });
+      document.getElementById('dbgSelf').addEventListener('change', function (e) { selfCollisionOn = e.target.checked; });
+      // cajas de contacto visibles (cables)
+      var boxHelpers = [];
+      function addHelper(parent, entry, color) {
+        var b = entry.b;
+        var m = new THREE.Mesh(new THREE.BoxGeometry(b[1] - b[0], b[3] - b[2], b[5] - b[4]),
+          new THREE.MeshBasicMaterial({ color: color, wireframe: true }));
+        m.position.set((b[0] + b[1]) / 2, (b[2] + b[3]) / 2, (b[4] + b[5]) / 2);
+        m.visible = false; parent.add(m); boxHelpers.push(m);
+      }
+      BODY_BOXES.forEach(function (e) { addHelper(machineRoot, e, 0xff3b30); });
+      TURRET_BOXES.forEach(function (e) { addHelper(turretPivot, e, 0x34c759); });
+      addHelper(boomSeg.root, BOOM_BOX, 0x0a84ff);
+      addHelper(antebrazoSeg.root, ANTE_BOX, 0xff2d92);
+      document.getElementById('dbgBoxes').addEventListener('change', function (e) {
+        boxHelpers.forEach(function (m) { m.visible = e.target.checked; });
+      });
+      function text() {
+        return 'var BOOM_MIN = ' + f3(LIM.boom.min) + ', BOOM_MAX = ' + f3(LIM.boom.max) + ';\n' +
+          'ANTEBRAZO_MIN = ' + f3(LIM.antebrazo.min) + ', ANTEBRAZO_MAX = ' + f3(LIM.antebrazo.max) + ';\n' +
+          'var ARM_MIN = ' + f3(LIM.arm.min) + ', ARM_MAX = ' + f3(LIM.arm.max) + ';\n' +
+          'var BUCKET_MIN = ' + f3(LIM.bucket.min) + ', BUCKET_MAX = ' + f3(LIM.bucket.max) + ';';
+      }
+      document.getElementById('dbgCopy').addEventListener('click', function () {
+        var out = document.getElementById('dbgOut'); out.value = text(); out.select();
+        try { navigator.clipboard.writeText(out.value); } catch (e) { try { document.execCommand('copy'); } catch (e2) {} }
+      });
+      document.getElementById('dbgReset').addEventListener('click', function () {
+        defs.forEach(function (d) { LIM[d.key].min = LIM_DEFAULT[d.key].min; LIM[d.key].max = LIM_DEFAULT[d.key].max; });
+      });
+      debugUpdate = function () {
+        defs.forEach(function (d) {
+          var k = d.key;
+          if (dragging !== k) document.getElementById('dbgSl_' + k).value = ctrl[k];
+          document.getElementById('dbgVal_' + k).textContent =
+            'actual ' + f3(ctrl[k]) + ' · mín ' + f3(LIM[k].min) + ' · máx ' + f3(LIM[k].max);
+        });
+        var hitEl = document.getElementById('dbgHit');
+        hitEl.textContent = (lastBlock && performance.now() - lastBlockAt < 1500) ? 'Contacto bloqueado: ' + lastBlock : (selfHit ? 'En contacto: ' + selfHit : '');
+      };
+    }
+
     // ========================= LOOP =========================
     var last = 0;
     function animate(ts) {
@@ -1230,11 +1429,16 @@
       var tF = trackBtn.f || keys['i'] || gp.f, tB = trackBtn.b || keys['k'] || gp.b;
       var tL = trackBtn.l || keys['j'] || gp.l, tR = trackBtn.r || keys['l'] || gp.r;
 
+      var prev = { swing: ctrl.swing, boom: ctrl.boom, antebrazo: ctrl.antebrazo, arm: ctrl.arm, bucket: ctrl.bucket, ext: ctrl.ext };
+      function step(k, axisV, speed) {
+        var v = ctrl[k] + axisV * speed * dt;
+        ctrl[k] = limitFree[k] ? v : clamp(v, LIM[k].min, LIM[k].max);
+      }
       ctrl.swing += swingAxis * SWING_SPEED * dt;
-      ctrl.boom = clamp(ctrl.boom + boomAxis * BOOM_SPEED * dt, BOOM_MIN, BOOM_MAX);
-      ctrl.antebrazo = clamp(ctrl.antebrazo + antebrazoAxis * ANTEBRAZO_SPEED * dt, ANTEBRAZO_MIN, ANTEBRAZO_MAX);
-      ctrl.arm = clamp(ctrl.arm + armAxis * ARM_SPEED * dt, ARM_MIN, ARM_MAX);
-      ctrl.bucket = clamp(ctrl.bucket + bucketAxis * BUCKET_SPEED * dt, BUCKET_MIN, BUCKET_MAX);
+      step('boom', boomAxis, BOOM_SPEED);
+      step('antebrazo', antebrazoAxis, ANTEBRAZO_SPEED);
+      step('arm', armAxis, ARM_SPEED);
+      step('bucket', bucketAxis, BUCKET_SPEED);
       ctrl.ext = clamp(ctrl.ext + extAxis * EXT_SPEED * dt, EXT_MIN, EXT_MAX);
 
       if (tF) { machine.x += Math.sin(machine.heading) * DRIVE_SPEED * dt; machine.z += Math.cos(machine.heading) * DRIVE_SPEED * dt; }
@@ -1242,16 +1446,8 @@
       if (tL) machine.heading += TURN_SPEED * dt;
       if (tR) machine.heading -= TURN_SPEED * dt;
 
-      machineRoot.position.set(machine.x, 0, machine.z);
-      machineRoot.rotation.y = machine.heading;
-
-      turretPivot.rotation.y = ctrl.swing;
-      boomSeg.root.rotation.x = -ctrl.boom;
-      antebrazoSeg.root.rotation.x = -ctrl.antebrazo;
-      armSeg.root.rotation.x = -ctrl.arm;
-      extender.rodGroup.position.z = ctrl.ext * EXT_STROKE;
-      bucketGroup.rotation.x = -ctrl.bucket;
-      machineRoot.updateMatrixWorld(true);
+      resolveContact(prev);
+      if (debugUpdate) debugUpdate();
       updateRams();
 
       // excavación
