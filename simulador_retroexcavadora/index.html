@@ -271,8 +271,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/MTLLoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
   <script>
   (function () {
     'use strict';
@@ -281,30 +279,27 @@
     var TERRAIN_W = 32, TERRAIN_D = 26, SEG_X = 96, SEG_Z = 78; // terreno más amplio (antes 22x18)
     var CELL_W = TERRAIN_W / SEG_X, CELL_D = TERRAIN_D / SEG_Z, CELL_AREA = CELL_W * CELL_D;
     var MIN_DEPTH = -2.4, MAX_PILE = 2.4;
-    // radio de excavación y capacidad, recalculados a partir de las medidas reales de
-    // la cuchara (panel de regla en modo "cuchara", ?debug=1): boca ~0.93x0.70 m,
-    // fondo ~0.72x0.41 m, profundidad boca->fondo ~0.81 m. Capacidad estimada como un
-    // tronco de pirámide entre boca y fondo.
+    // radio de excavación y capacidad según el tamaño de la cuchara propia (BK, BUCKET_W).
     var DIG_RADIUS = 0.8, PILE_RADIUS = 0.95;
-    var BUCKET_CAPACITY = 0.35; // m3, estimado real (antes 0.55, con la cuchara de referencia)
+    var BUCKET_CAPACITY = 0.35; // m3, estimado para una cuchara de boca 0.8 m
 
     var SWING_SPEED = 0.9, BOOM_SPEED = 0.7, ARM_SPEED = 0.8, BUCKET_SPEED = 1.1;
-    // límites reales, medidos con el panel de "sin límite" (?debug=1) sobre el brazo
-    // ya articulado con sus pasadores reales.
-    var BOOM_MIN = -0.760, BOOM_MAX = 0.440;
-    var ANTEBRAZO_SPEED = 0.7, ANTEBRAZO_MIN = -1.220, ANTEBRAZO_MAX = 0.760; // articulación pluma-antebrazo
-    var ARM_MIN = -1.250, ARM_MAX = 0.470;
+    // límites de giro de cada articulación (rad), medidos con el barrido de alcance de
+    // la máquina propia: llega a ~-4 m bajo el nivel de la torreta y ~8 m de alcance.
+    var BOOM_MIN = -0.500, BOOM_MAX = 0.850;
+    var ANTEBRAZO_SPEED = 0.7, ANTEBRAZO_MIN = -1.700, ANTEBRAZO_MAX = 0.500; // articulación pluma-antebrazo
+    var ARM_MIN = -2.000, ARM_MAX = 0.400;
     var BUCKET_MIN = -0.350, BUCKET_MAX = 2.930;
     var DUMP_ANGLE = 1.35; // curl por encima de esto + arriba del terreno = vuelca
-    var groundContactOffset = 0; // ajustable en ?debug=1: nivel virtual de contacto cuchara-suelo
     var DRIVE_SPEED = 1.6, TURN_SPEED = 0.55;
     var EXT_SPEED = 0.7, EXT_MIN = 0, EXT_MAX = 1, EXT_STROKE = 0.85; // brazo telescópico (0=retraído, 1=extendido)
     var EXT_SLEEVE_LEN = 0.55, EXT_ROD_LEN = 0.9;
 
-    var YELLOW = 0xffca08, YELLOW_DK = 0xe0a800, STEEL = 0x2d333b, DARK = 0x1c2128, GLASS = 0x8ecdf0; // amarillo calibrado con el modelo real
+    var YELLOW = 0xffca08, YELLOW_DK = 0xe0a800, STEEL = 0x2d333b, DARK = 0x1c2128, GLASS = 0x8ecdf0;
 
     // perfil curvo del cucharón (z=profundidad hacia adelante, y=altura) — pivote en (0,0)
-    var BUCKET_W = 0.8; // ancho real medido con la regla (promedio boca/fondo, ver DIG_RADIUS arriba)
+    var BUCKET_W = 0.8; // ancho de la cuchara (m)
+    var BUCKET_FILL_SIZE = 0.34; // radio (m) del montículo de tierra a carga 100%
     var BK = [
       { z: 0.00, y: 0.08 },
       { z: 0.02, y: -0.48 },
@@ -324,55 +319,11 @@
       minZ: TRUCK_POS.z - BED_L / 2, maxZ: TRUCK_POS.z + BED_L / 2
     };
 
-    // modelo real (OBJ) de la máquina: reemplaza chasis/orugas/torreta/cabina
-    // "de fábrica" (queda la pluma-brazo-cuchara propia, articulada, salvo la cuchara real
-    // que también se reengancha). Datos de calibración obtenidos analizando el .obj
-    // (unidades = milímetros, eje Y = arriba).
-    var MODEL_SCALE = 0.001;
-    var MODEL_CHASSIS_X = 1121.5, MODEL_CHASSIS_Z = -1724.5; // centro del chasis (mm, crudo)
-    var MODEL_TURRET_BASE_Y = 875; // altura donde arranca la torreta (mm, crudo)
-    var MODEL_ARM_CUT_X = 0; // piezas de la torreta (Group43) con centro X < esto = pluma/brazo de fábrica (se descartan)
-    // el chasis+orugas del .obj NO están alineados con los ejes crudos (están ~30° en
-    // diagonal, confirmado por PCA de los vértices de las orugas: eje principal a -150°/+30°
-    // respecto a +X). Con 120° en vez de 90° las orugas quedan realmente paralelas a la
-    // dirección de manejo (machine.heading), en vez de quedar cruzadas en diagonal.
-    var MODEL_ROTATE_Y = Math.PI * 2 / 3;
-
-    // Toda la cadena pluma->antebrazo->brazo->cuchara vive dentro de "Group44" en el
-    // .obj (20 mallas: Mesh363..Mesh382), identificada pieza por pieza por el usuario
-    // mirando el modelo real:
-    //   pluma      = Mesh367, Mesh368, Mesh369, Mesh370
-    //   antebrazo  = Mesh363 (antebrazo) + Mesh364 (botella hidráulica) + Mesh377..382 (letreros)
-    //   brazo      = Mesh365 (brazo) + Mesh366 (botella hidráulica) + Mesh371,373,374,375,376 (mecanismo cuchara)
-    //   cuchara    = Mesh372
-    // En vez de reorientar cada pieza por separado con ángulos "a mano" (lo que se venía
-    // haciendo y nunca terminaba de cuadrar del todo), ahora todo Group44 se reensambla
-    // como una sola pieza rígida con la MISMA transformación que ya usa el resto de la
-    // torreta (recentrado + MODEL_ROTATE_Y + escala) — queda tal cual salió del modelo,
-    // ya armado. Las articulaciones se definen aparte, marcando puntos directamente
-    // sobre este modelo ya ensamblado con el panel de picking (?debug=1).
-    var BUCKET_MESH_NAMES = ['Mesh372'];
-    var ARM_MESH_NAMES = ['Mesh365', 'Mesh366', 'Mesh371', 'Mesh373', 'Mesh374', 'Mesh375', 'Mesh376'];
-    var ANTEBRAZO_MESH_NAMES = ['Mesh363', 'Mesh364', 'Mesh377', 'Mesh378', 'Mesh379', 'Mesh380', 'Mesh381', 'Mesh382'];
-    var PLUMA_MESH_NAMES = ['Mesh367', 'Mesh368', 'Mesh369', 'Mesh370'];
-
-    // las 4 articulaciones reales, cada una definida como un pasador (cilindro
-    // pasante): un punto de origen sobre el eje + la dirección de ese eje (vector
-    // unitario) — no un simple punto girando siempre en X, para que cada pieza gire
-    // alrededor de su eje de bisagra REAL y no quede torsionada. Medidas por el
-    // usuario marcando 2 clics (entrada/salida del pasador) por articulación con el
-    // panel de picking (?debug=1) y confirmadas con "Aplicar y probar". En metros,
-    // mismo espacio "local" (turretPivot) que usan las mallas reales ya reensambladas.
-    var REAL_JOINT_A = { origin: { x: -0.349, y: 0.773, z: 0.384 }, axis: { x: 0.878, y: 0.023, z: -0.477 } }; // torreta -> pluma
-    var REAL_JOINT_B = { origin: { x: 0.363, y: 2.748, z: 1.277 }, axis: { x: 0.847, y: -0.031, z: -0.531 } }; // pluma -> antebrazo
-    var REAL_JOINT_C = { origin: { x: 2.114, y: 3.137, z: 4.231 }, axis: { x: 0.875, y: 0.003, z: -0.484 } }; // antebrazo -> brazo
-    var REAL_JOINT_D = { origin: { x: 2.828, y: 1.153, z: 5.507 }, axis: { x: 0.875, y: -0.010, z: -0.484 } }; // brazo -> cuchara
-
     function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
     function lerp(a, b, t) { return a + (b - a) * t; }
 
     // ========================= ESTADO =========================
-    var ctrl = { swing: 0.35, boom: 0.4, antebrazo: -0.3, arm: -1.0, bucket: 0.5, ext: 0 }; // pose inicial: cuchara despejada del suelo (boom dentro de BOOM_MAX real)
+    var ctrl = { swing: 0.35, boom: 0.7, antebrazo: -0.8, arm: -0.7, bucket: 0.5, ext: 0 }; // pose inicial: cuchara despejada del suelo
     var machine = { x: 0, z: -6, heading: 0 };
     var bucketLoad = 0, totalExcavated = 0, truckLoad = 0;
 
@@ -489,23 +440,6 @@
     var renderer, scene, camExternal, camCabin, activeCam;
     var terrainMesh, terrainGeo, heights, colors;
     var turretPivot, boomSeg, antebrazoSeg, armSeg, extender, bucketTip, dirtMound, machineRoot, bucketGroup, truckFill;
-    var placeholderParts = [];
-    var bucketPlaceholderParts = []; // cuchara de referencia: solo se retira si aparece la real
-    var plumaPlaceholderParts = []; // pluma de referencia: solo se retira si aparece la real
-    var antebrazoPlaceholderParts = []; // antebrazo de referencia: solo se retira si aparece el real
-    var armPlaceholderParts = []; // brazo de referencia: solo se retira si aparece el real
-    var DEBUG_MODE = location.search.indexOf('debug=1') >= 0;
-    // todas las mallas de Group44 (pluma+antebrazo+brazo+cuchara) ya reensambladas
-    // como una sola pieza rígida: {mesh, meshId, piece}. La usa el panel de picking
-    // (?debug=1) para saber qué pieza tocó cada clic, y buildRealArmChain() para
-    // repartir cada malla en su pivote real.
-    var armAssemblyMeshes = [];
-    // los 4 pivotes reales (torreta->pluma->antebrazo->brazo->cuchara), anidados uno
-    // dentro del otro en REAL_JOINT_A/B/C/D — null hasta que buildRealArmChain() los
-    // arma (cuando se identificó al menos una pieza real). Si quedan null, sigue
-    // funcionando el esqueleto procedural (boomSeg/antebrazoSeg/armSeg/bucketGroup).
-    var armPivotA = null, armPivotB = null, armPivotC = null, armPivotD = null;
-
     function currentSize() { return { w: VIEW.clientWidth || 800, h: VIEW.clientHeight || 500 }; }
 
     function initThree() {
@@ -539,7 +473,6 @@
       buildTerrain();
       buildMachine();
       buildTruck();
-      loadRealModel();
       setupExternalOrbit();
       window.addEventListener('resize', onResize);
       // el contenedor puede reportar tamaño 0 en el primer tick antes de que
@@ -775,109 +708,284 @@
       bucketLoad = clamp(bucketLoad - give, 0, BUCKET_CAPACITY);
     }
 
-    // ---------- máquina ----------
-    function makeSegment(length, width, height, color) {
+    // ---------- máquina (diseño propio, procedural) ----------
+    // Toda la máquina se construye con geometría generada por código (perfiles
+    // extruidos, cilindros, cajas): no usa mallas ni texturas externas. Eje +Z = hacia
+    // donde apunta la pluma, +Y = arriba, X = lateral (cabina a la izquierda, x<0).
+    function stdMat(color, rough, metal, extra) {
+      var m = new THREE.MeshStandardMaterial({ color: color, roughness: rough, metalness: metal });
+      if (extra) for (var k in extra) m[k] = extra[k];
+      return m;
+    }
+    var M_YEL, M_YEL_DK, M_STEEL, M_DARK, M_GRAY, M_CHROME, M_GLASS, M_BELT, M_LIGHT, M_RED;
+    function initMaterials() {
+      M_YEL = stdMat(YELLOW, 0.5, 0.25);
+      M_YEL_DK = stdMat(YELLOW_DK, 0.5, 0.3);
+      M_STEEL = stdMat(STEEL, 0.5, 0.5);
+      M_DARK = stdMat(DARK, 0.75, 0.2);
+      M_GRAY = stdMat(0x59616b, 0.6, 0.35);
+      M_CHROME = stdMat(0xc9d1d9, 0.25, 0.8);
+      M_GLASS = stdMat(GLASS, 0.1, 0.6, { transparent: true, opacity: 0.4, depthWrite: false });
+      M_BELT = stdMat(0x23272d, 0.95, 0.05);
+      M_LIGHT = stdMat(0xfff4c2, 0.3, 0.1, { emissive: 0xffe8a0, emissiveIntensity: 0.7 });
+      M_RED = stdMat(0xb3261e, 0.5, 0.1, { emissive: 0x5a0f0b, emissiveIntensity: 0.6 });
+    }
+    function addMesh(parent, geo, mat, x, y, z) {
+      var m = new THREE.Mesh(geo, mat);
+      m.position.set(x || 0, y || 0, z || 0);
+      m.castShadow = true; m.receiveShadow = true;
+      parent.add(m);
+      return m;
+    }
+    function addBox(parent, w, h, d, mat, x, y, z) {
+      return addMesh(parent, new THREE.BoxGeometry(w, h, d), mat, x, y, z);
+    }
+    // cilindro con eje a lo largo de X (ruedas, pasadores)
+    function addAxisX(parent, r, len, mat, x, y, z, seg) {
+      var g = new THREE.CylinderGeometry(r, r, len, seg || 18);
+      g.rotateZ(Math.PI / 2);
+      return addMesh(parent, g, mat, x, y, z);
+    }
+    function roundedRectShape(w, d, r) {
+      var x = w / 2, y = d / 2, s = new THREE.Shape();
+      s.moveTo(-x + r, -y); s.lineTo(x - r, -y); s.quadraticCurveTo(x, -y, x, -y + r);
+      s.lineTo(x, y - r); s.quadraticCurveTo(x, y, x - r, y);
+      s.lineTo(-x + r, y); s.quadraticCurveTo(-x, y, -x, y - r);
+      s.lineTo(-x, -y + r); s.quadraticCurveTo(-x, -y, -x + r, -y);
+      return s;
+    }
+    // losa de esquinas redondeadas: w en X, d en Z, altura h hacia +Y (base en y=0)
+    function roundedSlab(w, d, h, r, mat) {
+      var geo = new THREE.ExtrudeGeometry(roundedRectShape(w, d, r), {
+        depth: h, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.015, bevelSegments: 2, curveSegments: 6
+      });
+      geo.rotateX(-Math.PI / 2);
+      var m = new THREE.Mesh(geo, mat);
+      m.castShadow = true; m.receiveShadow = true;
+      return m;
+    }
+    // viga de perfil lateral (z, y) extruida a lo ancho (X) — pluma, antebrazo y brazo
+    function beamMesh(profile, width, mat) {
+      var s = new THREE.Shape();
+      profile.forEach(function (p, i) { if (i === 0) s.moveTo(p[0], p[1]); else s.lineTo(p[0], p[1]); });
+      s.closePath();
+      var geo = new THREE.ExtrudeGeometry(s, {
+        depth: width, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.02, bevelSegments: 2, curveSegments: 4
+      });
+      geo.rotateY(-Math.PI / 2);
+      geo.translate(width / 2, 0, 0);
+      var m = new THREE.Mesh(geo, mat);
+      m.castShadow = true; m.receiveShadow = true;
+      return m;
+    }
+    // segmento articulado: root gira en su origen; end es el siguiente pasador (0,0,length)
+    function makeBeam(length, width, profile, mat) {
       var g = new THREE.Group();
-      var geo = new THREE.BoxGeometry(width, height, length);
-      geo.translate(0, 0, length / 2);
-      var mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: color, roughness: 0.55, metalness: 0.35 }));
-      mesh.castShadow = true; mesh.receiveShadow = true;
+      var mesh = beamMesh(profile, width, mat);
       g.add(mesh);
       var end = new THREE.Group(); end.position.set(0, 0, length);
       g.add(end);
-      return { root: g, end: end, mesh: mesh, width: width, height: height, length: length };
+      // pasadores a la vista en ambos extremos
+      addAxisX(g, 0.07, width + 0.12, M_STEEL, 0, 0, 0, 14);
+      addAxisX(end, 0.07, width + 0.12, M_STEEL, 0, 0, 0, 14);
+      return { root: g, end: end, mesh: mesh, length: length, width: width };
+    }
+
+    // cilindro hidráulico: cuerpo + vástago, se reorienta cada frame entre dos anclajes
+    var rams = [];
+    var UP = new THREE.Vector3(0, 1, 0);
+    function addRam(parent, rBody, rRod, aObj, aPt, bObj, bPt) {
+      function part(r, mat) {
+        var geo = new THREE.CylinderGeometry(r, r, 1, 12);
+        geo.translate(0, 0.5, 0);
+        var m = new THREE.Mesh(geo, mat);
+        m.castShadow = true;
+        parent.add(m);
+        return m;
+      }
+      rams.push({
+        parent: parent, a: aObj, aPt: new THREE.Vector3(aPt[0], aPt[1], aPt[2]),
+        b: bObj, bPt: new THREE.Vector3(bPt[0], bPt[1], bPt[2]),
+        body: part(rBody, M_STEEL), rod: part(rRod, M_CHROME)
+      });
+    }
+    var _p1 = new THREE.Vector3(), _p2 = new THREE.Vector3(), _d = new THREE.Vector3(), _q = new THREE.Quaternion();
+    function updateRams() {
+      rams.forEach(function (r) {
+        _p1.copy(r.aPt); r.a.localToWorld(_p1); r.parent.worldToLocal(_p1);
+        _p2.copy(r.bPt); r.b.localToWorld(_p2); r.parent.worldToLocal(_p2);
+        _d.subVectors(_p2, _p1);
+        var len = Math.max(0.05, _d.length());
+        _d.normalize(); _q.setFromUnitVectors(UP, _d);
+        var bodyLen = len * 0.58;
+        r.body.position.copy(_p1); r.body.quaternion.copy(_q); r.body.scale.set(1, bodyLen, 1);
+        r.rod.position.copy(_p1).addScaledVector(_d, bodyLen * 0.9);
+        r.rod.quaternion.copy(_q); r.rod.scale.set(1, len - bodyLen * 0.9, 1);
+      });
+    }
+
+    // oruga: banda de eslabones con zapatas, bastidor, rueda motriz, guía y rodillos
+    function buildTrack(parent, side) {
+      var g = new THREE.Group();
+      g.position.set(side * 1.12, 0.4, 0);
+      parent.add(g);
+      var S = 2.9, R = 0.38, W = 0.56;
+      function stadium(path, r, s) {
+        path.moveTo(-s / 2, -r);
+        path.lineTo(s / 2, -r);
+        path.absarc(s / 2, 0, r, -Math.PI / 2, Math.PI / 2, false);
+        path.lineTo(-s / 2, r);
+        path.absarc(-s / 2, 0, r, Math.PI / 2, Math.PI * 1.5, false);
+      }
+      var outer = new THREE.Shape(); stadium(outer, R, S);
+      var hole = new THREE.Path(); stadium(hole, R - 0.075, S);
+      outer.holes.push(hole);
+      var beltGeo = new THREE.ExtrudeGeometry(outer, { depth: W, bevelEnabled: false, curveSegments: 20 });
+      beltGeo.rotateY(-Math.PI / 2); beltGeo.translate(W / 2, 0, 0);
+      addMesh(g, beltGeo, M_BELT, 0, 0, 0);
+      // zapatas (garras) repartidas a lo largo del perímetro de la banda
+      var perim = 2 * S + 2 * Math.PI * R, N = 52;
+      var shoeGeo = new THREE.BoxGeometry(W + 0.04, 0.05, 0.1);
+      var shoes = new THREE.InstancedMesh(shoeGeo, M_STEEL, N);
+      var dum = new THREE.Object3D();
+      for (var i = 0; i < N; i++) {
+        var t = (i / N) * perim, y, z, ang;
+        if (t < S) { z = -S / 2 + t; y = -R - 0.01; ang = 0; }
+        else if (t < S + Math.PI * R) { var a1 = (t - S) / R; z = S / 2 + R * Math.sin(a1); y = -R * Math.cos(a1); ang = a1; }
+        else if (t < 2 * S + Math.PI * R) { z = S / 2 - (t - S - Math.PI * R); y = R + 0.01; ang = Math.PI; }
+        else { var a2 = (t - 2 * S - Math.PI * R) / R; z = -S / 2 - R * Math.sin(a2); y = R * Math.cos(a2); ang = Math.PI + a2; }
+        dum.position.set(0, y, z); dum.rotation.set(-ang, 0, 0); dum.updateMatrix();
+        shoes.setMatrixAt(i, dum.matrix);
+      }
+      shoes.castShadow = true;
+      g.add(shoes);
+      // bastidor interior, rueda motriz (atrás), guía (adelante) y rodillos inferiores
+      addBox(g, 0.34, 0.26, S + 0.2, M_GRAY, 0, 0.0, 0);
+      addAxisX(g, 0.3, 0.46, M_STEEL, 0, 0, -S / 2, 20);
+      addAxisX(g, 0.27, 0.46, M_STEEL, 0, 0, S / 2, 20);
+      addAxisX(g, 0.12, 0.62, M_YEL_DK, 0, 0, -S / 2, 14); // cubo de la rueda motriz
+      for (var k = 0; k < 5; k++) addAxisX(g, 0.12, 0.5, M_GRAY, 0, -R + 0.13, -S / 2 + 0.55 + k * ((S - 1.1) / 4), 14);
+      // guardabarros superior
+      addBox(g, W - 0.06, 0.04, S - 0.4, M_YEL_DK, 0, R + 0.05, 0);
     }
 
     function buildMachine() {
+      initMaterials();
       var mroot = new THREE.Group();
       mroot.position.set(machine.x, 0, machine.z);
       scene.add(mroot);
       machineRoot = mroot;
 
-      // chasis/orugas/torreta/cabina "de referencia": se ven mientras carga el modelo
-      // real (OBJ) y se ocultan apenas ese modelo está listo.
-      // orugas
-      var trackMat = new THREE.MeshStandardMaterial({ color: DARK, roughness: 0.8 });
-      [-1, 1].forEach(function (side) {
-        var tr = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.5, 3.7), trackMat);
-        tr.position.set(side * 1.05, 0.28, 0);
-        tr.castShadow = true; tr.receiveShadow = true;
-        mroot.add(tr);
-        placeholderParts.push(tr);
-      });
-      // chasis inferior
-      var chassis = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.55, 2.9), new THREE.MeshStandardMaterial({ color: STEEL, roughness: 0.6, metalness: 0.4 }));
-      chassis.position.set(0, 0.75, 0); chassis.castShadow = true; chassis.receiveShadow = true;
-      mroot.add(chassis);
-      placeholderParts.push(chassis);
+      // ---- tren de rodaje ----
+      buildTrack(mroot, -1);
+      buildTrack(mroot, 1);
+      addBox(mroot, 1.7, 0.42, 2.6, M_STEEL, 0, 0.62, 0);          // bastidor central
+      addBox(mroot, 1.6, 0.2, 0.5, M_GRAY, 0, 0.5, 1.6);            // travesaño delantero
+      addBox(mroot, 1.6, 0.2, 0.5, M_GRAY, 0, 0.5, -1.6);           // travesaño trasero
+      var ring = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.14, 32), M_DARK);
+      ring.position.y = 0.9; ring.castShadow = true; mroot.add(ring); // corona de giro
 
-      // torreta (gira = swing)
+      // ---- torreta (gira = swing) ----
       turretPivot = new THREE.Group();
-      turretPivot.position.set(0, 1.05, 0.1);
+      turretPivot.position.set(0, 0.97, 0.1);
       mroot.add(turretPivot);
 
-      var turretBody = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.1, 0.5, 16), new THREE.MeshStandardMaterial({ color: YELLOW, roughness: 0.5, metalness: 0.3 }));
-      turretBody.position.y = 0.25; turretBody.castShadow = true; turretBody.receiveShadow = true;
-      turretPivot.add(turretBody);
-      placeholderParts.push(turretBody);
+      var deck = roundedSlab(2.3, 2.75, 0.16, 0.35, M_DARK);
+      deck.position.set(0, 0, -0.225); turretPivot.add(deck);
 
-      // cabina (desplazada del eje del brazo para tener visión)
-      var cabinGroup = new THREE.Group();
-      cabinGroup.position.set(-0.75, 0.5, -0.35);
-      turretPivot.add(cabinGroup);
-      placeholderParts.push(cabinGroup);
-      var cabinBody = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.25, 1.25), new THREE.MeshStandardMaterial({ color: YELLOW_DK, roughness: 0.5, metalness: 0.3 }));
-      cabinBody.position.y = 0.62; cabinBody.castShadow = true;
-      cabinGroup.add(cabinBody);
-      var glassFront = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.85, 0.06), new THREE.MeshStandardMaterial({ color: GLASS, roughness: 0.1, metalness: 0.6, transparent: true, opacity: 0.55 }));
-      glassFront.position.set(0, 0.75, 0.66);
-      cabinGroup.add(glassFront);
+      // motor (capó con rejillas), contrapeso y tanque
+      var hood = roundedSlab(1.75, 1.15, 0.72, 0.2, M_YEL);
+      hood.position.set(-0.05, 0.16, -0.72); turretPivot.add(hood);
+      for (var l = 0; l < 5; l++) addBox(turretPivot, 1.3, 0.025, 0.05, M_DARK, -0.05, 0.9, -0.5 - l * 0.14);
+      var cw = roundedSlab(2.15, 0.78, 0.78, 0.3, M_GRAY);
+      cw.position.set(0, 0.16, -1.55); turretPivot.add(cw);
+      [-1, 1].forEach(function (sd) { addBox(turretPivot, 0.22, 0.1, 0.05, M_RED, sd * 0.8, 0.62, -1.95); });
+      var tank = roundedSlab(0.62, 1.0, 0.55, 0.1, M_YEL_DK);
+      tank.position.set(0.98, 0.16, 0.38); turretPivot.add(tank);
+      addMesh(turretPivot, new THREE.CylinderGeometry(0.05, 0.06, 0.7, 10), M_DARK, 0.7, 1.15, -0.55); // escape
+      addMesh(turretPivot, new THREE.CylinderGeometry(0.085, 0.05, 0.06, 10), M_STEEL, 0.7, 1.52, -0.55);
+      // pasamanos del lado derecho
+      for (var pz = 0; pz < 3; pz++) {
+        addMesh(turretPivot, new THREE.CylinderGeometry(0.018, 0.018, 0.55, 8), M_STEEL, 1.15, 0.45, -1.0 + pz * 0.55);
+      }
+      var rail = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 1.1, 8), M_STEEL);
+      rail.rotation.x = Math.PI / 2; rail.position.set(1.15, 0.72, -0.45); turretPivot.add(rail);
 
-      // cámara de cabina: montada en la torreta (sigue el giro, no la pluma).
-      // Posición calibrada dentro de la cabina real (modelo real) una vez cargado;
-      // este valor es el de referencia mientras se usa el chasis provisorio.
-      camCabin.position.set(-0.13, 1.55, 1.1);
+      // ---- cabina (a la izquierda, con vista al brazo) ----
+      var cx = -0.78, cz = 0.45, cwid = 1.05, cdep = 1.2, base = 0.16;
+      var cabFloor = roundedSlab(cwid + 0.1, cdep + 0.1, 0.06, 0.08, M_GRAY);
+      cabFloor.position.set(cx, base, cz); turretPivot.add(cabFloor);
+      addBox(turretPivot, cwid, 0.42, cdep, M_YEL, cx, base + 0.27, cz);   // faldón inferior
+      var glassH = 1.0, glassY = base + 0.48 + glassH / 2;
+      addBox(turretPivot, cwid - 0.1, glassH, 0.03, M_GLASS, cx, glassY, cz + cdep / 2);          // frontal
+      addBox(turretPivot, cwid - 0.1, glassH, 0.03, M_GLASS, cx, glassY, cz - cdep / 2);          // trasero
+      addBox(turretPivot, 0.03, glassH, cdep - 0.1, M_GLASS, cx - cwid / 2, glassY, cz);          // lateral izq.
+      addBox(turretPivot, 0.03, glassH, cdep - 0.1, M_GLASS, cx + cwid / 2, glassY, cz);          // lateral der.
+      [-1, 1].forEach(function (sx) { [-1, 1].forEach(function (sz) {
+        addBox(turretPivot, 0.05, glassH + 0.05, 0.05, M_YEL_DK, cx + sx * cwid / 2, glassY, cz + sz * cdep / 2); // pilares
+      }); });
+      var roof = roundedSlab(cwid + 0.22, cdep + 0.3, 0.09, 0.1, M_YEL_DK);
+      roof.position.set(cx, base + 0.48 + glassH + 0.02, cz + 0.05); turretPivot.add(roof);
+      [-1, 1].forEach(function (sx) { addBox(turretPivot, 0.2, 0.09, 0.08, M_LIGHT, cx + sx * 0.32, base + 0.48 + glassH + 0.13, cz + cdep / 2 + 0.12); }); // faros
+      // interior: asiento y palancas
+      addBox(turretPivot, 0.46, 0.14, 0.46, M_DARK, cx, base + 0.5, cz - 0.28);
+      addBox(turretPivot, 0.46, 0.55, 0.1, M_DARK, cx, base + 0.8, cz - 0.5);
+      [-1, 1].forEach(function (sx) {
+        addBox(turretPivot, 0.16, 0.28, 0.4, M_GRAY, cx + sx * 0.36, base + 0.62, cz - 0.1);
+        addMesh(turretPivot, new THREE.CylinderGeometry(0.015, 0.015, 0.22, 6), M_DARK, cx + sx * 0.36, base + 0.88, cz - 0.04);
+      });
+
+      // cámara de cabina: dentro de la cabina, sigue el giro de la torreta
+      camCabin.position.set(cx + 0.12, base + 1.2, cz - 0.3);
       camCabin.rotation.y = Math.PI; // mirar hacia +Z (donde está la pluma)
       turretPivot.add(camCabin);
 
-      // contrapeso
-      var cw = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.6, 0.5), new THREE.MeshStandardMaterial({ color: DARK, roughness: 0.6 }));
-      cw.position.set(0, 0.55, -1.05); cw.castShadow = true;
-      turretPivot.add(cw);
-      placeholderParts.push(cw);
-
-      // pluma (boom) — articulación torreta-pluma
-      boomSeg = makeSegment(1.6, 0.34, 0.4, YELLOW);
-      boomSeg.root.position.set(0.32, 0.55, 0.55);
+      // ---- pluma (boom) — articulación torreta-pluma ----
+      var BX = 0.32, BY = 0.55, BZ = 0.55;
+      [-1, 1].forEach(function (sd) {
+        addBox(turretPivot, 0.06, 0.62, 0.55, M_YEL_DK, BX + sd * 0.2, BY / 2 + 0.2, BZ - 0.1); // orejas del soporte
+      });
+      boomSeg = makeBeam(2.1, 0.34, [
+        [0, 0.22], [0.45, 0.5], [1.2, 0.62], [1.95, 0.3], [2.1, 0.17],
+        [2.1, -0.17], [1.95, -0.2], [1.3, 0.12], [0.6, 0.0], [0, -0.22]
+      ], M_YEL);
+      boomSeg.root.position.set(BX, BY, BZ);
       boomSeg.root.rotation.x = -ctrl.boom;
       turretPivot.add(boomSeg.root);
-      plumaPlaceholderParts.push(boomSeg.mesh); // se oculta si la pluma real carga bien
+      // orejas para cilindros: abajo (pluma) y arriba (antebrazo)
+      [-1, 1].forEach(function (sd) { addBox(boomSeg.root, 0.05, 0.22, 0.2, M_YEL_DK, sd * 0.2, -0.04, 0.9); });
+      addBox(boomSeg.root, 0.1, 0.16, 0.14, M_YEL_DK, 0, 0.7, 1.15);
 
-      // antebrazo — articulación pluma-antebrazo (segunda sección del brazo articulado)
-      antebrazoSeg = makeSegment(1.4, 0.30, 0.34, YELLOW);
+      // ---- antebrazo — articulación pluma-antebrazo ----
+      antebrazoSeg = makeBeam(1.5, 0.3, [
+        [0, 0.22], [0.5, 0.3], [1.0, 0.22], [1.5, 0.15],
+        [1.5, -0.15], [1.0, -0.17], [0.5, -0.2], [0, -0.22]
+      ], M_YEL);
       antebrazoSeg.root.rotation.x = -ctrl.antebrazo;
       boomSeg.end.add(antebrazoSeg.root);
-      antebrazoPlaceholderParts.push(antebrazoSeg.mesh); // se oculta si el antebrazo real carga bien
+      addBox(antebrazoSeg.root, 0.1, 0.16, 0.14, M_YEL_DK, 0, 0.36, 0.42);
+      addBox(antebrazoSeg.root, 0.1, 0.14, 0.14, M_YEL_DK, 0, 0.3, 1.0);
 
-      // brazo (arm / stick) — articulación antebrazo-brazo
-      armSeg = makeSegment(2.05, 0.27, 0.3, YELLOW_DK);
+      // ---- brazo (dipper) — articulación antebrazo-brazo ----
+      armSeg = makeBeam(1.7, 0.27, [
+        [0, 0.2], [0.9, 0.22], [1.7, 0.12],
+        [1.7, -0.12], [0.9, -0.15], [0, -0.2]
+      ], M_YEL_DK);
       armSeg.root.rotation.x = -ctrl.arm;
       antebrazoSeg.end.add(armSeg.root);
-      armPlaceholderParts.push(armSeg.mesh); // se oculta si el brazo real carga bien
+      addBox(armSeg.root, 0.1, 0.14, 0.14, M_YEL, 0, 0.3, 0.38);
+      addBox(armSeg.root, 0.1, 0.14, 0.14, M_YEL, 0, 0.28, 1.0);
 
-      // extensor tipo boom (brazo telescópico): el modelo real no tiene telescopio
-      // identificado, es puramente del esqueleto procedural — se oculta junto con el
-      // resto de ese esqueleto en cuanto carga el brazo real (ver armPlaceholderParts).
+      // ---- extensor telescópico ----
       extender = buildExtender(armSeg.end, 0.22, 0.24);
-      armPlaceholderParts.push(extender.sleeve, extender.rod);
 
-      // cuchara (bucket) — perfil curvo de referencia (BK); se reemplaza por la cuchara
-      // real del modelo apenas termina de cargar (ver onRealModelLoaded).
+      // ---- cuchara — perfil curvo (BK) con filo, costillas y dientes ----
       bucketGroup = new THREE.Group();
       bucketGroup.rotation.x = -ctrl.bucket;
       extender.end.add(bucketGroup);
-      var bmat = new THREE.MeshStandardMaterial({ color: STEEL, roughness: 0.5, metalness: 0.5 });
-
+      addAxisX(bucketGroup, 0.07, 0.46, M_STEEL, 0, 0, 0, 14);
+      var bmat = stdMat(STEEL, 0.5, 0.5);
+      var edgeMat = stdMat(0x8a939c, 0.35, 0.7);
       for (var bi = 0; bi < BK.length - 1; bi++) {
         var pA = BK[bi], pB = BK[bi + 1];
         var dz = pB.z - pA.z, dy = pB.y - pA.y;
@@ -889,7 +997,6 @@
         plate.rotation.x = Math.atan2(-dy, dz);
         plate.castShadow = true; plate.receiveShadow = true;
         bucketGroup.add(plate);
-        bucketPlaceholderParts.push(plate);
       }
       [-1, 1].forEach(function (side) {
         var sideShape = new THREE.Shape();
@@ -903,17 +1010,18 @@
         sm.rotation.y = side > 0 ? Math.PI / 2 : -Math.PI / 2;
         sm.castShadow = true;
         bucketGroup.add(sm);
-        bucketPlaceholderParts.push(sm);
+        addBox(bucketGroup, 0.05, 0.28, 0.26, M_YEL_DK, side * 0.12, 0.1, 0.0); // orejas de enganche
       });
+      addBox(bucketGroup, 0.1, 0.16, 0.12, M_YEL_DK, 0, 0.3, -0.12);            // oreja del cilindro
       var tipP = BK[BK.length - 1], prevP = BK[BK.length - 2];
       var toothAngle = Math.atan2(-(tipP.y - prevP.y), tipP.z - prevP.z);
       for (var t = -2; t <= 2; t++) {
-        var tooth = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.17, 6), bmat);
+        var tooth = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.19, 4), edgeMat);
         tooth.position.set(t * (BUCKET_W / 5.2), tipP.y, tipP.z);
         tooth.rotation.x = Math.PI / 2 - toothAngle;
+        tooth.rotation.y = Math.PI / 4;
         tooth.castShadow = true;
         bucketGroup.add(tooth);
-        bucketPlaceholderParts.push(tooth);
       }
       bucketTip = new THREE.Object3D();
       bucketTip.position.set(0, tipP.y, tipP.z);
@@ -924,32 +1032,39 @@
       dirtMound.scale.set(0.001, 0.001, 0.001);
       dirtMound.position.set(0, (BK[1].y + BK[3].y) / 2 + 0.12, (BK[1].z + BK[3].z) / 2);
       bucketGroup.add(dirtMound);
+
+      // ---- cilindros hidráulicos (se estiran entre sus anclajes) ----
+      [-1, 1].forEach(function (sd) {
+        addRam(turretPivot, 0.075, 0.05, turretPivot, [BX + sd * 0.26, 0.32, 0.3], boomSeg.root, [sd * 0.26, -0.04, 0.9]);
+      });
+      addRam(turretPivot, 0.07, 0.048, boomSeg.root, [0, 0.74, 1.15], antebrazoSeg.root, [0, 0.38, 0.42]);
+      addRam(turretPivot, 0.065, 0.045, antebrazoSeg.root, [0, 0.36, 1.0], armSeg.root, [0, 0.34, 0.38]);
+      addRam(turretPivot, 0.06, 0.042, armSeg.root, [0, 0.34, 1.0], bucketGroup, [0, 0.36, -0.12]);
     }
 
     // ---------- extensor tipo boom (telescópico) ----------
     function buildExtender(parent, width, height) {
       var extRoot = new THREE.Group();
       parent.add(extRoot);
-      var mat = new THREE.MeshStandardMaterial({ color: YELLOW_DK, roughness: 0.5, metalness: 0.35 });
 
       var sleeveGeo = new THREE.BoxGeometry(width, height, EXT_SLEEVE_LEN);
       sleeveGeo.translate(0, 0, EXT_SLEEVE_LEN / 2);
-      var sleeve = new THREE.Mesh(sleeveGeo, mat);
+      var sleeve = new THREE.Mesh(sleeveGeo, M_YEL_DK);
       sleeve.castShadow = true; sleeve.receiveShadow = true;
       extRoot.add(sleeve);
 
       var rodGroup = new THREE.Group();
       extRoot.add(rodGroup);
-      var rodMat = new THREE.MeshStandardMaterial({ color: STEEL, roughness: 0.4, metalness: 0.55 });
       var rodGeo = new THREE.BoxGeometry(width * 0.72, height * 0.72, EXT_ROD_LEN);
       rodGeo.translate(0, 0, EXT_ROD_LEN / 2);
-      var rod = new THREE.Mesh(rodGeo, rodMat);
+      var rod = new THREE.Mesh(rodGeo, M_STEEL);
       rod.castShadow = true;
       rodGroup.add(rod);
 
       var end = new THREE.Group();
       end.position.set(0, 0, EXT_ROD_LEN);
       rodGroup.add(end);
+      addAxisX(end, 0.06, width + 0.1, M_STEEL, 0, 0, 0, 12);
 
       return { root: extRoot, rodGroup: rodGroup, end: end, sleeve: sleeve, rod: rod };
     }
@@ -1026,899 +1141,6 @@
     function emptyTruck() {
       truckLoad = 0;
       if (truckFill) truckFill.scale.y = 0.001;
-    }
-
-    // ---------- modelo real (OBJ) ----------
-    // Reemplaza el chasis/orugas/torreta/cabina "de referencia" por el modelo real del
-    // usuario. La torreta (Group43 en el .obj) viene soldada de fábrica con pluma+brazo+
-    // cuchara incluidos; pluma y brazo se descartan (queda la propia, articulada), pero la
-    // cuchara real (BUCKET_MESH_NAMES) se reengancha al pivote de la cuchara propia.
-    function loadRealModel() {
-      if (typeof THREE.MTLLoader !== 'function' || typeof THREE.OBJLoader !== 'function') return;
-      var mtlLoader = new THREE.MTLLoader();
-      mtlLoader.setPath('modelo/');
-      mtlLoader.load('excavadora.mtl', function (materials) {
-        materials.preload();
-        var objLoader = new THREE.OBJLoader();
-        objLoader.setMaterials(materials);
-        objLoader.setPath('modelo/');
-        objLoader.load('excavadora.obj', onRealModelLoaded, undefined, function (err) {
-          console.warn('No se pudo cargar excavadora.obj, se mantiene la máquina de referencia.', err);
-        });
-      }, undefined, function (err) {
-        console.warn('No se pudo cargar excavadora.mtl, se mantiene la máquina de referencia.', err);
-      });
-    }
-
-    function pieceOfMesh(meshId) {
-      if (BUCKET_MESH_NAMES.indexOf(meshId) >= 0) return 'cuchara';
-      if (ARM_MESH_NAMES.indexOf(meshId) >= 0) return 'brazo';
-      if (ANTEBRAZO_MESH_NAMES.indexOf(meshId) >= 0) return 'antebrazo';
-      if (PLUMA_MESH_NAMES.indexOf(meshId) >= 0) return 'pluma';
-      return null;
-    }
-
-    function onRealModelLoaded(obj) {
-      // 1) recolectar todas las mallas SIN tocar el árbol todavía (reparentar durante
-      // el traverse corrompe la recorrida, porque add() saca al hijo de su padre actual)
-      var meshes = [];
-      obj.traverse(function (o) { if (o.isMesh) meshes.push(o); });
-
-      // 2) clasificar y recién ahí transformar/reparentar/descartar. Group44 entero
-      // (pluma+antebrazo+brazo+cuchara) se reensambla con la MISMA transformación que
-      // el resto de la torreta — nada de ángulos "de ajuste" por pieza — y después
-      // buildRealArmChain() la cuelga de los 4 pivotes reales (REAL_JOINT_A/B/C/D,
-      // medidos y confirmados con el panel de picking, ?debug=1) para que quede
-      // articulada. Ya validado: se muestra en uso normal también, no solo en debug.
-      var box = new THREE.Box3();
-      meshes.forEach(function (o) {
-        var toks = (o.name || '').trim().split(/\s+/);
-        var meshId = toks[0];
-        var isUpperWorks = toks.indexOf('Group43') >= 0;
-        var piece = isUpperWorks ? pieceOfMesh(meshId) : null;
-
-        box.setFromObject(o);
-        var cx = (box.min.x + box.max.x) / 2;
-        var isArmSide = isUpperWorks && (piece || cx < MODEL_ARM_CUT_X);
-        if (isArmSide && !piece && !DEBUG_MODE) {
-          // pieza del lado del brazo pero todavía sin identificar (no es ninguna de
-          // las 20 mallas de Group44): en uso normal se descarta; en ?debug=1 se
-          // conserva colgada de la torreta para poder marcarla con el panel.
-          if (o.geometry) o.geometry.dispose();
-          return;
-        }
-
-        o.castShadow = true; o.receiveShadow = true;
-        // recentra en el eje de giro (y, para la torreta, en su base) y pasa a metros;
-        // MODEL_ROTATE_Y corrige el sesgo de ~30° con el que quedó modelado el chasis
-        // (confirmado por PCA de las orugas) para que la dirección de manejo coincida
-        // con hacia dónde apuntan realmente las orugas. La misma transformación vale
-        // para toda la torreta, cabina y ahora también el brazo/cuchara: es una sola
-        // pieza reensamblada tal cual salió del modelo.
-        o.geometry.translate(-MODEL_CHASSIS_X, isUpperWorks ? -MODEL_TURRET_BASE_Y : 0, -MODEL_CHASSIS_Z);
-        o.geometry.rotateY(MODEL_ROTATE_Y);
-        o.geometry.scale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
-        o.position.set(0, 0, 0);
-        o.rotation.set(0, 0, 0);
-        o.scale.set(1, 1, 1);
-        if (isUpperWorks) turretPivot.add(o); else machineRoot.add(o);
-
-        if (isArmSide) {
-          armAssemblyMeshes.push({ mesh: o, meshId: meshId, piece: piece || 'sin_identificar' });
-        }
-      });
-
-      turretPivot.position.set(0, MODEL_TURRET_BASE_Y * MODEL_SCALE, 0);
-      placeholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
-      placeholderParts.length = 0;
-
-      if (armAssemblyMeshes.filter(function (e) { return e.piece !== 'sin_identificar'; }).length > 0) {
-        // el brazo real reemplaza al procedural: se cuelga de los 4 pasadores reales
-        // ya articulado con buildRealArmChain, usando el eje real de cada uno (no una
-        // rotación fija en X) para que no quede torsionado.
-        buildRealArmChain(REAL_JOINT_A, REAL_JOINT_B, REAL_JOINT_C, REAL_JOINT_D);
-        bucketPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
-        bucketPlaceholderParts.length = 0;
-        armPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
-        armPlaceholderParts.length = 0;
-        antebrazoPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
-        antebrazoPlaceholderParts.length = 0;
-        plumaPlaceholderParts.forEach(function (m) { if (m.parent) m.parent.remove(m); });
-        plumaPlaceholderParts.length = 0;
-      }
-
-      if (DEBUG_MODE) setupPointPickerPanel();
-    }
-
-    // ---------- cuelga el brazo/cuchara real de los 4 pivotes reales, articulado ----------
-    // A cada pieza (pluma/antebrazo/brazo/cuchara) le corresponde un pivote propio,
-    // anidado dentro del anterior (A dentro de turretPivot, B dentro de A, C dentro de
-    // B, D dentro de C), ubicado en el ORIGEN del pasador y con su EJE propio guardado
-    // en userData.axis (vector unitario, medido con el panel de picking marcando 2
-    // puntos por articulación — entrada y salida del pasador). Al girar cada pivote se
-    // usa quaternion.setFromAxisAngle sobre ESE eje, no una rotación fija en X: así
-    // cada pieza gira alrededor de su bisagra real y no queda torsionada. Cada malla
-    // real solo se traslada (mesh.position = -origen del pivote) para que, con el
-    // pivote sin girar, quede en la MISMA posición donde ya estaba (nada de re-
-    // orientarla). Admite volver a llamarse (el panel la reinvoca al tocar "Aplicar y
-    // probar"): si ya había una cadena armada, primero la deshace.
-    function buildRealArmChain(jointA, jointB, jointC, jointD) {
-      if (armPivotA) {
-        armAssemblyMeshes.forEach(function (entry) {
-          if (entry.piece === 'sin_identificar') return;
-          turretPivot.add(entry.mesh);
-          entry.mesh.position.set(0, 0, 0);
-        });
-        armPivotD.remove(bucketTip);
-        armPivotD.remove(dirtMound);
-        bucketGroup.add(bucketTip);
-        bucketGroup.add(dirtMound);
-        bucketTip.position.set(0, -0.5, 0.8);
-        dirtMound.position.set(0, -0.28, 0.45);
-        if (armPivotA.parent) armPivotA.parent.remove(armPivotA);
-        armPivotA = armPivotB = armPivotC = armPivotD = null;
-      }
-
-      var A = jointA.origin, B = jointB.origin, C = jointC.origin, D = jointD.origin;
-
-      armPivotA = new THREE.Group();
-      armPivotA.position.set(A.x, A.y, A.z);
-      armPivotA.userData.axis = new THREE.Vector3(jointA.axis.x, jointA.axis.y, jointA.axis.z).normalize();
-      turretPivot.add(armPivotA);
-
-      armPivotB = new THREE.Group();
-      armPivotB.position.set(B.x - A.x, B.y - A.y, B.z - A.z);
-      armPivotB.userData.axis = new THREE.Vector3(jointB.axis.x, jointB.axis.y, jointB.axis.z).normalize();
-      armPivotA.add(armPivotB);
-
-      armPivotC = new THREE.Group();
-      armPivotC.position.set(C.x - B.x, C.y - B.y, C.z - B.z);
-      armPivotC.userData.axis = new THREE.Vector3(jointC.axis.x, jointC.axis.y, jointC.axis.z).normalize();
-      armPivotB.add(armPivotC);
-
-      armPivotD = new THREE.Group();
-      armPivotD.position.set(D.x - C.x, D.y - C.y, D.z - C.z);
-      armPivotD.userData.axis = new THREE.Vector3(jointD.axis.x, jointD.axis.y, jointD.axis.z).normalize();
-      armPivotC.add(armPivotD);
-
-      var pivotByPiece = { pluma: armPivotA, antebrazo: armPivotB, brazo: armPivotC, cuchara: armPivotD };
-      var originByPiece = { pluma: A, antebrazo: B, brazo: C, cuchara: D };
-      armAssemblyMeshes.forEach(function (entry) {
-        var pivot = pivotByPiece[entry.piece];
-        if (!pivot) return; // sin_identificar: se deja colgada de la torreta tal cual
-        var origin = originByPiece[entry.piece];
-        pivot.add(entry.mesh);
-        entry.mesh.position.set(-origin.x, -origin.y, -origin.z);
-      });
-
-      // la cuchara real pasa a mandar la excavación: el diente (bucketTip,
-      // BUCKET_TIP_OFFSET) y el montoncito de material cargado (dirtMound,
-      // BUCKET_FILL_POINT) se cuelgan del pivote real D, cada uno con su propio punto
-      // — el diente es por dónde corta, el montículo es dónde conviene que se vea la
-      // tierra adentro, no son el mismo lugar. Ambos ajustables en vivo con el panel
-      // de picking (?debug=1).
-      bucketGroup.remove(bucketTip);
-      bucketGroup.remove(dirtMound);
-      armPivotD.add(bucketTip);
-      armPivotD.add(dirtMound);
-      bucketTip.position.set(BUCKET_TIP_OFFSET.x, BUCKET_TIP_OFFSET.y, BUCKET_TIP_OFFSET.z);
-      dirtMound.position.set(BUCKET_FILL_POINT.x, BUCKET_FILL_POINT.y, BUCKET_FILL_POINT.z);
-    }
-
-    // ---------- panel de picking: 4 pasadores, como cilindro pasante (?debug=1) ----------
-    // Cada articulación se define con 2 clics (entrada y salida del pasador), no un
-    // punto suelto: así se mide también la DIRECCIÓN real del eje de giro, y cada
-    // pieza rota alrededor de su bisagra real en vez de girar siempre en X — que era
-    // lo que la torsionaba. Se ve como un cilindro fino atravesando el modelo, no una
-    // esfera. "Aplicar y probar" reconstruye la cadena en vivo; "Copiar los 4
-    // valores" arma el texto listo para pasar. Mientras el panel está abierto, el
-    // brazo se congela en pose de descanso (todo en 0) para que lo medido sea
-    // comparable a REAL_JOINT_A/B/C/D. No aparece en el uso normal.
-    var jointDefs = [
-      { key: 'A', label: 'A · torreta → pluma', color: '#ff3b30' },
-      { key: 'B', label: 'B · pluma → antebrazo', color: '#34c759' },
-      { key: 'C', label: 'C · antebrazo → brazo', color: '#0a84ff' },
-      { key: 'D', label: 'D · brazo → cuchara', color: '#ff2d92' }
-    ];
-    var pickRaycaster = new THREE.Raycaster();
-    var pickPointerDown = null;
-
-    // límites de giro reales, uno por control (mismo mapeo que las articulaciones:
-    // boom=A, antebrazo=B, arm=C, bucket=D). limitTestMode[key] en true le dice a
-    // tick() que NO clampee ni sume el eje de esa articulación — así el panel puede
-    // llevarla más allá de los límites actuales para encontrar los nuevos, sin que se
-    // trabe de vuelta cada frame.
-    var limitDefs = [
-      { key: 'boom', label: 'A · Pluma', color: '#ff3b30' },
-      { key: 'antebrazo', label: 'B · Antebrazo', color: '#34c759' },
-      { key: 'arm', label: 'C · Brazo', color: '#0a84ff' },
-      { key: 'bucket', label: 'D · Cuchara', color: '#ff2d92' }
-    ];
-    var limitTestMode = { boom: false, antebrazo: false, arm: false, bucket: false };
-
-    // 8 puntos de la cuchara medidos con la regla en su sesión anterior (espacio
-    // local de armPivotD): R1-R4 el perímetro de la boca, R5-R8 el del fondo. Se
-    // muestran como referencia fija en el panel de debug para calibrar el contacto
-    // cuchara-suelo contra la geometría real, sin tener que remedirlos cada vez.
-    var BUCKET_REF_POINTS = [
-      { id: 'R1', part: 'boca', x: -0.210, y: -0.089, z: -1.415 },
-      { id: 'R2', part: 'boca', x: 0.285, y: -0.073, z: -0.607 },
-      { id: 'R3', part: 'boca', x: -0.796, y: -0.107, z: -1.054 },
-      { id: 'R4', part: 'boca', x: -0.344, y: -0.086, z: -0.273 },
-      { id: 'R5', part: 'fondo', x: -0.469, y: -0.959, z: -0.442 },
-      { id: 'R6', part: 'fondo', x: 0.187, y: -0.964, z: -0.746 },
-      { id: 'R7', part: 'fondo', x: -0.017, y: -0.859, z: -1.100 },
-      { id: 'R8', part: 'fondo', x: -0.653, y: -0.832, z: -0.761 }
-    ];
-
-    // punto real de contacto/corte de la cuchara (bucketTip): NO es el pasador D (esa
-    // es la articulación, no el filo). Valor confirmado marcando con clic sobre el
-    // diente real en el panel de picking (?debug=1); ajustable ahí mismo si hace
-    // falta afinarlo más. Mismo espacio local que BUCKET_REF_POINTS (armPivotD).
-    var BUCKET_TIP_OFFSET = { x: -0.5462, y: -0.1289, z: -1.3432 };
-
-    // punto donde se ve el montoncito de tierra cargada (dirtMound) — separado del
-    // diente (BUCKET_TIP_OFFSET): ese es por dónde corta, este es dónde conviene que
-    // se vea el material adentro de la cuchara. Reconfirmado a mano con el panel de
-    // picking (?debug=1), visible bien anidado dentro de la cavidad real. Ajustable
-    // con clic igual que el diente. BUCKET_FILL_SIZE es el radio (m) del montículo a
-    // carga 100%.
-    var BUCKET_FILL_POINT = { x: -0.33, y: -0.29, z: -0.93 };
-    var BUCKET_FILL_SIZE = 0.38;
-
-    // cilindro fino orientable: geometría unitaria (radio fijo, largo 1 a lo largo de
-    // Z desde el origen), se reorienta con quaternion + se escala en Z para estirarlo
-    // entre 2 puntos cualesquiera — el "pasador" visible de cada articulación.
-    function makeAxisCylinder(parent, hexColor) {
-      var geo = new THREE.CylinderGeometry(0.025, 0.025, 1, 12);
-      geo.rotateX(Math.PI / 2);
-      geo.translate(0, 0, 0.5);
-      var mat = new THREE.MeshBasicMaterial({ color: hexColor, depthTest: false, transparent: true, opacity: 0.85 });
-      var mesh = new THREE.Mesh(geo, mat);
-      mesh.renderOrder = 999;
-      parent.add(mesh);
-      return mesh;
-    }
-    var UNIT_Z = new THREE.Vector3(0, 0, 1);
-    function setAxisCylinderEnds(mesh, p1, p2) {
-      var dir = new THREE.Vector3(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z);
-      var len = Math.max(0.03, dir.length());
-      mesh.position.set(p1.x, p1.y, p1.z);
-      mesh.quaternion.setFromUnitVectors(UNIT_Z, dir.clone().normalize());
-      mesh.scale.set(1, 1, len);
-    }
-
-    function setupPointPickerPanel() {
-      // congela el brazo en pose de descanso: lo que se clickea tiene que quedar
-      // comparable a REAL_JOINT_A/B/C/D (medidos con todo en 0), no a la pose de
-      // juego inicial (ctrl.boom/antebrazo/arm/bucket arrancan con valores != 0).
-      ctrl.boom = 0; ctrl.antebrazo = 0; ctrl.arm = 0; ctrl.bucket = 0;
-      boomSeg.root.rotation.x = 0; antebrazoSeg.root.rotation.x = 0;
-      armSeg.root.rotation.x = 0; bucketGroup.rotation.x = 0;
-      if (armPivotA) {
-        armPivotA.quaternion.identity(); armPivotB.quaternion.identity();
-        armPivotC.quaternion.identity(); armPivotD.quaternion.identity();
-      }
-
-      var realJointDefaults = { A: REAL_JOINT_A, B: REAL_JOINT_B, C: REAL_JOINT_C, D: REAL_JOINT_D };
-      var jointVal = {};
-      jointDefs.forEach(function (jd) {
-        var src = realJointDefaults[jd.key];
-        var o = src.origin, ax = src.axis;
-        jointVal[jd.key] = {
-          p1: { x: o.x, y: o.y, z: o.z },
-          p2: { x: o.x + ax.x * 0.3, y: o.y + ax.y * 0.3, z: o.z + ax.z * 0.3 }
-        };
-      });
-      var jointMarker = {};
-      var armed = null; // { key, point: 1|2 }
-
-      var wrap = document.createElement('div');
-      wrap.id = 'debugPanel';
-      wrap.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:999;background:rgba(13,17,23,.95);' +
-        'border:1px solid #30363d;border-radius:10px;padding:12px 14px;width:320px;max-height:82vh;overflow:auto;' +
-        'font-family:monospace;font-size:11px;color:#e6edf3;box-shadow:0 4px 20px rgba(0,0,0,.5);';
-
-      wrap.innerHTML =
-        '<div style="font-weight:bold;color:#58a6ff;margin-bottom:6px">🧩 4 pasadores reales</div>' +
-        '<div style="color:#8b949e;margin-bottom:8px">Por cada articulación, marcá 2 puntos sobre el mismo eje del pasador (entrada y salida, mirándolo desde cualquier ángulo) — el panel arma un cilindro entre los dos y calcula el eje de giro real. El brazo queda congelado en pose de descanso mientras marcás.</div>' +
-        '<div id="dbgArmStatus" style="min-height:14px;color:#f0b429;margin-bottom:6px"></div>' +
-        jointDefs.map(function (jd) {
-          return '<div style="border-left:4px solid ' + jd.color + ';padding:5px 8px;margin-bottom:6px;background:#161b22;border-radius:4px">' +
-            '<div style="display:flex;justify-content:space-between;align-items:center">' +
-            '<strong style="color:' + jd.color + '">' + jd.label + '</strong>' +
-            '<span style="display:flex;gap:4px">' +
-            '<button type="button" data-arm="' + jd.key + '" data-pt="1" id="dbgArm' + jd.key + '1" style="font-size:10px;padding:3px 6px;background:' + jd.color + ';color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">① </button>' +
-            '<button type="button" data-arm="' + jd.key + '" data-pt="2" id="dbgArm' + jd.key + '2" style="font-size:10px;padding:3px 6px;background:' + jd.color + ';color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">② </button>' +
-            '</span></div>' +
-            '<div id="dbgVal' + jd.key + '" style="color:#8b949e;margin-top:3px;white-space:pre-line"></div>' +
-            '</div>';
-        }).join('') +
-        '<div style="display:flex;gap:6px;margin:8px 0">' +
-        '<button type="button" id="dbgPickApply" style="flex:1;font-size:10px;padding:5px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:4px;cursor:pointer">Aplicar y probar</button>' +
-        '<button type="button" id="dbgPickCopy" style="flex:1;font-size:10px;padding:5px;background:#58a6ff;color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">Copiar los 4 valores</button>' +
-        '</div>' +
-        '<div style="font-weight:bold;color:#58a6ff;margin:10px 0 6px;border-top:1px solid #30363d;padding-top:10px">🎚️ Límites de giro reales</div>' +
-        '<div style="color:#8b949e;margin-bottom:8px">Activá "sin límite" en la articulación que querés probar, movela con el slider hasta el punto justo antes de que se vea mal (se clave en otra pieza, se estire de más), y tocá "Marcar mínimo/máximo" ahí. Con "sin límite" desactivado vuelve a mandar el límite ya guardado.</div>' +
-        limitDefs.map(function (ld) {
-          return '<div style="border-left:4px solid ' + ld.color + ';padding:5px 8px;margin-bottom:6px;background:#161b22;border-radius:4px">' +
-            '<div style="display:flex;justify-content:space-between;align-items:center">' +
-            '<strong style="color:' + ld.color + '">' + ld.label + '</strong>' +
-            '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:10px">' +
-            '<input type="checkbox" id="dbgLim' + ld.key + 'Free">sin límite</label>' +
-            '</div>' +
-            '<input type="range" id="dbgLim' + ld.key + 'Slider" min="-3.2" max="3.2" step="0.01" style="width:100%" disabled>' +
-            '<div id="dbgLim' + ld.key + 'Val" style="color:#8b949e;margin:2px 0"></div>' +
-            '<div style="display:flex;gap:6px">' +
-            '<button type="button" id="dbgLim' + ld.key + 'SetMin" style="flex:1;font-size:10px;padding:3px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:4px;cursor:pointer">Marcar mínimo</button>' +
-            '<button type="button" id="dbgLim' + ld.key + 'SetMax" style="flex:1;font-size:10px;padding:3px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:4px;cursor:pointer">Marcar máximo</button>' +
-            '</div>' +
-            '</div>';
-        }).join('') +
-        '<button type="button" id="dbgLimCopy" style="width:100%;margin-top:4px;font-size:10px;padding:5px;background:#58a6ff;color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">Copiar límites</button>' +
-        '<div style="font-weight:bold;color:#58a6ff;margin:10px 0 6px;border-top:1px solid #30363d;padding-top:10px">🪣 Contacto cuchara-suelo</div>' +
-        '<div style="color:#8b949e;margin-bottom:8px">Corre el nivel donde la cuchara "toca" el suelo SIN mover el terreno real — para calibrar el diente contra los puntos de la cuchara medidos (abajo, en amarillo/rosa). Positivo = hace contacto/tira antes (más arriba); negativo, más abajo.</div>' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;color:#8b949e;margin-bottom:2px">' +
-        '<span>Desfasaje (m)</span>' +
-        '<input type="number" id="dbgGroundOffsetNum" step="0.01" value="0" style="width:70px;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:4px;padding:2px 4px;font-family:inherit;font-size:11px;text-align:right">' +
-        '</div>' +
-        '<input type="range" id="dbgGroundOffset" min="-4" max="4" step="0.01" value="0" style="width:100%">' +
-        '<label style="display:flex;align-items:center;gap:6px;padding:2px 0;margin-top:6px;cursor:pointer">' +
-        '<input type="checkbox" id="dbgShowBucketRefPts" checked><span>Mostrar puntos de la cuchara (🟡 boca / 🩷 fondo)</span></label>' +
-        '<label style="display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer">' +
-        '<input type="checkbox" id="dbgShowBucketOutline" checked><span>Mostrar contorno (líneas boca/fondo)</span></label>' +
-        '<div style="color:#8b949e;margin:10px 0 4px;border-top:1px solid #30363d;padding-top:8px">🔴 Punta real de la cuchara (dónde corta)</div>' +
-        '<button type="button" id="dbgTipPick" style="width:100%;font-size:10px;padding:5px;margin-bottom:6px;background:#ff3b30;color:#fff;border:none;border-radius:4px;font-weight:bold;cursor:pointer">📍 Marcar con clic sobre el diente</button>' +
-        '<div style="color:#8b949e;margin-bottom:4px">O ajustá a mano, comparando contra las esferas de arriba:</div>' +
-        ['X', 'Y', 'Z'].map(function (ax) {
-          var lax = ax.toLowerCase();
-          return '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;color:#8b949e;margin-bottom:2px">' +
-            '<span>' + ax + '</span>' +
-            '<input type="number" id="dbgTip' + ax + 'Num" step="0.01" value="' + BUCKET_TIP_OFFSET[lax] + '" style="width:70px;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:4px;padding:2px 4px;font-family:inherit;font-size:11px;text-align:right">' +
-            '</div>' +
-            '<input type="range" id="dbgTip' + ax + '" min="-2" max="2" step="0.01" value="' + BUCKET_TIP_OFFSET[lax] + '" style="width:100%">';
-        }).join('') +
-        '<div style="color:#8b949e;margin:10px 0 4px;border-top:1px solid #30363d;padding-top:8px">🟤 Montón de material cargado (dónde se ve la tierra adentro)</div>' +
-        '<button type="button" id="dbgFillPick" style="width:100%;font-size:10px;padding:5px;margin-bottom:6px;background:#8a5a2e;color:#fff;border:none;border-radius:4px;font-weight:bold;cursor:pointer">📍 Marcar con clic dentro de la cuchara</button>' +
-        '<div style="color:#8b949e;margin-bottom:4px">O ajustá a mano:</div>' +
-        ['X', 'Y', 'Z'].map(function (ax) {
-          var lax = ax.toLowerCase();
-          return '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;color:#8b949e;margin-bottom:2px">' +
-            '<span>' + ax + '</span>' +
-            '<input type="number" id="dbgFill' + ax + 'Num" step="0.01" value="' + BUCKET_FILL_POINT[lax] + '" style="width:70px;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:4px;padding:2px 4px;font-family:inherit;font-size:11px;text-align:right">' +
-            '</div>' +
-            '<input type="range" id="dbgFill' + ax + '" min="-2" max="2" step="0.01" value="' + BUCKET_FILL_POINT[lax] + '" style="width:100%">';
-        }).join('') +
-        '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;color:#8b949e;margin-bottom:2px">' +
-        '<span>Tamaño a carga llena (m)</span>' +
-        '<input type="number" id="dbgFillSizeNum" step="0.01" value="' + BUCKET_FILL_SIZE + '" style="width:70px;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:4px;padding:2px 4px;font-family:inherit;font-size:11px;text-align:right">' +
-        '</div>' +
-        '<input type="range" id="dbgFillSize" min="0.05" max="1" step="0.01" value="' + BUCKET_FILL_SIZE + '" style="width:100%">' +
-        '<button type="button" id="dbgFillPreview" style="width:100%;margin-top:6px;font-size:10px;padding:5px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:4px;cursor:pointer">Vista previa: llenar/vaciar la cuchara</button>' +
-        '<div style="font-weight:bold;color:#58a6ff;margin:10px 0 6px;border-top:1px solid #30363d;padding-top:10px">📏 Regla</div>' +
-        '<div style="color:#8b949e;margin-bottom:8px">Con "Modo regla" activo, un clic marca un punto. En referencia "Cuchara" los puntos quedan en el espacio propio de la cuchara (no cambian aunque muevas el brazo), para medir su ancho/alto/profundidad marcando sus esquinas; el panel calcula esas 3 medidas solo. En "Máquina" mide alcance sobre el terreno.</div>' +
-        '<div style="display:flex;gap:10px;margin-bottom:6px;font-size:10px">' +
-        '<label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="dbgRulerFrame" value="bucket" checked>🪣 Cuchara</label>' +
-        '<label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="dbgRulerFrame" value="machine">🚜 Máquina</label>' +
-        '</div>' +
-        '<label style="display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer">' +
-        '<input type="checkbox" id="dbgRulerActive"><span>Modo regla activado</span></label>' +
-        '<div style="display:flex;gap:6px;margin:8px 0">' +
-        '<button type="button" id="dbgRulerClear" style="flex:1;font-size:10px;padding:5px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:4px;cursor:pointer">Borrar todos</button>' +
-        '<button type="button" id="dbgRulerCopy" style="flex:1;font-size:10px;padding:5px;background:#58a6ff;color:#0d1117;border:none;border-radius:4px;font-weight:bold;cursor:pointer">Copiar todo</button>' +
-        '</div>' +
-        '<div id="dbgRulerDims" style="color:#7ee787;margin-bottom:6px"></div>' +
-        '<div id="dbgRulerList"></div>';
-
-      document.body.appendChild(wrap);
-
-      // ---- desfasaje de contacto cuchara-suelo: mueve solo el umbral que usa
-      // tick() para decidir cuándo la cuchara "toca" el terreno, nunca el heightmap
-      // real (ver groundContactOffset arriba). ----
-      var groundOffsetEl = document.getElementById('dbgGroundOffset');
-      var groundOffsetNumEl = document.getElementById('dbgGroundOffsetNum');
-      function applyGroundOffset(v) {
-        groundContactOffset = v;
-        groundOffsetEl.value = v;
-        groundOffsetNumEl.value = v;
-      }
-      groundOffsetEl.addEventListener('input', function () { applyGroundOffset(parseFloat(groundOffsetEl.value)); });
-      groundOffsetNumEl.addEventListener('change', function () {
-        var v = parseFloat(groundOffsetNumEl.value);
-        if (isNaN(v)) { groundOffsetNumEl.value = groundContactOffset; return; }
-        applyGroundOffset(v);
-      });
-
-      // ---- puntos de la cuchara medidos anteriormente: esferas fijas, colgadas de
-      // armPivotD (rígidas con la cuchara real, se mueven con ella). Si todavía no se
-      // armó la cadena real (no se identificó ninguna pieza), no hay de dónde
-      // colgarlas — se omiten sin romper el resto del panel. ----
-      var bucketRefMarkers = armPivotD ? BUCKET_REF_POINTS.map(function (p) {
-        var color = p.part === 'boca' ? '#ffd60a' : '#ff375f';
-        var m = makeRulerMarker(armPivotD, color);
-        m.userData.isPickMarker = true;
-        m.position.set(p.x, p.y, p.z);
-        return m;
-      }) : [];
-      document.getElementById('dbgShowBucketRefPts').addEventListener('change', function (e) {
-        bucketRefMarkers.forEach(function (m) { m.visible = e.target.checked; });
-      });
-
-      // ---- contorno de la cuchara: une los R1-R8 con líneas (boca y fondo, cada uno
-      // un lazo cerrado de 4 lados) para que se vea la forma real de la cuchara de un
-      // vistazo, no solo puntos sueltos. El orden de cada lazo viene del análisis de
-      // distancias entre puntos hecho en su momento (los lados más cortos son
-      // adyacentes; las diagonales, más largas, quedan afuera). ----
-      function makeOutlineLoop(parent, pts, hexColor) {
-        var positions = [];
-        pts.forEach(function (p) { positions.push(p.x, p.y, p.z); });
-        var geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        var mat = new THREE.LineBasicMaterial({ color: hexColor, depthTest: false });
-        var line = new THREE.LineLoop(geo, mat);
-        line.renderOrder = 998;
-        parent.add(line);
-        return line;
-      }
-      var bucketOutlines = [];
-      if (armPivotD) {
-        var refById = {};
-        BUCKET_REF_POINTS.forEach(function (p) { refById[p.id] = p; });
-        var mouthLoop = ['R1', 'R2', 'R4', 'R3'].map(function (id) { return refById[id]; });
-        var bottomLoop = ['R5', 'R6', 'R7', 'R8'].map(function (id) { return refById[id]; });
-        bucketOutlines.push(makeOutlineLoop(armPivotD, mouthLoop, '#ffd60a'));
-        bucketOutlines.push(makeOutlineLoop(armPivotD, bottomLoop, '#ff375f'));
-        bucketOutlines.forEach(function (l) { l.userData.isPickMarker = true; });
-      }
-      document.getElementById('dbgShowBucketOutline').addEventListener('change', function (e) {
-        bucketOutlines.forEach(function (l) { l.visible = e.target.checked; });
-      });
-
-      // ---- punta real de la cuchara: mueve bucketTip (el punto que de verdad usa el
-      // juego para cavar/soltar) dentro del espacio de armPivotD, en vivo — sin
-      // reconstruir la cadena. Una esfera roja la marca para compararla contra los
-      // puntos de referencia R1-R8. Se puede ajustar con los sliders O marcando con
-      // un clic directo sobre el diente en el modelo (igual que los pasadores). ----
-      var bucketTipMarker = armPivotD ? makeRulerMarker(armPivotD, '#ff3b30') : null;
-      if (bucketTipMarker) {
-        bucketTipMarker.userData.isPickMarker = true;
-        bucketTipMarker.position.set(BUCKET_TIP_OFFSET.x, BUCKET_TIP_OFFSET.y, BUCKET_TIP_OFFSET.z);
-      }
-      function setBucketTip(x, y, z) {
-        BUCKET_TIP_OFFSET.x = x; BUCKET_TIP_OFFSET.y = y; BUCKET_TIP_OFFSET.z = z;
-        bucketTip.position.set(x, y, z);
-        if (bucketTipMarker) bucketTipMarker.position.set(x, y, z);
-        ['X', 'Y', 'Z'].forEach(function (ax) {
-          var v = BUCKET_TIP_OFFSET[ax.toLowerCase()];
-          document.getElementById('dbgTip' + ax).value = v;
-          document.getElementById('dbgTip' + ax + 'Num').value = v;
-        });
-      }
-      ['X', 'Y', 'Z'].forEach(function (ax) {
-        var lax = ax.toLowerCase();
-        var el = document.getElementById('dbgTip' + ax), numEl = document.getElementById('dbgTip' + ax + 'Num');
-        function apply(v) {
-          var next = { x: BUCKET_TIP_OFFSET.x, y: BUCKET_TIP_OFFSET.y, z: BUCKET_TIP_OFFSET.z };
-          next[lax] = v;
-          setBucketTip(next.x, next.y, next.z);
-        }
-        el.addEventListener('input', function () { apply(parseFloat(el.value)); });
-        numEl.addEventListener('change', function () {
-          var v = parseFloat(numEl.value);
-          if (isNaN(v)) { numEl.value = BUCKET_TIP_OFFSET[lax]; return; }
-          apply(v);
-        });
-      });
-
-      var tipArmed = false;
-      var tipPickerDown = null;
-      var tipRaycaster = new THREE.Raycaster();
-      var tipPickBtn = document.getElementById('dbgTipPick');
-      var tipDom = renderer.domElement; // declarado acá porque "dom" todavía no existe en este punto de la función
-      tipPickBtn.addEventListener('click', function () {
-        tipArmed = !tipArmed;
-        tipPickBtn.textContent = tipArmed ? '👉 Tocá el diente en el modelo…' : '📍 Marcar con clic sobre el diente';
-      });
-      tipDom.addEventListener('pointerdown', function (e) {
-        if (!tipArmed) return;
-        tipPickerDown = { x: e.clientX, y: e.clientY, t: performance.now() };
-      });
-      tipDom.addEventListener('pointerup', function (e) {
-        if (!tipArmed || !tipPickerDown) return;
-        var moved = Math.hypot(e.clientX - tipPickerDown.x, e.clientY - tipPickerDown.y);
-        var dt = performance.now() - tipPickerDown.t;
-        tipPickerDown = null;
-        if (moved > 6 || dt > 600) return; // fue drag/orbit, no un clic de marcar
-        if (!armPivotD) return;
-        var rect = tipDom.getBoundingClientRect();
-        var ndc = new THREE.Vector2(
-          ((e.clientX - rect.left) / rect.width) * 2 - 1,
-          -((e.clientY - rect.top) / rect.height) * 2 + 1
-        );
-        tipRaycaster.setFromCamera(ndc, activeCam);
-        var hits = tipRaycaster.intersectObjects([turretPivot, machineRoot], true).filter(function (h) {
-          return h.object.visible && !h.object.userData.isPickMarker;
-        });
-        if (!hits.length) return;
-        var local = armPivotD.worldToLocal(hits[0].point.clone());
-        setBucketTip(local.x, local.y, local.z);
-        tipArmed = false;
-        tipPickBtn.textContent = '📍 Marcar con clic sobre el diente';
-      });
-
-      // ---- montón de material cargado: mismo mecanismo que el diente (clic o
-      // sliders), pero para BUCKET_FILL_POINT/BUCKET_FILL_SIZE — dónde y qué tan
-      // grande se ve la tierra adentro de la cuchara al cargarla. ----
-      var fillMarker = armPivotD ? makeRulerMarker(armPivotD, '#8a5a2e') : null;
-      if (fillMarker) {
-        fillMarker.userData.isPickMarker = true;
-        fillMarker.position.set(BUCKET_FILL_POINT.x, BUCKET_FILL_POINT.y, BUCKET_FILL_POINT.z);
-      }
-      function setBucketFill(x, y, z) {
-        BUCKET_FILL_POINT.x = x; BUCKET_FILL_POINT.y = y; BUCKET_FILL_POINT.z = z;
-        dirtMound.position.set(x, y, z);
-        if (fillMarker) fillMarker.position.set(x, y, z);
-        ['X', 'Y', 'Z'].forEach(function (ax) {
-          var v = BUCKET_FILL_POINT[ax.toLowerCase()];
-          document.getElementById('dbgFill' + ax).value = v;
-          document.getElementById('dbgFill' + ax + 'Num').value = v;
-        });
-      }
-      ['X', 'Y', 'Z'].forEach(function (ax) {
-        var lax = ax.toLowerCase();
-        var el = document.getElementById('dbgFill' + ax), numEl = document.getElementById('dbgFill' + ax + 'Num');
-        function apply(v) {
-          var next = { x: BUCKET_FILL_POINT.x, y: BUCKET_FILL_POINT.y, z: BUCKET_FILL_POINT.z };
-          next[lax] = v;
-          setBucketFill(next.x, next.y, next.z);
-        }
-        el.addEventListener('input', function () { apply(parseFloat(el.value)); });
-        numEl.addEventListener('change', function () {
-          var v = parseFloat(numEl.value);
-          if (isNaN(v)) { numEl.value = BUCKET_FILL_POINT[lax]; return; }
-          apply(v);
-        });
-      });
-      var fillSizeEl = document.getElementById('dbgFillSize'), fillSizeNumEl = document.getElementById('dbgFillSizeNum');
-      function applyFillSize(v) {
-        BUCKET_FILL_SIZE = v; fillSizeEl.value = v; fillSizeNumEl.value = v;
-      }
-      fillSizeEl.addEventListener('input', function () { applyFillSize(parseFloat(fillSizeEl.value)); });
-      fillSizeNumEl.addEventListener('change', function () {
-        var v = parseFloat(fillSizeNumEl.value);
-        if (isNaN(v)) { fillSizeNumEl.value = BUCKET_FILL_SIZE; return; }
-        applyFillSize(v);
-      });
-
-      var fillArmed = false;
-      var fillPickerDown = null;
-      var fillPickBtn = document.getElementById('dbgFillPick');
-      fillPickBtn.addEventListener('click', function () {
-        fillArmed = !fillArmed;
-        fillPickBtn.textContent = fillArmed ? '👉 Tocá adentro de la cuchara…' : '📍 Marcar con clic dentro de la cuchara';
-      });
-      tipDom.addEventListener('pointerdown', function (e) {
-        if (!fillArmed) return;
-        fillPickerDown = { x: e.clientX, y: e.clientY, t: performance.now() };
-      });
-      tipDom.addEventListener('pointerup', function (e) {
-        if (!fillArmed || !fillPickerDown) return;
-        var moved = Math.hypot(e.clientX - fillPickerDown.x, e.clientY - fillPickerDown.y);
-        var dt = performance.now() - fillPickerDown.t;
-        fillPickerDown = null;
-        if (moved > 6 || dt > 600) return;
-        if (!armPivotD) return;
-        var rect = tipDom.getBoundingClientRect();
-        var ndc = new THREE.Vector2(
-          ((e.clientX - rect.left) / rect.width) * 2 - 1,
-          -((e.clientY - rect.top) / rect.height) * 2 + 1
-        );
-        tipRaycaster.setFromCamera(ndc, activeCam);
-        var hits = tipRaycaster.intersectObjects([turretPivot, machineRoot], true).filter(function (h) {
-          return h.object.visible && !h.object.userData.isPickMarker;
-        });
-        if (!hits.length) return;
-        var local = armPivotD.worldToLocal(hits[0].point.clone());
-        setBucketFill(local.x, local.y, local.z);
-        fillArmed = false;
-        fillPickBtn.textContent = '📍 Marcar con clic dentro de la cuchara';
-      });
-
-      var fillPreviewOn = false;
-      var fillPreviewBtn = document.getElementById('dbgFillPreview');
-      fillPreviewBtn.addEventListener('click', function () {
-        fillPreviewOn = !fillPreviewOn;
-        bucketLoad = fillPreviewOn ? BUCKET_CAPACITY : 0;
-        fillPreviewBtn.textContent = fillPreviewOn ? 'Vista previa: vaciar la cuchara' : 'Vista previa: llenar/vaciar la cuchara';
-      });
-
-      function axisOf(key) {
-        var v = jointVal[key];
-        var dir = new THREE.Vector3(v.p2.x - v.p1.x, v.p2.y - v.p1.y, v.p2.z - v.p1.z);
-        if (dir.lengthSq() < 1e-8) dir.set(1, 0, 0); else dir.normalize();
-        return dir;
-      }
-      function renderVal(key) {
-        var v = jointVal[key], ax = axisOf(key);
-        document.getElementById('dbgVal' + key).textContent =
-          '① x=' + v.p1.x.toFixed(3) + ', y=' + v.p1.y.toFixed(3) + ', z=' + v.p1.z.toFixed(3) + '\n' +
-          '② x=' + v.p2.x.toFixed(3) + ', y=' + v.p2.y.toFixed(3) + ', z=' + v.p2.z.toFixed(3) + '\n' +
-          'eje: x=' + ax.x.toFixed(3) + ', y=' + ax.y.toFixed(3) + ', z=' + ax.z.toFixed(3);
-        setAxisCylinderEnds(jointMarker[key], v.p1, v.p2);
-      }
-      jointDefs.forEach(function (jd) {
-        jointMarker[jd.key] = makeAxisCylinder(turretPivot, jd.color);
-        jointMarker[jd.key].userData.isPickMarker = true;
-        renderVal(jd.key);
-      });
-
-      function setArmed(next) {
-        armed = next;
-        jointDefs.forEach(function (jd) {
-          [1, 2].forEach(function (pt) {
-            var btn = document.getElementById('dbgArm' + jd.key + pt);
-            var isArmed = armed && armed.key === jd.key && armed.point === pt;
-            btn.textContent = (isArmed ? '● ' : (pt === 1 ? '① ' : '② '));
-          });
-        });
-        document.getElementById('dbgArmStatus').textContent = armed ? 'Tocá el modelo para fijar el punto ' + armed.point + ' de ' + armed.key + '.' : '';
-      }
-      setArmed(null);
-      jointDefs.forEach(function (jd) {
-        [1, 2].forEach(function (pt) {
-          document.getElementById('dbgArm' + jd.key + pt).addEventListener('click', function () {
-            setArmed({ key: jd.key, point: pt });
-          });
-        });
-      });
-
-      document.getElementById('dbgPickApply').addEventListener('click', function () {
-        function toJoint(key) { return { origin: jointVal[key].p1, axis: axisOf(key) }; }
-        buildRealArmChain(toJoint('A'), toJoint('B'), toJoint('C'), toJoint('D'));
-      });
-
-      document.getElementById('dbgPickCopy').addEventListener('click', function () {
-        var text = jointDefs.map(function (jd) {
-          var ax = axisOf(jd.key), p1 = jointVal[jd.key].p1;
-          return 'var REAL_JOINT_' + jd.key + ' = { origin: { x: ' + p1.x.toFixed(3) + ', y: ' + p1.y.toFixed(3) + ', z: ' + p1.z.toFixed(3) +
-            ' }, axis: { x: ' + ax.x.toFixed(3) + ', y: ' + ax.y.toFixed(3) + ', z: ' + ax.z.toFixed(3) + ' } }; // ' + jd.label;
-        }).join('\n');
-        var btn = document.getElementById('dbgPickCopy');
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(text).then(function () {
-            var prev = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(function () { btn.textContent = prev; }, 1200);
-          }).catch(function () { window.prompt('Copiá manualmente:', text); });
-        } else {
-          window.prompt('Copiá manualmente:', text);
-        }
-      });
-
-      var dom = renderer.domElement;
-      dom.addEventListener('pointerdown', function (e) {
-        if (!armed) return;
-        pickPointerDown = { x: e.clientX, y: e.clientY, t: performance.now() };
-      });
-      dom.addEventListener('pointerup', function (e) {
-        if (!armed || !pickPointerDown) return;
-        var moved = Math.hypot(e.clientX - pickPointerDown.x, e.clientY - pickPointerDown.y);
-        var dt = performance.now() - pickPointerDown.t;
-        pickPointerDown = null;
-        if (moved > 6 || dt > 600) return; // fue drag/orbit, no un clic de marcar
-        var rect = dom.getBoundingClientRect();
-        var ndc = new THREE.Vector2(
-          ((e.clientX - rect.left) / rect.width) * 2 - 1,
-          -((e.clientY - rect.top) / rect.height) * 2 + 1
-        );
-        pickRaycaster.setFromCamera(ndc, activeCam);
-        var hits = pickRaycaster.intersectObjects([turretPivot, machineRoot], true).filter(function (h) {
-          return h.object.visible && !h.object.userData.isPickMarker;
-        });
-        if (!hits.length) return;
-        // se convierte al espacio local de turretPivot (no al del mesh tocado): si el
-        // brazo real ya está armado y con rotación aplicada, el mesh tocado puede
-        // colgar de un pivote rotado, y su propio worldToLocal daría una coordenada
-        // en ESE marco rotado — turretPivot.worldToLocal() da siempre la coordenada de
-        // reposo correcta, sea cual sea la pose actual.
-        var local = turretPivot.worldToLocal(hits[0].point.clone());
-        var key = armed.key, pointField = armed.point === 1 ? 'p1' : 'p2';
-        jointVal[key][pointField] = { x: local.x, y: local.y, z: local.z };
-        renderVal(key);
-        setArmed(null);
-      });
-
-      // ---- límites de giro reales: "sin límite" saca esa articulación del clamp de
-      // tick() y la deja solo bajo el slider; "Marcar mínimo/máximo" graba el ángulo
-      // actual. "Copiar límites" arma el texto con las 4 constantes _MIN/_MAX. ----
-      var limitVal = {
-        boom: { min: BOOM_MIN, max: BOOM_MAX },
-        antebrazo: { min: ANTEBRAZO_MIN, max: ANTEBRAZO_MAX },
-        arm: { min: ARM_MIN, max: ARM_MAX },
-        bucket: { min: BUCKET_MIN, max: BUCKET_MAX }
-      };
-      function renderLimitVal(key) {
-        var lv = limitVal[key];
-        document.getElementById('dbgLim' + key + 'Val').textContent =
-          'actual=' + ctrl[key].toFixed(3) + '   mín=' + lv.min.toFixed(3) + '   máx=' + lv.max.toFixed(3);
-      }
-      limitDefs.forEach(function (ld) {
-        var slider = document.getElementById('dbgLim' + ld.key + 'Slider');
-        slider.value = ctrl[ld.key];
-        renderLimitVal(ld.key);
-        document.getElementById('dbgLim' + ld.key + 'Free').addEventListener('change', function (e) {
-          limitTestMode[ld.key] = e.target.checked;
-          slider.disabled = !e.target.checked;
-          slider.value = ctrl[ld.key];
-        });
-        slider.addEventListener('input', function () {
-          ctrl[ld.key] = parseFloat(slider.value);
-          renderLimitVal(ld.key);
-        });
-        document.getElementById('dbgLim' + ld.key + 'SetMin').addEventListener('click', function () {
-          limitVal[ld.key].min = ctrl[ld.key];
-          renderLimitVal(ld.key);
-        });
-        document.getElementById('dbgLim' + ld.key + 'SetMax').addEventListener('click', function () {
-          limitVal[ld.key].max = ctrl[ld.key];
-          renderLimitVal(ld.key);
-        });
-      });
-
-      document.getElementById('dbgLimCopy').addEventListener('click', function () {
-        var names = { boom: 'BOOM', antebrazo: 'ANTEBRAZO', arm: 'ARM', bucket: 'BUCKET' };
-        var text = limitDefs.map(function (ld) {
-          var lv = limitVal[ld.key], n = names[ld.key];
-          return 'var ' + n + '_MIN = ' + lv.min.toFixed(3) + ', ' + n + '_MAX = ' + lv.max.toFixed(3) + '; // ' + ld.label;
-        }).join('\n');
-        var btn = document.getElementById('dbgLimCopy');
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(text).then(function () {
-            var prev = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(function () { btn.textContent = prev; }, 1200);
-          }).catch(function () { window.prompt('Copiá manualmente:', text); });
-        } else {
-          window.prompt('Copiá manualmente:', text);
-        }
-      });
-
-      // ---- regla: clic marca un punto. En referencia "cuchara" el punto se guarda en
-      // el espacio propio de armPivotD (el pivote D, rígido con la malla real de la
-      // cuchara) — esas coordenadas NO cambian aunque después muevas el brazo, así que
-      // marcando las esquinas de la cuchara se puede medir su ancho/alto/profundidad
-      // reales sin que la posición/pose de la máquina lo arruine. En "máquina" mide
-      // alcance sobre el terreno respecto al eje de giro, como antes. ----
-      var rulerActive = false;
-      var rulerPoints = [];
-      var rulerCounter = 0;
-      function currentRulerFrame() {
-        var el = wrap.querySelector('input[name="dbgRulerFrame"]:checked');
-        return el ? el.value : 'bucket';
-      }
-      function renderDims() {
-        var pts = rulerPoints.filter(function (p) { return p.frame === 'bucket'; });
-        var dims = document.getElementById('dbgRulerDims');
-        if (pts.length < 2) { dims.textContent = ''; return; }
-        var xs = pts.map(function (p) { return p.local.x; });
-        var ys = pts.map(function (p) { return p.local.y; });
-        var zs = pts.map(function (p) { return p.local.z; });
-        dims.textContent =
-          'medidas de la cuchara (' + pts.length + ' puntos) — ' +
-          'X: ' + (Math.max.apply(null, xs) - Math.min.apply(null, xs)).toFixed(3) + ' m, ' +
-          'Y: ' + (Math.max.apply(null, ys) - Math.min.apply(null, ys)).toFixed(3) + ' m, ' +
-          'Z: ' + (Math.max.apply(null, zs) - Math.min.apply(null, zs)).toFixed(3) + ' m';
-      }
-      function renderRulerList() {
-        var list = document.getElementById('dbgRulerList');
-        renderDims();
-        if (!rulerPoints.length) {
-          list.innerHTML = '<div style="color:#8b949e;padding:6px 0">(sin puntos todavía)</div>';
-          return;
-        }
-        list.innerHTML = rulerPoints.map(function (p) {
-          var extra = p.frame === 'bucket'
-            ? ''
-            : '<div style="color:#7ee787">alcance horizontal: ' + p.reach.toFixed(2) + ' m &nbsp; · &nbsp; a la cuchara: ' + p.distToBucket.toFixed(2) + ' m</div>';
-          return '<div style="border-left:4px solid ' + p.color + ';padding:5px 8px;margin-bottom:6px;background:#161b22;border-radius:4px">' +
-            '<div style="display:flex;justify-content:space-between;align-items:center">' +
-            '<strong style="color:' + p.color + '">' + p.id + ' · ' + (p.frame === 'bucket' ? '🪣 cuchara' : '🚜 máquina') + '</strong>' +
-            '<button type="button" data-delruler="' + p.id + '" style="background:none;border:none;color:#f85149;cursor:pointer;font-size:13px;line-height:1">✕</button>' +
-            '</div>' +
-            '<div style="color:#8b949e;margin-top:3px">x=' + p.local.x.toFixed(3) + ', y=' + p.local.y.toFixed(3) + ', z=' + p.local.z.toFixed(3) + '</div>' +
-            extra +
-            '</div>';
-        }).join('');
-      }
-      renderRulerList();
-      document.getElementById('dbgRulerActive').addEventListener('change', function (e) {
-        rulerActive = e.target.checked;
-      });
-      document.getElementById('dbgRulerClear').addEventListener('click', function () {
-        rulerPoints.forEach(function (p) { if (p.marker.parent) p.marker.parent.remove(p.marker); });
-        rulerPoints.length = 0;
-        renderRulerList();
-      });
-      document.getElementById('dbgRulerList').addEventListener('click', function (e) {
-        var id = e.target.getAttribute('data-delruler');
-        if (!id) return;
-        var idx = rulerPoints.findIndex(function (p) { return p.id === id; });
-        if (idx < 0) return;
-        if (rulerPoints[idx].marker.parent) rulerPoints[idx].marker.parent.remove(rulerPoints[idx].marker);
-        rulerPoints.splice(idx, 1);
-        renderRulerList();
-      });
-      document.getElementById('dbgRulerCopy').addEventListener('click', function () {
-        var text = rulerPoints.map(function (p) {
-          var extra = p.frame === 'bucket' ? '' :
-            '\n  alcance horizontal: ' + p.reach.toFixed(2) + ' m\n  distancia a la cuchara: ' + p.distToBucket.toFixed(2) + ' m';
-          return p.id + ' · ' + (p.frame === 'bucket' ? 'cuchara' : 'máquina') + '\n' +
-            '  x=' + p.local.x.toFixed(3) + ', y=' + p.local.y.toFixed(3) + ', z=' + p.local.z.toFixed(3) + extra;
-        }).join('\n\n') || '(sin puntos)';
-        var btn = document.getElementById('dbgRulerCopy');
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(text).then(function () {
-            var prev = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(function () { btn.textContent = prev; }, 1200);
-          }).catch(function () { window.prompt('Copiá manualmente:', text); });
-        } else {
-          window.prompt('Copiá manualmente:', text);
-        }
-      });
-
-      function makeRulerMarker(parent, hexColor) {
-        var mat = new THREE.MeshBasicMaterial({ color: hexColor, depthTest: false });
-        var m = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8), mat);
-        m.renderOrder = 999;
-        parent.add(m);
-        return m;
-      }
-      var rulerPointerDown = null;
-      var rulerRaycaster = new THREE.Raycaster();
-      var tipWorld = new THREE.Vector3();
-      dom.addEventListener('pointerdown', function (e) {
-        if (!rulerActive) return;
-        rulerPointerDown = { x: e.clientX, y: e.clientY, t: performance.now() };
-      });
-      dom.addEventListener('pointerup', function (e) {
-        if (!rulerActive || !rulerPointerDown) return;
-        var moved = Math.hypot(e.clientX - rulerPointerDown.x, e.clientY - rulerPointerDown.y);
-        var dt = performance.now() - rulerPointerDown.t;
-        rulerPointerDown = null;
-        if (moved > 6 || dt > 600) return;
-        var rect = dom.getBoundingClientRect();
-        var ndc = new THREE.Vector2(
-          ((e.clientX - rect.left) / rect.width) * 2 - 1,
-          -((e.clientY - rect.top) / rect.height) * 2 + 1
-        );
-        rulerRaycaster.setFromCamera(ndc, activeCam);
-        var hits = rulerRaycaster.intersectObjects([terrainMesh, turretPivot, machineRoot], true).filter(function (h) {
-          return h.object.visible && !h.object.userData.isPickMarker;
-        });
-        if (!hits.length) return;
-        var worldPt = hits[0].point;
-        var frame = currentRulerFrame();
-        rulerCounter++;
-        var color = 'hsl(' + ((rulerCounter * 61) % 360) + ', 85%, 58%)';
-        var point = { id: 'R' + rulerCounter, color: color, frame: frame };
-        if (frame === 'bucket' && armPivotD) {
-          // espacio propio del pivote D: rígido con la cuchara real, independiente de
-          // en qué pose esté el brazo en este momento.
-          var localB = armPivotD.worldToLocal(worldPt.clone());
-          point.local = { x: localB.x, y: localB.y, z: localB.z };
-          var marker = makeRulerMarker(armPivotD, color);
-          marker.userData.isPickMarker = true;
-          marker.position.copy(localB);
-          point.marker = marker;
-        } else {
-          var localM = machineRoot.worldToLocal(worldPt.clone());
-          bucketTip.getWorldPosition(tipWorld);
-          point.local = { x: localM.x, y: localM.y, z: localM.z };
-          point.reach = Math.hypot(localM.x, localM.z);
-          point.distToBucket = worldPt.distanceTo(tipWorld);
-          var marker2 = makeRulerMarker(scene, color);
-          marker2.userData.isPickMarker = true;
-          marker2.position.copy(worldPt);
-          point.marker = marker2;
-        }
-        rulerPoints.push(point);
-        renderRulerList();
-      });
     }
 
     // ---------- cámara externa (orbit manual) ----------
@@ -2009,10 +1231,10 @@
       var tL = trackBtn.l || keys['j'] || gp.l, tR = trackBtn.r || keys['l'] || gp.r;
 
       ctrl.swing += swingAxis * SWING_SPEED * dt;
-      if (!limitTestMode.boom) ctrl.boom = clamp(ctrl.boom + boomAxis * BOOM_SPEED * dt, BOOM_MIN, BOOM_MAX);
-      if (!limitTestMode.antebrazo) ctrl.antebrazo = clamp(ctrl.antebrazo + antebrazoAxis * ANTEBRAZO_SPEED * dt, ANTEBRAZO_MIN, ANTEBRAZO_MAX);
-      if (!limitTestMode.arm) ctrl.arm = clamp(ctrl.arm + armAxis * ARM_SPEED * dt, ARM_MIN, ARM_MAX);
-      if (!limitTestMode.bucket) ctrl.bucket = clamp(ctrl.bucket + bucketAxis * BUCKET_SPEED * dt, BUCKET_MIN, BUCKET_MAX);
+      ctrl.boom = clamp(ctrl.boom + boomAxis * BOOM_SPEED * dt, BOOM_MIN, BOOM_MAX);
+      ctrl.antebrazo = clamp(ctrl.antebrazo + antebrazoAxis * ANTEBRAZO_SPEED * dt, ANTEBRAZO_MIN, ANTEBRAZO_MAX);
+      ctrl.arm = clamp(ctrl.arm + armAxis * ARM_SPEED * dt, ARM_MIN, ARM_MAX);
+      ctrl.bucket = clamp(ctrl.bucket + bucketAxis * BUCKET_SPEED * dt, BUCKET_MIN, BUCKET_MAX);
       ctrl.ext = clamp(ctrl.ext + extAxis * EXT_SPEED * dt, EXT_MIN, EXT_MAX);
 
       if (tF) { machine.x += Math.sin(machine.heading) * DRIVE_SPEED * dt; machine.z += Math.cos(machine.heading) * DRIVE_SPEED * dt; }
@@ -2029,25 +1251,14 @@
       armSeg.root.rotation.x = -ctrl.arm;
       extender.rodGroup.position.z = ctrl.ext * EXT_STROKE;
       bucketGroup.rotation.x = -ctrl.bucket;
-      // si ya se armó el brazo real (buildRealArmChain), son sus 4 pivotes los que
-      // realmente se ven y excavan; el esqueleto procedural de arriba sigue girando
-      // pero queda oculto detrás. No hay telescopio identificado en el modelo real,
-      // así que ctrl.ext no tiene efecto acá (el brazo real es rígido entre C y D).
-      if (armPivotA) {
-        armPivotA.quaternion.setFromAxisAngle(armPivotA.userData.axis, -ctrl.boom);
-        armPivotB.quaternion.setFromAxisAngle(armPivotB.userData.axis, -ctrl.antebrazo);
-        armPivotC.quaternion.setFromAxisAngle(armPivotC.userData.axis, -ctrl.arm);
-        armPivotD.quaternion.setFromAxisAngle(armPivotD.userData.axis, -ctrl.bucket);
-      }
+      machineRoot.updateMatrixWorld(true);
+      updateRams();
 
       // excavación
       terrainDirty = false;
       var tipPos = new THREE.Vector3();
       bucketTip.getWorldPosition(tipPos);
-      // groundContactOffset: ajuste de debug (?debug=1) para el nivel donde la
-      // cuchara "toca" el suelo — no mueve el terreno real, solo corre el umbral de
-      // contacto para calibrar el diente contra el heightmap real.
-      var groundH = heightAtWorld(tipPos.x, tipPos.z) + groundContactOffset;
+      var groundH = heightAtWorld(tipPos.x, tipPos.z);
       var inBounds = Math.abs(tipPos.x) < TERRAIN_W / 2 - 0.3 && (tipPos.z) > -TERRAIN_D / 2 + 0.3 && (tipPos.z) < TERRAIN_D / 2 - 0.3;
 
       // dirección (en el plano XZ) en la que se movió la punta este frame respecto al
