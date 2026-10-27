@@ -194,8 +194,10 @@
   .empty b { display: block; color: var(--text); font-size: 18px; margin-bottom: 6px; }
   noscript p { text-align: center; color: var(--muted); padding: 60px 20px; }
 
-  footer { border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; text-align: center; padding: 20px; }
+  footer { border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; text-align: center; padding: 22px 20px 28px; }
+  footer p { max-width: 68ch; margin: 0 auto 10px; }
   footer a { color: var(--accent); }
+  footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; }
 
   @media (max-width: 560px) {
     .top-in { padding: 12px 14px; gap: 10px; }
@@ -252,7 +254,15 @@
   <noscript><p>Activa JavaScript para ver las herramientas, o entra directo a <a href="https://porticad.app" style="color:var(--accent)">porticad.app</a>.</p></noscript>
 </main>
 
-<footer>Cada botón abre la herramienta en <a href="https://porticad.app">porticad.app</a>.</footer>
+<footer>
+  <p>Cada botón abre la herramienta en <a href="https://porticad.app">porticad.app</a>. Los resultados son una ayuda de cálculo y no reemplazan la revisión de un profesional competente.</p>
+  <nav aria-label="Información legal">
+    <a href="/legal/terminos/">Términos de uso</a>
+    <a href="/legal/privacidad/">Privacidad</a>
+    <a href="/legal/derechos-de-autor/">Derechos de autor</a>
+    <a href="mailto:conteecg@gmail.com">Contacto</a>
+  </nav>
+</footer>
 
 <div class="layer" id="layer" aria-hidden="true">
   <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title"></div>
@@ -274,6 +284,15 @@
     return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + icon + '</svg>';
   }
   function plural(n) { return n + (n === 1 ? ' herramienta' : ' herramientas'); }
+
+  /* Solo se muestran herramientas cuyo enlace apunte a porticad.app (https) */
+  function safeData(list) {
+    return list.map(function (c) {
+      return Object.assign({}, c, { tools: c.tools.filter(function (t) {
+        return typeof t.href === 'string' && /^https:\/\/porticad\.app(\/|$)/.test(t.href);
+      }) });
+    }).filter(function (c) { return c.tools.length; });
+  }
 
   function toolHtml(t) {
     return '<a class="sq" href="' + esc(t.href) + '" style="--c:' + esc(t.color) + '" data-name="' + esc(t.name) + '" data-desc="' + esc(t.desc) + '">' +
@@ -393,7 +412,7 @@
 
   fetch('tools.json', { cache: 'no-cache' })
     .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then(function (d) { data = d; render(); })
+    .then(function (d) { data = safeData(d); render(); })
     .catch(function () {
       $list.innerHTML = '<div class="empty"><b>No se pudo cargar la lista</b>Recarga la página o entra directo a <a href="https://porticad.app" style="color:var(--accent)">porticad.app</a>.</div>';
     });
