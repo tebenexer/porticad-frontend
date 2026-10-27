@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Multi-Tools · PortiCAD</title>
-<meta name="description" content="Todas las herramientas de PortiCAD en un solo lugar: toca una y se abre.">
+<meta name="description" content="Todas las herramientas de PortiCAD en un solo lugar: elige una categoría y toca la herramienta.">
 <meta name="theme-color" content="#0d1117">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
@@ -28,7 +28,8 @@
     min-height: 100vh;
   }
   a { color: inherit; text-decoration: none; }
-  :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 12px; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 14px; }
 
   .top {
     position: sticky; top: 0; z-index: 10;
@@ -59,29 +60,65 @@
   .search input::placeholder { color: var(--muted); }
   .search svg { position: absolute; left: 13px; top: 12px; }
 
-  main { max-width: 1200px; margin: 0 auto; padding: 22px 20px 56px; }
+  main { max-width: 1200px; margin: 0 auto; padding: 24px 20px 56px; }
 
-  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 26px; }
-  .chip {
-    font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
-    background: var(--panel); color: var(--text);
-    border: 1px solid var(--line); border-radius: 999px; padding: 9px 16px;
-    min-height: 40px;
+  /* ── Cuadrados de categoría ── */
+  .cats {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+    gap: 14px;
+    align-items: start;
   }
-  .chip:hover { border-color: var(--muted); }
-  .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #0d1117; }
+  .cat { min-width: 0; scroll-margin-top: 92px; }
+  .cat-btn {
+    width: 100%; aspect-ratio: 1 / 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    padding: 14px; text-align: center; cursor: pointer;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-bottom: 5px solid var(--c);
+    border-radius: 18px;
+    transition: background .15s, border-color .15s, transform .15s;
+  }
+  .cat-btn:hover { background: var(--panel-2); border-color: var(--c); transform: translateY(-2px); }
+  .cat-btn:active { transform: translateY(0); }
+  .cat-ico {
+    width: 60px; height: 60px; border-radius: 16px;
+    display: grid; place-items: center;
+    background: color-mix(in srgb, var(--c) 16%, transparent);
+  }
+  .cat-name { font-size: 16px; font-weight: 700; line-height: 1.2; }
+  .cat-count { font-size: 13px; color: var(--muted); }
 
-  section { margin-bottom: 38px; }
-  .cat-head { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; }
-  .cat-head svg { flex-shrink: 0; }
-  .cat-head h2 { margin: 0; font-size: 18px; font-weight: 700; }
-  .cat-head small { color: var(--muted); font-size: 13px; }
+  /* ── Categoría abierta: el cuadrado se expande a todo el ancho ── */
+  .cat.open { grid-column: 1 / -1; }
+  .cat.open .cat-btn { display: none; }
+  .panel {
+    display: none;
+    background: var(--panel);
+    border: 1px solid var(--c);
+    border-bottom: 5px solid var(--c);
+    border-radius: 18px;
+    padding: 18px;
+  }
+  .cat.open .panel { display: block; animation: expand .22s ease-out; }
+  @keyframes expand { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
+  .panel-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+  .panel-head .cat-ico { width: 48px; height: 48px; border-radius: 14px; flex-shrink: 0; }
+  .panel-head h2 { margin: 0; font-size: 20px; line-height: 1.2; }
+  .panel-head small { display: block; color: var(--muted); font-size: 13px; }
+  .close {
+    margin-left: auto; cursor: pointer; flex-shrink: 0;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 16px; font-size: 14px; font-weight: 600; min-height: 44px;
+  }
+  .close:hover { border-color: var(--muted); }
 
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
   .tool {
-    display: flex; align-items: center; gap: 16px;
-    min-height: 104px; padding: 18px;
-    background: var(--panel); border: 1px solid var(--line);
+    display: flex; align-items: center; gap: 14px;
+    min-height: 92px; padding: 16px;
+    background: var(--bg); border: 1px solid var(--line);
     border-left: 5px solid var(--c);
     border-radius: 14px;
     transition: border-color .15s, background .15s, transform .15s;
@@ -89,16 +126,18 @@
   .tool:hover { background: var(--panel-2); border-color: var(--c); transform: translateY(-2px); }
   .tool:active { transform: translateY(0); }
   .tile {
-    flex: 0 0 54px; height: 54px; border-radius: 14px;
+    flex: 0 0 50px; height: 50px; border-radius: 14px;
     display: grid; place-items: center;
     background: color-mix(in srgb, var(--c) 16%, transparent);
   }
-  .tool b { display: block; font-size: 17px; line-height: 1.25; }
+  .tool b { display: block; font-size: 16px; line-height: 1.25; }
   .tool span {
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
     margin-top: 4px; font-size: 13px; color: var(--muted);
   }
 
+  /* ── Resultados de búsqueda ── */
+  .results-title { margin: 0 0 14px; font-size: 15px; color: var(--muted); font-weight: 600; }
   .empty { text-align: center; color: var(--muted); padding: 60px 0; font-size: 16px; }
   .empty b { display: block; color: var(--text); font-size: 18px; margin-bottom: 6px; }
   noscript p { text-align: center; color: var(--muted); padding: 60px 20px; }
@@ -108,15 +147,25 @@
 
   @media (max-width: 560px) {
     .top-in { padding: 12px 14px; }
+    .top-in { gap: 10px; }
+    .brand { gap: 10px; }
+    .brand img { height: 30px; }
     .brand h1 { font-size: 18px; }
+    .brand span { display: none; }
+    .home-link { padding: 9px 12px; font-size: 13px; }
     .search { order: 3; max-width: none; flex-basis: 100%; }
+    .cat { scroll-margin-top: 128px; }
     main { padding: 18px 14px 48px; }
+    .cats { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .cat-ico { width: 54px; height: 54px; }
+    .cat-name { font-size: 15px; }
+    .panel { padding: 14px; }
     .grid { grid-template-columns: 1fr; }
-    .tool { min-height: 96px; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .tool { transition: none; }
-    .tool:hover { transform: none; }
+    .cat-btn, .tool { transition: none; }
+    .cat-btn:hover, .tool:hover { transform: none; }
+    .cat.open .panel { animation: none; }
   }
 </style>
 </head>
@@ -136,7 +185,6 @@
 </header>
 
 <main>
-  <div class="chips" id="chips" role="group" aria-label="Filtrar por categoría"></div>
   <div id="list" aria-live="polite"></div>
   <noscript><p>Activa JavaScript para ver las herramientas, o entra directo a <a href="https://porticad.app" style="color:#58a6ff">porticad.app</a>.</p></noscript>
 </main>
@@ -145,9 +193,8 @@
 
 <script>
 (function () {
-  var data = [], active = 'all', query = '';
+  var data = [], openId = null, query = '';
   var $list = document.getElementById('list');
-  var $chips = document.getElementById('chips');
   var $q = document.getElementById('q');
 
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -155,45 +202,82 @@
   function svg(icon, color, size) {
     return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + icon + '</svg>';
   }
+  function plural(n) { return n + (n === 1 ? ' herramienta' : ' herramientas'); }
 
-  function renderChips() {
-    var items = [{ id: 'all', name: 'Todas' }].concat(data);
-    $chips.innerHTML = items.map(function (c) {
-      return '<button type="button" class="chip" data-id="' + esc(c.id) + '" aria-pressed="' + (c.id === active) + '">' + esc(c.name) + '</button>';
-    }).join('');
+  function toolHtml(t) {
+    return '<a class="tool" href="' + esc(t.href) + '" style="--c:' + esc(t.color) + '">' +
+      '<div class="tile">' + svg(t.icon, t.color, 26) + '</div>' +
+      '<div><b>' + esc(t.name) + '</b><span>' + esc(t.desc) + '</span></div></a>';
   }
 
-  function renderList() {
+  function catHtml(c) {
+    var open = c.id === openId;
+    return '<div class="cat' + (open ? ' open' : '') + '" id="cat-' + esc(c.id) + '" style="--c:' + esc(c.color) + '">' +
+      '<button type="button" class="cat-btn" data-open="' + esc(c.id) + '" aria-expanded="' + open + '" aria-controls="panel-' + esc(c.id) + '">' +
+        '<span class="cat-ico">' + svg(c.icon, c.color, 30) + '</span>' +
+        '<span class="cat-name">' + esc(c.name) + '</span>' +
+        '<span class="cat-count">' + plural(c.tools.length) + '</span>' +
+      '</button>' +
+      '<div class="panel" id="panel-' + esc(c.id) + '" role="region" aria-label="' + esc(c.name) + '">' +
+        '<div class="panel-head"><span class="cat-ico">' + svg(c.icon, c.color, 26) + '</span>' +
+          '<div><h2>' + esc(c.name) + '</h2><small>' + plural(c.tools.length) + '</small></div>' +
+          '<button type="button" class="close" data-close="1">Cerrar</button></div>' +
+        '<div class="grid">' + c.tools.map(toolHtml).join('') + '</div>' +
+      '</div></div>';
+  }
+
+  function render() {
     var q = norm(query.trim());
-    var html = '';
-    data.forEach(function (c) {
-      if (active !== 'all' && active !== c.id) return;
-      var tools = c.tools.filter(function (t) {
-        return !q || norm(t.name + ' ' + t.desc + ' ' + c.name).indexOf(q) > -1;
+    if (q) {
+      var found = [];
+      data.forEach(function (c) {
+        c.tools.forEach(function (t) {
+          if (norm(t.name + ' ' + t.desc + ' ' + c.name).indexOf(q) > -1) found.push(t);
+        });
       });
-      if (!tools.length) return;
-      html += '<section><div class="cat-head">' + svg(c.icon, c.color, 22) +
-        '<h2>' + esc(c.name) + '</h2><small>' + tools.length + (tools.length === 1 ? ' herramienta' : ' herramientas') + '</small></div><div class="grid">' +
-        tools.map(function (t) {
-          return '<a class="tool" href="' + esc(t.href) + '" style="--c:' + esc(t.color) + '">' +
-            '<div class="tile">' + svg(t.icon, t.color, 28) + '</div>' +
-            '<div><b>' + esc(t.name) + '</b><span>' + esc(t.desc) + '</span></div></a>';
-        }).join('') + '</div></section>';
-    });
-    $list.innerHTML = html || '<div class="empty"><b>No hay herramientas con ese nombre</b>Prueba con otra palabra o elige la categoría Todas.</div>';
+      $list.innerHTML = found.length
+        ? '<h2 class="results-title">' + plural(found.length) + ' encontradas</h2><div class="grid">' + found.map(toolHtml).join('') + '</div>'
+        : '<div class="empty"><b>No hay herramientas con ese nombre</b>Prueba con otra palabra o borra la búsqueda para ver las categorías.</div>';
+      return;
+    }
+    $list.innerHTML = '<div class="cats">' + data.map(catHtml).join('') + '</div>';
   }
 
-  $chips.addEventListener('click', function (e) {
-    var b = e.target.closest('.chip');
-    if (!b) return;
-    active = b.getAttribute('data-id');
-    renderChips(); renderList();
+  function setOpen(id, scroll) {
+    openId = id;
+    render();
+    if (id && scroll) {
+      var el = document.getElementById('cat-' + id);
+      if (el) {
+        var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        el.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
+        var first = el.querySelector('.tool'); if (first) first.focus({ preventScroll: true });
+      }
+    } else if (!id && scroll === 'restore') {
+      /* nada */
+    }
+  }
+
+  $list.addEventListener('click', function (e) {
+    var o = e.target.closest('[data-open]');
+    if (o) { setOpen(o.getAttribute('data-open'), true); return; }
+    if (e.target.closest('[data-close]')) {
+      var prev = openId;
+      setOpen(null, false);
+      var b = document.querySelector('[data-open="' + prev + '"]'); if (b) b.focus();
+    }
   });
-  $q.addEventListener('input', function () { query = $q.value; renderList(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && openId && !query) {
+      var prev = openId; setOpen(null, false);
+      var b = document.querySelector('[data-open="' + prev + '"]'); if (b) b.focus();
+    }
+  });
+  $q.addEventListener('input', function () { query = $q.value; render(); });
 
   fetch('tools.json', { cache: 'no-cache' })
     .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then(function (d) { data = d; renderChips(); renderList(); })
+    .then(function (d) { data = d; render(); })
     .catch(function () {
       $list.innerHTML = '<div class="empty"><b>No se pudo cargar la lista</b>Recarga la página o entra directo a <a href="https://porticad.app" style="color:#58a6ff">porticad.app</a>.</div>';
     });
